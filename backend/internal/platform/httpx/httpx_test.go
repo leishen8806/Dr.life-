@@ -14,7 +14,7 @@ import (
 )
 
 func TestRequestIDIsGeneratedOrEchoed(t *testing.T) {
-	for _, supplied := range []string{"", "caller-request-123"} {
+	for _, supplied := range []string{"", "a", "caller-request-123", strings.Repeat("x", 64)} {
 		t.Run("supplied="+supplied, func(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
 			if supplied != "" {
@@ -36,6 +36,30 @@ func TestRequestIDIsGeneratedOrEchoed(t *testing.T) {
 			}
 			if response["request_id"] != requestID {
 				t.Fatalf("header and body request IDs differ: %#v", response)
+			}
+		})
+	}
+}
+
+func TestRequestIDRejectsInvalidClientValues(t *testing.T) {
+	for _, supplied := range []string{strings.Repeat("a", 65), "has space", "has\nnewline", "special!"} {
+		t.Run(supplied, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			r.Header.Set("X-Request-ID", supplied)
+			w := httptest.NewRecorder()
+			RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				WriteOK(w, r, nil)
+			})).ServeHTTP(w, r)
+			generated := w.Header().Get("X-Request-ID")
+			if generated == "" || generated == supplied {
+				t.Fatalf("invalid request id was not replaced: %q", generated)
+			}
+			var response map[string]any
+			if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+				t.Fatal(err)
+			}
+			if response["request_id"] != generated {
+				t.Fatalf("header and body request IDs differ: header=%q body=%#v", generated, response["request_id"])
 			}
 		})
 	}
@@ -94,7 +118,10 @@ func TestRecoverReturnsGenericErrorAndDoesNotLogPanicValue(t *testing.T) {
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}
-	if strings.Contains(w.Body.String(), "sensitive panic details") || strings.Contains(output.String(), "sensitive panic details") || strings.Contains(w.Body.String(), "goroutine") {
+	if !strings.Contains(output.String(), `"stack":"goroutine `) {
+		t.Fatalf("panic stack missing from log: %s", output.String())
+	}
+	if strings.Contains(w.Body.String(), "sensitive panic details") || strings.Contains(output.String(), "sensitive panic details") || strings.Contains(w.Body.String(), "goroutine") || strings.Contains(w.Body.String(), "httpx_test.go") {
 		t.Fatalf("panic details leaked: response=%s log=%s", w.Body.String(), output.String())
 	}
 	var response map[string]any

@@ -10,12 +10,15 @@ import (
 )
 
 type Config struct {
-	HTTPAddr        string
-	AppEnv          string
-	LogLevel        slog.Level
-	ShutdownTimeout time.Duration
-	DatabaseURL     string
-	RedisURL        string
+	HTTPAddr          string
+	AppEnv            string
+	LogLevel          slog.Level
+	ShutdownTimeout   time.Duration
+	ReadHeaderTimeout time.Duration
+	ReadTimeout       time.Duration
+	IdleTimeout       time.Duration
+	DatabaseURL       string
+	RedisURL          string
 }
 
 func Load() (Config, error) {
@@ -62,13 +65,40 @@ func load(getenv func(string) string) (Config, error) {
 		}
 		shutdownSeconds = parsed
 	}
+	readHeaderSeconds, err := durationSeconds(getenv, "READ_HEADER_TIMEOUT_SECONDS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	readSeconds, err := durationSeconds(getenv, "READ_TIMEOUT_SECONDS", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	idleSeconds, err := durationSeconds(getenv, "IDLE_TIMEOUT_SECONDS", 60)
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
-		HTTPAddr:        httpAddr,
-		AppEnv:          appEnv,
-		LogLevel:        logLevel,
-		ShutdownTimeout: time.Duration(shutdownSeconds) * time.Second,
-		DatabaseURL:     strings.TrimSpace(getenv("DATABASE_URL")),
-		RedisURL:        strings.TrimSpace(getenv("REDIS_URL")),
+		HTTPAddr:          httpAddr,
+		AppEnv:            appEnv,
+		LogLevel:          logLevel,
+		ShutdownTimeout:   time.Duration(shutdownSeconds) * time.Second,
+		ReadHeaderTimeout: time.Duration(readHeaderSeconds) * time.Second,
+		ReadTimeout:       time.Duration(readSeconds) * time.Second,
+		IdleTimeout:       time.Duration(idleSeconds) * time.Second,
+		DatabaseURL:       strings.TrimSpace(getenv("DATABASE_URL")),
+		RedisURL:          strings.TrimSpace(getenv("REDIS_URL")),
 	}, nil
+}
+
+func durationSeconds(getenv func(string) string, name string, defaultValue int) (int, error) {
+	raw := strings.TrimSpace(getenv(name))
+	if raw == "" {
+		return defaultValue, nil
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer", name)
+	}
+	return parsed, nil
 }
