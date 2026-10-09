@@ -1,6 +1,30 @@
 historical/
 *.bak
 *.log
-Node_modules/
+
+# Go
+/backend/bin/
+/backend/coverage/
+/backend/coverage.out
+/backend/coverage.html
+
+# Node.js
+node_modules/
+dist/
+.turbo/
+.vite/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Operating systems
 .DS_Store
 Thumbs.db
+Desktop.ini

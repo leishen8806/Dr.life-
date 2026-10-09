@@ -1,0 +1,7 @@
+# 账务、权限、登录、迁移、接口规范相关改动必须由负责人评审；团队确认分工后在此替换为实际负责人。
+* @leishen8806
+/backend/internal/ledger/ @leishen8806
+/backend/internal/iam/ @leishen8806
+/backend/migrations/ @leishen8806
+/backend/api/ @leishen8806
+/.github/ @leishen8806
