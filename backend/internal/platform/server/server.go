@@ -29,7 +29,6 @@ func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
 				if logger != nil {
 					logger.ErrorContext(r.Context(), "readiness check failed", "request_id", httpx.RequestIDFromContext(r.Context()))
 				}
-				w.WriteHeader(http.StatusServiceUnavailable)
 				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
 				return
 			}

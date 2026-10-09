@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -9,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 )
 
 func TestHealthAndReadiness(t *testing.T) {
@@ -35,6 +38,28 @@ func TestHealthAndReadiness(t *testing.T) {
 			}
 			if test.path == "/readyz" && !strings.Contains(w.Body.String(), `"request_id"`) {
 				t.Fatalf("ready response missing request_id: %s", w.Body.String())
+			}
+			if test.name == "not ready" {
+				if got := w.Header().Get("Content-Type"); got != "application/json; charset=utf-8" {
+					t.Fatalf("Content-Type = %q", got)
+				}
+				var response struct {
+					Error struct {
+						Code    int               `json:"code"`
+						Message map[string]string `json:"message"`
+					} `json:"error"`
+				}
+				if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+					t.Fatal(err)
+				}
+				if response.Error.Code != int(httpx.CodeServiceUnavailable) {
+					t.Fatalf("error code = %d", response.Error.Code)
+				}
+				for _, language := range []string{"zh", "en", "km"} {
+					if response.Error.Message[language] == "" {
+						t.Errorf("missing %s message: %#v", language, response.Error.Message)
+					}
+				}
 			}
 		})
 	}

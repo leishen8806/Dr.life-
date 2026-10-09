@@ -31,7 +31,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	httpServer := &http.Server{Addr: cfg.HTTPAddr, Handler: server.NewHandler(logger)}
+	httpServer := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           server.NewHandler(logger),
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		ReadTimeout:       cfg.ReadTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
+		// WriteTimeout stays unset so future real-time streams can remain open.
+	}
 	logger.Info("http server starting", "addr", cfg.HTTPAddr, "environment", cfg.AppEnv)
 	if err := server.Serve(ctx, httpServer, listener, cfg.ShutdownTimeout); err != nil {
 		logger.Error("http server stopped with error", "error", err)

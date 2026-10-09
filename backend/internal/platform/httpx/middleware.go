@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,6 +19,7 @@ func Recover(logger *slog.Logger) func(http.Handler) http.Handler {
 						logger.ErrorContext(r.Context(), "panic recovered",
 							"request_id", RequestIDFromContext(r.Context()),
 							"panic_type", fmt.Sprintf("%T", recovered),
+							"stack", string(debug.Stack()),
 						)
 					}
 					if state, ok := w.(interface{ Written() bool }); ok && state.Written() {
