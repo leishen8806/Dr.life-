@@ -1,0 +1,6 @@
+historical/
+*.bak
+*.log
+Node_modules/
+.DS_Store
+Thumbs.db
