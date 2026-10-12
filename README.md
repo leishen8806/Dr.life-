@@ -25,6 +25,7 @@ Telegram Mini App 电商平台，首版聚焦商家仓储与配送，并由平�
 | [Codex 任务提示词 F-01 至 F-03](<Dr.life+Codex任务提示词-F01至F03.md>) | 项目骨架任务的自包含执行提示与评审重点 |
 | [Codex 任务提示词 F-04 与 F-08](<Dr.life+Codex任务提示词-F04与F08.md>) | OpenAPI 骨架与 CI 任务的自包含执行提示、评审重点与设置必需检查的步骤 |
 | [Codex 任务提示词 F-05 与 F-10](<Dr.life+Codex任务提示词-F05与F10.md>) | 网关中间件与密钥/信封加密任务的自包含执行提示与评审重点 |
+| [Codex 任务提示词 A-01、L-01、F-06](<Dr.life+Codex任务提示词-A01-L01-F06.md>) | iam 表、账务表与硬约束、前端工作区任务的自包含执行提示与评审重点 |
 | [backend/](backend/README.md) | Go 后端目录用途与设计依据 |
 | [backend/cmd/](backend/cmd/README.md) | Go 可执行程序入口 |
 | [backend/internal/](backend/internal/README.md) | 后端内部模块与平台组件 |
