@@ -16,7 +16,7 @@ report_matches 'private key marker' 'BEGIN [A-Z ]*PRIVATE KEY'
 report_matches 'AI key pattern' "s""k-[A-Za-z0-9_-]{20,}"
 report_matches 'Telegram token pattern' '[0-9]{6,12}:[A-Za-z0-9_-]{35}'
 
-tracked_env=$(git ls-files | awk '/(^|\/)\.env(\.|$)/ && $0 !~ /(^|\/)\.env\.example$/')
+tracked_env=$(git ls-files | awk '/(^|\/)\.env(\.|$)/ && $0 !~ /\.example$/')
 if [ -n "$tracked_env" ]; then
   printf '%s\n' "$tracked_env" | awk '{print "tracked environment file: " $0}' >&2
   failed=1

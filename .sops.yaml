@@ -1,0 +1,3 @@
+creation_rules:
+  - path_regex: backend/secrets/.*\.yaml$
+    age: age1REPLACE_WITH_DEPLOYMENT_PUBLIC_KEY
