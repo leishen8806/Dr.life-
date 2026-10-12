@@ -1,4 +1,7 @@
 -- +goose Up
+CREATE SEQUENCE ledger.txn_no_seq;
+GRANT USAGE, SELECT ON SEQUENCE ledger.txn_no_seq TO ledger_rw;
+
 REVOKE UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ledger.account FROM ledger_rw;
 GRANT SELECT, INSERT ON ledger.account TO ledger_rw;
 GRANT UPDATE (status) ON ledger.account TO ledger_rw;
@@ -47,6 +50,7 @@ CREATE TRIGGER trg_account_no_truncate BEFORE TRUNCATE ON ledger.account
 DROP TRIGGER IF EXISTS trg_account_no_truncate ON ledger.account;
 DROP TRIGGER IF EXISTS trg_account_immutable ON ledger.account;
 DROP FUNCTION IF EXISTS ledger.protect_account();
+DROP SEQUENCE IF EXISTS ledger.txn_no_seq;
 
 GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON
     ledger.account,

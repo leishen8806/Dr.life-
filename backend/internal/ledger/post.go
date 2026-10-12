@@ -2,8 +2,6 @@ package ledger
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -163,17 +161,13 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest) (PostResult
 		accounts[id] = account
 	}
 
-	txnNo, err := newTxnNo()
-	if err != nil {
-		return PostResult{}, err
-	}
 	var txnID int64
 	var storedTxnNo string
 	err = tx.QueryRow(ctx, `
 		INSERT INTO ledger.txn(txn_no,type,amount,idem_key,ref_type,ref_id,note,reverses_txn_id,actor_id,occurred_at)
-		VALUES($1,$2,$3,$4,NULLIF($5,''),$6,NULLIF($7,''),$8,$9,COALESCE($10,now()))
+		VALUES('L'||lpad(nextval('ledger.txn_no_seq')::text,12,'0'),$1,$2,$3,NULLIF($4,''),$5,NULLIF($6,''),$7,$8,COALESCE($9,now()))
 		ON CONFLICT (idem_key) DO NOTHING
-		RETURNING id,txn_no`, txnNo, request.Type, request.Amount, request.IdemKey,
+		RETURNING id,txn_no`, request.Type, request.Amount, request.IdemKey,
 		request.RefType, request.RefID, request.Note, request.ReversesTxnID, request.ActorID, request.OccurredAt).
 		Scan(&txnID, &storedTxnNo)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -302,14 +296,6 @@ func checkedAdd(left, right int64) (int64, bool) {
 		return 0, false
 	}
 	return left + right, true
-}
-
-func newTxnNo() (string, error) {
-	bytes := make([]byte, 12)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	return "L" + hex.EncodeToString(bytes), nil
 }
 
 func isRetryable(err error) bool {

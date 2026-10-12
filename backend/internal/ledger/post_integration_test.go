@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"regexp"
 	"runtime"
 	"sort"
 	"sync"
@@ -126,6 +127,9 @@ func TestPostIntegration(t *testing.T) {
 		first, err := adminService.Post(ctx, request)
 		if err != nil {
 			t.Fatal(err)
+		}
+		if !regexp.MustCompile(`^L[0-9]{12}$`).MatchString(first.TxnNo) {
+			t.Fatalf("txn_no=%q", first.TxnNo)
 		}
 		replayed, err := adminService.Post(ctx, request)
 		if err != nil {
