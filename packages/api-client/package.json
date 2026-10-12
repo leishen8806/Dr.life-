@@ -1,0 +1,15 @@
+{
+  "name": "@drlife/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "types": "./src/schema.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/schema.d.ts"
+    }
+  },
+  "files": [
+    "src/schema.d.ts"
+  ]
+}

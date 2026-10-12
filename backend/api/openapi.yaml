@@ -1,0 +1,242 @@
+openapi: 3.0.3
+info:
+  title: Dr.life+ API
+  version: 1.0.0-draft
+  description: |
+    Shared API contract for every Dr.life+ client. Error-code ranges are:
+    1xxx common, 2xxx identity and permissions, 3xxx catalog and trade,
+    4xxx warehousing and logistics, 5xxx ledger and funds, 6xxx AI, and
+    7xxx external services.
+servers:
+  - url: https://adminapi.settlecore.org
+    description: Production API gateway placeholder
+  - url: http://localhost:8080
+    description: Local development server
+tags:
+  - name: public
+    description: Public endpoints under /v1/public; no login is required.
+    x-roles: ["none"]
+  - name: buyer
+    description: Buyer endpoints under /v1/buyer; accessible only to buyer accounts.
+    x-roles: [buyer]
+  - name: merchant
+    description: Merchant endpoints under /v1/merchant; accessible only to merchant accounts.
+    x-roles: [merchant]
+  - name: driver
+    description: Driver endpoints under /v1/driver; accessible only to driver accounts.
+    x-roles: [driver]
+  - name: wms
+    description: Warehouse endpoints under /v1/wms; accessible only to authorized WMS staff.
+    x-roles: [wms]
+  - name: admin
+    description: Administration endpoints under /v1/admin; accessible only to authorized platform staff.
+    x-roles: [admin]
+security:
+  - bearerAuth: []
+paths:
+  /v1/public/ping:
+    get:
+      tags: [public]
+      operationId: getPublicPing
+      summary: Check public API availability
+      security: []
+      responses:
+        "200":
+          description: API is available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PingSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT containing the account role; a role/path mismatch returns HTTP 403.
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: One-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: page_size
+      in: query
+      description: Number of items per page, capped at 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Sort:
+      name: sort
+      in: query
+      description: Comma-separated field names; prefix a field with - for descending order.
+      schema:
+        type: string
+    Filter:
+      name: filter
+      in: query
+      description: Field filters encoded as filter[field]=value; each operation defines allowed fields.
+      style: deepObject
+      explode: true
+      schema:
+        type: object
+        additionalProperties:
+          type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        pattern: "^[A-Za-z0-9_-]+$"
+    XRequestID:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: Optional caller request identifier. Invalid values are replaced by the server.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+        pattern: "^[A-Za-z0-9_-]+$"
+  schemas:
+    ErrorCode:
+      type: integer
+      format: int32
+      description: Documented application error code; ranges are described in the API description.
+      enum: [1001, 1002, 1003, 1004, 1005, 2001, 2002]
+      x-enum-varnames:
+        - InternalError
+        - InvalidArgument
+        - ResourceNotFound
+        - TooManyRequests
+        - ServiceUnavailable
+        - Unauthenticated
+        - PermissionDenied
+    Messages:
+      type: object
+      additionalProperties: false
+      required: [zh, en, km]
+      properties:
+        zh:
+          type: string
+        en:
+          type: string
+        km:
+          type: string
+    ErrorBody:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          $ref: "#/components/schemas/Messages"
+    SuccessEnvelope:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          nullable: true
+        request_id:
+          type: string
+          minLength: 1
+    ErrorEnvelope:
+      type: object
+      additionalProperties: false
+      required: [ok, error, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [false]
+        error:
+          $ref: "#/components/schemas/ErrorBody"
+        request_id:
+          type: string
+          minLength: 1
+    PingData:
+      type: object
+      additionalProperties: false
+      required: [pong]
+      properties:
+        pong:
+          type: boolean
+          enum: [true]
+    PingSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/PingData"
+        request_id:
+          type: string
+          minLength: 1
+  responses:
+    BadRequest:
+      description: Invalid request (error code 1002).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Unauthorized:
+      description: Authentication required (error code 2001).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Forbidden:
+      description: Permission denied (error code 2002).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: Resource not found (error code 1003).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    TooManyRequests:
+      description: Request rate exceeded (error code 1004).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    InternalServerError:
+      description: Internal server error (error code 1001).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    ServiceUnavailable:
+      description: Service temporarily unavailable (error code 1005).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"

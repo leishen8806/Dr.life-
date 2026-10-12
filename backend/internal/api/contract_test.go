@@ -1,0 +1,133 @@
+package api_test
+
+import (
+	"context"
+	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"testing"
+
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
+)
+
+func TestOpenAPIContract(t *testing.T) {
+	doc := loadSpec(t)
+	if err := doc.Validate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	wantTags := map[string]string{
+		"public": "/v1/public", "buyer": "/v1/buyer", "merchant": "/v1/merchant",
+		"driver": "/v1/driver", "wms": "/v1/wms", "admin": "/v1/admin",
+	}
+	for _, tag := range doc.Tags {
+		prefix, ok := wantTags[tag.Name]
+		if !ok || !strings.Contains(tag.Description, prefix) || tag.Extensions["x-roles"] == nil {
+			t.Fatalf("tag %q is missing its path or x-roles contract", tag.Name)
+		}
+		delete(wantTags, tag.Name)
+	}
+	if len(wantTags) != 0 {
+		t.Fatalf("missing audience tags: %v", wantTags)
+	}
+	want := sourceErrorCodes(t)
+	if got := documentedErrorCodes(t, doc); !equalInts(got, want) {
+		t.Fatalf("documented error codes %v do not match httpx constants %v", got, want)
+	}
+}
+
+func TestPublicPingMatchesOpenAPI(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	server.NewHandler(nil).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/v1/public/ping", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	var body any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	doc := loadSpec(t)
+	response := doc.Paths.Value("/v1/public/ping").Get.Responses.Value("200")
+	if err := response.Value.Content.Get("application/json").Schema.Value.VisitJSON(body); err != nil {
+		t.Fatalf("response does not match OpenAPI schema: %v", err)
+	}
+}
+
+func loadSpec(t *testing.T) *openapi3.T {
+	t.Helper()
+	_, filename, _, _ := runtime.Caller(0)
+	doc, err := openapi3.NewLoader().LoadFromFile(filepath.Join(filepath.Dir(filename), "..", "..", "api", "openapi.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return doc
+}
+
+func documentedErrorCodes(t *testing.T, doc *openapi3.T) []int {
+	t.Helper()
+	values := doc.Components.Schemas["ErrorCode"].Value.Enum
+	codes := make([]int, 0, len(values))
+	for _, value := range values {
+		number, ok := value.(float64)
+		if !ok {
+			t.Fatalf("error code %v is not a number", value)
+		}
+		codes = append(codes, int(number))
+	}
+	sort.Ints(codes)
+	return codes
+}
+
+func sourceErrorCodes(t *testing.T) []int {
+	t.Helper()
+	_, filename, _, _ := runtime.Caller(0)
+	path := filepath.Join(filepath.Dir(filename), "..", "platform", "httpx", "response.go")
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var codes []int
+	ast.Inspect(file, func(node ast.Node) bool {
+		spec, ok := node.(*ast.ValueSpec)
+		if !ok {
+			return true
+		}
+		for i, name := range spec.Names {
+			if !strings.HasPrefix(name.Name, "Code") || strings.HasPrefix(name.Name, "ErrorCode") || i >= len(spec.Values) {
+				continue
+			}
+			literal, ok := spec.Values[i].(*ast.BasicLit)
+			if !ok || literal.Kind != token.INT {
+				t.Fatalf("%s must have an explicit integer value", name.Name)
+			}
+			value, err := strconv.Atoi(literal.Value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			codes = append(codes, value)
+		}
+		return true
+	})
+	sort.Ints(codes)
+	return codes
+}
+
+func equalInts(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
