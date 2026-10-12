@@ -27,6 +27,7 @@ type Config struct {
 	DBConnectTimeout   time.Duration
 	RedisURL           string
 	CORSAllowedOrigins []string
+	WebhookPrefix      string
 	TrustedProxyHeader string
 	TrustedProxyCIDRs  []string
 	RateLimitIP        int
@@ -111,6 +112,10 @@ func load(getenv func(string) string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	publicWebhookPrefix, err := parsePublicWebhookPrefix(getenv("PUBLIC_WEBHOOK_PREFIX"))
+	if err != nil {
+		return Config{}, err
+	}
 	proxyHeader := strings.TrimSpace(getenv("TRUSTED_PROXY_HEADER"))
 	proxyCIDRs, err := parseCIDRs(getenv("TRUSTED_PROXY_CIDRS"))
 	if err != nil {
@@ -126,7 +131,7 @@ func load(getenv func(string) string) (Config, error) {
 	for i, item := range []struct {
 		name  string
 		value int
-	}{{"RATE_LIMIT_IP_PER_MINUTE", 120}, {"RATE_LIMIT_ACCOUNT_PER_MINUTE", 300}, {"RATE_LIMIT_LOGIN_PER_MINUTE", 10}, {"RATE_LIMIT_WITHDRAW_PER_MINUTE", 5}, {"RATE_LIMIT_AI_PER_MINUTE", 30}} {
+	}{{"RATE_LIMIT_IP_PER_MINUTE", 600}, {"RATE_LIMIT_ACCOUNT_PER_MINUTE", 300}, {"RATE_LIMIT_LOGIN_PER_MINUTE", 10}, {"RATE_LIMIT_WITHDRAW_PER_MINUTE", 5}, {"RATE_LIMIT_AI_PER_MINUTE", 30}} {
 		limits[i], err = positiveInt(getenv, item.name, item.value)
 		if err != nil {
 			return Config{}, err
@@ -148,6 +153,7 @@ func load(getenv func(string) string) (Config, error) {
 		DBConnectTimeout:   time.Duration(dbConnectSeconds) * time.Second,
 		RedisURL:           strings.TrimSpace(getenv("REDIS_URL")),
 		CORSAllowedOrigins: corsOrigins,
+		WebhookPrefix:      publicWebhookPrefix,
 		TrustedProxyHeader: proxyHeader,
 		TrustedProxyCIDRs:  proxyCIDRs,
 		RateLimitIP:        limits[0],
@@ -156,6 +162,22 @@ func load(getenv func(string) string) (Config, error) {
 		RateLimitWithdraw:  limits[3],
 		RateLimitAI:        limits[4],
 	}, nil
+}
+
+func parsePublicWebhookPrefix(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", nil
+	}
+	if value == "/" || !strings.HasPrefix(value, "/") || strings.HasSuffix(value, "/") || value == "/v1" || strings.HasPrefix(value, "/v1/") || strings.ToLower(value) != value || strings.Contains(value, "//") {
+		return "", fmt.Errorf("PUBLIC_WEBHOOK_PREFIX must be a lowercase non-v1 path prefix without a trailing slash")
+	}
+	for _, char := range value {
+		if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '/' && char != '-' && char != '_' {
+			return "", fmt.Errorf("PUBLIC_WEBHOOK_PREFIX contains an invalid character")
+		}
+	}
+	return value, nil
 }
 
 func parseOrigins(raw string) ([]string, error) {

@@ -82,7 +82,7 @@ func TestEveryErrorAndRouterFailureMatchesOpenAPI(t *testing.T) {
 		status             int
 		code               httpx.ErrorCode
 	}{
-		{name: "not found", method: http.MethodGet, path: "/missing", status: http.StatusNotFound, code: httpx.CodeResourceNotFound},
+		{name: "not found", method: http.MethodGet, path: "/v1/public/missing", status: http.StatusNotFound, code: httpx.CodeResourceNotFound},
 		{name: "method not allowed", method: http.MethodOptions, path: "/v1/public/ping", status: http.StatusMethodNotAllowed, code: httpx.CodeMethodNotAllowed},
 	} {
 		t.Run(test.name, func(t *testing.T) {

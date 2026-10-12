@@ -20,6 +20,7 @@ type ReadinessCheck func(context.Context) error
 
 type GatewayOptions struct {
 	AllowedOrigins    []string
+	WebhookPrefix     string
 	ClientIP          gateway.ClientIPResolver
 	Limiter           gateway.Limiter
 	Authenticator     gateway.Authenticator
@@ -42,8 +43,8 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.Use(httpx.Recover(logger))
 	router.Use(gateway.CORS(options.AllowedOrigins))
 	router.Use(gateway.LimitByIP(options.Limiter, options.ClientIP, options.IPRules))
-	router.Use(gateway.Authenticate(options.Authenticator))
-	router.Use(gateway.Authorize)
+	router.Use(gateway.Authenticate(options.Authenticator, options.WebhookPrefix))
+	router.Use(gateway.Authorize(options.WebhookPrefix))
 	router.Use(gateway.LimitByAccount(options.Limiter, options.AccountRules))
 	router.Use(gateway.RequireIdempotency(options.IdempotencyExempt))
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {

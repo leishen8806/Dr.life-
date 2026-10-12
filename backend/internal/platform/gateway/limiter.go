@@ -171,13 +171,20 @@ func (r ClientIPResolver) Resolve(request *http.Request) string {
 	direct := net.ParseIP(host)
 	if r.Header != "" && direct != nil && r.isTrusted(direct) {
 		if forwarded := net.ParseIP(strings.TrimSpace(request.Header.Get(r.Header))); forwarded != nil {
-			return forwarded.String()
+			return rateLimitAddress(forwarded)
 		}
 	}
 	if direct == nil {
 		return "unknown"
 	}
-	return direct.String()
+	return rateLimitAddress(direct)
+}
+
+func rateLimitAddress(ip net.IP) string {
+	if ipv4 := ip.To4(); ipv4 != nil {
+		return ipv4.String()
+	}
+	return ip.Mask(net.CIDRMask(64, 128)).String() + "/64"
 }
 
 func (r ClientIPResolver) isTrusted(ip net.IP) bool {
@@ -235,18 +242,19 @@ func limit(limiter Limiter, rules RuleSet, subject func(*http.Request) (string, 
 }
 
 func selectRule(path string, rules RuleSet) (Rule, string) {
-	switch {
-	case strings.Contains(path, "/auth") || strings.Contains(path, "/login"):
-		return rules.Login, "login"
-	case strings.Contains(path, "/withdraw"):
-		return rules.Withdrawal, "withdrawal"
-	case strings.Contains(path, "/ai"):
-		return rules.AI, "ai"
-	default:
-		parts := strings.Split(strings.Trim(path, "/"), "/")
-		if len(parts) >= 2 {
-			return rules.Default, strings.Join(parts[:2], "/")
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	for _, part := range parts {
+		switch part {
+		case "auth", "login":
+			return rules.Login, "login"
+		case "withdraw", "withdrawals":
+			return rules.Withdrawal, "withdrawal"
+		case "ai":
+			return rules.AI, "ai"
 		}
-		return rules.Default, "other"
 	}
+	if len(parts) >= 2 {
+		return rules.Default, strings.Join(parts[:2], "/")
+	}
+	return rules.Default, "other"
 }

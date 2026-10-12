@@ -70,6 +70,7 @@ func main() {
 		Addr: cfg.HTTPAddr,
 		Handler: server.NewHandlerWithGateway(logger, server.GatewayOptions{
 			AllowedOrigins: cfg.CORSAllowedOrigins,
+			WebhookPrefix:  cfg.WebhookPrefix,
 			ClientIP:       clientIP,
 			Limiter:        limiter,
 			IPRules:        strictRules(cfg.RateLimitIP),

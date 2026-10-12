@@ -62,6 +62,8 @@ func TestPathRoleGuard(t *testing.T) {
 		{path: "/v1/buyer/resource", status: http.StatusUnauthorized, code: httpx.CodeUnauthenticated},
 		{path: "/v1/buyer/resource", header: "Bearer invalid", status: http.StatusUnauthorized, code: httpx.CodeUnauthenticated},
 		{path: "/v1/public/ping", status: http.StatusNoContent},
+		{path: "/healthz", status: http.StatusNoContent},
+		{path: "/readyz", status: http.StatusNoContent},
 		{path: "/v1/foo/x", status: http.StatusForbidden, code: httpx.CodePermissionDenied},
 	} {
 		request := httptest.NewRequest(http.MethodGet, test.path, nil)
@@ -69,6 +71,24 @@ func TestPathRoleGuard(t *testing.T) {
 		response := httptest.NewRecorder()
 		accessHandler().ServeHTTP(response, request)
 		assertStatusCode(t, response, test.status, test.code)
+	}
+}
+
+func TestNonV1PathsFailClosedUnlessConfiguredAsWebhook(t *testing.T) {
+	for _, path := range []string{"/metrics", "/debug/pprof", "/admin", "/internal/x"} {
+		response := httptest.NewRecorder()
+		accessHandler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		assertStatusCode(t, response, http.StatusForbidden, httpx.CodePermissionDenied)
+	}
+	webhook := httpx.RequestID(Authenticate(nil, "/webhooks/telegram")(Authorize("/webhooks/telegram")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))))
+	for path, want := range map[string]int{"/webhooks/telegram/update": http.StatusNoContent, "/webhooks/telegramx": http.StatusForbidden} {
+		response := httptest.NewRecorder()
+		webhook.ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, nil))
+		if response.Code != want {
+			t.Fatalf("path=%s status=%d want=%d body=%s", path, response.Code, want, response.Body.String())
+		}
 	}
 }
 
@@ -104,6 +124,9 @@ func TestCORSAllowlistAndPreflight(t *testing.T) {
 			handler.ServeHTTP(response, request)
 			if response.Code != test.status {
 				t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+			}
+			if response.Header().Get("Vary") != "Origin" {
+				t.Fatalf("Vary=%q", response.Header().Get("Vary"))
 			}
 		})
 	}
@@ -190,6 +213,25 @@ func TestMemoryLimitAndTrustedProxy(t *testing.T) {
 	}
 }
 
+func TestIPv6AddressesSharePrefixLimit(t *testing.T) {
+	rule := Rule{Limit: 1, Window: time.Minute}
+	rules := RuleSet{Default: rule, Login: rule, Withdrawal: rule, AI: rule}
+	handler := LimitByIP(NewMemoryLimiter(), ClientIPResolver{}, rules)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	for i, remote := range []string{"[2001:db8:abcd:42::1]:1234", "[2001:db8:abcd:42::ffff]:5678"} {
+		request := httptest.NewRequest(http.MethodGet, "/v1/public/ping", nil)
+		request.RemoteAddr = remote
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		want := http.StatusNoContent
+		if i == 1 {
+			want = http.StatusTooManyRequests
+		}
+		if response.Code != want {
+			t.Fatalf("remote=%s status=%d want=%d", remote, response.Code, want)
+		}
+	}
+}
+
 func TestHealthChecksAreNotRateLimited(t *testing.T) {
 	rule := Rule{Limit: 1, Window: time.Minute}
 	rules := RuleSet{Default: rule, Login: rule, Withdrawal: rule, AI: rule}
@@ -208,7 +250,7 @@ func TestAccountLimitUsesSensitiveRuleAndAccountIdentity(t *testing.T) {
 		Default: Rule{Limit: 10, Window: time.Minute}, Login: Rule{Limit: 2, Window: time.Minute},
 		Withdrawal: Rule{Limit: 1, Window: time.Minute}, AI: Rule{Limit: 1, Window: time.Minute},
 	}
-	handler := Authenticate(accountAuthenticator{})(Authorize(LimitByAccount(NewMemoryLimiter(), rules)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := Authenticate(accountAuthenticator{}, "")(Authorize("")(LimitByAccount(NewMemoryLimiter(), rules)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))))
 	for i, account := range []string{"one", "one", "two"} {
@@ -222,6 +264,29 @@ func TestAccountLimitUsesSensitiveRuleAndAccountIdentity(t *testing.T) {
 		}
 		if response.Code != want {
 			t.Fatalf("request %d account=%s status=%d want=%d", i+1, account, response.Code, want)
+		}
+	}
+}
+
+func TestSelectRuleMatchesWholePathSegments(t *testing.T) {
+	rules := RuleSet{
+		Default: Rule{Limit: 100, Window: time.Minute}, Login: Rule{Limit: 10, Window: time.Minute},
+		Withdrawal: Rule{Limit: 5, Window: time.Minute}, AI: Rule{Limit: 30, Window: time.Minute},
+	}
+	for _, test := range []struct {
+		path, group string
+		want        Rule
+	}{
+		{"/v1/buyer/airport-pickup", "v1/buyer", rules.Default},
+		{"/v1/merchant/authors", "v1/merchant", rules.Default},
+		{"/v1/merchant/orders/aids", "v1/merchant", rules.Default},
+		{"/v1/buyer/ai/chat", "ai", rules.AI},
+		{"/v1/public/auth/telegram", "login", rules.Login},
+		{"/v1/buyer/withdrawals", "withdrawal", rules.Withdrawal},
+	} {
+		got, group := selectRule(test.path, rules)
+		if got != test.want || group != test.group {
+			t.Errorf("path=%s rule=%+v group=%s; want=%+v %s", test.path, got, group, test.want, test.group)
 		}
 	}
 }
@@ -306,7 +371,7 @@ func TestRedisLimiterWithRealRedis(t *testing.T) {
 func TestAccessLogIncludesRoleWithoutToken(t *testing.T) {
 	var logs bytes.Buffer
 	logger := logx.NewLogger(slog.LevelInfo, &logs)
-	handler := httpx.RequestLogger(logger, RoleFromContext)(Authenticate(bearerAuthenticator{})(Authorize(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := httpx.RequestLogger(logger, RoleFromContext)(Authenticate(bearerAuthenticator{}, "")(Authorize("")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))))
 	request := httptest.NewRequest(http.MethodGet, "/v1/buyer/x", nil)
@@ -322,7 +387,7 @@ func TestAccessLogIncludesRoleWithoutToken(t *testing.T) {
 }
 
 func accessHandler() http.Handler {
-	return httpx.RequestID(Authenticate(bearerAuthenticator{})(Authorize(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	return httpx.RequestID(Authenticate(bearerAuthenticator{}, "")(Authorize("")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))))
 }
