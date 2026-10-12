@@ -18,6 +18,10 @@ type Config struct {
 	ReadTimeout       time.Duration
 	IdleTimeout       time.Duration
 	DatabaseURL       string
+	ReportDatabaseURL string
+	DBMaxConns        int32
+	DBMinConns        int32
+	DBConnectTimeout  time.Duration
 	RedisURL          string
 }
 
@@ -77,6 +81,21 @@ func load(getenv func(string) string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	dbMaxConns, err := positiveInt(getenv, "DB_MAX_CONNS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	dbMinConns, err := positiveInt(getenv, "DB_MIN_CONNS", 2)
+	if err != nil {
+		return Config{}, err
+	}
+	if dbMinConns > dbMaxConns {
+		return Config{}, fmt.Errorf("DB_MIN_CONNS must not exceed DB_MAX_CONNS")
+	}
+	dbConnectSeconds, err := durationSeconds(getenv, "DB_CONNECT_TIMEOUT_SECONDS", 5)
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		HTTPAddr:          httpAddr,
@@ -87,8 +106,24 @@ func load(getenv func(string) string) (Config, error) {
 		ReadTimeout:       time.Duration(readSeconds) * time.Second,
 		IdleTimeout:       time.Duration(idleSeconds) * time.Second,
 		DatabaseURL:       strings.TrimSpace(getenv("DATABASE_URL")),
+		ReportDatabaseURL: strings.TrimSpace(getenv("REPORT_DATABASE_URL")),
+		DBMaxConns:        int32(dbMaxConns),
+		DBMinConns:        int32(dbMinConns),
+		DBConnectTimeout:  time.Duration(dbConnectSeconds) * time.Second,
 		RedisURL:          strings.TrimSpace(getenv("REDIS_URL")),
 	}, nil
+}
+
+func positiveInt(getenv func(string) string, name string, defaultValue int) (int, error) {
+	raw := strings.TrimSpace(getenv(name))
+	if raw == "" {
+		return defaultValue, nil
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("%s must be a positive integer", name)
+	}
+	return parsed, nil
 }
 
 func durationSeconds(getenv func(string) string, name string, defaultValue int) (int, error) {

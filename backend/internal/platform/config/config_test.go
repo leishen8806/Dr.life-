@@ -27,10 +27,10 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.HTTPAddr != ":8080" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second {
+	if cfg.HTTPAddr != ":8080" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
-	if cfg.DatabaseURL != "" || cfg.RedisURL != "" {
+	if cfg.DatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" {
 		t.Fatalf("optional URLs should be empty: %+v", cfg)
 	}
 }
@@ -45,12 +45,16 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"READ_TIMEOUT_SECONDS":        "35",
 		"IDLE_TIMEOUT_SECONDS":        "75",
 		"DATABASE_URL":                "postgres://placeholder",
+		"REPORT_DATABASE_URL":         "postgres://report-placeholder",
+		"DB_MAX_CONNS":                "20",
+		"DB_MIN_CONNS":                "4",
+		"DB_CONNECT_TIMEOUT_SECONDS":  "6",
 		"REDIS_URL":                   "redis://placeholder",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AppEnv != "staging" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second {
+	if cfg.AppEnv != "staging" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	for _, raw := range []string{"0", "-1", "abc"} {
@@ -66,6 +70,16 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 				t.Fatalf("expected invalid %s error", key)
 			}
 		})
+	}
+	for _, key := range []string{"DB_MAX_CONNS", "DB_MIN_CONNS", "DB_CONNECT_TIMEOUT_SECONDS"} {
+		t.Run("invalid "+key, func(t *testing.T) {
+			if _, err := load(lookup(map[string]string{"APP_ENV": "test", key: "0"})); err == nil {
+				t.Fatalf("expected invalid %s error", key)
+			}
+		})
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "DB_MAX_CONNS": "2", "DB_MIN_CONNS": "3"})); err == nil {
+		t.Fatal("expected DB_MIN_CONNS greater than DB_MAX_CONNS to fail")
 	}
 }
 
