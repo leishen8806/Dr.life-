@@ -50,19 +50,20 @@
 
 | 表 | 关键字段 | 约束与说明 |
 |---|---|---|
-| `person` | id, public_id, tg_user_id **bigint unique**, tg_first_name, tg_username, tg_lang_code, phone(加密), phone_verified_at, status | **一个 Telegram 号一个人**；手机号（App 阶段/提现验证用）加密存储 |
-| `account` | id, public_id, person_id→person, role (`buyer/merchant_owner/merchant_staff/driver`), merchant_id→merchant(可空), status (`active/frozen/disabled`), status_reason, lang, lang_registered_at, kyc_status | `UNIQUE(person_id, role, merchant_id)`；冻结/停用必须填 `status_reason`（CHECK）；`lang` 为 `zh/en/km` |
+| `person` | id, public_id, tg_user_id **bigint unique**, tg_first_name, tg_username, tg_lang_code, phone_enc, phone_verified_at, status | **一个 Telegram 号一个人**；`phone_enc bytea` 由应用层加密后存放 |
+| `account` | id, public_id, person_id→person, role (`buyer/merchant_owner/merchant_staff/driver`), merchant_id→merchant(可空), status (`active/frozen/disabled`), status_reason, lang, lang_registered_at, kyc_status | `UNIQUE NULLS NOT DISTINCT(person_id, role, merchant_id)`，确保 `merchant_id` 为空的账号也不能重复；冻结/停用必须填 `status_reason`（CHECK）；`lang` 为 `zh/en/km` |
 | `account_device` | account_id, device_id, first_seen_at, last_seen_at | 登录设备记录（语言登记设备） |
-| `bot` | id, end (`buyer/merchant/driver`), username unique, role_in_pool (`primary/standby`), status (`active/standby/limited/banned`), token_enc (bytea), token_last4, webhook_secret_enc, priority | **令牌信封加密**；`token_last4` 仅用于显示；同一端 `priority` 唯一 |
+| `bot` | id, public_id, end (`buyer/merchant/driver`), username unique, role_in_pool (`primary/standby`), status (`active/standby/limited/banned`), token_enc (bytea), token_last4, webhook_secret_enc, priority | **令牌信封加密**，AAD 为 `bot_token:<id>`；`token_last4` 仅用于显示；同一端 `priority` 唯一且最多一个 primary |
 | `account_bot` | account_id, bot_id, bound_at, write_access boolean, unreachable_at | 用户在哪些 Bot 点过开始/允许私信；发送时据此选 Bot（第二章） |
 | `login_event` | id, person_id, bot_id, valid_by_bot_id, tried_count, auth_date, ip, device_id, result, created_at | 登录审计；校验命中的 Bot、尝试次数 |
 | `session` | id, account_id, refresh_token_hash, device_id, ip, expires_at, revoked_at, revoked_reason | 停用员工/冻结账号时批量 `revoked_at` |
-| `merchant` | id, public_id, name jsonb, type, area, svc jsonb, desc jsonb, phone, address, contact, kind (`self/verified/pending`), status, owner_account_id | 商户资料；`kind=verified` 须核验 |
-| `merchant_staff` | id, merchant_id, account_id(可空,未接受前), name, phone, tg_username, note, role (`manager/sales/warehouse/finance`), status (`invited/active/off`), invite_code unique, invited_by, last_login_at | 员工上限 10（应用层校验）；同一商户内手机号唯一 |
+| `merchant` | id, public_id, name jsonb, type, area, svc jsonb, description jsonb, phone_enc, address_enc, contact_enc, kind (`self/verified/pending`), status, owner_account_id | 商户资料；电话、地址、联系人由应用层加密后存放；`kind=verified` 须核验 |
+| `merchant_staff` | id, public_id, merchant_id, account_id(可空,未接受前), name, phone_enc, phone_hash, tg_username, note, role (`manager/sales/warehouse/finance`), status (`invited/active/off`), invite_code unique, invited_by, last_login_at | 员工上限 10（应用层校验）；`phone_enc` 存密文，`phone_hash` 存规范化手机号的不可逆摘要并用于同一商户内唯一性 |
 | `merchant_role_perm` | merchant_id, role, module (`dash/prod/orders/store/fin/ads/prof/staff/ai`), level (`none/view/edit`) | `PRIMARY KEY(merchant_id,role,module)`；`staff` 模块 level 只允许 `none/view` |
+| `merchant_role_perm_template` | role, module, level | 四类商户角色的默认权限模板；创建商户时由应用复制到 `merchant_role_perm` |
 | `merchant_op_log` | id, merchant_id, actor_account_id, action, detail, created_at | 员工操作记录（只追加） |
 | `account_link` | id, buyer_account_id, merchant_account_id, linked_at, unlinked_at | 一键关联；`UNIQUE(buyer,merchant)` 且仅一条未解除；**只保存关联，不改变任何资金/订单归属** |
-| `admin_user` | id, name, email, password_hash(argon2), totp_secret_enc, role, data_scope text[], status, last_login_at | 平台与物流仓储 Web 账号；超级管理员至少 1 位启用（应用层 + 定期审计） |
+| `admin_user` | id, public_id, name, email, password_hash(argon2), totp_secret_enc, role, data_scope text[], status, last_login_at | 密码只存哈希，TOTP 密钥由应用层加密后存放；平台与物流仓储 Web 账号；超级管理员至少 1 位启用（应用层 + 定期审计） |
 | `admin_role_perm` | role (`super/ops/finance/logi/cs/auditor`), module(17 个), level | 对应《权限与审计规范》矩阵；`super` 固定全 `edit` |
 | `actor` | id, kind (`account/admin/system/external`), ref_id | 统一"操作人"，供 `created_by`、审计、流水引用 |
 
