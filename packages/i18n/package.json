@@ -1,0 +1,23 @@
+{
+  "name": "@drlife/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "lint": "eslint src scripts",
+    "test": "vitest run",
+    "i18n:check": "node scripts/check-i18n.mjs"
+  },
+  "peerDependencies": {
+    "react": "19.2.3"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "react": "19.2.3"
+  }
+}

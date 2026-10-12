@@ -1,0 +1,36 @@
+#root,
+.admin-shell {
+  min-height: 100vh;
+}
+.admin-sider {
+  min-height: 100vh;
+}
+.brand {
+  height: 64px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+}
+.admin-header {
+  height: auto;
+  min-height: 64px;
+  padding: 12px 24px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.admin-header h4 {
+  margin: 0;
+}
+.admin-content {
+  margin: 24px;
+  padding: 24px;
+  min-height: 320px;
+  border-radius: var(--drl-radius);
+  background: #fff;
+}

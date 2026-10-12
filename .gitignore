@@ -28,3 +28,6 @@ dist/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+.pnpm-store/
+*.tsbuildinfo
