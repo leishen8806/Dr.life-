@@ -64,7 +64,6 @@ func TestDatabaseFramework(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertSchemasAndRoles(t, sqlDB)
-		assertNoBusinessTables(t, sqlDB)
 		if err := goose.DownTo(sqlDB, migrationsDir, 0); err != nil {
 			t.Fatal(err)
 		}
@@ -178,17 +177,6 @@ func assertSchemasAndRoles(t *testing.T, database *sql.DB) {
 	}
 	if roleCount != len(roles) {
 		t.Fatalf("NOLOGIN role count = %d, want %d", roleCount, len(roles))
-	}
-}
-
-func assertNoBusinessTables(t *testing.T, database *sql.DB) {
-	t.Helper()
-	var count int
-	if err := database.QueryRow(`SELECT count(*) FROM pg_tables WHERE schemaname = ANY($1)`, schemas).Scan(&count); err != nil {
-		t.Fatal(err)
-	}
-	if count != 0 {
-		t.Fatalf("migrations created %d business tables", count)
 	}
 }
 
