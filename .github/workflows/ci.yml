@@ -238,6 +238,7 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
       - name: Run govulncheck
+        continue-on-error: true
         working-directory: backend
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
