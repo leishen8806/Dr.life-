@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DR.LIFE+ initData PoC</title>
+  <script src="https://telegram.org/js/telegram-web-app.js?64"></script>
+  <style>
+    body { font: 16px system-ui, sans-serif; margin: 2rem; color: var(--tg-theme-text-color, #111); background: var(--tg-theme-bg-color, #fff); }
+    button, select { font: inherit; margin: .5rem .5rem .5rem 0; padding: .7rem 1rem; }
+    pre { white-space: pre-wrap; word-break: break-word; padding: 1rem; background: rgba(127,127,127,.12); }
+  </style>
+</head>
+<body>
+  <h1>initData verification</h1>
+  <p id="summary"></p>
+  <label>End <select id="end"><option>buyer</option><option>merchant</option><option>driver</option></select></label><br>
+  <button id="copy">Copy initData</button>
+  <button id="verify">Verify</button>
+  <pre id="result">Not verified</pre>
+  <script>
+    const initData = window.Telegram?.WebApp?.initData || '';
+    document.querySelector('#summary').textContent = `Length: ${initData.length}; prefix: ${initData.slice(0, 12)}`;
+    document.querySelector('#copy').onclick = () => navigator.clipboard.writeText(initData);
+    document.querySelector('#verify').onclick = async () => {
+      const result = document.querySelector('#result');
+      try {
+        const response = await fetch('/poc/auth/verify', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({end: document.querySelector('#end').value, init_data: initData})
+        });
+        result.textContent = JSON.stringify(await response.json(), null, 2);
+      } catch (_) {
+        result.textContent = 'Request failed';
+      }
+    };
+    window.Telegram?.WebApp?.ready();
+  </script>
+</body>
+</html>
