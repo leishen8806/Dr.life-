@@ -3,13 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "types": "./src/schema.d.ts",
   "exports": {
     ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./schema": {
       "types": "./src/schema.d.ts"
     }
   },
-  "files": [
-    "src/schema.d.ts"
-  ]
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "lint": "eslint src --ignore-pattern schema.d.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
+  }
 }
