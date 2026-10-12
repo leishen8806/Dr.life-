@@ -111,7 +111,7 @@ P0 技术验证(PoC) ──┐
 
 | ID | 任务 | 依赖 | 交付物 | 验收标准 | 规模 | 角色 |
 |---|---|---|---|---|---|---|
-| L-01 | 账务表、约束与触发器 | F-03,P0-2 | 第五章 SQL：`account/txn/posting/balance`、借贷平衡延迟触发器、只追加触发器、撤销应用角色 UPDATE/DELETE | ① 借贷不平提交失败；② UPDATE/DELETE 流水失败；③ 负余额被约束拦截；④ 单例账户（银行、平台、过渡）种子 | M | BE |
+| L-01 | 账务表、约束与触发器 | F-03,P0-2 | 第五章 SQL：`account/txn/posting/balance`、借贷平衡延迟触发器、只追加触发器、撤销应用角色 UPDATE/DELETE（**注意：F-03 的默认权限会自动给 `ledger_rw` 授予新表的 UPDATE/DELETE/TRUNCATE，L-01 必须对 `ledger.txn`、`ledger.posting` 显式 REVOKE**；迁移必须由 F-03 约定的同一个迁移角色执行，否则默认权限不生效） | ① 借贷不平提交失败；② UPDATE/DELETE 流水失败；③ 负余额被约束拦截；④ 单例账户（银行、平台、过渡）种子；⑤ 用 `app_ledger` 登录身份验证：能 INSERT/SELECT 流水，UPDATE/DELETE/TRUNCATE 被权限拒绝（SQLSTATE 42501），且被触发器兜底 | M | BE |
 | L-02 | `Post()` 入账核心 | L-01 | Go 函数：校验、按账户 id 升序加锁、幂等键、写 txn/posting/balance、outbox | ① P0-2 全部验收；② 重复 `idem_key` 返回原结果；③ 不足返回 `ERR_INSUFFICIENT_FUNDS` 且不记账；④ 提交后事件失败不影响已入账（outbox） | L | BE |
 | L-03 | 业务入账封装（6.1–6.19） | L-02 | 每类业务一个强类型方法：`Topup`、`Freeze`、`Settle`、`RefundFrozen`、`WithdrawReq`、`Payout`、`PayoutFail`、`StorageFee`、`DeliveryHold`、`DeliveryRelease`、`DeliveryRefund`、`AdCharge/AdSpend/AdRefund`、`MemberFee`、`Sweep`、`CarrierPay`、`Reverse`、`BankDiff` | ① 每个方法的分录与第六章表格一致（表驱动测试逐条对照）；② 分账用整数运算最后一项倒挤，**之和恒等于总额**（含奇数/极小金额/舍入边界测试）；③ 每个方法定义幂等键规则 | L | BE |
 | L-04 | 冻结明细与分批结算 | L-03 | `ledger.hold`、装修资金计划的冻结/释放/争议 | ① `hold` 与分录一一对应；② 争议冻结不动；③ 裁决人 ≠ 出款人 | M | BE |
