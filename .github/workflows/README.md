@@ -13,10 +13,12 @@
 | `docker-image` | 构建镜像，以真实 PostgreSQL 启动，检查 health、ready、Docker 健康状态和 uid 10001 | 后端或 CI 基础设施变化 |
 | `openapi-check` | 存在 `backend/scripts/check-generated.sh` 时检查生成代码，否则成功跳过 | API、后端或 CI 基础设施变化；F-04 合并后自动生效 |
 | `frontend-check` | 存在 `pnpm-workspace.yaml` 时先启用 pnpm，再安装、类型检查、构建和检查三语词条，否则成功跳过 | 前端或 CI 基础设施变化；F-06 合并后自动生效 |
-| `vuln-scan` | 执行 `govulncheck ./...` | 后端或 CI 基础设施变化；目前告警但不阻塞 |
+| `vuln-scan` | 使用固定版本 `govulncheck v1.9.0` 执行 `govulncheck ./...` | 后端或 CI 基础设施变化；阻塞 |
 | `ci-gate` | 汇总所有结果，必需任务失败或取消时失败，条件跳过视为通过 | 始终 |
 
-推送到 `main` 时不会按路径跳过任何重型任务。纯文档 PR 只运行 `changes`、`light-checks` 和 `ci-gate`。`vuln-scan` 在连续 10 个 PR 中稳定运行且团队完成现有漏洞分级后，再取消 `continue-on-error` 并纳入阻塞结果。
+推送到 `main` 时不会按路径跳过任何重型任务。纯文档 PR 只运行 `changes`、`light-checks` 和 `ci-gate`。`vuln-scan` 使用固定版本 `v1.9.0` 并作为阻塞检查；升级 Go 工具链后应先在同一 govulncheck 版本下复扫，只有结果清零才能保持阻塞。
+
+Go 工具链版本以 `backend/go.mod` 的 `go` 指令为 CI 和本地开发基准，`backend/Dockerfile` 的构建镜像必须使用相同补丁版本。升级时同时核对两处，并运行 `go mod tidy`、`go vet`、`go test -race` 和 `govulncheck`。
 
 工作流只使用以下官方 Actions，均固定到主版本标签：`actions/checkout@v7`、`actions/setup-go@v7`、`actions/setup-node@v7`、`docker/setup-buildx-action@v4`、`docker/build-push-action@v7`。这些版本使用 Node 24，要求 Actions Runner 版本不低于 2.327.1；本仓库使用 GitHub 托管 runner。
 
@@ -31,6 +33,7 @@ go vet ./...
 go mod tidy && git diff --exit-code -- go.mod go.sum
 go test -race -count=1 -skip '^TestDatabaseFramework$' ./...
 go test -count=1 -run '^TestDatabaseFramework$' -v ./internal/platform/db
+go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 cd ..
 backend/scripts/check-secrets.sh
 python3 backend/scripts/check-doc-index.py

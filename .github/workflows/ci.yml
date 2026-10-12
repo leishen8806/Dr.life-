@@ -230,7 +230,6 @@ jobs:
   vuln-scan:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push')
-    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -240,10 +239,9 @@ jobs:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
       - name: Run govulncheck
-        continue-on-error: true
         working-directory: backend
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
           govulncheck ./...
 
   ci-gate:
@@ -268,12 +266,11 @@ jobs:
           import json, os, sys
 
           jobs = json.loads(os.environ["RESULTS"])
-          non_blocking = {"vuln-scan"}
           failed = []
           for name, job in jobs.items():
               result = job["result"]
               print(f"{name}: {result}")
-              if name not in non_blocking and result not in {"success", "skipped"}:
+              if result not in {"success", "skipped"}:
                   failed.append(f"{name}={result}")
           if failed:
               print("blocking jobs did not pass: " + ", ".join(failed), file=sys.stderr)
