@@ -95,7 +95,7 @@ jobs:
 
   backend-tests:
     needs: changes
-    if: needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -110,7 +110,7 @@ jobs:
 
   backend-integration:
     needs: changes
-    if: needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -125,7 +125,7 @@ jobs:
 
   docker-image:
     needs: changes
-    if: needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -181,7 +181,7 @@ jobs:
 
   openapi-check:
     needs: changes
-    if: needs.changes.outputs.api_changed == 'true' || needs.changes.outputs.backend_changed == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.api_changed == 'true' || needs.changes.outputs.backend_changed == 'true' || github.event_name == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -201,7 +201,7 @@ jobs:
 
   frontend-check:
     needs: changes
-    if: needs.changes.outputs.frontend_changed == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.frontend_changed == 'true' || github.event_name == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -227,7 +227,7 @@ jobs:
 
   vuln-scan:
     needs: changes
-    if: needs.changes.outputs.backend_changed == 'true' || github.event_name == 'push'
+    if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.backend_changed == 'true' || github.event_name == 'push')
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
