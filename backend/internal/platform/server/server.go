@@ -10,6 +10,8 @@ import (
 	"log/slog"
 
 	"github.com/go-chi/chi/v5"
+	api "github.com/leishen8806/Dr.life-/backend/internal/api"
+	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 )
 
@@ -18,6 +20,7 @@ type ReadinessCheck func(context.Context) error
 func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID, httpx.RequestLogger(logger), httpx.Recover(logger))
+	gen.HandlerFromMux(api.Handler{}, router)
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
