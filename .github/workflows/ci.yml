@@ -161,6 +161,8 @@ jobs:
           trap cleanup EXIT
           docker run -d --name drlife-backend-ci \
             --add-host host.docker.internal:host-gateway \
+            --health-cmd 'wget -q -O /dev/null http://127.0.0.1:9999/healthz || exit 1' \
+            --health-interval 2s --health-timeout 1s --health-retries 3 \
             -p 127.0.0.1:18080:8080 \
             -e APP_ENV=test \
             -e DATABASE_URL=postgres://drlife_ci:test-only@host.docker.internal:5432/drlife_ci?sslmode=disable \
