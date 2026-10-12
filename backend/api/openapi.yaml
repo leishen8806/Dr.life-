@@ -49,6 +49,8 @@ paths:
                 $ref: "#/components/schemas/PingSuccessResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
         "429":
           $ref: "#/components/responses/TooManyRequests"
         "500":
@@ -121,13 +123,14 @@ components:
       type: integer
       format: int32
       description: Documented application error code; ranges are described in the API description.
-      enum: [1001, 1002, 1003, 1004, 1005, 2001, 2002]
+      enum: [1001, 1002, 1003, 1004, 1005, 1006, 2001, 2002]
       x-enum-varnames:
         - InternalError
         - InvalidArgument
         - ResourceNotFound
         - TooManyRequests
         - ServiceUnavailable
+        - MethodNotAllowed
         - Unauthenticated
         - PermissionDenied
     Messages:
@@ -236,6 +239,12 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     ServiceUnavailable:
       description: Service temporarily unavailable (error code 1005).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    MethodNotAllowed:
+      description: HTTP method is not allowed (error code 1006).
       content:
         application/json:
           schema:

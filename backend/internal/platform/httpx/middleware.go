@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -33,7 +34,7 @@ func Recover(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
+func RequestLogger(logger *slog.Logger, roleFromContext ...func(context.Context) string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			started := time.Now()
@@ -46,13 +47,17 @@ func RequestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 				if route := chi.RouteContext(r.Context()).RoutePattern(); route != "" {
 					path = route
 				}
+				role := ""
+				if len(roleFromContext) == 1 {
+					role = roleFromContext[0](r.Context())
+				}
 				logger.InfoContext(r.Context(), "http request",
 					"request_id", RequestIDFromContext(r.Context()),
 					"method", r.Method,
 					"path", path,
 					"status", response.status,
 					"duration_ms", time.Since(started).Milliseconds(),
-					"role", "",
+					"role", role,
 				)
 			}()
 			next.ServeHTTP(response, r)
