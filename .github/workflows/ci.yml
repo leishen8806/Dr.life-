@@ -193,12 +193,13 @@ jobs:
       - name: Check generated OpenAPI files
         shell: bash
         run: |
-          echo '// F-13 temporary workflow-only drift check' >> backend/internal/api/gen/openapi.gen.go
           if [[ -x backend/scripts/check-generated.sh ]]; then
             backend/scripts/check-generated.sh
           else
             echo "F-04 尚未合并，跳过"
           fi
+          echo '// F-13 temporary workflow-only drift check' >> backend/internal/api/gen/openapi.gen.go
+          git diff --exit-code -- backend/internal/api/gen/openapi.gen.go
 
   frontend-check:
     needs: changes
