@@ -50,3 +50,5 @@ F-08 上线后观察前 10 个 PR：完整 CI 中位耗时目标不超过 8 分�
 ## 设置合并门槛
 
 仓库管理员在 GitHub **Settings → Branches** 为 `main` 添加保护规则，启用 **Require a pull request before merging** 和 **Require status checks to pass**，必需检查只选择 `ci-gate`。Codex 不修改分支保护设置。
+
+<!-- CI negative probe: sk-THIS_IS_NOT_REAL_0000000000000000 -->
