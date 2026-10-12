@@ -60,14 +60,14 @@ func TestLedgerMigrationAndConstraints(t *testing.T) {
 	}
 
 	t.Run("down removes ledger objects and up restores them", func(t *testing.T) {
-		if err := goose.Down(database, migrations); err != nil {
+		if err := goose.DownTo(database, migrations, 3); err != nil {
 			t.Fatal(err)
 		}
 		assertLedgerObjectCount(t, database, 0, 0)
 		if err := goose.Up(database, migrations); err != nil {
 			t.Fatal(err)
 		}
-		assertLedgerObjectCount(t, database, 9, 6)
+		assertLedgerObjectCount(t, database, 9, 7)
 	})
 
 	admin, err := pgx.Connect(ctx, dsn)

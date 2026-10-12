@@ -253,10 +253,11 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 2. **开启事务**（`READ COMMITTED` + 显式行锁）。
 3. **按 `account_id` 升序**对涉及的 `ledger.balance` 行 `SELECT … FOR UPDATE`（**固定顺序加锁，避免死锁**）。
 4. 检查余额：借记负债账户后不得小于 0（客户资金）；不足返回 `ERR_INSUFFICIENT_FUNDS`，**不记账**。
-5. `INSERT ledger.txn`（带 `idem_key`）。**若唯一冲突，说明是重复请求：读取并返回已有结果，不再入账。**
+5. `INSERT ledger.txn`（带 `idem_key`）。**若唯一冲突，比较类型、金额、关联信息、发起人和规范化后的分录；内容相同才读取 outbox 中保存的原结果并返回，内容不同返回幂等冲突，不再入账。**
 6. `INSERT ledger.posting`（批量）；更新各 `balance`（`balance = balance ± amount`，`version+1`）。
-7. 提交事务；提交时延迟触发器验证借贷平衡；失败整体回滚。
-8. 提交后发事件（通知、财务中心缓存失效）；**事件发送失败不影响账已入**（用 outbox 表保证至少一次）。
+7. 同事务写入 outbox，再提交事务；提交时延迟触发器验证借贷平衡，任一步失败均整体回滚。
+8. outbox 工作者用 `FOR UPDATE SKIP LOCKED` 并发领取，发送成功后标记 `sent_at`；发送失败释放事务锁以便重试，**不回滚已经提交的账务**。
+9. `40001`（序列化失败）和 `40P01`（死锁）有限次数退避重试；其他数据库错误和业务错误不自动重试，上下文取消立即停止。
 
 **幂等键规则（`idem_key`）：** `业务类型:业务单据:动作[:序号]`，例如 `delivery_hold:order:12345`、`payout:withdrawal:777`、`settle:batch:99`；重试同一动作必须用同一个键。
 
