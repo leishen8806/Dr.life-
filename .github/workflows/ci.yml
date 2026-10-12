@@ -1,0 +1,278 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+      backend_changed: ${{ steps.classify.outputs.backend_changed }}
+      frontend_changed: ${{ steps.classify.outputs.frontend_changed }}
+      api_changed: ${{ steps.classify.outputs.api_changed }}
+      infra_changed: ${{ steps.classify.outputs.infra_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: classify
+        name: Classify changed files
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            for output in docs_only backend_changed frontend_changed api_changed infra_changed; do
+              [[ "$output" == docs_only ]] && value=false || value=true
+              echo "$output=$value" >> "$GITHUB_OUTPUT"
+            done
+            exit 0
+          fi
+
+          git diff --name-only -z "$BASE_SHA" "$HEAD_SHA" > changed-files
+          docs_only=true
+          backend_changed=false
+          frontend_changed=false
+          api_changed=false
+          infra_changed=false
+          while IFS= read -r -d '' file; do
+            case "$file" in
+              *.md|docs/*|LICENSE|LICENSE.*) ;;
+              *) docs_only=false ;;
+            esac
+            case "$file" in backend/*) backend_changed=true ;; esac
+            case "$file" in apps/*|packages/*|site/*|pnpm-workspace.yaml|pnpm-lock.yaml|package.json) frontend_changed=true ;; esac
+            case "$file" in backend/api/*) api_changed=true ;; esac
+            case "$file" in .github/*|backend/Dockerfile|backend/Makefile|backend/scripts/*|docker-compose*.yml|docker-compose*.yaml) infra_changed=true ;; esac
+          done < changed-files
+          {
+            echo "docs_only=$docs_only"
+            echo "backend_changed=$backend_changed"
+            echo "frontend_changed=$frontend_changed"
+            echo "api_changed=$api_changed"
+            echo "infra_changed=$infra_changed"
+          } >> "$GITHUB_OUTPUT"
+
+  light-checks:
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Check Go formatting
+        working-directory: backend
+        run: test -z "$(gofmt -l .)"
+      - name: Run go vet
+        working-directory: backend
+        run: go vet ./...
+      - name: Check module files are tidy
+        working-directory: backend
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Scan tracked files for secrets
+        run: backend/scripts/check-secrets.sh
+      - name: Check README document index
+        run: python3 backend/scripts/check-doc-index.py
+
+  backend-tests:
+    needs: changes
+    if: needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Run unit tests with race detector
+        working-directory: backend
+        run: go test -race -count=1 -skip '^TestDatabaseFramework$' ./...
+
+  backend-integration:
+    needs: changes
+    if: needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Run PostgreSQL integration tests
+        working-directory: backend
+        run: go test -count=1 -run '^TestDatabaseFramework$' -v ./internal/platform/db
+
+  docker-image:
+    needs: changes
+    if: needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: drlife_ci
+          POSTGRES_USER: drlife_ci
+          POSTGRES_PASSWORD: test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U drlife_ci -d drlife_ci"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          load: true
+          push: false
+          tags: drlife-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Start and verify image
+        shell: bash
+        run: |
+          cleanup() { docker rm -f drlife-backend-ci >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          docker run -d --name drlife-backend-ci \
+            --add-host host.docker.internal:host-gateway \
+            -p 127.0.0.1:18080:8080 \
+            -e APP_ENV=test \
+            -e DATABASE_URL=postgres://drlife_ci:test-only@host.docker.internal:5432/drlife_ci?sslmode=disable \
+            drlife-backend:ci
+
+          deadline=$((SECONDS + 60))
+          until [[ "$(docker inspect --format '{{.State.Health.Status}}' drlife-backend-ci)" == healthy ]]; do
+            if (( SECONDS >= deadline )); then
+              docker inspect drlife-backend-ci
+              docker logs drlife-backend-ci
+              exit 1
+            fi
+            sleep 2
+          done
+          test "$(docker exec drlife-backend-ci id -u)" = 10001
+          curl --fail --silent --show-error http://127.0.0.1:18080/healthz >/dev/null
+          curl --fail --silent --show-error http://127.0.0.1:18080/readyz >/dev/null
+
+  openapi-check:
+    needs: changes
+    if: needs.changes.outputs.api_changed == 'true' || needs.changes.outputs.backend_changed == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Check generated OpenAPI files
+        shell: bash
+        run: |
+          if [[ -x backend/scripts/check-generated.sh ]]; then
+            backend/scripts/check-generated.sh
+          else
+            echo "F-04 尚未合并，跳过"
+          fi
+
+  frontend-check:
+    needs: changes
+    if: needs.changes.outputs.frontend_changed == 'true' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: hashFiles('pnpm-workspace.yaml') != ''
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Check frontend
+        shell: bash
+        run: |
+          if [[ -f pnpm-workspace.yaml ]]; then
+            corepack enable
+            pnpm install --frozen-lockfile
+            pnpm -r typecheck
+            pnpm -r build
+            pnpm -r i18n:check
+          else
+            echo "F-06 尚未合并，跳过"
+          fi
+
+  vuln-scan:
+    needs: changes
+    if: needs.changes.outputs.backend_changed == 'true' || github.event_name == 'push'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Run govulncheck
+        working-directory: backend
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  ci-gate:
+    if: always()
+    needs:
+      - changes
+      - light-checks
+      - backend-tests
+      - backend-integration
+      - docker-image
+      - openapi-check
+      - frontend-check
+      - vuln-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require all blocking jobs
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          jobs = json.loads(os.environ["RESULTS"])
+          non_blocking = {"vuln-scan"}
+          failed = []
+          for name, job in jobs.items():
+              result = job["result"]
+              print(f"{name}: {result}")
+              if name not in non_blocking and result not in {"success", "skipped"}:
+                  failed.append(f"{name}={result}")
+          if failed:
+              print("blocking jobs did not pass: " + ", ".join(failed), file=sys.stderr)
+              sys.exit(1)
+          PY
