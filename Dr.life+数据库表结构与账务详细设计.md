@@ -169,7 +169,12 @@ create table ledger.account (
   allow_negative boolean not null default false,
   status        text not null default 'open' check (status in ('open','closed')),
   created_at    timestamptz not null default now(),
-  unique (kind, owner_account)
+  check ((kind = 'BANK_DEDICATED' and normal_side = 'DEBIT') or
+         (kind <> 'BANK_DEDICATED' and normal_side = 'CREDIT')),
+  check ((kind in ('BANK_DEDICATED','PENDING_PAYOUT','DELIVERY_ESCROW','PLATFORM_HELD','PAYABLE_CARRIER','SUSPENSE') and owner_account is null) or
+         (kind in ('WALLET_AVAIL','WALLET_FROZEN','AD_BUDGET') and owner_account is not null)),
+  check (not allow_negative or kind in ('PAYABLE_CARRIER','SUSPENSE')),
+  unique nulls not distinct (kind, owner_account)
 );
 
 -- 交易（一次业务动作）
@@ -207,8 +212,10 @@ create index ix_posting_txn on ledger.posting(txn_id);
 create table ledger.balance (
   account_id    bigint primary key references ledger.account(id),
   balance       bigint not null default 0,         -- 正常方向余额
+  allow_negative boolean not null,                 -- 从 account 冗余，数据库 CHECK 可直接约束余额
   version       bigint not null default 0,
-  updated_at    timestamptz not null default now()
+  updated_at    timestamptz not null default now(),
+  check (allow_negative or balance >= 0)
 );
 ```
 
@@ -233,12 +240,13 @@ create function ledger.deny_mutation() returns trigger as $$
 begin raise exception 'ledger rows are append-only'; end $$ language plpgsql;
 create trigger trg_txn_ro     before update or delete on ledger.txn     for each row execute function ledger.deny_mutation();
 create trigger trg_posting_ro before update or delete on ledger.posting for each row execute function ledger.deny_mutation();
--- 同时：REVOKE UPDATE, DELETE ON ledger.txn, ledger.posting FROM ALL应用角色；
+create trigger trg_txn_no_truncate before truncate on ledger.txn for each statement execute function ledger.deny_mutation();
+create trigger trg_posting_no_truncate before truncate on ledger.posting for each statement execute function ledger.deny_mutation();
+-- 同时：REVOKE UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ledger.txn, ledger.posting FROM ledger_rw；
 
--- (3) 非负余额：客户资金账户不允许为负（透支就是 bug）
-alter table ledger.balance add constraint ck_balance_nonneg check (balance >= 0);   -- 对 allow_negative=false 的账户；SUSPENSE 例外用单独表或部分约束
+-- (3) 非负余额：由 balance.allow_negative + CHECK 兜底；客户资金账户永远是 false
 ```
-> `SUSPENSE` 和 `PAYABLE_CARRIER` 如允许暂时为负，应放入 `allow_negative` 账户，通过应用层规则放行；也可用 `exclude`/触发器按 `allow_negative` 校验。**客户钱包类账户永远不允许为负。**
+> `SUSPENSE` 使用 CREDIT 正常方向并允许暂时为负，供对账差异双向暂存；`PAYABLE_CARRIER` 第一版保持不允许负数。`allow_negative` 在创建账户时由触发器复制到 `balance`，且余额写入触发器要求两处策略一致；**客户钱包类账户永远不允许为负。**
 
 ### 入账流程（账务模块唯一入口 `Post(ctx, req)`）
 1. 校验请求：金额 > 0；分录借贷平衡；账户存在且 `open`；金额与业务单据一致（例如分账之和 = 托管金额）。

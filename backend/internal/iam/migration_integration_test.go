@@ -66,7 +66,7 @@ func TestIAMMigration(t *testing.T) {
 
 	t.Run("up down up is reversible", func(t *testing.T) {
 		assertIAMTableCount(t, database, 16)
-		if err := goose.Down(database, migrationsDir); err != nil {
+		if err := goose.DownTo(database, migrationsDir, 2); err != nil {
 			t.Fatal(err)
 		}
 		assertIAMTableCount(t, database, 0)
