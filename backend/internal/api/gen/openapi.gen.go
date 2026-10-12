@@ -14,6 +14,7 @@ import (
 const (
 	ErrorCodeInternalError      ErrorCode = 1001
 	ErrorCodeInvalidArgument    ErrorCode = 1002
+	ErrorCodeMethodNotAllowed   ErrorCode = 1006
 	ErrorCodePermissionDenied   ErrorCode = 2002
 	ErrorCodeResourceNotFound   ErrorCode = 1003
 	ErrorCodeServiceUnavailable ErrorCode = 1005
@@ -27,6 +28,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeInternalError:
 		return true
 	case ErrorCodeInvalidArgument:
+		return true
+	case ErrorCodeMethodNotAllowed:
 		return true
 	case ErrorCodePermissionDenied:
 		return true
@@ -184,6 +187,9 @@ type Forbidden = ErrorEnvelope
 
 // InternalServerError defines model for InternalServerError.
 type InternalServerError = ErrorEnvelope
+
+// MethodNotAllowed defines model for MethodNotAllowed.
+type MethodNotAllowed = ErrorEnvelope
 
 // NotFound defines model for NotFound.
 type NotFound = ErrorEnvelope

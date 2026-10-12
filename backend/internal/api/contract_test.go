@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 )
 
@@ -58,6 +59,65 @@ func TestPublicPingMatchesOpenAPI(t *testing.T) {
 	response := doc.Paths.Value("/v1/public/ping").Get.Responses.Value("200")
 	if err := response.Value.Content.Get("application/json").Schema.Value.VisitJSON(body); err != nil {
 		t.Fatalf("response does not match OpenAPI schema: %v", err)
+	}
+}
+
+func TestEveryErrorAndRouterFailureMatchesOpenAPI(t *testing.T) {
+	doc := loadSpec(t)
+	schema := doc.Components.Schemas["ErrorEnvelope"].Value
+	for _, code := range documentedErrorCodes(t, doc) {
+		t.Run(strconv.Itoa(code), func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, "/", nil)
+			response := httptest.NewRecorder()
+			httpx.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				httpx.WriteError(w, r, httpx.NewAppError(httpx.ErrorCode(code)))
+			})).ServeHTTP(response, request)
+			assertErrorSchema(t, schema, response)
+		})
+	}
+
+	handler := server.NewHandler(nil)
+	for _, test := range []struct {
+		name, method, path string
+		status             int
+		code               httpx.ErrorCode
+	}{
+		{name: "not found", method: http.MethodGet, path: "/missing", status: http.StatusNotFound, code: httpx.CodeResourceNotFound},
+		{name: "method not allowed", method: http.MethodOptions, path: "/v1/public/ping", status: http.StatusMethodNotAllowed, code: httpx.CodeMethodNotAllowed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, httptest.NewRequest(test.method, test.path, nil))
+			if response.Code != test.status {
+				t.Fatalf("status=%d want=%d body=%s", response.Code, test.status, response.Body.String())
+			}
+			var body struct {
+				Error struct {
+					Code httpx.ErrorCode `json:"code"`
+				} `json:"error"`
+			}
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if body.Error.Code != test.code {
+				t.Fatalf("code=%d want=%d", body.Error.Code, test.code)
+			}
+			assertErrorSchema(t, schema, response)
+		})
+	}
+}
+
+func assertErrorSchema(t *testing.T, schema *openapi3.Schema, response *httptest.ResponseRecorder) {
+	t.Helper()
+	if response.Header().Get("Content-Type") != "application/json; charset=utf-8" {
+		t.Fatalf("Content-Type=%q", response.Header().Get("Content-Type"))
+	}
+	var body any
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if err := schema.VisitJSON(body); err != nil {
+		t.Fatalf("response does not match ErrorEnvelope: %v; body=%s", err, response.Body.String())
 	}
 }
 

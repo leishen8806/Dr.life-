@@ -8,9 +8,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/db"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 )
@@ -33,6 +35,31 @@ func main() {
 	}
 	defer database.Close()
 
+	clientIP, err := gateway.NewClientIPResolver(cfg.TrustedProxyHeader, cfg.TrustedProxyCIDRs)
+	if err != nil {
+		logger.Error("gateway configuration failed", "error", err)
+		os.Exit(1)
+	}
+	memoryLimiter := gateway.NewMemoryLimiter()
+	var limiter gateway.Limiter = memoryLimiter
+	if cfg.RedisURL != "" {
+		redisLimiter, redisErr := gateway.NewRedisLimiter(cfg.RedisURL)
+		if redisErr != nil {
+			logger.Error("Redis limiter configuration failed", "error", redisErr)
+			os.Exit(1)
+		}
+		defer redisLimiter.Close()
+		limiter = &gateway.FallbackLimiter{Primary: redisLimiter, Fallback: memoryLimiter, Logger: logger}
+	}
+	strictRules := func(defaultLimit int) gateway.RuleSet {
+		return gateway.RuleSet{
+			Default:    gateway.Rule{Limit: defaultLimit, Window: time.Minute},
+			Login:      gateway.Rule{Limit: cfg.RateLimitLogin, Window: time.Minute},
+			Withdrawal: gateway.Rule{Limit: cfg.RateLimitWithdraw, Window: time.Minute},
+			AI:         gateway.Rule{Limit: cfg.RateLimitAI, Window: time.Minute},
+		}
+	}
+
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)
 	if err != nil {
 		logger.Error("http listener failed", "error", err)
@@ -40,8 +67,14 @@ func main() {
 	}
 
 	httpServer := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           server.NewHandler(logger, db.Ping(database)),
+		Addr: cfg.HTTPAddr,
+		Handler: server.NewHandlerWithGateway(logger, server.GatewayOptions{
+			AllowedOrigins: cfg.CORSAllowedOrigins,
+			ClientIP:       clientIP,
+			Limiter:        limiter,
+			IPRules:        strictRules(cfg.RateLimitIP),
+			AccountRules:   strictRules(cfg.RateLimitAccount),
+		}, db.Ping(database)),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,
 		IdleTimeout:       cfg.IdleTimeout,

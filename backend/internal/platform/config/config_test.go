@@ -27,34 +27,45 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.HTTPAddr != ":8080" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second {
+	if cfg.HTTPAddr != ":8080" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.RateLimitIP != 120 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 	if cfg.DatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" {
 		t.Fatalf("optional URLs should be empty: %+v", cfg)
 	}
+	if len(cfg.CORSAllowedOrigins) != 0 || cfg.TrustedProxyHeader != "" || len(cfg.TrustedProxyCIDRs) != 0 {
+		t.Fatalf("gateway trust defaults should be empty: %+v", cfg)
+	}
 }
 
 func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 	cfg, err := load(lookup(map[string]string{
-		"APP_ENV":                     "staging",
-		"HTTP_ADDR":                   "127.0.0.1:9090",
-		"LOG_LEVEL":                   "debug",
-		"SHUTDOWN_TIMEOUT_SECONDS":    "8",
-		"READ_HEADER_TIMEOUT_SECONDS": "12",
-		"READ_TIMEOUT_SECONDS":        "35",
-		"IDLE_TIMEOUT_SECONDS":        "75",
-		"DATABASE_URL":                "postgres://placeholder",
-		"REPORT_DATABASE_URL":         "postgres://report-placeholder",
-		"DB_MAX_CONNS":                "20",
-		"DB_MIN_CONNS":                "4",
-		"DB_CONNECT_TIMEOUT_SECONDS":  "6",
-		"REDIS_URL":                   "redis://placeholder",
+		"APP_ENV":                        "staging",
+		"HTTP_ADDR":                      "127.0.0.1:9090",
+		"LOG_LEVEL":                      "debug",
+		"SHUTDOWN_TIMEOUT_SECONDS":       "8",
+		"READ_HEADER_TIMEOUT_SECONDS":    "12",
+		"READ_TIMEOUT_SECONDS":           "35",
+		"IDLE_TIMEOUT_SECONDS":           "75",
+		"DATABASE_URL":                   "postgres://placeholder",
+		"REPORT_DATABASE_URL":            "postgres://report-placeholder",
+		"DB_MAX_CONNS":                   "20",
+		"DB_MIN_CONNS":                   "4",
+		"DB_CONNECT_TIMEOUT_SECONDS":     "6",
+		"REDIS_URL":                      "redis://placeholder",
+		"CORS_ALLOWED_ORIGINS":           "https://miniapp.settlecore.org,http://localhost:5173",
+		"TRUSTED_PROXY_HEADER":           "CF-Connecting-IP",
+		"TRUSTED_PROXY_CIDRS":            "192.0.2.0/24,2001:db8::/32",
+		"RATE_LIMIT_IP_PER_MINUTE":       "100",
+		"RATE_LIMIT_ACCOUNT_PER_MINUTE":  "200",
+		"RATE_LIMIT_LOGIN_PER_MINUTE":    "9",
+		"RATE_LIMIT_WITHDRAW_PER_MINUTE": "4",
+		"RATE_LIMIT_AI_PER_MINUTE":       "20",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AppEnv != "staging" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second {
+	if cfg.AppEnv != "staging" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || len(cfg.CORSAllowedOrigins) != 2 || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	for _, raw := range []string{"0", "-1", "abc"} {
@@ -80,6 +91,19 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 	}
 	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "DB_MAX_CONNS": "2", "DB_MIN_CONNS": "3"})); err == nil {
 		t.Fatal("expected DB_MIN_CONNS greater than DB_MAX_CONNS to fail")
+	}
+	for name, env := range map[string]map[string]string{
+		"bad origin":          {"APP_ENV": "test", "CORS_ALLOWED_ORIGINS": "*"},
+		"bad cidr":            {"APP_ENV": "test", "TRUSTED_PROXY_HEADER": "CF-Connecting-IP", "TRUSTED_PROXY_CIDRS": "bad"},
+		"header without cidr": {"APP_ENV": "test", "TRUSTED_PROXY_HEADER": "CF-Connecting-IP"},
+		"cidr without header": {"APP_ENV": "test", "TRUSTED_PROXY_CIDRS": "127.0.0.1/32"},
+		"bad rate":            {"APP_ENV": "test", "RATE_LIMIT_IP_PER_MINUTE": "0"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := load(lookup(env)); err == nil {
+				t.Fatal("expected configuration error")
+			}
+		})
 	}
 }
 
