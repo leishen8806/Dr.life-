@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/go-chi/chi/v5"
@@ -35,6 +36,43 @@ func TestHTTPMetricsUseRoutePatternWithoutCardinalityGrowth(t *testing.T) {
 	}
 	if got := labelValue(family.Metric[0], "route"); got != "/v1/buyer/orders/{id}" {
 		t.Fatalf("route label = %q", got)
+	}
+}
+
+func TestHTTPMetricsCollapseCustomMethodsToOther(t *testing.T) {
+	metrics := NewMetrics()
+	router := chi.NewRouter()
+	router.Use(metrics.HTTPMiddleware)
+	router.HandleFunc("/v1/public/ping", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	for i := 0; i < 1000; i++ {
+		request := httptest.NewRequest("CUSTOM"+strings.Repeat("X", i+1), "/v1/public/ping", nil)
+		router.ServeHTTP(httptest.NewRecorder(), request)
+	}
+	family := metricFamily(t, metrics, "drlife_http_requests_total")
+	if len(family.Metric) != 1 {
+		t.Fatalf("series = %d, want 1", len(family.Metric))
+	}
+	if got := labelValue(family.Metric[0], "method"); got != "OTHER" {
+		t.Fatalf("method label = %q, want OTHER", got)
+	}
+}
+
+func TestHTTPMetricLabelsUseFixedSets(t *testing.T) {
+	for _, test := range []struct {
+		input string
+		want  string
+	}{{http.MethodGet, http.MethodGet}, {"get", http.MethodGet}, {"TRACE", "OTHER"}, {"CUSTOM", "OTHER"}} {
+		if got := methodLabel(test.input); got != test.want {
+			t.Errorf("methodLabel(%q) = %q, want %q", test.input, got, test.want)
+		}
+	}
+	for _, test := range []struct {
+		input int
+		want  string
+	}{{100, "1xx"}, {204, "2xx"}, {302, "3xx"}, {403, "4xx"}, {503, "5xx"}, {999, "other"}} {
+		if got := statusClass(test.input); got != test.want {
+			t.Errorf("statusClass(%d) = %q, want %q", test.input, got, test.want)
+		}
 	}
 }
 
@@ -95,16 +133,54 @@ func TestBusinessMetricMethods(t *testing.T) {
 func TestSlowQueryUsesFingerprintAndNeverLogsArguments(t *testing.T) {
 	metrics := NewMetrics()
 	var logs bytes.Buffer
-	tracer := QueryTracer{Threshold: time.Nanosecond, Metrics: metrics, Logger: logx.NewLogger(slog.LevelInfo, &logs)}
-	ctx := tracer.TraceQueryStart(context.Background(), nil, pgx.TraceQueryStartData{SQL: "SELECT * FROM account WHERE phone = $1", Args: []any{"0123456789"}})
+	tracer := NewQueryTracer(time.Nanosecond, metrics, logx.NewLogger(slog.LevelInfo, &logs))
+	template := "SELECT * FROM account WHERE phone = $1"
+	ctx := tracer.TraceQueryStart(context.Background(), nil, pgx.TraceQueryStartData{SQL: template, Args: []any{"0123456789"}})
 	time.Sleep(time.Microsecond)
 	tracer.TraceQueryEnd(ctx, nil, pgx.TraceQueryEndData{})
-	if strings.Contains(logs.String(), "0123456789") || strings.Contains(logs.String(), "SELECT *") {
-		t.Fatalf("query details leaked: %s", logs.String())
+	repeated := tracer.TraceQueryStart(context.Background(), nil, pgx.TraceQueryStartData{SQL: template, Args: []any{"second-secret-value"}})
+	time.Sleep(time.Microsecond)
+	tracer.TraceQueryEnd(repeated, nil, pgx.TraceQueryEndData{})
+	if strings.Contains(logs.String(), "0123456789") || strings.Contains(logs.String(), "second-secret-value") || !strings.Contains(logs.String(), template) || strings.Count(logs.String(), "slow database query fingerprint registered") != 1 {
+		t.Fatalf("unexpected query log: %s", logs.String())
 	}
 	family := metricFamily(t, metrics, "drlife_db_slow_queries_total")
-	if len(family.Metric) != 1 || labelValue(family.Metric[0], "fingerprint") != statementFingerprint("SELECT * FROM account WHERE phone = $1") {
+	if len(family.Metric) != 1 || labelValue(family.Metric[0], "fingerprint") != statementFingerprint(template) || family.Metric[0].GetCounter().GetValue() != 2 {
 		t.Fatalf("unexpected slow-query metric: %#v", family.Metric)
+	}
+}
+
+func TestSlowQueryFingerprintLimitAndTemplateTruncation(t *testing.T) {
+	metrics := NewMetrics()
+	var logs bytes.Buffer
+	tracer := newQueryTracer(time.Nanosecond, metrics, logx.NewLogger(slog.LevelInfo, &logs), 1)
+	firstTemplate := "SELECT '" + strings.Repeat("ក", 600) + "' WHERE secret = $1"
+	first := tracer.TraceQueryStart(context.Background(), nil, pgx.TraceQueryStartData{SQL: firstTemplate, Args: []any{"first-secret-value"}})
+	time.Sleep(time.Microsecond)
+	tracer.TraceQueryEnd(first, nil, pgx.TraceQueryEndData{})
+	secondTemplate := "SELECT * FROM second_table WHERE secret = $1"
+	second := tracer.TraceQueryStart(context.Background(), nil, pgx.TraceQueryStartData{SQL: secondTemplate, Args: []any{"second-secret-value"}})
+	time.Sleep(time.Microsecond)
+	tracer.TraceQueryEnd(second, nil, pgx.TraceQueryEndData{})
+
+	if got := utf8.RuneCountInString(sqlTemplate(firstTemplate)); got != maxSQLTemplateRunes {
+		t.Fatalf("template length = %d, want %d", got, maxSQLTemplateRunes)
+	}
+	if !strings.HasSuffix(sqlTemplate(firstTemplate), "...") {
+		t.Fatalf("truncated template lacks ellipsis: %q", sqlTemplate(firstTemplate))
+	}
+	logText := logs.String()
+	for _, secret := range []string{"first-secret-value", "second-secret-value"} {
+		if strings.Contains(logText, secret) {
+			t.Fatalf("query argument leaked: %s", logText)
+		}
+	}
+	if strings.Contains(logText, secondTemplate) || strings.Contains(logText, statementFingerprint(secondTemplate)) {
+		t.Fatalf("fingerprint beyond the bound was logged: %s", logText)
+	}
+	family := metricFamily(t, metrics, "drlife_db_slow_queries_total")
+	if len(family.Metric) != 2 || metricValueForLabel(family, "fingerprint", statementFingerprint(firstTemplate)) != 1 || metricValueForLabel(family, "fingerprint", slowQueryOverflowLabel) != 1 {
+		t.Fatalf("unexpected bounded slow-query metrics: %#v", family.Metric)
 	}
 }
 
@@ -125,6 +201,10 @@ func TestSentryDisabledWithoutDSNAndScrubsEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	reporter.hub.CaptureEvent(&sentry.Event{
+		Message: "call +855 12 345 678 with bot 123456:ABCdef_123 and Bearer header.payload.signature",
+		Exception: []sentry.Exception{{
+			Type: "Bearer type-secret", Value: "phone 0123456789 token 999:AlphaNum_1", Module: "Bearer module-secret",
+		}},
 		User:  sentry.User{ID: "public-1", Email: "person@example.test", IPAddress: "203.0.113.10", Name: "Person", Data: map[string]string{"phone": "0123456789"}},
 		Extra: map[string]any{"phone": "0123456789"},
 		Request: &sentry.Request{
@@ -133,13 +213,13 @@ func TestSentryDisabledWithoutDSNAndScrubsEvent(t *testing.T) {
 		},
 	})
 	event := transport.last(t)
-	serialized := event.Request.URL + event.Request.QueryString + event.Request.Data + event.Request.Cookies + event.User.Email + event.User.IPAddress + event.User.Name
-	for _, value := range []string{"secret", "0123456789", "person@example.test", "203.0.113.10"} {
+	serialized := event.Request.URL + event.Request.QueryString + event.Request.Data + event.Request.Cookies + event.User.Email + event.User.IPAddress + event.User.Name + event.Message + event.Exception[0].Type + event.Exception[0].Value + event.Exception[0].Module
+	for _, value := range []string{"secret", "0123456789", "+855 12 345 678", "123456:ABCdef_123", "999:AlphaNum_1", "header.payload.signature", "person@example.test", "203.0.113.10"} {
 		if strings.Contains(strings.ToLower(serialized), strings.ToLower(value)) {
 			t.Fatalf("event leaked %q: %#v", value, event)
 		}
 	}
-	if event.User.ID != "public-1" || event.Request.Headers["X-Safe"] != "visible" || event.Request.QueryString != "safe=yes" || event.Extra != nil {
+	if event.User.ID != "public-1" || event.Request.Headers["X-Safe"] != "visible" || event.Request.QueryString != "safe=yes" || event.Extra != nil || !strings.Contains(event.Message, "[REDACTED]") || !strings.Contains(event.Exception[0].Value, "[REDACTED]") {
 		t.Fatalf("unexpected scrubbed event: %#v", event)
 	}
 }
@@ -213,6 +293,15 @@ func labelValue(metric *dto.Metric, name string) string {
 		}
 	}
 	return ""
+}
+
+func metricValueForLabel(family *dto.MetricFamily, labelName, labelValueWant string) float64 {
+	for _, metric := range family.Metric {
+		if labelValue(metric, labelName) == labelValueWant {
+			return metric.GetCounter().GetValue()
+		}
+	}
+	return 0
 }
 
 type fakeTransport struct {

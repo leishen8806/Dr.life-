@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -13,6 +14,12 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
+)
+
+var (
+	bearerTokenPattern = regexp.MustCompile(`(?i)\bbearer[ \t]+[^\s,;]+`)
+	colonTokenPattern  = regexp.MustCompile(`\b[0-9]+:[[:alnum:]_-]+\b`)
+	phonePattern       = regexp.MustCompile(`\+?[0-9](?:[ ()-]*[0-9]){7,14}`)
 )
 
 type ErrorReporter struct {
@@ -80,6 +87,12 @@ func scrubEvent(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
 	}
 	event.Extra = nil
 	event.User = sentry.User{ID: event.User.ID}
+	event.Message = scrubText(event.Message)
+	for i := range event.Exception {
+		event.Exception[i].Type = scrubText(event.Exception[i].Type)
+		event.Exception[i].Value = scrubText(event.Exception[i].Value)
+		event.Exception[i].Module = scrubText(event.Exception[i].Module)
+	}
 	if event.Request != nil {
 		event.Request.Data = ""
 		event.Request.Cookies = ""
@@ -96,6 +109,12 @@ func scrubEvent(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
 		}
 	}
 	return event
+}
+
+func scrubText(value string) string {
+	value = bearerTokenPattern.ReplaceAllString(value, "[REDACTED]")
+	value = colonTokenPattern.ReplaceAllString(value, "[REDACTED]")
+	return phonePattern.ReplaceAllString(value, "[REDACTED]")
 }
 
 func scrubQuery(raw string) string {

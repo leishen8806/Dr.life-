@@ -70,8 +70,8 @@ func (m *Metrics) HTTPMiddleware(next http.Handler) http.Handler {
 		if route == "" {
 			route = "unmatched"
 		}
-		class := strconv.Itoa(captured.status/100) + "xx"
-		values := []string{role, route, r.Method, class}
+		class := statusClass(captured.status)
+		values := []string{role, route, methodLabel(r.Method), class}
 		m.requests.WithLabelValues(values...).Inc()
 		m.duration.WithLabelValues(values...).Observe(time.Since(started).Seconds())
 		if captured.status >= 400 {
@@ -84,6 +84,32 @@ func (m *Metrics) HTTPMiddleware(next http.Handler) http.Handler {
 			m.authFailures.WithLabelValues(strconv.Itoa(captured.status)).Inc()
 		}
 	})
+}
+
+func methodLabel(method string) string {
+	switch strings.ToUpper(method) {
+	case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions, http.MethodHead:
+		return strings.ToUpper(method)
+	default:
+		return "OTHER"
+	}
+}
+
+func statusClass(status int) string {
+	switch status / 100 {
+	case 1:
+		return "1xx"
+	case 2:
+		return "2xx"
+	case 3:
+		return "3xx"
+	case 4:
+		return "4xx"
+	case 5:
+		return "5xx"
+	default:
+		return "other"
+	}
 }
 
 func (m *Metrics) RegisterPool(pool *pgxpool.Pool) {

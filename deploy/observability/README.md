@@ -27,13 +27,13 @@ docker run --rm --entrypoint=promtool -v "$PWD/deploy/observability/prometheus:/
 | 业务 | `drlife_orders_total`, `drlife_withdrawals_total`, `drlife_ai_requests_total`, `drlife_bot_sends_total`, `drlife_login_validation_failures_total`, `drlife_ledger_posts_total`, `drlife_ledger_reconciliation_mismatches_total` | 固定枚举；未知值归为 `other` |
 | Go | `go_*`, `process_*` | Prometheus 默认采集器 |
 
-`route` 始终取 chi 路由模式，例如 `/v1/buyer/orders/{id}`；未匹配请求为 `unmatched`。禁止把原始路径、账号、手机号、订单号或任意错误文本放进标签。新增业务失败原因必须先扩充代码中的固定枚举。
+`route` 始终取 chi 路由模式，例如 `/v1/buyer/orders/{id}`；未匹配请求为 `unmatched`。HTTP 方法只允许 `GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`OPTIONS`、`HEAD`，其他方法统一为 `OTHER`；状态码也只归入固定的 `1xx` 至 `5xx` 或 `other`。慢查询指纹最多记录 256 个；超过上限的新指纹统一计入固定的 `overflow` 序列，以保留告警计数，同时不记录其模板日志或创建新指纹标签。禁止把原始路径、账号、手机号、订单号或任意错误文本放进标签。新增业务失败原因必须先扩充代码中的固定枚举。
 
 ## Sentry 与日志
 
-`SENTRY_DSN` 为空时不会初始化 Sentry 客户端，也不会发生外联。启用时通过 `APP_ENV` 和 `APP_RELEASE` 标记环境与版本。发送前会清除请求体、Cookie、Authorization、Idempotency-Key，以及查询参数中的 `init_data`、token、phone、secret、password、key；用户只保留 `public_id`，IP、姓名和邮箱被移除。panic 响应、JSON 日志和 Sentry 事件使用同一个 `request_id`。
+`SENTRY_DSN` 为空时不会初始化 Sentry 客户端，也不会发生外联。启用时通过 `APP_ENV` 和 `APP_RELEASE` 标记环境与版本。发送前会清除请求体、Cookie、Authorization、Idempotency-Key，以及查询参数中的 `init_data`、token、phone、secret、password、key；用户只保留 `public_id`，IP、姓名和邮箱被移除。事件消息和异常文本中的手机号、数字加冒号格式令牌及 Bearer 令牌会被遮蔽。panic 响应、JSON 日志和 Sentry 事件使用同一个 `request_id`。
 
-日志继续通过 `logx` 的字段名脱敏。慢查询日志只记录 `fingerprint`、耗时和命令结果，不记录 SQL、参数值或连接字符串。
+日志继续通过 `logx` 的字段名脱敏。每个被接纳的慢查询指纹第一次出现时会以 INFO 记录指纹和最长 500 字符的无参数 SQL 模板；后续日志只记录指纹、耗时和命令结果。任何慢查询日志都不记录参数值或连接字符串。
 
 ## 遗留
 
