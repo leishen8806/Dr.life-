@@ -103,6 +103,10 @@ type transactionCheck func(context.Context, pgx.Tx) error
 type transactionAfter func(context.Context, pgx.Tx, PostResult) error
 type transactionReplayCheck func(context.Context, pgx.Tx, PostResult) error
 
+type transactionReplay struct{ result PostResult }
+
+func (*transactionReplay) Error() string { return "ledger transaction replay" }
+
 type transactionHooks struct {
 	check       transactionCheck
 	after       transactionAfter
@@ -187,6 +191,18 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest, hooks trans
 	}
 	if hooks.check != nil {
 		if err := hooks.check(ctx, tx); err != nil {
+			var replay *transactionReplay
+			if errors.As(err, &replay) {
+				if hooks.replayCheck != nil {
+					if err := hooks.replayCheck(ctx, tx, replay.result); err != nil {
+						return PostResult{}, err
+					}
+				}
+				if err := tx.Commit(ctx); err != nil {
+					return PostResult{}, err
+				}
+				return replay.result, nil
+			}
 			return PostResult{}, err
 		}
 	}

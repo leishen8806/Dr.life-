@@ -67,7 +67,7 @@ func TestLedgerMigrationAndConstraints(t *testing.T) {
 		if err := goose.Up(database, migrations); err != nil {
 			t.Fatal(err)
 		}
-		assertLedgerObjectCount(t, database, 9, 8)
+		assertLedgerObjectCount(t, database, 9, 9)
 	})
 
 	admin, err := pgx.Connect(ctx, dsn)
@@ -210,10 +210,12 @@ func TestLedgerMigrationAndConstraints(t *testing.T) {
 	})
 
 	t.Run("supporting table checks", func(t *testing.T) {
-		baseTxn := insertBalanced(t, ctx, admin, "support", "support", 50, debitAccount, creditAccount, 0)
-		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES($1,'batch',1,0,'held',$2)`, creditAccount, baseTxn), "23514")
-		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES($1,'batch',1,1,'bad',$2)`, creditAccount, baseTxn), "23514")
-		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES(999999,'batch',1,1,'held',$1)`, baseTxn), "23503")
+		available := insertOwnedAccount(t, ctx, admin, "WALLET_AVAIL", 2101, false)
+		frozen := insertOwnedAccount(t, ctx, admin, "WALLET_FROZEN", 2101, false)
+		baseTxn := insertBalancedType(t, ctx, admin, "support", "freeze", "support", 50, available, frozen, 0)
+		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES($1,'batch',1,0,'held',$2)`, frozen, baseTxn), "23514")
+		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES($1,'batch',1,1,'bad',$2)`, frozen, baseTxn), "55000")
+		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES(999999,'batch',1,1,'held',$1)`, baseTxn), "55000")
 		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.withdrawal(public_id,account_id,amount,payee_account_text,status,maker_actor,checker_actor) VALUES('wd1',1,1,'cipher','review',10,10)`), "23514")
 		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.bank_statement_line(bank_ref,booked_on,amount,direction,imported_batch) VALUES('b1',CURRENT_DATE,1,'SIDE','x')`), "23514")
 	})
@@ -413,6 +415,14 @@ func insertOwnedAccount(t *testing.T, ctx context.Context, conn *pgx.Conn, kind 
 }
 
 func insertBalanced(t *testing.T, ctx context.Context, conn *pgx.Conn, txnNo, idem string, amount, debit, credit, reverses int64) int64 {
+	txnType := "topup"
+	if reverses != 0 {
+		txnType = "reversal"
+	}
+	return insertBalancedType(t, ctx, conn, txnNo, txnType, idem, amount, debit, credit, reverses)
+}
+
+func insertBalancedType(t *testing.T, ctx context.Context, conn *pgx.Conn, txnNo, txnType, idem string, amount, debit, credit, reverses int64) int64 {
 	t.Helper()
 	tx, err := conn.Begin(ctx)
 	if err != nil {
@@ -420,10 +430,8 @@ func insertBalanced(t *testing.T, ctx context.Context, conn *pgx.Conn, txnNo, id
 	}
 	defer tx.Rollback(ctx)
 	var id int64
-	txnType := "topup"
 	var reversal any
 	if reverses != 0 {
-		txnType = "reversal"
 		reversal = reverses
 	}
 	if err := tx.QueryRow(ctx, `INSERT INTO ledger.txn(txn_no,type,amount,idem_key,reverses_txn_id,actor_id) VALUES($1,$2,$3,$4,$5,1) RETURNING id`, txnNo, txnType, amount, idem, reversal).Scan(&id); err != nil {

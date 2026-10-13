@@ -81,7 +81,24 @@ func (s *Service) FreezeHold(ctx context.Context, in FreezeHoldInput) (FreezeHol
 
 	var holdID int64
 	hooks := transactionHooks{
-		check: requireKinds(map[int64]string{in.WalletAvailable: "WALLET_AVAIL", in.WalletFrozen: "WALLET_FROZEN"}, nil,
+		check: requireKinds(map[int64]string{in.WalletAvailable: "WALLET_AVAIL", in.WalletFrozen: "WALLET_FROZEN"}, func(ctx context.Context, tx pgx.Tx) error {
+			var existingID int64
+			err := tx.QueryRow(ctx, `SELECT id FROM ledger.hold WHERE ref_type=$1 AND ref_id=$2 FOR UPDATE`, in.RefType, in.RefID).Scan(&existingID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			result, err := loadExisting(ctx, tx, req)
+			if err == nil {
+				return &transactionReplay{result: result}
+			}
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrIdempotencyConflict
+			}
+			return err
+		},
 			[]int64{in.WalletAvailable, in.WalletFrozen}),
 		after: func(ctx context.Context, tx pgx.Tx, result PostResult) error {
 			err := tx.QueryRow(ctx, `
@@ -222,6 +239,13 @@ func (s *Service) closeHold(ctx context.Context, holdID int64, target string, pa
 			return mapHoldNotFound(err)
 		}
 		if !sameHoldSnapshot(locked, snapshot) {
+			result, replayErr := loadExisting(ctx, tx, req)
+			if replayErr == nil {
+				return &transactionReplay{result: result}
+			}
+			if !errors.Is(replayErr, pgx.ErrNoRows) {
+				return replayErr
+			}
 			return holdStateError(locked.Status)
 		}
 		return nil

@@ -19,6 +19,34 @@ ALTER TABLE ledger.hold ADD CONSTRAINT ck_hold_state_metadata CHECK (
 );
 
 -- +goose StatementBegin
+CREATE FUNCTION ledger.guard_hold_insert() RETURNS trigger AS $$
+DECLARE
+    account_kind text;
+    freeze_txn_type text;
+BEGIN
+    IF NEW.status IS DISTINCT FROM 'held'
+       OR NEW.close_txn_id IS NOT NULL OR NEW.closed_at IS NOT NULL
+       OR NEW.dispute_reason IS NOT NULL OR NEW.disputed_by IS NOT NULL
+       OR NEW.disputed_at IS NOT NULL OR NEW.resolved_by IS NOT NULL THEN
+        RAISE EXCEPTION 'new hold must start in held state without close or dispute metadata' USING ERRCODE = '55000';
+    END IF;
+    SELECT kind INTO account_kind FROM ledger.account WHERE id=NEW.account_id;
+    IF account_kind IS DISTINCT FROM 'WALLET_FROZEN' THEN
+        RAISE EXCEPTION 'hold account must be WALLET_FROZEN' USING ERRCODE = '55000';
+    END IF;
+    SELECT type INTO freeze_txn_type FROM ledger.txn WHERE id=NEW.freeze_txn_id;
+    IF freeze_txn_type IS DISTINCT FROM 'freeze' THEN
+        RAISE EXCEPTION 'hold freeze transaction must have type freeze' USING ERRCODE = '55000';
+    END IF;
+    RETURN NEW;
+END
+$$ LANGUAGE plpgsql;
+-- +goose StatementEnd
+
+CREATE TRIGGER trg_hold_insert_guard BEFORE INSERT ON ledger.hold
+    FOR EACH ROW EXECUTE FUNCTION ledger.guard_hold_insert();
+
+-- +goose StatementBegin
 CREATE FUNCTION ledger.protect_hold() RETURNS trigger AS $$
 BEGIN
     IF TG_OP = 'UPDATE' THEN
@@ -74,6 +102,8 @@ GRANT SELECT, INSERT ON ledger.hold TO ledger_rw;
 GRANT UPDATE (status, close_txn_id, closed_at, dispute_reason, disputed_by, disputed_at, resolved_by) ON ledger.hold TO ledger_rw;
 
 -- +goose Down
+DROP TRIGGER IF EXISTS trg_hold_insert_guard ON ledger.hold;
+DROP FUNCTION IF EXISTS ledger.guard_hold_insert();
 DROP TRIGGER IF EXISTS trg_hold_no_truncate ON ledger.hold;
 DROP TRIGGER IF EXISTS trg_hold_guard ON ledger.hold;
 DROP FUNCTION IF EXISTS ledger.protect_hold();
