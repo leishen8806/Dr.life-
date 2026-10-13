@@ -352,5 +352,8 @@ func businessRequest(typ string, amount int64, key, refType string, refID *int64
 }
 
 func (s *Service) postBusiness(ctx context.Context, request PostRequest, kinds map[int64]string, extra transactionCheck) (PostResult, error) {
+	if request.RefID != nil && *request.RefID <= 0 {
+		return PostResult{}, ErrInvalidRequest
+	}
 	return s.post(ctx, request, requireKinds(kinds, extra))
 }

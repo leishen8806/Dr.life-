@@ -301,6 +301,9 @@ func TestBusinessPostingIntegration(t *testing.T) {
 		if _, err := e.appService.BankDiff(e.ctx, ledger.BankDiffInput{BankLineID: 1505, Amount: 1, ActorID: 1, Direction: "SIDEWAYS", Reason: "bad"}); !errors.Is(err, ledger.ErrInvalidRequest) {
 			t.Errorf("bank direction error=%v", err)
 		}
+		if _, err := e.appService.WithdrawReq(e.ctx, ledger.WithdrawReqInput{WithdrawalID: 0, WalletAvailable: buyer.Available, Amount: 1, ActorID: 1}); !errors.Is(err, ledger.ErrInvalidRequest) {
+			t.Errorf("zero business id error=%v", err)
+		}
 	})
 
 	t.Run("insufficient funds leave no trace", func(t *testing.T) {
