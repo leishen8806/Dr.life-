@@ -45,13 +45,23 @@ type beginner interface {
 }
 
 type Service struct {
-	db         beginner
-	maxRetries int
-	singletons singletonCache
+	db                       beginner
+	maxRetries               int
+	singletons               singletonCache
+	accountGuard             AccountGuard
+	payeeCipher              PayeeCipher
+	withdrawalMetrics        WithdrawalMetrics
+	largeWithdrawalThreshold int64
+	now                      func() time.Time
 }
 
 type Options struct {
-	MaxRetries int
+	MaxRetries               int
+	AccountGuard             AccountGuard
+	PayeeCipher              PayeeCipher
+	WithdrawalMetrics        WithdrawalMetrics
+	LargeWithdrawalThreshold int64
+	Now                      func() time.Time
 }
 
 func New(db beginner, options Options) *Service {
@@ -59,7 +69,19 @@ func New(db beginner, options Options) *Service {
 	if maxRetries <= 0 {
 		maxRetries = 3
 	}
-	return &Service{db: db, maxRetries: maxRetries}
+	threshold := options.LargeWithdrawalThreshold
+	if threshold <= 0 {
+		threshold = 10_000_000
+	}
+	now := options.Now
+	if now == nil {
+		now = time.Now
+	}
+	return &Service{
+		db: db, maxRetries: maxRetries, accountGuard: options.AccountGuard,
+		payeeCipher: options.PayeeCipher, withdrawalMetrics: options.WithdrawalMetrics,
+		largeWithdrawalThreshold: threshold, now: now,
+	}
 }
 
 type Posting struct {

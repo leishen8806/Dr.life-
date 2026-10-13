@@ -33,8 +33,16 @@ func newBusiness(registry *prometheus.Registry) *Business {
 func (b *Business) OrderCreated()        { b.orders.WithLabelValues("created").Inc() }
 func (b *Business) OrderSigned()         { b.orders.WithLabelValues("signed").Inc() }
 func (b *Business) WithdrawalRequested() { b.withdrawals.WithLabelValues("requested").Inc() }
+func (b *Business) WithdrawalReviewed()  { b.withdrawals.WithLabelValues("reviewed").Inc() }
 func (b *Business) WithdrawalPaid()      { b.withdrawals.WithLabelValues("paid").Inc() }
-func (b *Business) AIRequested()         { b.ai.WithLabelValues("request", "none").Inc() }
+func (b *Business) WithdrawalFailed()    { b.withdrawals.WithLabelValues("failed").Inc() }
+func (b *Business) WithdrawalCancelled() { b.withdrawals.WithLabelValues("cancelled").Inc() }
+func (b *Business) WithdrawalOverdue(count int) {
+	if count > 0 {
+		b.withdrawals.WithLabelValues("overdue").Add(float64(count))
+	}
+}
+func (b *Business) AIRequested() { b.ai.WithLabelValues("request", "none").Inc() }
 func (b *Business) AIFallback(level string) {
 	b.ai.WithLabelValues("fallback", bounded(level, "primary", "secondary", "local")).Inc()
 }

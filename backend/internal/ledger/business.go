@@ -115,7 +115,7 @@ func (s *Service) refundFrozen(ctx context.Context, in RefundFrozenInput) (PostR
 
 type WithdrawReqInput struct{ WithdrawalID, WalletAvailable, Amount, ActorID int64 }
 
-func (s *Service) WithdrawReq(ctx context.Context, in WithdrawReqInput) (PostResult, error) {
+func (s *Service) withdrawReq(ctx context.Context, in WithdrawReqInput) (PostResult, error) {
 	ids, err := s.singletonAccounts(ctx)
 	if err != nil {
 		return PostResult{}, err
@@ -127,7 +127,7 @@ func (s *Service) WithdrawReq(ctx context.Context, in WithdrawReqInput) (PostRes
 
 type PayoutInput struct{ WithdrawalID, Amount, RequestedAmount, ActorID int64 }
 
-func (s *Service) Payout(ctx context.Context, in PayoutInput) (PostResult, error) {
+func (s *Service) payoutLegacy(ctx context.Context, in PayoutInput) (PostResult, error) {
 	if in.Amount != in.RequestedAmount {
 		return PostResult{}, ErrInvalidAmount
 	}
@@ -136,7 +136,7 @@ func (s *Service) Payout(ctx context.Context, in PayoutInput) (PostResult, error
 
 type PayoutFailInput struct{ WithdrawalID, WalletAvailable, Amount, ActorID int64 }
 
-func (s *Service) PayoutFail(ctx context.Context, in PayoutFailInput) (PostResult, error) {
+func (s *Service) payoutFailLegacy(ctx context.Context, in PayoutFailInput) (PostResult, error) {
 	return s.payout(ctx, "payout_fail", in.WithdrawalID, in.Amount, in.ActorID, in.WalletAvailable)
 }
 
