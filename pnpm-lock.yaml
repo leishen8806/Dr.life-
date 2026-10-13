@@ -205,9 +205,9 @@ importers:
 
   packages/ui:
     dependencies:
-      '@fontsource/noto-sans-khmer':
-        specifier: 5.2.8
-        version: 5.2.8
+      '@drlife/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@telegram-apps/sdk':
         specifier: 3.11.8
         version: 3.11.8(typescript@5.9.3)
@@ -552,9 +552,6 @@ packages:
   '@eslint/plugin-kit@0.7.3':
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
-
-  '@fontsource/noto-sans-khmer@5.2.8':
-    resolution: {integrity: sha512-nIuy718KK0thk5hu/plNdJvmoA3AElDZMLidYm2ju5TzmowLAS3OoCMXMneLmek2gGlJQmOtsZtF78OQ5orwQw==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -2119,8 +2116,6 @@ snapshots:
     dependencies:
       '@eslint/core': 1.2.1
       levn: 0.4.1
-
-  '@fontsource/noto-sans-khmer@5.2.8': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

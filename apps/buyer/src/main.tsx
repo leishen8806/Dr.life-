@@ -1,6 +1,11 @@
 import { StrictMode, useCallback, useMemo } from "react";
 import { createRoot } from "react-dom/client";
-import { I18nProvider, resolveLanguage, useI18n } from "@drlife/i18n";
+import {
+  I18nProvider,
+  readLanguagePreference,
+  resolveLanguage,
+  useI18n
+} from "@drlife/i18n";
 
 const languageKeys = {
   zh: "language.zh",
@@ -9,6 +14,7 @@ const languageKeys = {
 } as const;
 import {
   getTelegramEnvironment,
+  LanguageSwitcher,
   mountTelegramTheme,
   useBackButton,
   useMainButton
@@ -20,7 +26,7 @@ const environment = getTelegramEnvironment();
 mountTelegramTheme();
 
 function App() {
-  const { language, setLanguage, t } = useI18n();
+  const { language, t } = useI18n();
   const noOp = useCallback(() => undefined, []);
   useBackButton(noOp, environment.isTelegram);
   useMainButton(noOp, t("common.confirm"), environment.isTelegram);
@@ -48,21 +54,7 @@ function App() {
         <p>{t("shell.currentLanguage", { language: languageName })}</p>
         <p>{t("shell.initData", { length: environment.initData.length })}</p>
         <p>{t("shell.theme", { color: environment.backgroundColor })}</p>
-        <div
-          className="languages"
-          aria-label={t("shell.currentLanguage", { language: languageName })}
-        >
-          {(["zh", "en", "km"] as const).map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setLanguage(item)}
-              aria-pressed={language === item}
-            >
-              {t(languageKeys[item])}
-            </button>
-          ))}
-        </div>
+        <LanguageSwitcher />
       </section>
       <section className="card typography-demo">
         <p lang="zh">{t("demo.zh")}</p>
@@ -82,7 +74,10 @@ function App() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <I18nProvider
-      initialLanguage={resolveLanguage(undefined, environment.languageCode)}
+      initialLanguage={resolveLanguage(
+        readLanguagePreference(),
+        environment.languageCode
+      )}
     >
       <App />
     </I18nProvider>

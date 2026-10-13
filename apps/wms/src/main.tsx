@@ -1,8 +1,14 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { Button, Layout, Menu, Result, Space, Typography } from "antd";
+import { Button, Layout, Menu, Result, Typography } from "antd";
 import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
-import { I18nProvider, useI18n } from "@drlife/i18n";
+import {
+  I18nProvider,
+  readLanguagePreference,
+  resolveLanguage,
+  useI18n
+} from "@drlife/i18n";
+import { LanguageSwitcher } from "@drlife/ui";
 import "antd/dist/reset.css";
 import "@drlife/ui/styles.css";
 import "./styles.css";
@@ -47,7 +53,7 @@ function NotFound() {
 }
 
 function App() {
-  const { language, setLanguage, t } = useI18n();
+  const { t } = useI18n();
   return (
     <Layout className="admin-shell">
       <Sider breakpoint="lg" collapsedWidth="0" className="admin-sider">
@@ -72,17 +78,7 @@ function App() {
           <Typography.Title level={4}>
             {t("app.wms")} · {t("shell.header")}
           </Typography.Title>
-          <Space>
-            {(["zh", "en", "km"] as const).map((item) => (
-              <Button
-                key={item}
-                type={language === item ? "primary" : "default"}
-                onClick={() => setLanguage(item)}
-              >
-                {item.toUpperCase()}
-              </Button>
-            ))}
-          </Space>
+          <LanguageSwitcher />
         </Header>
         <Content className="admin-content">
           <Routes>
@@ -98,7 +94,9 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <I18nProvider initialLanguage="en">
+    <I18nProvider
+      initialLanguage={resolveLanguage(readLanguagePreference(), undefined)}
+    >
       <BrowserRouter>
         <App />
       </BrowserRouter>

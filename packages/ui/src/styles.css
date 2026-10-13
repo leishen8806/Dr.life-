@@ -1,13 +1,11 @@
-@import "@fontsource/noto-sans-khmer/400.css";
-
 :root {
   --drl-color-brand: #1677ff;
   --drl-color-surface: #ffffff;
   --drl-color-text: #172033;
   --drl-radius: 12px;
   --drl-khmer-font-size: 13px;
-  --drl-khmer-line-height: 1.6;
-  font-family: Inter, "Noto Sans Khmer", system-ui, sans-serif;
+  --drl-khmer-line-height: 1.7;
+  font-family: Inter, "Segoe UI", Arial, system-ui, sans-serif;
   color: var(--drl-color-text);
   background: #f4f6f8;
 }
@@ -24,9 +22,32 @@ body {
 
 :lang(km),
 .drl-khmer {
-  font-family: "Noto Sans Khmer", sans-serif;
+  font-family:
+    "Noto Sans Khmer", "Khmer UI", "Leelawadee UI", system-ui, sans-serif;
   font-size: max(1em, var(--drl-khmer-font-size));
   line-height: var(--drl-khmer-line-height);
+  overflow: visible;
+}
+
+:lang(km) h1,
+:lang(km) h2,
+:lang(km) h3,
+:lang(km) h4,
+:lang(km) h5,
+:lang(km) h6 {
+  line-height: 1.5;
+}
+
+.drl-language-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.drl-language-switcher button {
+  width: auto;
+  min-width: max-content;
+  white-space: normal;
   overflow: visible;
 }
 

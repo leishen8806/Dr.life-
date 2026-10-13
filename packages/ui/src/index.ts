@@ -1,4 +1,5 @@
 export { Loading } from "./loading";
+export { LanguageSwitcher, LanguageSwitcherView } from "./language-switcher";
 export {
   getTelegramEnvironment,
   mountTelegramTheme,

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5175 --strictPort",
+    "prebuild": "pnpm --filter @drlife/i18n i18n:check",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
