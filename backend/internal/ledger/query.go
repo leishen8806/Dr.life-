@@ -3,6 +3,7 @@ package ledger
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sort"
 	"time"
 
@@ -14,19 +15,37 @@ type rowQuerier interface {
 }
 
 func (s *Service) GetByID(ctx context.Context, txnID int64) (PostResult, error) {
-	return queryResult(ctx, s.db, `SELECT o.payload FROM ledger.outbox o WHERE o.txn_id=$1 AND o.topic='ledger.txn.posted' ORDER BY o.id LIMIT 1`, txnID)
+	return queryResult(ctx, s.db, `
+		SELECT t.id,t.txn_no,o.payload
+		FROM ledger.txn t
+		LEFT JOIN LATERAL (
+			SELECT payload FROM ledger.outbox
+			WHERE txn_id=t.id AND topic='ledger.txn.posted' ORDER BY id LIMIT 1
+		) o ON true
+		WHERE t.id=$1`, txnID)
 }
 
 func (s *Service) GetByIdemKey(ctx context.Context, idemKey string) (PostResult, error) {
-	return queryResult(ctx, s.db, `SELECT o.payload FROM ledger.outbox o JOIN ledger.txn t ON t.id=o.txn_id WHERE t.idem_key=$1 AND o.topic='ledger.txn.posted' ORDER BY o.id LIMIT 1`, idemKey)
+	return queryResult(ctx, s.db, `
+		SELECT t.id,t.txn_no,o.payload
+		FROM ledger.txn t
+		LEFT JOIN LATERAL (
+			SELECT payload FROM ledger.outbox
+			WHERE txn_id=t.id AND topic='ledger.txn.posted' ORDER BY id LIMIT 1
+		) o ON true
+		WHERE t.idem_key=$1`, idemKey)
 }
 
 func queryResult(ctx context.Context, db rowQuerier, statement string, value any) (PostResult, error) {
+	var result PostResult
 	var payload []byte
-	if err := db.QueryRow(ctx, statement, value).Scan(&payload); err != nil {
+	if err := db.QueryRow(ctx, statement, value).Scan(&result.TxnID, &result.TxnNo, &payload); err != nil {
 		return PostResult{}, err
 	}
-	var result PostResult
+	if payload == nil {
+		result.Replayed = true
+		return result, nil
+	}
 	if err := json.Unmarshal(payload, &result); err != nil {
 		return PostResult{}, err
 	}
@@ -80,7 +99,10 @@ func loadExisting(ctx context.Context, tx pgx.Tx, request PostRequest) (PostResu
 		return PostResult{}, ErrIdempotencyConflict
 	}
 	var payload []byte
-	if err := tx.QueryRow(ctx, `SELECT payload FROM ledger.outbox WHERE txn_id=$1 AND topic='ledger.txn.posted' ORDER BY id LIMIT 1`, result.TxnID).Scan(&payload); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT payload FROM ledger.outbox WHERE txn_id=$1 AND topic='ledger.txn.posted' ORDER BY id LIMIT 1`, result.TxnID).Scan(&payload); errors.Is(err, pgx.ErrNoRows) {
+		result.Replayed = true
+		return result, nil
+	} else if err != nil {
 		return PostResult{}, err
 	}
 	if err := json.Unmarshal(payload, &result); err != nil {

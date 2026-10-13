@@ -52,12 +52,16 @@ func TestPostIntegration(t *testing.T) {
 	if err := goose.Up(database, migrationDirectory(t)); err != nil {
 		t.Fatal(err)
 	}
-	admin, err := pgxpool.New(ctx, dsn)
+	adminConfig, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminConfig.MaxConns = 64
+	admin, err := pgxpool.NewWithConfig(ctx, adminConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer admin.Close()
-	admin.Config().MaxConns = 64
 	if _, err := admin.Exec(ctx, `CREATE ROLE app_ledger LOGIN PASSWORD 'test-only'; GRANT ledger_rw TO app_ledger`); err != nil {
 		t.Fatal(err)
 	}
@@ -156,6 +160,38 @@ func TestPostIntegration(t *testing.T) {
 			t.Fatalf("content conflict error=%v", err)
 		}
 		assertTxnCounts(t, ctx, admin, request.IdemKey, 1, 2, 1)
+	})
+
+	t.Run("replay survives outbox cleanup", func(t *testing.T) {
+		source := createWallet(t, ctx, admin, 104, 10, false)
+		destination := createWallet(t, ctx, admin, 105, 0, false)
+		request := transfer("settle:outbox-cleanup:104", source, destination, 4)
+		first, err := adminService.Post(ctx, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `DELETE FROM ledger.outbox WHERE txn_id=$1`, first.TxnID); err != nil {
+			t.Fatal(err)
+		}
+		for name, load := range map[string]func() (ledger.PostResult, error){
+			"Post":         func() (ledger.PostResult, error) { return adminService.Post(ctx, request) },
+			"GetByID":      func() (ledger.PostResult, error) { return adminService.GetByID(ctx, first.TxnID) },
+			"GetByIdemKey": func() (ledger.PostResult, error) { return adminService.GetByIdemKey(ctx, request.IdemKey) },
+		} {
+			t.Run(name, func(t *testing.T) {
+				got, err := load()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got.TxnID != first.TxnID || got.TxnNo != first.TxnNo || !got.Replayed || len(got.Balances) != 0 {
+					t.Fatalf("result=%+v", got)
+				}
+			})
+		}
+		if getBalance(t, ctx, admin, source) != 6 {
+			t.Fatal("replay changed balance")
+		}
+		assertTxnCounts(t, ctx, admin, request.IdemKey, 1, 2, 0)
 	})
 
 	t.Run("debit-normal accounts increase on debit", func(t *testing.T) {
