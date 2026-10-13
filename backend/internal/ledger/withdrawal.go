@@ -2,7 +2,9 @@ package ledger
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -42,6 +44,7 @@ type WithdrawalMetrics interface {
 type Withdrawal struct {
 	ID                int64
 	PublicID          string
+	RequestKey        string
 	AccountID         int64
 	Amount            int64
 	PayeeAccountLast4 string
@@ -60,6 +63,7 @@ type Withdrawal struct {
 }
 
 type RequestWithdrawalInput struct {
+	RequestKey           string
 	RequesterAccountID   int64
 	WalletAvailable      int64
 	Amount               int64
@@ -104,10 +108,20 @@ type PendingPayoutMismatch struct {
 	OpenAmountSum int64
 }
 
+type withdrawalEventPayload struct {
+	PublicID     string    `json:"public_id"`
+	Amount       int64     `json:"amount"`
+	ActorID      int64     `json:"actor_id,omitempty"`
+	MakerActor   int64     `json:"maker_actor,omitempty"`
+	CheckerActor int64     `json:"checker_actor,omitempty"`
+	OccurredAt   time.Time `json:"occurred_at"`
+}
+
 // RequestWithdrawal requires the API layer to complete real second-factor
 // verification first. The boolean is only a fail-closed boundary marker.
 func (s *Service) RequestWithdrawal(ctx context.Context, in RequestWithdrawalInput) (RequestWithdrawalResult, error) {
-	if in.RequesterAccountID <= 0 || in.WalletAvailable <= 0 || in.Amount <= 0 || in.ActorID <= 0 || strings.TrimSpace(in.PayeeAccount) == "" {
+	if len(in.RequestKey) == 0 || len(in.RequestKey) > 100 || !keySegmentPattern.MatchString(in.RequestKey) ||
+		in.RequesterAccountID <= 0 || in.WalletAvailable <= 0 || in.Amount <= 0 || in.ActorID <= 0 || strings.TrimSpace(in.PayeeAccount) == "" {
 		return RequestWithdrawalResult{}, ErrInvalidRequest
 	}
 	if !in.SecondFactorVerified {
@@ -116,11 +130,16 @@ func (s *Service) RequestWithdrawal(ctx context.Context, in RequestWithdrawalInp
 	if s.accountGuard == nil {
 		return RequestWithdrawalResult{}, ErrAccountGuardRequired
 	}
-	if err := s.accountGuard.CanWithdraw(ctx, in.RequesterAccountID); err != nil {
-		return RequestWithdrawalResult{}, err
-	}
 	if s.payeeCipher == nil {
 		return RequestWithdrawalResult{}, ErrPayeeCipherRequired
+	}
+	if existing, err := queryWithdrawal(s.db.QueryRow(ctx, withdrawalSelect+` WHERE request_key=$1`, in.RequestKey)); err == nil {
+		return s.replayWithdrawalRequest(ctx, s.db, existing, in)
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return RequestWithdrawalResult{}, err
+	}
+	if err := s.accountGuard.CanWithdraw(ctx, in.RequesterAccountID); err != nil {
+		return RequestWithdrawalResult{}, err
 	}
 	publicID, err := ids.NewULID()
 	if err != nil {
@@ -144,10 +163,22 @@ func (s *Service) RequestWithdrawal(ctx context.Context, in RequestWithdrawalInp
 	if err != nil {
 		return RequestWithdrawalResult{}, err
 	}
-	req := businessRequest("withdraw_req", in.Amount, fmt.Sprintf("withdraw_req:withdrawal:%d", withdrawalID), "withdrawal", &withdrawalID, in.ActorID,
+	req := businessRequest("withdraw_req", in.Amount, "withdraw_req:request:"+in.RequestKey, "withdrawal", &withdrawalID, in.ActorID,
 		Posting{AccountID: in.WalletAvailable, Side: "DEBIT", Amount: in.Amount},
 		Posting{AccountID: idsByKind["PENDING_PAYOUT"], Side: "CREDIT", Amount: in.Amount})
 	check := requireKinds(map[int64]string{in.WalletAvailable: "WALLET_AVAIL", idsByKind["PENDING_PAYOUT"]: "PENDING_PAYOUT"}, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, in.RequestKey); err != nil {
+			return err
+		}
+		if existing, err := queryWithdrawal(tx.QueryRow(ctx, withdrawalSelect+` WHERE request_key=$1 FOR UPDATE`, in.RequestKey)); err == nil {
+			replayed, err := s.replayWithdrawalRequest(ctx, tx, existing, in)
+			if err != nil {
+				return err
+			}
+			return &transactionReplay{result: replayed.Post}
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
 		var owner *int64
 		if err := tx.QueryRow(ctx, `SELECT owner_account FROM ledger.account WHERE id=$1`, in.WalletAvailable).Scan(&owner); err != nil {
 			return err
@@ -156,12 +187,12 @@ func (s *Service) RequestWithdrawal(ctx context.Context, in RequestWithdrawalInp
 			return ErrAccountOwnerMismatch
 		}
 		_, err := tx.Exec(ctx, `
-			INSERT INTO ledger.withdrawal(id,public_id,account_id,amount,payee_account_text,payee_account_last4,status,requester_actor,requires_review)
-			OVERRIDING SYSTEM VALUE VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, withdrawalID, publicID, in.RequesterAccountID,
+			INSERT INTO ledger.withdrawal(id,public_id,request_key,account_id,amount,payee_account_text,payee_account_last4,status,requester_actor,requires_review)
+			OVERRIDING SYSTEM VALUE VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, withdrawalID, publicID, in.RequestKey, in.RequesterAccountID,
 			in.Amount, base64.RawStdEncoding.EncodeToString(ciphertext), last4, status, in.ActorID, requiresReview)
 		return err
 	})
-	hooks := transactionHooks{check: check, after: func(ctx context.Context, tx pgx.Tx, result PostResult) error {
+	hooks := transactionHooks{skipInitialReplay: true, check: check, after: func(ctx context.Context, tx pgx.Tx, result PostResult) error {
 		command, err := tx.Exec(ctx, `UPDATE ledger.withdrawal SET req_txn_id=$2 WHERE id=$1`, withdrawalID, result.TxnID)
 		if err != nil {
 			return err
@@ -175,14 +206,54 @@ func (s *Service) RequestWithdrawal(ctx context.Context, in RequestWithdrawalInp
 	if err != nil {
 		return RequestWithdrawalResult{}, err
 	}
-	withdrawal, err := s.GetWithdrawal(ctx, withdrawalID)
+	withdrawal, err := s.getWithdrawalByRequestKey(ctx, in.RequestKey)
 	if err != nil {
 		return RequestWithdrawalResult{}, err
 	}
-	if s.withdrawalMetrics != nil {
+	if !post.Replayed && s.withdrawalMetrics != nil {
 		s.withdrawalMetrics.WithdrawalRequested()
 	}
 	return RequestWithdrawalResult{Withdrawal: withdrawal, Post: post}, nil
+}
+
+func (s *Service) replayWithdrawalRequest(ctx context.Context, db rowQuerier, existing Withdrawal, in RequestWithdrawalInput) (RequestWithdrawalResult, error) {
+	if existing.AccountID != in.RequesterAccountID || existing.Amount != in.Amount || existing.RequesterActor != in.ActorID {
+		return RequestWithdrawalResult{}, ErrIdempotencyConflict
+	}
+	var wallet int64
+	if err := db.QueryRow(ctx, `SELECT id FROM ledger.account WHERE owner_account=$1 AND kind='WALLET_AVAIL'`, existing.AccountID).Scan(&wallet); err != nil {
+		return RequestWithdrawalResult{}, err
+	}
+	if wallet != in.WalletAvailable {
+		return RequestWithdrawalResult{}, ErrIdempotencyConflict
+	}
+	var encoded string
+	if err := db.QueryRow(ctx, `SELECT payee_account_text FROM ledger.withdrawal WHERE id=$1`, existing.ID).Scan(&encoded); err != nil {
+		return RequestWithdrawalResult{}, err
+	}
+	blob, err := base64.RawStdEncoding.DecodeString(encoded)
+	if err != nil {
+		return RequestWithdrawalResult{}, ErrIdempotencyConflict
+	}
+	plaintext, err := s.payeeCipher.Decrypt(ctx, blob, withdrawalPayeeAAD(existing.PublicID))
+	if err != nil || subtle.ConstantTimeCompare(plaintext, []byte(in.PayeeAccount)) != 1 {
+		return RequestWithdrawalResult{}, ErrIdempotencyConflict
+	}
+	post, err := queryResult(ctx, db, `
+		SELECT t.id,t.txn_no,o.payload
+		FROM ledger.txn t
+		LEFT JOIN LATERAL (
+			SELECT payload FROM ledger.outbox WHERE txn_id=t.id AND topic='ledger.txn.posted' ORDER BY id LIMIT 1
+		) o ON true
+		WHERE t.idem_key=$1`, "withdraw_req:request:"+in.RequestKey)
+	if err != nil {
+		return RequestWithdrawalResult{}, err
+	}
+	if existing.ReqTxnID == nil || post.TxnID != *existing.ReqTxnID {
+		return RequestWithdrawalResult{}, ErrIdempotencyConflict
+	}
+	post.Replayed = true
+	return RequestWithdrawalResult{Withdrawal: existing, Post: post}, nil
 }
 
 func (s *Service) StartReview(ctx context.Context, in StartReviewInput) (Withdrawal, error) {
@@ -190,11 +261,25 @@ func (s *Service) StartReview(ctx context.Context, in StartReviewInput) (Withdra
 		return Withdrawal{}, ErrInvalidRequest
 	}
 	withdrawal, err := s.updateWithdrawal(ctx, in.WithdrawalID, func(ctx context.Context, tx pgx.Tx, current Withdrawal) error {
+		if current.Status == "review" && current.MakerActor != nil {
+			if *current.MakerActor == in.MakerActor {
+				return nil
+			}
+			return ErrIdempotencyConflict
+		}
 		if !current.RequiresReview || current.Status != "requested" {
 			return ErrWithdrawalState
 		}
-		_, err := tx.Exec(ctx, `UPDATE ledger.withdrawal SET status='review',maker_actor=$2 WHERE id=$1`, current.ID, in.MakerActor)
-		return err
+		at := s.now()
+		if _, err := tx.Exec(ctx, `UPDATE ledger.withdrawal SET status='review',maker_actor=$2 WHERE id=$1`, current.ID, in.MakerActor); err != nil {
+			return err
+		}
+		if err := insertWithdrawalEvent(ctx, tx, nil, "ledger.withdrawal.review_started", withdrawalEventPayload{
+			PublicID: current.PublicID, Amount: current.Amount, MakerActor: in.MakerActor, OccurredAt: at,
+		}); err != nil {
+			return err
+		}
+		return nil
 	})
 	return withdrawal, err
 }
@@ -203,17 +288,33 @@ func (s *Service) ApproveReview(ctx context.Context, in ApproveReviewInput) (Wit
 	if in.WithdrawalID <= 0 || in.CheckerActor <= 0 {
 		return Withdrawal{}, ErrInvalidRequest
 	}
+	changed := false
 	withdrawal, err := s.updateWithdrawal(ctx, in.WithdrawalID, func(ctx context.Context, tx pgx.Tx, current Withdrawal) error {
+		if current.Status == "approved" && current.RequiresReview && current.CheckerActor != nil {
+			if *current.CheckerActor == in.CheckerActor {
+				return nil
+			}
+			return ErrIdempotencyConflict
+		}
 		if current.Status != "review" || current.MakerActor == nil {
 			return ErrWithdrawalState
 		}
 		if in.CheckerActor == *current.MakerActor || in.CheckerActor == current.RequesterActor {
 			return ErrSeparationDuty
 		}
-		_, err := tx.Exec(ctx, `UPDATE ledger.withdrawal SET status='approved',checker_actor=$2,reviewed_at=$3 WHERE id=$1`, current.ID, in.CheckerActor, s.now())
-		return err
+		at := s.now()
+		if _, err := tx.Exec(ctx, `UPDATE ledger.withdrawal SET status='approved',checker_actor=$2,reviewed_at=$3 WHERE id=$1`, current.ID, in.CheckerActor, at); err != nil {
+			return err
+		}
+		if err := insertWithdrawalEvent(ctx, tx, nil, "ledger.withdrawal.approved", withdrawalEventPayload{
+			PublicID: current.PublicID, Amount: current.Amount, MakerActor: *current.MakerActor, CheckerActor: in.CheckerActor, OccurredAt: at,
+		}); err != nil {
+			return err
+		}
+		changed = true
+		return nil
 	})
-	if err == nil && s.withdrawalMetrics != nil {
+	if err == nil && changed && s.withdrawalMetrics != nil {
 		s.withdrawalMetrics.WithdrawalReviewed()
 	}
 	return withdrawal, err
@@ -246,9 +347,15 @@ func (s *Service) ConfirmPayout(ctx context.Context, in ConfirmPayoutInput) (Pos
 		Posting{AccountID: idsByKind["PENDING_PAYOUT"], Side: "DEBIT", Amount: snapshot.Amount},
 		Posting{AccountID: idsByKind["BANK_DEDICATED"], Side: "CREDIT", Amount: snapshot.Amount})
 	req.Note = "bank_ref:" + strings.TrimSpace(in.BankRef)
+	at := s.now()
 	hooks := s.withdrawalCloseHooks(snapshot, "paid", req, func(ctx context.Context, tx pgx.Tx, result PostResult) error {
-		_, err := tx.Exec(ctx, `UPDATE ledger.withdrawal SET status='paid',paid_txn_id=$2,bank_ref=$3,paid_at=$4 WHERE id=$1`, snapshot.ID, result.TxnID, strings.TrimSpace(in.BankRef), s.now())
-		return err
+		if _, err := tx.Exec(ctx, `UPDATE ledger.withdrawal SET status='paid',paid_txn_id=$2,bank_ref=$3,paid_at=$4 WHERE id=$1`, snapshot.ID, result.TxnID, strings.TrimSpace(in.BankRef), at); err != nil {
+			return err
+		}
+		return insertWithdrawalEvent(ctx, tx, result.TxnID, "ledger.withdrawal.paid", withdrawalEventPayload{
+			PublicID: snapshot.PublicID, Amount: snapshot.Amount, ActorID: in.ActorID,
+			MakerActor: valueOrZero(snapshot.MakerActor), CheckerActor: valueOrZero(snapshot.CheckerActor), OccurredAt: at,
+		})
 	})
 	result, err := s.postWithHooks(ctx, req, hooks)
 	if err == nil && !result.Replayed && s.withdrawalMetrics != nil {
@@ -261,6 +368,9 @@ func (s *Service) FailWithdrawal(ctx context.Context, in FailWithdrawalInput) (P
 	return s.refundWithdrawal(ctx, in.WithdrawalID, "failed", in.Reason, in.ActorID)
 }
 
+// CancelWithdrawal can cancel an approved withdrawal, but that transition can
+// race with a bank payment. The surrounding process must forbid cancellation
+// after a bank transfer has been submitted.
 func (s *Service) CancelWithdrawal(ctx context.Context, in CancelWithdrawalInput) (PostResult, error) {
 	return s.refundWithdrawal(ctx, in.WithdrawalID, "cancelled", in.Reason, in.ActorID)
 }
@@ -273,7 +383,10 @@ func (s *Service) refundWithdrawal(ctx context.Context, withdrawalID int64, targ
 	if err != nil {
 		return PostResult{}, err
 	}
-	allowed := snapshot.Status == "requested" || snapshot.Status == "review" || snapshot.Status == "approved"
+	allowed := snapshot.Status == "approved"
+	if target == "cancelled" {
+		allowed = snapshot.Status == "requested" || snapshot.Status == "review" || snapshot.Status == "approved"
+	}
 	if snapshot.Status != target && !allowed {
 		return PostResult{}, ErrWithdrawalState
 	}
@@ -289,9 +402,15 @@ func (s *Service) refundWithdrawal(ctx context.Context, withdrawalID int64, targ
 		Posting{AccountID: idsByKind["PENDING_PAYOUT"], Side: "DEBIT", Amount: snapshot.Amount},
 		Posting{AccountID: wallet, Side: "CREDIT", Amount: snapshot.Amount})
 	req.Note = target + ":" + strings.TrimSpace(reason)
-	hooks := s.withdrawalCloseHooks(snapshot, target, req, func(ctx context.Context, tx pgx.Tx, _ PostResult) error {
-		_, err := tx.Exec(ctx, `UPDATE ledger.withdrawal SET status=$2,failed_reason=$3 WHERE id=$1`, snapshot.ID, target, strings.TrimSpace(reason))
-		return err
+	at := s.now()
+	hooks := s.withdrawalCloseHooks(snapshot, target, req, func(ctx context.Context, tx pgx.Tx, result PostResult) error {
+		if _, err := tx.Exec(ctx, `UPDATE ledger.withdrawal SET status=$2,failed_reason=$3 WHERE id=$1`, snapshot.ID, target, strings.TrimSpace(reason)); err != nil {
+			return err
+		}
+		return insertWithdrawalEvent(ctx, tx, result.TxnID, "ledger.withdrawal."+target, withdrawalEventPayload{
+			PublicID: snapshot.PublicID, Amount: snapshot.Amount, ActorID: actorID,
+			MakerActor: valueOrZero(snapshot.MakerActor), CheckerActor: valueOrZero(snapshot.CheckerActor), OccurredAt: at,
+		})
 	})
 	result, err := s.postWithHooks(ctx, req, hooks)
 	if err == nil && !result.Replayed && s.withdrawalMetrics != nil {
@@ -339,6 +458,14 @@ func (s *Service) GetWithdrawal(ctx context.Context, id int64) (Withdrawal, erro
 		return Withdrawal{}, ErrInvalidRequest
 	}
 	withdrawal, err := queryWithdrawal(s.db.QueryRow(ctx, withdrawalSelect+` WHERE id=$1`, id))
+	return withdrawal, mapWithdrawalNotFound(err)
+}
+
+func (s *Service) getWithdrawalByRequestKey(ctx context.Context, requestKey string) (Withdrawal, error) {
+	if len(requestKey) == 0 || len(requestKey) > 100 || !keySegmentPattern.MatchString(requestKey) {
+		return Withdrawal{}, ErrInvalidRequest
+	}
+	withdrawal, err := queryWithdrawal(s.db.QueryRow(ctx, withdrawalSelect+` WHERE request_key=$1`, requestKey))
 	return withdrawal, mapWithdrawalNotFound(err)
 }
 
@@ -446,11 +573,11 @@ func (s *Service) availableWalletForOwner(ctx context.Context, owner int64) (int
 	return wallet, err
 }
 
-const withdrawalSelect = `SELECT id,public_id,account_id,amount,COALESCE(payee_account_last4,''),status,requester_actor,maker_actor,checker_actor,requires_review,req_txn_id,paid_txn_id,bank_ref,requested_at,reviewed_at,paid_at,failed_reason FROM ledger.withdrawal`
+const withdrawalSelect = `SELECT id,public_id,request_key,account_id,amount,COALESCE(payee_account_last4,''),status,requester_actor,maker_actor,checker_actor,requires_review,req_txn_id,paid_txn_id,bank_ref,requested_at,reviewed_at,paid_at,failed_reason FROM ledger.withdrawal`
 
 func queryWithdrawal(row rowScanner) (Withdrawal, error) {
 	var withdrawal Withdrawal
-	err := row.Scan(&withdrawal.ID, &withdrawal.PublicID, &withdrawal.AccountID, &withdrawal.Amount, &withdrawal.PayeeAccountLast4,
+	err := row.Scan(&withdrawal.ID, &withdrawal.PublicID, &withdrawal.RequestKey, &withdrawal.AccountID, &withdrawal.Amount, &withdrawal.PayeeAccountLast4,
 		&withdrawal.Status, &withdrawal.RequesterActor, &withdrawal.MakerActor, &withdrawal.CheckerActor, &withdrawal.RequiresReview,
 		&withdrawal.ReqTxnID, &withdrawal.PaidTxnID, &withdrawal.BankRef, &withdrawal.RequestedAt, &withdrawal.ReviewedAt,
 		&withdrawal.PaidAt, &withdrawal.FailedReason)
@@ -465,11 +592,20 @@ func mapWithdrawalNotFound(err error) error {
 }
 
 func sameWithdrawalSnapshot(a, b Withdrawal) bool {
-	return a.ID == b.ID && a.AccountID == b.AccountID && a.Amount == b.Amount && a.Status == b.Status &&
+	return a.ID == b.ID && a.RequestKey == b.RequestKey && a.AccountID == b.AccountID && a.Amount == b.Amount && a.Status == b.Status &&
 		sameInt64(a.ReqTxnID, b.ReqTxnID) && sameInt64(a.MakerActor, b.MakerActor) && sameInt64(a.CheckerActor, b.CheckerActor)
 }
 
 func withdrawalPayeeAAD(publicID string) string { return "withdrawal_payee:" + publicID }
+
+func insertWithdrawalEvent(ctx context.Context, tx pgx.Tx, txnID any, topic string, payload withdrawalEventPayload) error {
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO ledger.outbox(txn_id,topic,payload) VALUES($1,$2,$3)`, txnID, topic, encoded)
+	return err
+}
 
 func payeeLast4(value string) string {
 	runes := []rune(strings.TrimSpace(value))

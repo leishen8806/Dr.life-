@@ -133,6 +133,9 @@ type transactionHooks struct {
 	check       transactionCheck
 	after       transactionAfter
 	replayCheck transactionReplayCheck
+	// skipInitialReplay lets a business-owned unique key resolve its record
+	// under the transaction check before comparing the ledger transaction.
+	skipInitialReplay bool
 }
 
 func (s *Service) post(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
@@ -177,18 +180,20 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest, hooks trans
 		return PostResult{}, err
 	}
 	defer tx.Rollback(ctx)
-	if result, replayErr := loadExisting(ctx, tx, request); replayErr == nil {
-		if hooks.replayCheck != nil {
-			if err := hooks.replayCheck(ctx, tx, result); err != nil {
+	if !hooks.skipInitialReplay {
+		if result, replayErr := loadExisting(ctx, tx, request); replayErr == nil {
+			if hooks.replayCheck != nil {
+				if err := hooks.replayCheck(ctx, tx, result); err != nil {
+					return PostResult{}, err
+				}
+			}
+			if err := tx.Commit(ctx); err != nil {
 				return PostResult{}, err
 			}
+			return result, nil
+		} else if !errors.Is(replayErr, pgx.ErrNoRows) {
+			return PostResult{}, replayErr
 		}
-		if err := tx.Commit(ctx); err != nil {
-			return PostResult{}, err
-		}
-		return result, nil
-	} else if !errors.Is(replayErr, pgx.ErrNoRows) {
-		return PostResult{}, replayErr
 	}
 
 	ids := sortedAccountIDs(request.Postings)

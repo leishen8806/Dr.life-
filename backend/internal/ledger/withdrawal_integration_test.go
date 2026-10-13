@@ -2,6 +2,7 @@ package ledger_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -22,6 +23,8 @@ func (g withdrawalGuard) CanWithdraw(context.Context, int64) error { return g.er
 type withdrawalMetrics struct {
 	requested, reviewed, paid, failed, cancelled, overdue atomic.Int64
 }
+
+var withdrawalRequestKey atomic.Int64
 
 func (m *withdrawalMetrics) WithdrawalRequested()    { m.requested.Add(1) }
 func (m *withdrawalMetrics) WithdrawalReviewed()     { m.reviewed.Add(1) }
@@ -44,7 +47,7 @@ func TestWithdrawalWorkflowIntegration(t *testing.T) {
 
 	t.Run("fail closed boundaries and no residual rows", func(t *testing.T) {
 		before := withdrawalCounts(t, e)
-		base := ledger.RequestWithdrawalInput{RequesterAccountID: 8101, WalletAvailable: wallet.Available, Amount: 10, PayeeAccount: "ACCT-SECRET-1234", ActorID: 11, SecondFactorVerified: true}
+		base := ledger.RequestWithdrawalInput{RequestKey: "fail-closed-1", RequesterAccountID: 8101, WalletAvailable: wallet.Available, Amount: 10, PayeeAccount: "ACCT-SECRET-1234", ActorID: 11, SecondFactorVerified: true}
 		if _, err := ledger.New(e.app, ledger.Options{PayeeCipher: cipher}).RequestWithdrawal(e.ctx, base); !errors.Is(err, ledger.ErrAccountGuardRequired) {
 			t.Fatalf("missing guard error = %v", err)
 		}
@@ -72,13 +75,26 @@ func TestWithdrawalWorkflowIntegration(t *testing.T) {
 		if after := withdrawalCounts(t, e); after != before {
 			t.Fatalf("owner mismatch left residual rows before=%v after=%v", before, after)
 		}
+		base.WalletAvailable = wallet.Available
+		base.RequestKey = ""
+		if _, err := service.RequestWithdrawal(e.ctx, base); !errors.Is(err, ledger.ErrInvalidRequest) {
+			t.Fatalf("missing request key error = %v", err)
+		}
+		base.RequestKey = "bad key"
+		if _, err := service.RequestWithdrawal(e.ctx, base); !errors.Is(err, ledger.ErrInvalidRequest) {
+			t.Fatalf("invalid request key error = %v", err)
+		}
+		base.RequestKey = strings.Repeat("x", 101)
+		if _, err := service.RequestWithdrawal(e.ctx, base); !errors.Is(err, ledger.ErrInvalidRequest) {
+			t.Fatalf("long request key error = %v", err)
+		}
 	})
 
 	t.Run("small request encrypts payee and cancellation restores balances", func(t *testing.T) {
 		plaintext := "BANK-ACCOUNT-SECRET-1234"
 		beforeWallet := accountBalance(t, e, wallet.Available)
 		result, err := service.RequestWithdrawal(e.ctx, ledger.RequestWithdrawalInput{
-			RequesterAccountID: 8101, WalletAvailable: wallet.Available, Amount: 25,
+			RequestKey: "small-cancel-1", RequesterAccountID: 8101, WalletAvailable: wallet.Available, Amount: 25,
 			PayeeAccount: plaintext, ActorID: 11, SecondFactorVerified: true,
 		})
 		if err != nil {
@@ -97,6 +113,7 @@ func TestWithdrawalWorkflowIntegration(t *testing.T) {
 		if strings.Contains(fmt.Sprint(result), plaintext) {
 			t.Fatal("service result contains payee plaintext")
 		}
+		assertSQLState(t, execErr(e.ctx, e.admin, `UPDATE ledger.withdrawal SET request_key='changed-key' WHERE id=$1`, result.Withdrawal.ID), "55000")
 		decrypted, err := service.DecryptWithdrawalPayee(e.ctx, result.Withdrawal.ID)
 		if err != nil || string(decrypted) != plaintext {
 			t.Fatalf("decrypt=%q err=%v", decrypted, err)
@@ -127,6 +144,10 @@ func TestWithdrawalWorkflowIntegration(t *testing.T) {
 		if _, err := service.StartReview(e.ctx, ledger.StartReviewInput{WithdrawalID: result.Withdrawal.ID, MakerActor: 41}); err != nil {
 			t.Fatal(err)
 		}
+		if _, err := service.StartReview(e.ctx, ledger.StartReviewInput{WithdrawalID: result.Withdrawal.ID, MakerActor: 41}); err != nil {
+			t.Fatalf("review replay: %v", err)
+		}
+		assertWithdrawalEvent(t, e, result.Withdrawal.PublicID, "ledger.withdrawal.review_started", "LARGE-9876", 41)
 		if _, err := service.ApproveReview(e.ctx, ledger.ApproveReviewInput{WithdrawalID: result.Withdrawal.ID, CheckerActor: 41}); !errors.Is(err, ledger.ErrSeparationDuty) {
 			t.Fatalf("same maker error=%v", err)
 		}
@@ -137,10 +158,19 @@ func TestWithdrawalWorkflowIntegration(t *testing.T) {
 		if _, err := service.ApproveReview(e.ctx, ledger.ApproveReviewInput{WithdrawalID: result.Withdrawal.ID, CheckerActor: 42}); err != nil {
 			t.Fatal(err)
 		}
+		if _, err := service.ApproveReview(e.ctx, ledger.ApproveReviewInput{WithdrawalID: result.Withdrawal.ID, CheckerActor: 42}); err != nil {
+			t.Fatalf("approval replay: %v", err)
+		}
+		assertWithdrawalEvent(t, e, result.Withdrawal.PublicID, "ledger.withdrawal.approved", "LARGE-9876", 42)
 		post, err := service.ConfirmPayout(e.ctx, ledger.ConfirmPayoutInput{WithdrawalID: result.Withdrawal.ID, BankRef: "BANK-REF-1", ActorID: 43})
 		if err != nil || post.Replayed {
 			t.Fatalf("confirm result=%+v err=%v", post, err)
 		}
+		replayed, err := service.ConfirmPayout(e.ctx, ledger.ConfirmPayoutInput{WithdrawalID: result.Withdrawal.ID, BankRef: "BANK-REF-1", ActorID: 43})
+		if err != nil || !replayed.Replayed || replayed.TxnID != post.TxnID {
+			t.Fatalf("confirm replay result=%+v err=%v", replayed, err)
+		}
+		assertWithdrawalEvent(t, e, result.Withdrawal.PublicID, "ledger.withdrawal.paid", "LARGE-9876", 43)
 		if _, err := service.CancelWithdrawal(e.ctx, ledger.CancelWithdrawalInput{WithdrawalID: result.Withdrawal.ID, Reason: "too late", ActorID: 43}); !errors.Is(err, ledger.ErrWithdrawalState) {
 			t.Fatalf("paid cancellation error=%v", err)
 		}
@@ -168,9 +198,15 @@ func TestWithdrawalWorkflowIntegration(t *testing.T) {
 		before := accountBalance(t, e, wallet.Available)
 		result := requestWithdrawal(t, e, service, wallet.Available, 8101, 40, "FAIL-4444", 71)
 		assertSQLState(t, execErr(e.ctx, e.admin, `UPDATE ledger.withdrawal SET amount=amount+1 WHERE id=$1`, result.Withdrawal.ID), "55000")
-		if _, err := service.FailWithdrawal(e.ctx, ledger.FailWithdrawalInput{WithdrawalID: result.Withdrawal.ID, Reason: "bank rejected", ActorID: 72}); err != nil {
-			t.Fatal(err)
+		failed, err := service.FailWithdrawal(e.ctx, ledger.FailWithdrawalInput{WithdrawalID: result.Withdrawal.ID, Reason: "bank rejected", ActorID: 72})
+		if err != nil || failed.Replayed {
+			t.Fatalf("failure result=%+v err=%v", failed, err)
 		}
+		failedReplay, err := service.FailWithdrawal(e.ctx, ledger.FailWithdrawalInput{WithdrawalID: result.Withdrawal.ID, Reason: "bank rejected", ActorID: 72})
+		if err != nil || !failedReplay.Replayed || failedReplay.TxnID != failed.TxnID {
+			t.Fatalf("failure replay=%+v err=%v", failedReplay, err)
+		}
+		assertWithdrawalEvent(t, e, result.Withdrawal.PublicID, "ledger.withdrawal.failed", "FAIL-4444", 72)
 		if got := accountBalance(t, e, wallet.Available); got != before {
 			t.Fatalf("wallet=%d want=%d", got, before)
 		}
@@ -179,17 +215,35 @@ func TestWithdrawalWorkflowIntegration(t *testing.T) {
 
 	t.Run("requested and review states can cancel but direct invalid inserts fail", func(t *testing.T) {
 		requested := requestWithdrawal(t, e, service, wallet.Available, 8101, 100, "CANCEL-REQUESTED-1", 75)
-		if _, err := service.CancelWithdrawal(e.ctx, ledger.CancelWithdrawalInput{WithdrawalID: requested.Withdrawal.ID, Reason: "cancel requested", ActorID: 76}); err != nil {
-			t.Fatal(err)
+		if _, err := service.FailWithdrawal(e.ctx, ledger.FailWithdrawalInput{WithdrawalID: requested.Withdrawal.ID, Reason: "too early", ActorID: 76}); !errors.Is(err, ledger.ErrWithdrawalState) {
+			t.Fatalf("requested failure error=%v", err)
 		}
+		cancelled, err := service.CancelWithdrawal(e.ctx, ledger.CancelWithdrawalInput{WithdrawalID: requested.Withdrawal.ID, Reason: "cancel requested", ActorID: 76})
+		if err != nil || cancelled.Replayed {
+			t.Fatalf("cancellation result=%+v err=%v", cancelled, err)
+		}
+		cancelledReplay, err := service.CancelWithdrawal(e.ctx, ledger.CancelWithdrawalInput{WithdrawalID: requested.Withdrawal.ID, Reason: "cancel requested", ActorID: 76})
+		if err != nil || !cancelledReplay.Replayed || cancelledReplay.TxnID != cancelled.TxnID {
+			t.Fatalf("cancellation replay=%+v err=%v", cancelledReplay, err)
+		}
+		assertWithdrawalEvent(t, e, requested.Withdrawal.PublicID, "ledger.withdrawal.cancelled", "CANCEL-REQUESTED-1", 76)
 		review := requestWithdrawal(t, e, service, wallet.Available, 8101, 100, "CANCEL-REVIEW-2", 77)
 		if _, err := service.StartReview(e.ctx, ledger.StartReviewInput{WithdrawalID: review.Withdrawal.ID, MakerActor: 78}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := service.CancelWithdrawal(e.ctx, ledger.CancelWithdrawalInput{WithdrawalID: review.Withdrawal.ID, Reason: "cancel review", ActorID: 79}); err != nil {
-			t.Fatal(err)
+		if _, err := service.FailWithdrawal(e.ctx, ledger.FailWithdrawalInput{WithdrawalID: review.Withdrawal.ID, Reason: "too early", ActorID: 79}); !errors.Is(err, ledger.ErrWithdrawalState) {
+			t.Fatalf("review failure error=%v", err)
 		}
-		assertSQLState(t, execErr(e.ctx, e.app, `INSERT INTO ledger.withdrawal(public_id,account_id,amount,payee_account_text,status,requester_actor,requires_review) VALUES('01ARZ3NDEKTSV4RRFFQ69G5FZZ',8101,1,'cipher','paid',80,false)`), "55000")
+		reviewCancelled, err := service.CancelWithdrawal(e.ctx, ledger.CancelWithdrawalInput{WithdrawalID: review.Withdrawal.ID, Reason: "cancel review", ActorID: 79})
+		if err != nil || reviewCancelled.Replayed {
+			t.Fatalf("review cancellation result=%+v err=%v", reviewCancelled, err)
+		}
+		reviewCancelledReplay, err := service.CancelWithdrawal(e.ctx, ledger.CancelWithdrawalInput{WithdrawalID: review.Withdrawal.ID, Reason: "cancel review", ActorID: 79})
+		if err != nil || !reviewCancelledReplay.Replayed || reviewCancelledReplay.TxnID != reviewCancelled.TxnID {
+			t.Fatalf("review cancellation replay=%+v err=%v", reviewCancelledReplay, err)
+		}
+		assertWithdrawalEvent(t, e, review.Withdrawal.PublicID, "ledger.withdrawal.cancelled", "CANCEL-REVIEW-2", 79)
+		assertSQLState(t, execErr(e.ctx, e.app, `INSERT INTO ledger.withdrawal(public_id,request_key,account_id,amount,payee_account_text,status,requester_actor,requires_review) VALUES('01ARZ3NDEKTSV4RRFFQ69G5FZZ','invalid-direct-insert',8101,1,'cipher','paid',80,false)`), "55000")
 	})
 
 	t.Run("bank reference is unique", func(t *testing.T) {
@@ -234,6 +288,95 @@ func TestWithdrawalConcurrencyIntegration(t *testing.T) {
 	wallet := mustWallet(t, e, 8201, nil)
 	setBalance(t, e, wallet.Available, 1_000)
 	setSingletonBalance(t, e, "BANK_DEDICATED", 1_000)
+
+	t.Run("one hundred identical request keys create once", func(t *testing.T) {
+		const workers = 100
+		input := ledger.RequestWithdrawalInput{
+			RequestKey: "same-request-100", RequesterAccountID: 8201, WalletAvailable: wallet.Available,
+			Amount: 25, PayeeAccount: "IDEMPOTENT-ACCOUNT-7777", ActorID: 100, SecondFactorVerified: true,
+		}
+		beforeBalance := accountBalance(t, e, wallet.Available)
+		results := make(chan ledger.RequestWithdrawalResult, workers)
+		errorsCh := make(chan error, workers)
+		start := make(chan struct{})
+		var group sync.WaitGroup
+		for range workers {
+			group.Add(1)
+			go func() {
+				defer group.Done()
+				<-start
+				result, err := service.RequestWithdrawal(e.ctx, input)
+				if err != nil {
+					errorsCh <- err
+					return
+				}
+				results <- result
+			}()
+		}
+		close(start)
+		group.Wait()
+		close(errorsCh)
+		close(results)
+		for err := range errorsCh {
+			t.Errorf("request error=%v", err)
+		}
+		var withdrawalID, txnID int64
+		var first, replayed int
+		for result := range results {
+			if withdrawalID == 0 {
+				withdrawalID, txnID = result.Withdrawal.ID, result.Post.TxnID
+			}
+			if result.Withdrawal.ID != withdrawalID || result.Post.TxnID != txnID {
+				t.Fatalf("result withdrawal=%d txn=%d want withdrawal=%d txn=%d", result.Withdrawal.ID, result.Post.TxnID, withdrawalID, txnID)
+			}
+			if result.Post.Replayed {
+				replayed++
+			} else {
+				first++
+			}
+		}
+		if first != 1 || replayed != workers-1 {
+			t.Fatalf("first=%d replayed=%d", first, replayed)
+		}
+		var withdrawals, txns int
+		if err := e.admin.QueryRow(e.ctx, `
+			SELECT (SELECT count(*) FROM ledger.withdrawal WHERE request_key=$1),
+			       (SELECT count(*) FROM ledger.txn WHERE idem_key=$2)`, input.RequestKey, "withdraw_req:request:"+input.RequestKey).Scan(&withdrawals, &txns); err != nil {
+			t.Fatal(err)
+		}
+		if withdrawals != 1 || txns != 1 || accountBalance(t, e, wallet.Available) != beforeBalance-input.Amount {
+			t.Fatalf("withdrawals=%d txns=%d balance=%d", withdrawals, txns, accountBalance(t, e, wallet.Available))
+		}
+
+		conflict := input
+		conflict.Amount++
+		if _, err := service.RequestWithdrawal(e.ctx, conflict); !errors.Is(err, ledger.ErrIdempotencyConflict) {
+			t.Fatalf("changed amount error=%v", err)
+		}
+		conflict = input
+		conflict.PayeeAccount = "DIFFERENT-ACCOUNT-8888"
+		if _, err := service.RequestWithdrawal(e.ctx, conflict); !errors.Is(err, ledger.ErrIdempotencyConflict) {
+			t.Fatalf("changed payee error=%v", err)
+		}
+		other := mustWallet(t, e, 8299, nil)
+		conflict = input
+		conflict.WalletAvailable = other.Available
+		if _, err := service.RequestWithdrawal(e.ctx, conflict); !errors.Is(err, ledger.ErrIdempotencyConflict) {
+			t.Fatalf("changed wallet error=%v", err)
+		}
+		conflict = input
+		conflict.RequesterAccountID = 8299
+		if _, err := service.RequestWithdrawal(e.ctx, conflict); !errors.Is(err, ledger.ErrIdempotencyConflict) {
+			t.Fatalf("changed applicant error=%v", err)
+		}
+		distinct := input
+		distinct.RequestKey = "different-request-101"
+		distinct.ActorID++
+		created, err := service.RequestWithdrawal(e.ctx, distinct)
+		if err != nil || created.Post.Replayed || created.Withdrawal.ID == withdrawalID {
+			t.Fatalf("distinct result=%+v err=%v", created, err)
+		}
+	})
 
 	t.Run("one hundred identical confirmations post once", func(t *testing.T) {
 		wd := requestWithdrawal(t, e, service, wallet.Available, 8201, 100, "CONCURRENT-1000", 101)
@@ -321,7 +464,7 @@ func TestWithdrawalConcurrencyIntegration(t *testing.T) {
 			group.Add(1)
 			go func(i int) {
 				defer group.Done()
-				_, err := service.RequestWithdrawal(e.ctx, ledger.RequestWithdrawalInput{RequesterAccountID: 8202, WalletAvailable: limited.Available, Amount: 1, PayeeAccount: fmt.Sprintf("P-%04d", i), ActorID: int64(200 + i), SecondFactorVerified: true})
+				_, err := service.RequestWithdrawal(e.ctx, ledger.RequestWithdrawalInput{RequestKey: fmt.Sprintf("overdraw-%04d", i), RequesterAccountID: 8202, WalletAvailable: limited.Available, Amount: 1, PayeeAccount: fmt.Sprintf("P-%04d", i), ActorID: int64(200 + i), SecondFactorVerified: true})
 				if err == nil {
 					success.Add(1)
 				} else if !errors.Is(err, ledger.ErrInsufficientFunds) {
@@ -384,11 +527,54 @@ func withdrawalCipher(t *testing.T) *secrets.Envelope {
 
 func requestWithdrawal(t *testing.T, e businessEnv, service *ledger.Service, wallet, owner, amount int64, payee string, actor int64) ledger.RequestWithdrawalResult {
 	t.Helper()
-	result, err := service.RequestWithdrawal(e.ctx, ledger.RequestWithdrawalInput{RequesterAccountID: owner, WalletAvailable: wallet, Amount: amount, PayeeAccount: payee, ActorID: actor, SecondFactorVerified: true})
+	result, err := service.RequestWithdrawal(e.ctx, ledger.RequestWithdrawalInput{RequestKey: fmt.Sprintf("test-request-%d", withdrawalRequestKey.Add(1)), RequesterAccountID: owner, WalletAvailable: wallet, Amount: amount, PayeeAccount: payee, ActorID: actor, SecondFactorVerified: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	return result
+}
+
+func assertWithdrawalEvent(t *testing.T, e businessEnv, publicID, topic, secret string, actorID int64) {
+	t.Helper()
+	var count int
+	var payload string
+	if err := e.admin.QueryRow(e.ctx, `
+		SELECT count(*), min(payload::text)
+		FROM ledger.outbox
+		WHERE topic=$1 AND payload->>'public_id'=$2`, topic, publicID).Scan(&count, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("topic=%s public_id=%s event count=%d", topic, publicID, count)
+	}
+	if strings.Contains(payload, secret) {
+		t.Fatalf("topic=%s leaked payee", topic)
+	}
+	var event map[string]any
+	if err := json.Unmarshal([]byte(payload), &event); err != nil {
+		t.Fatal(err)
+	}
+	amount, hasAmount := event["amount"].(float64)
+	if event["public_id"] != publicID || event["occurred_at"] == nil || !hasAmount || amount <= 0 {
+		t.Fatalf("topic=%s payload=%s", topic, payload)
+	}
+	foundActor := false
+	for _, key := range []string{"actor_id", "maker_actor", "checker_actor"} {
+		if value, ok := event[key].(float64); ok && int64(value) == actorID {
+			foundActor = true
+		}
+	}
+	if !foundActor {
+		t.Fatalf("topic=%s payload lacks actor %d: %s", topic, actorID, payload)
+	}
+	if topic == "ledger.withdrawal.approved" && (event["maker_actor"] == nil || event["checker_actor"] == nil) {
+		t.Fatalf("approval payload lacks maker/checker: %s", payload)
+	}
+	if strings.HasSuffix(topic, ".paid") || strings.HasSuffix(topic, ".failed") || strings.HasSuffix(topic, ".cancelled") {
+		if event["actor_id"] == nil {
+			t.Fatalf("financial payload lacks operator: %s", payload)
+		}
+	}
 }
 
 func setSingletonBalance(t *testing.T, e businessEnv, kind string, balance int64) {
