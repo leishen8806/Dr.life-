@@ -14,7 +14,9 @@ import (
 
 type Config struct {
 	HTTPAddr           string
+	MetricsAddr        string
 	AppEnv             string
+	AppRelease         string
 	LogLevel           slog.Level
 	ShutdownTimeout    time.Duration
 	ReadHeaderTimeout  time.Duration
@@ -25,6 +27,8 @@ type Config struct {
 	DBMaxConns         int32
 	DBMinConns         int32
 	DBConnectTimeout   time.Duration
+	DBSlowQuery        time.Duration
+	SentryDSN          string
 	RedisURL           string
 	CORSAllowedOrigins []string
 	WebhookPrefix      string
@@ -38,10 +42,17 @@ type Config struct {
 }
 
 func Load() (Config, error) {
-	return load(os.Getenv)
+	return loadWithLookup(os.Getenv, os.LookupEnv)
 }
 
 func load(getenv func(string) string) (Config, error) {
+	return loadWithLookup(getenv, func(key string) (string, bool) {
+		value := getenv(key)
+		return value, value != ""
+	})
+}
+
+func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, bool)) (Config, error) {
 	appEnv := strings.TrimSpace(getenv("APP_ENV"))
 	if appEnv == "" {
 		return Config{}, fmt.Errorf("APP_ENV is required (dev, test, staging, or prod)")
@@ -55,6 +66,10 @@ func load(getenv func(string) string) (Config, error) {
 	httpAddr := strings.TrimSpace(getenv("HTTP_ADDR"))
 	if httpAddr == "" {
 		httpAddr = ":8080"
+	}
+	metricsAddr := "127.0.0.1:9100"
+	if raw, present := lookupEnv("METRICS_ADDR"); present {
+		metricsAddr = strings.TrimSpace(raw)
 	}
 
 	logLevel := slog.LevelInfo
@@ -108,6 +123,10 @@ func load(getenv func(string) string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	dbSlowQueryMS, err := positiveInt(getenv, "DB_SLOW_QUERY_MS", 200)
+	if err != nil {
+		return Config{}, err
+	}
 	corsOrigins, err := parseOrigins(getenv("CORS_ALLOWED_ORIGINS"))
 	if err != nil {
 		return Config{}, err
@@ -140,7 +159,9 @@ func load(getenv func(string) string) (Config, error) {
 
 	return Config{
 		HTTPAddr:           httpAddr,
+		MetricsAddr:        metricsAddr,
 		AppEnv:             appEnv,
+		AppRelease:         strings.TrimSpace(getenv("APP_RELEASE")),
 		LogLevel:           logLevel,
 		ShutdownTimeout:    time.Duration(shutdownSeconds) * time.Second,
 		ReadHeaderTimeout:  time.Duration(readHeaderSeconds) * time.Second,
@@ -151,6 +172,8 @@ func load(getenv func(string) string) (Config, error) {
 		DBMaxConns:         int32(dbMaxConns),
 		DBMinConns:         int32(dbMinConns),
 		DBConnectTimeout:   time.Duration(dbConnectSeconds) * time.Second,
+		DBSlowQuery:        time.Duration(dbSlowQueryMS) * time.Millisecond,
+		SentryDSN:          strings.TrimSpace(getenv("SENTRY_DSN")),
 		RedisURL:           strings.TrimSpace(getenv("REDIS_URL")),
 		CORSAllowedOrigins: corsOrigins,
 		WebhookPrefix:      publicWebhookPrefix,
