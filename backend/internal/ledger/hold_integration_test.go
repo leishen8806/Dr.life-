@@ -144,6 +144,66 @@ func TestHoldIntegration(t *testing.T) {
 		assertHoldInvariant(t, e)
 	})
 
+	t.Run("identical concurrent closes replay one transaction", func(t *testing.T) {
+		t.Run("settle", func(t *testing.T) {
+			frozen, err := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "plan_batch", RefID: 8, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: 800, ActorID: 11})
+			if err != nil {
+				t.Fatal(err)
+			}
+			buyerFrozenBefore := getBalance(t, e.ctx, e.admin, buyer.Frozen)
+			payeeBefore := getBalance(t, e.ctx, e.admin, payee.Available)
+			assertConcurrentReplay(t, 30, func() (ledger.PostResult, error) {
+				return e.appService.SettleHold(e.ctx, ledger.SettleHoldInput{HoldID: frozen.Hold.ID, PayeeAvailable: payee.Available, ActorID: 81})
+			})
+			if got := getBalance(t, e.ctx, e.admin, buyer.Frozen); got != buyerFrozenBefore-800 {
+				t.Fatalf("frozen balance=%d want=%d", got, buyerFrozenBefore-800)
+			}
+			if got := getBalance(t, e.ctx, e.admin, payee.Available); got != payeeBefore+800 {
+				t.Fatalf("payee balance=%d want=%d", got, payeeBefore+800)
+			}
+		})
+
+		t.Run("refund", func(t *testing.T) {
+			frozen, err := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "plan_batch", RefID: 9, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: 900, ActorID: 11})
+			if err != nil {
+				t.Fatal(err)
+			}
+			availableBefore := getBalance(t, e.ctx, e.admin, buyer.Available)
+			frozenBefore := getBalance(t, e.ctx, e.admin, buyer.Frozen)
+			assertConcurrentReplay(t, 30, func() (ledger.PostResult, error) {
+				return e.appService.RefundHold(e.ctx, ledger.RefundHoldInput{HoldID: frozen.Hold.ID, ActorID: 91, PayerActorID: 92})
+			})
+			if got := getBalance(t, e.ctx, e.admin, buyer.Available); got != availableBefore+900 {
+				t.Fatalf("available balance=%d want=%d", got, availableBefore+900)
+			}
+			if got := getBalance(t, e.ctx, e.admin, buyer.Frozen); got != frozenBefore-900 {
+				t.Fatalf("frozen balance=%d want=%d", got, frozenBefore-900)
+			}
+		})
+
+		t.Run("resolve dispute", func(t *testing.T) {
+			frozen, err := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "plan_batch", RefID: 10, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: 1000, ActorID: 11})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := e.appService.DisputeHold(e.ctx, ledger.DisputeHoldInput{HoldID: frozen.Hold.ID, ActorID: 101, Reason: "concurrent resolution"}); err != nil {
+				t.Fatal(err)
+			}
+			frozenBefore := getBalance(t, e.ctx, e.admin, buyer.Frozen)
+			payeeBefore := getBalance(t, e.ctx, e.admin, payee.Available)
+			assertConcurrentReplay(t, 30, func() (ledger.PostResult, error) {
+				return e.appService.ResolveDispute(e.ctx, ledger.ResolveDisputeInput{HoldID: frozen.Hold.ID, Resolution: "release", ResolvedBy: 102, PayerActorID: 103, PayeeAvailable: payee.Available})
+			})
+			if got := getBalance(t, e.ctx, e.admin, buyer.Frozen); got != frozenBefore-1000 {
+				t.Fatalf("frozen balance=%d want=%d", got, frozenBefore-1000)
+			}
+			if got := getBalance(t, e.ctx, e.admin, payee.Available); got != payeeBefore+1000 {
+				t.Fatalf("payee balance=%d want=%d", got, payeeBefore+1000)
+			}
+		})
+		assertHoldInvariant(t, e)
+	})
+
 	t.Run("one hundred concurrent freezes create one hold", func(t *testing.T) {
 		input := ledger.FreezeHoldInput{RefType: "plan_batch", RefID: 5, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: 500, ActorID: 11}
 		results := make(chan ledger.FreezeHoldResult, 100)
@@ -168,12 +228,21 @@ func TestHoldIntegration(t *testing.T) {
 			t.Error(err)
 		}
 		var holdID, txnID int64
+		fresh, replayed := 0, 0
 		for result := range results {
 			if holdID == 0 {
 				holdID, txnID = result.Hold.ID, result.Post.TxnID
 			} else if result.Hold.ID != holdID || result.Post.TxnID != txnID {
 				t.Fatalf("different replay result: %+v", result)
 			}
+			if result.Post.Replayed {
+				replayed++
+			} else {
+				fresh++
+			}
+		}
+		if fresh != 1 || replayed != 99 {
+			t.Fatalf("fresh=%d replayed=%d", fresh, replayed)
 		}
 		assertTxnCounts(t, e.ctx, e.admin, "freeze:hold:plan_batch-5", 1, 2, 1)
 		var count int
@@ -202,7 +271,18 @@ func TestHoldIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertState(t, execError(e.ctx, e.admin, `UPDATE ledger.hold SET amount=701 WHERE id=$1`, frozen.Hold.ID), "55000")
-		assertState(t, execError(e.ctx, e.admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES($1,'invalid_dispute',7001,1,'disputed',$2)`, buyer.Frozen, frozen.Post.TxnID), "23514")
+		assertState(t, execError(e.ctx, e.admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES($1,'invalid_dispute',7001,1,'disputed',$2)`, buyer.Frozen, frozen.Post.TxnID), "55000")
+		var nonFreezeTxnID int64
+		if err := e.admin.QueryRow(e.ctx, `SELECT id FROM ledger.txn WHERE type<>'freeze' ORDER BY id LIMIT 1`).Scan(&nonFreezeTxnID); err != nil {
+			t.Fatal(err)
+		}
+		for name, connection := range map[string]execer{"admin": e.admin, "app_ledger": e.app} {
+			t.Run(name+" insert guard", func(t *testing.T) {
+				assertState(t, execError(e.ctx, connection, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id,close_txn_id,closed_at) VALUES($1,'raw_released',$2,1,'released',$3,$3,now())`, buyer.Frozen, 7100+frozen.Hold.ID, frozen.Post.TxnID), "55000")
+				assertState(t, execError(e.ctx, connection, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES($1,'raw_account',$2,1,'held',$3)`, buyer.Available, 7200+frozen.Hold.ID, frozen.Post.TxnID), "55000")
+				assertState(t, execError(e.ctx, connection, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES($1,'raw_txn',$2,1,'held',$3)`, buyer.Frozen, 7300+frozen.Hold.ID, nonFreezeTxnID), "55000")
+			})
+		}
 		assertState(t, execError(e.ctx, e.admin, `UPDATE ledger.hold SET status='released' WHERE id=$1`, frozen.Hold.ID), "55000")
 		assertState(t, execError(e.ctx, e.admin, `DELETE FROM ledger.hold WHERE id=$1`, frozen.Hold.ID), "55000")
 		assertState(t, execError(e.ctx, e.app, `UPDATE ledger.hold SET amount=701 WHERE id=$1`, frozen.Hold.ID), "42501")
@@ -261,4 +341,48 @@ func assertHoldInvariant(t *testing.T, e businessEnv) {
 	if len(mismatches) != 0 {
 		t.Fatalf("hold invariant mismatches: %s", fmt.Sprint(mismatches))
 	}
+}
+
+func assertConcurrentReplay(t *testing.T, count int, call func() (ledger.PostResult, error)) int64 {
+	t.Helper()
+	results := make(chan ledger.PostResult, count)
+	errs := make(chan error, count)
+	var wg sync.WaitGroup
+	for range count {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result, err := call()
+			if err != nil {
+				errs <- err
+				return
+			}
+			results <- result
+		}()
+	}
+	wg.Wait()
+	close(results)
+	close(errs)
+	for err := range errs {
+		t.Errorf("concurrent request: %v", err)
+	}
+	var txnID int64
+	fresh, replayed, total := 0, 0, 0
+	for result := range results {
+		total++
+		if txnID == 0 {
+			txnID = result.TxnID
+		} else if result.TxnID != txnID {
+			t.Errorf("txn=%d want=%d", result.TxnID, txnID)
+		}
+		if result.Replayed {
+			replayed++
+		} else {
+			fresh++
+		}
+	}
+	if total != count || fresh != 1 || replayed != count-1 {
+		t.Fatalf("total=%d fresh=%d replayed=%d", total, fresh, replayed)
+	}
+	return txnID
 }
