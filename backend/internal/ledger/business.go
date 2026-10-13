@@ -286,7 +286,7 @@ func escrowCheck(accountID, orderID, amount int64, rejectReleased bool, refundWa
 			WHERE t.type='delivery_hold' AND t.ref_type='order' AND t.ref_id=$1
 			  AND p.side='DEBIT' AND a.kind='WALLET_AVAIL'
 			ORDER BY t.id LIMIT 1`, orderID).Scan(&holdWallet); errors.Is(err, pgx.ErrNoRows) {
-			return ErrEscrowExceeded
+			return ErrAccountOwnerMismatch
 		} else if err != nil {
 			return err
 		}

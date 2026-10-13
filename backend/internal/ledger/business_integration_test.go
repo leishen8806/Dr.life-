@@ -420,11 +420,11 @@ func TestBusinessPostingIntegration(t *testing.T) {
 	})
 
 	t.Run("delivery requires and preserves the original hold", func(t *testing.T) {
-		if _, err := e.appService.DeliveryRelease(e.ctx, ledger.DeliveryReleaseInput{OrderID: 1620, Amount: 1, ActorID: 2, DriverWallet: driver.Available, DriverBP: 10000, Remainder: 0, ProofID: "proof_1620"}); !errors.Is(err, ledger.ErrEscrowExceeded) {
+		if _, err := e.appService.DeliveryRelease(e.ctx, ledger.DeliveryReleaseInput{OrderID: 1620, Amount: 1, ActorID: 2, DriverWallet: driver.Available, DriverBP: 10000, Remainder: 0, ProofID: "proof_1620"}); !errors.Is(err, ledger.ErrAccountOwnerMismatch) {
 			t.Fatalf("release without hold error=%v", err)
 		}
 		assertTxnCounts(t, e.ctx, e.admin, "delivery_release:order:1620", 0, 0, 0)
-		if _, err := e.appService.DeliveryRefund(e.ctx, ledger.DeliveryRefundInput{OrderID: 1621, MerchantWallet: merchant.Available, Amount: 1, ActorID: 2}); !errors.Is(err, ledger.ErrEscrowExceeded) {
+		if _, err := e.appService.DeliveryRefund(e.ctx, ledger.DeliveryRefundInput{OrderID: 1621, MerchantWallet: merchant.Available, Amount: 1, ActorID: 2}); !errors.Is(err, ledger.ErrAccountOwnerMismatch) {
 			t.Fatalf("refund without hold error=%v", err)
 		}
 		assertTxnCounts(t, e.ctx, e.admin, "delivery_refund:order:1621", 0, 0, 0)
@@ -479,7 +479,7 @@ func TestBusinessPostingIntegration(t *testing.T) {
 		if successes != 1 || rejected != 1 {
 			t.Fatalf("success=%d rejected=%d", successes, rejected)
 		}
-		if _, err := e.appService.DeliveryRelease(e.ctx, ledger.DeliveryReleaseInput{OrderID: 1402, Amount: 1, ActorID: 2, DriverWallet: driver.Available, DriverBP: 10000, Remainder: 0, ProofID: "proof_1402"}); !errors.Is(err, ledger.ErrEscrowExceeded) {
+		if _, err := e.appService.DeliveryRelease(e.ctx, ledger.DeliveryReleaseInput{OrderID: 1402, Amount: 1, ActorID: 2, DriverWallet: driver.Available, DriverBP: 10000, Remainder: 0, ProofID: "proof_1402"}); !errors.Is(err, ledger.ErrAccountOwnerMismatch) {
 			t.Fatalf("cross-order release error=%v", err)
 		}
 	})
