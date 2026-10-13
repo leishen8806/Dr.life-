@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
-	"github.com/leishen8806/Dr.life-/backend/internal/platform/db"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 )
 
@@ -27,8 +27,15 @@ func main() {
 	logger := logx.NewLogger(cfg.LogLevel, os.Stdout)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	metrics := observability.NewMetrics()
+	reporter, err := observability.NewErrorReporter(cfg.SentryDSN, cfg.AppEnv, cfg.AppRelease, nil)
+	if err != nil {
+		logger.Error("Sentry configuration failed", "error", err)
+		os.Exit(1)
+	}
+	defer reporter.Flush(2 * time.Second)
 
-	database, err := db.NewPool(ctx, cfg)
+	database, err := observability.NewDatabasePool(ctx, cfg, metrics, logger)
 	if err != nil {
 		logger.Error("database pool failed", "error", err)
 		os.Exit(1)
@@ -75,11 +82,32 @@ func main() {
 			Limiter:        limiter,
 			IPRules:        strictRules(cfg.RateLimitIP),
 			AccountRules:   strictRules(cfg.RateLimitAccount),
-		}, db.Ping(database)),
+			Metrics:        metrics,
+			ErrorReporter:  reporter,
+		}, database.Ping),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,
 		IdleTimeout:       cfg.IdleTimeout,
 		// WriteTimeout stays unset so future real-time streams can remain open.
+	}
+	if cfg.MetricsAddr != "" {
+		metricsListener, listenErr := net.Listen("tcp", cfg.MetricsAddr)
+		if listenErr != nil {
+			logger.Error("metrics listener failed", "error", listenErr)
+			os.Exit(1)
+		}
+		metricsServer := &http.Server{
+			Addr: cfg.MetricsAddr, Handler: observability.MetricsHandler(metrics),
+			ReadHeaderTimeout: cfg.ReadHeaderTimeout, ReadTimeout: cfg.ReadTimeout,
+			WriteTimeout: 15 * time.Second, IdleTimeout: cfg.IdleTimeout,
+		}
+		go func() {
+			logger.Info("internal metrics server starting", "addr", cfg.MetricsAddr)
+			if serveErr := server.Serve(ctx, metricsServer, metricsListener, cfg.ShutdownTimeout); serveErr != nil {
+				logger.Error("metrics server stopped with error", "error", serveErr)
+				stop()
+			}
+		}()
 	}
 	logger.Info("http server starting", "addr", cfg.HTTPAddr, "environment", cfg.AppEnv)
 	if err := server.Serve(ctx, httpServer, listener, cfg.ShutdownTimeout); err != nil {

@@ -27,7 +27,7 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.HTTPAddr != ":8080" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 {
+	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 	if cfg.DatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" {
@@ -42,6 +42,8 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 	cfg, err := load(lookup(map[string]string{
 		"APP_ENV":                        "staging",
 		"HTTP_ADDR":                      "127.0.0.1:9090",
+		"METRICS_ADDR":                   "127.0.0.1:9200",
+		"APP_RELEASE":                    "test-release",
 		"LOG_LEVEL":                      "debug",
 		"SHUTDOWN_TIMEOUT_SECONDS":       "8",
 		"READ_HEADER_TIMEOUT_SECONDS":    "12",
@@ -52,6 +54,8 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"DB_MAX_CONNS":                   "20",
 		"DB_MIN_CONNS":                   "4",
 		"DB_CONNECT_TIMEOUT_SECONDS":     "6",
+		"DB_SLOW_QUERY_MS":               "250",
+		"SENTRY_DSN":                     "https://public@example.invalid/1",
 		"REDIS_URL":                      "redis://placeholder",
 		"CORS_ALLOWED_ORIGINS":           "https://miniapp.settlecore.org,http://localhost:5173",
 		"PUBLIC_WEBHOOK_PREFIX":          "/webhooks/telegram",
@@ -66,7 +70,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AppEnv != "staging" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || len(cfg.CORSAllowedOrigins) != 2 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 {
+	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSAllowedOrigins) != 2 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	for _, raw := range []string{"0", "-1", "abc"} {
@@ -83,7 +87,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 			}
 		})
 	}
-	for _, key := range []string{"DB_MAX_CONNS", "DB_MIN_CONNS", "DB_CONNECT_TIMEOUT_SECONDS"} {
+	for _, key := range []string{"DB_MAX_CONNS", "DB_MIN_CONNS", "DB_CONNECT_TIMEOUT_SECONDS", "DB_SLOW_QUERY_MS"} {
 		t.Run("invalid "+key, func(t *testing.T) {
 			if _, err := load(lookup(map[string]string{"APP_ENV": "test", key: "0"})); err == nil {
 				t.Fatalf("expected invalid %s error", key)
@@ -109,6 +113,20 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 				t.Fatal("expected configuration error")
 			}
 		})
+	}
+}
+
+func TestExplicitEmptyMetricsAddressDisablesListener(t *testing.T) {
+	values := map[string]string{"APP_ENV": "test", "METRICS_ADDR": ""}
+	cfg, err := loadWithLookup(lookup(values), func(key string) (string, bool) {
+		value, ok := values[key]
+		return value, ok
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.MetricsAddr != "" {
+		t.Fatalf("MetricsAddr = %q, want disabled", cfg.MetricsAddr)
 	}
 }
 

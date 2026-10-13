@@ -1,0 +1,26 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "panels": [
+    {"id": 1, "title": "HTTP requests / second", "type": "timeseries", "gridPos": {"h": 8, "w": 8, "x": 0, "y": 0}, "targets": [{"expr": "sum by (role, route) (rate(drlife_http_requests_total[5m]))", "legendFormat": "{{role}} {{route}}"}]},
+    {"id": 2, "title": "Query latency P50 / P95 / P99", "type": "timeseries", "gridPos": {"h": 8, "w": 8, "x": 8, "y": 0}, "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 0.5}]}}}, "targets": [{"expr": "histogram_quantile(0.50, sum by (le) (rate(drlife_http_request_duration_seconds_bucket{method=\"GET\"}[5m])))", "legendFormat": "P50"}, {"expr": "histogram_quantile(0.95, sum by (le) (rate(drlife_http_request_duration_seconds_bucket{method=\"GET\"}[5m])))", "legendFormat": "P95"}, {"expr": "histogram_quantile(0.99, sum by (le) (rate(drlife_http_request_duration_seconds_bucket{method=\"GET\"}[5m])))", "legendFormat": "P99"}]},
+    {"id": 3, "title": "Write latency P95", "type": "timeseries", "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0}, "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"color": "red", "value": 1}]}}}, "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(drlife_http_request_duration_seconds_bucket{method!=\"GET\"}[5m])))", "legendFormat": "P95"}]},
+    {"id": 4, "title": "HTTP error rate", "type": "timeseries", "gridPos": {"h": 7, "w": 8, "x": 0, "y": 8}, "targets": [{"expr": "sum by (status_class) (rate(drlife_http_errors_total[5m]))", "legendFormat": "{{status_class}}"}]},
+    {"id": 5, "title": "Orders created / signed", "type": "timeseries", "gridPos": {"h": 7, "w": 8, "x": 8, "y": 8}, "targets": [{"expr": "sum by (event) (rate(drlife_orders_total[5m]))", "legendFormat": "{{event}}"}]},
+    {"id": 6, "title": "Withdrawals requested / paid", "type": "timeseries", "gridPos": {"h": 7, "w": 8, "x": 16, "y": 8}, "targets": [{"expr": "sum by (event) (rate(drlife_withdrawals_total[5m]))", "legendFormat": "{{event}}"}]},
+    {"id": 7, "title": "AI fallback rate", "type": "timeseries", "gridPos": {"h": 7, "w": 8, "x": 0, "y": 15}, "targets": [{"expr": "sum(rate(drlife_ai_requests_total{event=\"fallback\"}[5m])) / clamp_min(sum(rate(drlife_ai_requests_total{event=\"request\"}[5m])), 0.001)", "legendFormat": "fallback ratio"}]},
+    {"id": 8, "title": "Bot send success rate", "type": "timeseries", "gridPos": {"h": 7, "w": 8, "x": 8, "y": 15}, "targets": [{"expr": "sum by (endpoint) (rate(drlife_bot_sends_total{status=\"success\"}[5m])) / clamp_min(sum by (endpoint) (rate(drlife_bot_sends_total[5m])), 0.001)", "legendFormat": "{{endpoint}}"}]},
+    {"id": 9, "title": "Login validation failures", "type": "timeseries", "gridPos": {"h": 7, "w": 8, "x": 16, "y": 15}, "targets": [{"expr": "sum by (endpoint, reason) (rate(drlife_login_validation_failures_total[5m]))", "legendFormat": "{{endpoint}} {{reason}}"}]},
+    {"id": 10, "title": "Ledger posts and failures", "type": "timeseries", "gridPos": {"h": 7, "w": 8, "x": 0, "y": 22}, "targets": [{"expr": "sum by (status, reason) (rate(drlife_ledger_posts_total[5m]))", "legendFormat": "{{status}} {{reason}}"}]},
+    {"id": 11, "title": "Reconciliation mismatches", "type": "stat", "gridPos": {"h": 7, "w": 8, "x": 8, "y": 22}, "targets": [{"expr": "increase(drlife_ledger_reconciliation_mismatches_total[24h])", "legendFormat": "24h"}]},
+    {"id": 12, "title": "Database pool", "type": "timeseries", "gridPos": {"h": 7, "w": 8, "x": 16, "y": 22}, "targets": [{"expr": "drlife_db_pool_acquired_connections", "legendFormat": "acquired"}, {"expr": "drlife_db_pool_idle_connections", "legendFormat": "idle"}, {"expr": "rate(drlife_db_pool_acquire_wait_seconds_total[5m])", "legendFormat": "wait seconds/s"}]},
+    {"id": 13, "title": "Slow queries", "type": "timeseries", "gridPos": {"h": 7, "w": 24, "x": 0, "y": 29}, "targets": [{"expr": "sum by (fingerprint) (rate(drlife_db_slow_queries_total[5m]))", "legendFormat": "{{fingerprint}}"}]}
+  ],
+  "refresh": "15s",
+  "schemaVersion": 42,
+  "tags": ["drlife", "backend"],
+  "time": {"from": "now-6h", "to": "now"},
+  "title": "Dr.life+ Overview",
+  "uid": "drlife-overview",
+  "version": 1
+}

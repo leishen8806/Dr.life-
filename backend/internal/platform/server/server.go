@@ -14,6 +14,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
 )
 
 type ReadinessCheck func(context.Context) error
@@ -27,6 +28,8 @@ type GatewayOptions struct {
 	IPRules           gateway.RuleSet
 	AccountRules      gateway.RuleSet
 	IdempotencyExempt func(*http.Request) bool
+	Metrics           *observability.Metrics
+	ErrorReporter     *observability.ErrorReporter
 }
 
 func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
@@ -39,8 +42,11 @@ func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
 func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks ...ReadinessCheck) http.Handler {
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID)
+	if options.Metrics != nil {
+		router.Use(options.Metrics.HTTPMiddleware)
+	}
 	router.Use(httpx.RequestLogger(logger, gateway.RoleFromContext))
-	router.Use(httpx.Recover(logger))
+	router.Use(observability.Recover(logger, options.ErrorReporter))
 	router.Use(gateway.CORS(options.AllowedOrigins))
 	router.Use(gateway.LimitByIP(options.Limiter, options.ClientIP, options.IPRules))
 	router.Use(gateway.Authenticate(options.Authenticator, options.WebhookPrefix))

@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: Dr.life+
+    folder: Dr.life+
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
