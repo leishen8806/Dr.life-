@@ -22,6 +22,7 @@ const (
 	CodeResourceNotFound   ErrorCode = 1003
 	CodeTooManyRequests    ErrorCode = 1004
 	CodeServiceUnavailable ErrorCode = 1005
+	CodeMethodNotAllowed   ErrorCode = 1006
 	CodeUnauthenticated    ErrorCode = 2001
 	CodePermissionDenied   ErrorCode = 2002
 )
@@ -48,6 +49,7 @@ var appErrors = map[ErrorCode]AppError{
 	CodeResourceNotFound:   {Code: CodeResourceNotFound, StatusCode: http.StatusNotFound, Message: Messages{ZH: "请求的资源不存在", EN: "The requested resource was not found", KM: "The requested resource was not found"}},
 	CodeTooManyRequests:    {Code: CodeTooManyRequests, StatusCode: http.StatusTooManyRequests, Message: Messages{ZH: "请求过于频繁", EN: "Too many requests", KM: "Too many requests"}},
 	CodeServiceUnavailable: {Code: CodeServiceUnavailable, StatusCode: http.StatusServiceUnavailable, Message: Messages{ZH: "服务暂时不可用", EN: "Service temporarily unavailable", KM: "Service temporarily unavailable"}},
+	CodeMethodNotAllowed:   {Code: CodeMethodNotAllowed, StatusCode: http.StatusMethodNotAllowed, Message: Messages{ZH: "请求方法不允许", EN: "Method not allowed", KM: "Method not allowed"}},
 	CodeUnauthenticated:    {Code: CodeUnauthenticated, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "请先登录", EN: "Authentication required", KM: "Authentication required"}},
 	CodePermissionDenied:   {Code: CodePermissionDenied, StatusCode: http.StatusForbidden, Message: Messages{ZH: "无权执行此操作", EN: "Permission denied", KM: "Permission denied"}},
 }

@@ -30,7 +30,7 @@ export interface components {
          * @description Documented application error code; ranges are described in the API description.
          * @enum {integer}
          */
-        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 2001 | 2002;
+        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 2001 | 2002;
         Messages: {
             zh: string;
             en: string;
@@ -127,6 +127,15 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
+        /** @description HTTP method is not allowed (error code 1006). */
+        MethodNotAllowed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
     };
     parameters: {
         /** @description One-based page number. */
@@ -169,6 +178,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            405: components["responses"]["MethodNotAllowed"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             503: components["responses"]["ServiceUnavailable"];

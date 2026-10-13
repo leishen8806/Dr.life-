@@ -50,19 +50,20 @@
 
 | 表 | 关键字段 | 约束与说明 |
 |---|---|---|
-| `person` | id, public_id, tg_user_id **bigint unique**, tg_first_name, tg_username, tg_lang_code, phone(加密), phone_verified_at, status | **一个 Telegram 号一个人**；手机号（App 阶段/提现验证用）加密存储 |
-| `account` | id, public_id, person_id→person, role (`buyer/merchant_owner/merchant_staff/driver`), merchant_id→merchant(可空), status (`active/frozen/disabled`), status_reason, lang, lang_registered_at, kyc_status | `UNIQUE(person_id, role, merchant_id)`；冻结/停用必须填 `status_reason`（CHECK）；`lang` 为 `zh/en/km` |
+| `person` | id, public_id, tg_user_id **bigint unique**, tg_first_name, tg_username, tg_lang_code, phone_enc, phone_verified_at, status | **一个 Telegram 号一个人**；`phone_enc bytea` 由应用层加密后存放 |
+| `account` | id, public_id, person_id→person, role (`buyer/merchant_owner/merchant_staff/driver`), merchant_id→merchant(可空), status (`active/frozen/disabled`), status_reason, lang, lang_registered_at, kyc_status | `UNIQUE NULLS NOT DISTINCT(person_id, role, merchant_id)`，确保 `merchant_id` 为空的账号也不能重复；冻结/停用必须填 `status_reason`（CHECK）；`lang` 为 `zh/en/km` |
 | `account_device` | account_id, device_id, first_seen_at, last_seen_at | 登录设备记录（语言登记设备） |
-| `bot` | id, end (`buyer/merchant/driver`), username unique, role_in_pool (`primary/standby`), status (`active/standby/limited/banned`), token_enc (bytea), token_last4, webhook_secret_enc, priority | **令牌信封加密**；`token_last4` 仅用于显示；同一端 `priority` 唯一 |
+| `bot` | id, public_id, end (`buyer/merchant/driver`), username unique, role_in_pool (`primary/standby`), status (`active/standby/limited/banned`), token_enc (bytea), token_last4, webhook_secret_enc, priority | **令牌信封加密**，AAD 为 `bot_token:<id>`；`token_last4` 仅用于显示；同一端 `priority` 唯一且最多一个 primary |
 | `account_bot` | account_id, bot_id, bound_at, write_access boolean, unreachable_at | 用户在哪些 Bot 点过开始/允许私信；发送时据此选 Bot（第二章） |
 | `login_event` | id, person_id, bot_id, valid_by_bot_id, tried_count, auth_date, ip, device_id, result, created_at | 登录审计；校验命中的 Bot、尝试次数 |
 | `session` | id, account_id, refresh_token_hash, device_id, ip, expires_at, revoked_at, revoked_reason | 停用员工/冻结账号时批量 `revoked_at` |
-| `merchant` | id, public_id, name jsonb, type, area, svc jsonb, desc jsonb, phone, address, contact, kind (`self/verified/pending`), status, owner_account_id | 商户资料；`kind=verified` 须核验 |
-| `merchant_staff` | id, merchant_id, account_id(可空,未接受前), name, phone, tg_username, note, role (`manager/sales/warehouse/finance`), status (`invited/active/off`), invite_code unique, invited_by, last_login_at | 员工上限 10（应用层校验）；同一商户内手机号唯一 |
+| `merchant` | id, public_id, name jsonb, type, area, svc jsonb, description jsonb, phone_enc, address_enc, contact_enc, kind (`self/verified/pending`), status, owner_account_id | 商户资料；电话、地址、联系人由应用层加密后存放；`kind=verified` 须核验 |
+| `merchant_staff` | id, public_id, merchant_id, account_id(可空,未接受前), name, phone_enc, phone_hash, tg_username, note, role (`manager/sales/warehouse/finance`), status (`invited/active/off`), invite_code unique, invited_by, last_login_at | 员工上限 10（应用层校验）；`phone_enc` 存密文，`phone_hash` 存规范化手机号的不可逆摘要并用于同一商户内唯一性 |
 | `merchant_role_perm` | merchant_id, role, module (`dash/prod/orders/store/fin/ads/prof/staff/ai`), level (`none/view/edit`) | `PRIMARY KEY(merchant_id,role,module)`；`staff` 模块 level 只允许 `none/view` |
+| `merchant_role_perm_template` | role, module, level | 四类商户角色的默认权限模板；创建商户时由应用复制到 `merchant_role_perm` |
 | `merchant_op_log` | id, merchant_id, actor_account_id, action, detail, created_at | 员工操作记录（只追加） |
 | `account_link` | id, buyer_account_id, merchant_account_id, linked_at, unlinked_at | 一键关联；`UNIQUE(buyer,merchant)` 且仅一条未解除；**只保存关联，不改变任何资金/订单归属** |
-| `admin_user` | id, name, email, password_hash(argon2), totp_secret_enc, role, data_scope text[], status, last_login_at | 平台与物流仓储 Web 账号；超级管理员至少 1 位启用（应用层 + 定期审计） |
+| `admin_user` | id, public_id, name, email, password_hash(argon2), totp_secret_enc, role, data_scope text[], status, last_login_at | 密码只存哈希，TOTP 密钥由应用层加密后存放；平台与物流仓储 Web 账号；超级管理员至少 1 位启用（应用层 + 定期审计） |
 | `admin_role_perm` | role (`super/ops/finance/logi/cs/auditor`), module(17 个), level | 对应《权限与审计规范》矩阵；`super` 固定全 `edit` |
 | `actor` | id, kind (`account/admin/system/external`), ref_id | 统一"操作人"，供 `created_by`、审计、流水引用 |
 
@@ -168,7 +169,12 @@ create table ledger.account (
   allow_negative boolean not null default false,
   status        text not null default 'open' check (status in ('open','closed')),
   created_at    timestamptz not null default now(),
-  unique (kind, owner_account)
+  check ((kind = 'BANK_DEDICATED' and normal_side = 'DEBIT') or
+         (kind <> 'BANK_DEDICATED' and normal_side = 'CREDIT')),
+  check ((kind in ('BANK_DEDICATED','PENDING_PAYOUT','DELIVERY_ESCROW','PLATFORM_HELD','PAYABLE_CARRIER','SUSPENSE') and owner_account is null) or
+         (kind in ('WALLET_AVAIL','WALLET_FROZEN','AD_BUDGET') and owner_account is not null)),
+  check (not allow_negative or kind in ('PAYABLE_CARRIER','SUSPENSE')),
+  unique nulls not distinct (kind, owner_account)
 );
 
 -- 交易（一次业务动作）
@@ -206,8 +212,10 @@ create index ix_posting_txn on ledger.posting(txn_id);
 create table ledger.balance (
   account_id    bigint primary key references ledger.account(id),
   balance       bigint not null default 0,         -- 正常方向余额
+  allow_negative boolean not null,                 -- 从 account 冗余，数据库 CHECK 可直接约束余额
   version       bigint not null default 0,
-  updated_at    timestamptz not null default now()
+  updated_at    timestamptz not null default now(),
+  check (allow_negative or balance >= 0)
 );
 ```
 
@@ -232,22 +240,24 @@ create function ledger.deny_mutation() returns trigger as $$
 begin raise exception 'ledger rows are append-only'; end $$ language plpgsql;
 create trigger trg_txn_ro     before update or delete on ledger.txn     for each row execute function ledger.deny_mutation();
 create trigger trg_posting_ro before update or delete on ledger.posting for each row execute function ledger.deny_mutation();
--- 同时：REVOKE UPDATE, DELETE ON ledger.txn, ledger.posting FROM ALL应用角色；
+create trigger trg_txn_no_truncate before truncate on ledger.txn for each statement execute function ledger.deny_mutation();
+create trigger trg_posting_no_truncate before truncate on ledger.posting for each statement execute function ledger.deny_mutation();
+-- 同时：REVOKE UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ledger.txn, ledger.posting FROM ledger_rw；
 
--- (3) 非负余额：客户资金账户不允许为负（透支就是 bug）
-alter table ledger.balance add constraint ck_balance_nonneg check (balance >= 0);   -- 对 allow_negative=false 的账户；SUSPENSE 例外用单独表或部分约束
+-- (3) 非负余额：由 balance.allow_negative + CHECK 兜底；客户资金账户永远是 false
 ```
-> `SUSPENSE` 和 `PAYABLE_CARRIER` 如允许暂时为负，应放入 `allow_negative` 账户，通过应用层规则放行；也可用 `exclude`/触发器按 `allow_negative` 校验。**客户钱包类账户永远不允许为负。**
+> `SUSPENSE` 使用 CREDIT 正常方向并允许暂时为负，供对账差异双向暂存；`PAYABLE_CARRIER` 第一版保持不允许负数。`allow_negative` 在创建账户时由触发器复制到 `balance`，且余额写入触发器要求两处策略一致；**客户钱包类账户永远不允许为负。**
 
 ### 入账流程（账务模块唯一入口 `Post(ctx, req)`）
 1. 校验请求：金额 > 0；分录借贷平衡；账户存在且 `open`；金额与业务单据一致（例如分账之和 = 托管金额）。
 2. **开启事务**（`READ COMMITTED` + 显式行锁）。
 3. **按 `account_id` 升序**对涉及的 `ledger.balance` 行 `SELECT … FOR UPDATE`（**固定顺序加锁，避免死锁**）。
 4. 检查余额：借记负债账户后不得小于 0（客户资金）；不足返回 `ERR_INSUFFICIENT_FUNDS`，**不记账**。
-5. `INSERT ledger.txn`（带 `idem_key`）。**若唯一冲突，说明是重复请求：读取并返回已有结果，不再入账。**
+5. `INSERT ledger.txn`（带 `idem_key`）。**若唯一冲突，比较类型、金额、关联信息、发起人和规范化后的分录；内容相同才读取 outbox 中保存的原结果并返回，内容不同返回幂等冲突，不再入账。**
 6. `INSERT ledger.posting`（批量）；更新各 `balance`（`balance = balance ± amount`，`version+1`）。
-7. 提交事务；提交时延迟触发器验证借贷平衡；失败整体回滚。
-8. 提交后发事件（通知、财务中心缓存失效）；**事件发送失败不影响账已入**（用 outbox 表保证至少一次）。
+7. 同事务写入 outbox，再提交事务；提交时延迟触发器验证借贷平衡，任一步失败均整体回滚。
+8. outbox 工作者用 `FOR UPDATE SKIP LOCKED` 并发领取，发送成功后标记 `sent_at`；发送失败释放事务锁以便重试，**不回滚已经提交的账务**。
+9. `40001`（序列化失败）和 `40P01`（死锁）有限次数退避重试；其他数据库错误和业务错误不自动重试，上下文取消立即停止。
 
 **幂等键规则（`idem_key`）：** `业务类型:业务单据:动作[:序号]`，例如 `delivery_hold:order:12345`、`payout:withdrawal:777`、`settle:batch:99`；重试同一动作必须用同一个键。
 

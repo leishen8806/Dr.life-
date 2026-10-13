@@ -65,6 +65,15 @@ func TestHealthAndReadiness(t *testing.T) {
 	}
 }
 
+func TestMetricsAreNotExposedOnPublicHandler(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	response := httptest.NewRecorder()
+	NewHandler(nil).ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403; body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestServeWaitsForInflightRequestDuringShutdown(t *testing.T) {
 	started, release := make(chan struct{}), make(chan struct{})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

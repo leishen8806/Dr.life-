@@ -1,0 +1,37 @@
+groups:
+  - name: drlife
+    rules:
+      - alert: HTTP5xxErrorRateHigh
+        expr: sum(rate(drlife_http_requests_total{status_class="5xx"}[5m])) / clamp_min(sum(rate(drlife_http_requests_total[5m])), 0.001) > 0.05
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "5xx error rate is above 5%"}
+      - alert: QueryP95LatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(drlife_http_request_duration_seconds_bucket{method="GET"}[5m]))) > 0.5
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Query P95 is above 500 ms"}
+      - alert: WriteP95LatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(drlife_http_request_duration_seconds_bucket{method!="GET"}[5m]))) > 1
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Write P95 is above 1 second"}
+      - alert: LoginValidationFailuresHigh
+        expr: sum(rate(drlife_login_validation_failures_total[5m])) > 0.1
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Login validation failures increased"}
+      - alert: BotSendSuccessRateLow
+        expr: sum(rate(drlife_bot_sends_total{status="success"}[10m])) / clamp_min(sum(rate(drlife_bot_sends_total[10m])), 0.001) < 0.95 and sum(rate(drlife_bot_sends_total[10m])) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Bot send success rate is below 95%"}
+      - alert: LedgerReconciliationMismatch
+        expr: increase(drlife_ledger_reconciliation_mismatches_total[5m]) > 0
+        labels: {severity: critical}
+        annotations: {summary: "A ledger reconciliation mismatch was detected"}
+      - alert: SlowQueriesHigh
+        expr: sum(rate(drlife_db_slow_queries_total[5m])) > 0.2
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Slow query rate increased"}
