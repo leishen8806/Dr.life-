@@ -99,7 +99,10 @@ type RefundFrozenInput struct {
 }
 
 func (s *Service) RefundFrozen(ctx context.Context, in RefundFrozenInput) (PostResult, error) {
-	if in.HoldID <= 0 || in.ActorID <= 0 || in.ActorID == in.PayerActorID {
+	if in.HoldID <= 0 || in.ActorID <= 0 || in.PayerActorID <= 0 {
+		return PostResult{}, ErrInvalidRequest
+	}
+	if in.ActorID == in.PayerActorID {
 		return PostResult{}, ErrSeparationDuty
 	}
 	req := businessRequest("refund", in.Amount, fmt.Sprintf("refund:hold:%d", in.HoldID), "hold", &in.HoldID, in.ActorID,
