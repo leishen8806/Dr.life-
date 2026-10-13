@@ -212,15 +212,6 @@ func TestBusinessPostingIntegration(t *testing.T) {
 		{"refund frozen", "refund", fmt.Sprintf("refund:hold:%d", refundSeed.Hold.ID), "hold", refundSeed.Hold.ID, func() (ledger.PostResult, error) {
 			return e.appService.RefundHold(e.ctx, ledger.RefundHoldInput{HoldID: refundSeed.Hold.ID, ActorID: 2, PayerActorID: 1})
 		}, []expectedPosting{{"WALLET_FROZEN", "DEBIT", 104, ""}, {"WALLET_AVAIL", "CREDIT", 104, ""}}},
-		{"withdraw request", "withdraw_req", "withdraw_req:withdrawal:105", "withdrawal", 105, func() (ledger.PostResult, error) {
-			return e.appService.WithdrawReq(e.ctx, ledger.WithdrawReqInput{WithdrawalID: 105, WalletAvailable: buyer.Available, Amount: 105, ActorID: 1})
-		}, []expectedPosting{{"WALLET_AVAIL", "DEBIT", 105, ""}, {"PENDING_PAYOUT", "CREDIT", 105, ""}}},
-		{"payout", "payout", "payout:withdrawal:106", "withdrawal", 106, func() (ledger.PostResult, error) {
-			return e.appService.Payout(e.ctx, ledger.PayoutInput{WithdrawalID: 106, Amount: 106, RequestedAmount: 106, ActorID: 1})
-		}, []expectedPosting{{"PENDING_PAYOUT", "DEBIT", 106, ""}, {"BANK_DEDICATED", "CREDIT", 106, ""}}},
-		{"payout fail", "payout_fail", "payout_fail:withdrawal:107", "withdrawal", 107, func() (ledger.PostResult, error) {
-			return e.appService.PayoutFail(e.ctx, ledger.PayoutFailInput{WithdrawalID: 107, WalletAvailable: buyer.Available, Amount: 107, ActorID: 1})
-		}, []expectedPosting{{"PENDING_PAYOUT", "DEBIT", 107, ""}, {"WALLET_AVAIL", "CREDIT", 107, ""}}},
 		{"storage fee", "storage_fee", "storage_fee:bill:108", "bill", 108, func() (ledger.PostResult, error) {
 			return e.appService.StorageFee(e.ctx, ledger.ChargeInput{ID: 108, WalletAccountID: merchant.Available, Amount: 108, ActorID: 1})
 		}, []expectedPosting{{"WALLET_AVAIL", "DEBIT", 108, ""}, {"PLATFORM_HELD", "CREDIT", 108, "storage"}}},
@@ -298,9 +289,6 @@ func TestBusinessPostingIntegration(t *testing.T) {
 		if _, err := e.appService.Topup(e.ctx, ledger.TopupInput{BankStatementLineID: 1501, WalletAccountID: buyer.Available, Amount: 1, ActorID: 1}); !errors.Is(err, ledger.ErrInvalidRequest) {
 			t.Errorf("unconfirmed topup error=%v", err)
 		}
-		if _, err := e.appService.Payout(e.ctx, ledger.PayoutInput{WithdrawalID: 1502, Amount: 2, RequestedAmount: 1, ActorID: 1}); !errors.Is(err, ledger.ErrInvalidAmount) {
-			t.Errorf("payout mismatch error=%v", err)
-		}
 		if _, err := e.appService.SettleHold(e.ctx, ledger.SettleHoldInput{HoldID: 1503, PayeeAvailable: payee.Available, Fee: 2, ActorID: 1}); !errors.Is(err, ledger.ErrInvalidRequest) {
 			t.Errorf("fee error=%v", err)
 		}
@@ -309,9 +297,6 @@ func TestBusinessPostingIntegration(t *testing.T) {
 		}
 		if _, err := e.appService.BankDiff(e.ctx, ledger.BankDiffInput{BankLineID: 1505, Amount: 1, ActorID: 1, Direction: "SIDEWAYS", Reason: "bad"}); !errors.Is(err, ledger.ErrInvalidRequest) {
 			t.Errorf("bank direction error=%v", err)
-		}
-		if _, err := e.appService.WithdrawReq(e.ctx, ledger.WithdrawReqInput{WithdrawalID: 0, WalletAvailable: buyer.Available, Amount: 1, ActorID: 1}); !errors.Is(err, ledger.ErrInvalidRequest) {
-			t.Errorf("zero business id error=%v", err)
 		}
 	})
 
@@ -326,9 +311,6 @@ func TestBusinessPostingIntegration(t *testing.T) {
 			{"freeze:hold:empty-1", func() (ledger.PostResult, error) {
 				got, err := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "empty", RefID: 1, WalletAvailable: empty.Available, WalletFrozen: empty.Frozen, Amount: 1, ActorID: 1})
 				return got.Post, err
-			}},
-			{"withdraw_req:withdrawal:1201", func() (ledger.PostResult, error) {
-				return e.appService.WithdrawReq(e.ctx, ledger.WithdrawReqInput{WithdrawalID: 1201, WalletAvailable: empty.Available, Amount: 1, ActorID: 1})
 			}},
 			{"storage_fee:bill:1202", func() (ledger.PostResult, error) {
 				return e.appService.StorageFee(e.ctx, ledger.ChargeInput{ID: 1202, WalletAccountID: empty.Available, Amount: 1, ActorID: 1})
@@ -546,19 +528,7 @@ func TestBusinessRandomSequenceMaintainsInvariant(t *testing.T) {
 				}
 			}
 		case 2:
-			if call(func() (ledger.PostResult, error) {
-				return e.appService.WithdrawReq(e.ctx, ledger.WithdrawReqInput{WithdrawalID: id, WalletAvailable: buyer.Available, Amount: amount, ActorID: 1})
-			}) {
-				if rng.Intn(2) == 0 {
-					call(func() (ledger.PostResult, error) {
-						return e.appService.Payout(e.ctx, ledger.PayoutInput{WithdrawalID: id, Amount: amount, RequestedAmount: amount, ActorID: 2})
-					})
-				} else {
-					call(func() (ledger.PostResult, error) {
-						return e.appService.PayoutFail(e.ctx, ledger.PayoutFailInput{WithdrawalID: id, WalletAvailable: buyer.Available, Amount: amount, ActorID: 2})
-					})
-				}
-			}
+			// Withdrawal state-machine random steps are covered in withdrawal_integration_test.go.
 		case 3:
 			call(func() (ledger.PostResult, error) {
 				return e.appService.StorageFee(e.ctx, ledger.ChargeInput{ID: id, WalletAccountID: merchant.Available, Amount: amount, ActorID: 1})

@@ -67,7 +67,7 @@ func TestLedgerMigrationAndConstraints(t *testing.T) {
 		if err := goose.Up(database, migrations); err != nil {
 			t.Fatal(err)
 		}
-		assertLedgerObjectCount(t, database, 9, 9)
+		assertLedgerObjectCount(t, database, 9, 11)
 	})
 
 	admin, err := pgx.Connect(ctx, dsn)
@@ -216,7 +216,7 @@ func TestLedgerMigrationAndConstraints(t *testing.T) {
 		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES($1,'batch',1,0,'held',$2)`, frozen, baseTxn), "23514")
 		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES($1,'batch',1,1,'bad',$2)`, frozen, baseTxn), "55000")
 		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.hold(account_id,ref_type,ref_id,amount,status,freeze_txn_id) VALUES(999999,'batch',1,1,'held',$1)`, baseTxn), "55000")
-		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.withdrawal(public_id,account_id,amount,payee_account_text,status,maker_actor,checker_actor) VALUES('wd1',1,1,'cipher','review',10,10)`), "23514")
+		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.withdrawal(public_id,account_id,amount,payee_account_text,status,maker_actor,checker_actor,requester_actor,requires_review) VALUES('01ARZ3NDEKTSV4RRFFQ69G5FA0',1,1,'cipher','review',10,10,11,true)`), "55000")
 		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.bank_statement_line(bank_ref,booked_on,amount,direction,imported_batch) VALUES('b1',CURRENT_DATE,1,'SIDE','x')`), "23514")
 	})
 
