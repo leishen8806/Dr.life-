@@ -54,7 +54,7 @@ type FreezeInput struct {
 	Amount, ActorID               int64
 }
 
-func (s *Service) Freeze(ctx context.Context, in FreezeInput) (PostResult, error) {
+func (s *Service) freeze(ctx context.Context, in FreezeInput) (PostResult, error) {
 	if !keySegmentPattern.MatchString(in.RefType) || in.RefID <= 0 {
 		return PostResult{}, ErrInvalidRequest
 	}
@@ -70,7 +70,7 @@ type SettleInput struct {
 	Amount, Fee, ActorID        int64
 }
 
-func (s *Service) Settle(ctx context.Context, in SettleInput) (PostResult, error) {
+func (s *Service) settle(ctx context.Context, in SettleInput) (PostResult, error) {
 	if in.HoldID <= 0 || in.Fee < 0 || in.Fee > in.Amount {
 		return PostResult{}, ErrInvalidRequest
 	}
@@ -99,7 +99,7 @@ type RefundFrozenInput struct {
 	Amount, ActorID, PayerActorID         int64
 }
 
-func (s *Service) RefundFrozen(ctx context.Context, in RefundFrozenInput) (PostResult, error) {
+func (s *Service) refundFrozen(ctx context.Context, in RefundFrozenInput) (PostResult, error) {
 	if in.HoldID <= 0 || in.ActorID <= 0 || in.PayerActorID <= 0 {
 		return PostResult{}, ErrInvalidRequest
 	}

@@ -40,6 +40,7 @@ var validCategories = map[string]struct{}{
 
 type beginner interface {
 	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
@@ -99,15 +100,27 @@ func (s *Service) Post(ctx context.Context, request PostRequest) (PostResult, er
 }
 
 type transactionCheck func(context.Context, pgx.Tx) error
+type transactionAfter func(context.Context, pgx.Tx, PostResult) error
+type transactionReplayCheck func(context.Context, pgx.Tx, PostResult) error
+
+type transactionHooks struct {
+	check       transactionCheck
+	after       transactionAfter
+	replayCheck transactionReplayCheck
+}
 
 func (s *Service) post(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
+	return s.postWithHooks(ctx, request, transactionHooks{check: check})
+}
+
+func (s *Service) postWithHooks(ctx context.Context, request PostRequest, hooks transactionHooks) (PostResult, error) {
 	if err := validateRequest(request); err != nil {
 		return PostResult{}, err
 	}
 	var result PostResult
 	var err error
 	for attempt := 0; attempt <= s.maxRetries; attempt++ {
-		result, err = s.postOnce(ctx, request, check)
+		result, err = s.postOnce(ctx, request, hooks)
 		if err == nil || !isRetryable(err) || attempt == s.maxRetries {
 			return result, err
 		}
@@ -132,13 +145,18 @@ type accountState struct {
 	balance       int64
 }
 
-func (s *Service) postOnce(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
+func (s *Service) postOnce(ctx context.Context, request PostRequest, hooks transactionHooks) (PostResult, error) {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return PostResult{}, err
 	}
 	defer tx.Rollback(ctx)
 	if result, replayErr := loadExisting(ctx, tx, request); replayErr == nil {
+		if hooks.replayCheck != nil {
+			if err := hooks.replayCheck(ctx, tx, result); err != nil {
+				return PostResult{}, err
+			}
+		}
 		if err := tx.Commit(ctx); err != nil {
 			return PostResult{}, err
 		}
@@ -167,8 +185,8 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest, check trans
 		}
 		accounts[id] = account
 	}
-	if check != nil {
-		if err := check(ctx, tx); err != nil {
+	if hooks.check != nil {
+		if err := hooks.check(ctx, tx); err != nil {
 			return PostResult{}, err
 		}
 	}
@@ -186,6 +204,11 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest, check trans
 		result, replayErr := loadExisting(ctx, tx, request)
 		if replayErr != nil {
 			return PostResult{}, replayErr
+		}
+		if hooks.replayCheck != nil {
+			if err := hooks.replayCheck(ctx, tx, result); err != nil {
+				return PostResult{}, err
+			}
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return PostResult{}, err
@@ -232,6 +255,11 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest, check trans
 			return PostResult{}, err
 		}
 		result.Balances = append(result.Balances, Balance{AccountID: id, Balance: account.balance})
+	}
+	if hooks.after != nil {
+		if err := hooks.after(ctx, tx, result); err != nil {
+			return PostResult{}, err
+		}
 	}
 	payload, err := json.Marshal(result)
 	if err != nil {

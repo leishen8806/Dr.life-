@@ -67,7 +67,7 @@ func TestLedgerMigrationAndConstraints(t *testing.T) {
 		if err := goose.Up(database, migrations); err != nil {
 			t.Fatal(err)
 		}
-		assertLedgerObjectCount(t, database, 9, 7)
+		assertLedgerObjectCount(t, database, 9, 8)
 	})
 
 	admin, err := pgx.Connect(ctx, dsn)

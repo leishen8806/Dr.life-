@@ -255,9 +255,10 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 4. 检查余额：借记负债账户后不得小于 0（客户资金）；不足返回 `ERR_INSUFFICIENT_FUNDS`，**不记账**。
 5. `INSERT ledger.txn`（带 `idem_key`）。**若唯一冲突，比较类型、金额、关联信息、发起人和规范化后的分录；内容相同才读取 outbox 中保存的原结果并返回，内容不同返回幂等冲突，不再入账。**
 6. `INSERT ledger.posting`（批量）；更新各 `balance`（`balance = balance ± amount`，`version+1`）。
-7. 同事务写入 outbox，再提交事务；提交时延迟触发器验证借贷平衡，任一步失败均整体回滚。
-8. outbox 工作者用 `FOR UPDATE SKIP LOCKED` 并发领取，发送成功后标记 `sent_at`；发送失败释放事务锁以便重试，**不回滚已经提交的账务**。
-9. `40001`（序列化失败）和 `40P01`（死锁）有限次数退避重试；其他数据库错误和业务错误不自动重试，上下文取消立即停止。
+7. 如业务动作注册了事务后置钩子，在分录与余额写入后、提交前执行；冻结业务用它写入或关闭 `ledger.hold`，因此记账与状态变化只能一起成功或一起回滚。幂等重放不重复执行后置钩子，并在原事务中校验业务状态与原交易一致。
+8. 同事务写入 outbox，再提交事务；提交时延迟触发器验证借贷平衡，任一步失败均整体回滚。
+9. outbox 工作者用 `FOR UPDATE SKIP LOCKED` 并发领取，发送成功后标记 `sent_at`；发送失败释放事务锁以便重试，**不回滚已经提交的账务**。
+10. `40001`（序列化失败）和 `40P01`（死锁）有限次数退避重试；其他数据库错误和业务错误不自动重试，上下文取消立即停止。
 
 **幂等键规则（`idem_key`）：** `业务类型:业务单据:动作[:序号]`，例如 `delivery_hold:order:12345`、`payout:withdrawal:777`、`settle:batch:99`；重试同一动作必须用同一个键。
 
@@ -301,6 +302,8 @@ create table ledger.hold (          -- 冻结明细
   freeze_txn_id bigint not null references ledger.txn(id),
   close_txn_id bigint references ledger.txn(id),
   created_at timestamptz not null default now(), closed_at timestamptz,
+  dispute_reason text, disputed_by bigint, disputed_at timestamptz,
+  resolved_by bigint,
   unique (ref_type, ref_id)
 );
 
@@ -324,6 +327,12 @@ create table ledger.outbox (        -- 事务性发件箱：账已入则事件�
   txn_id bigint, topic text, payload jsonb, created_at timestamptz default now(), sent_at timestamptz
 );
 ```
+
+`hold` 状态机为 `held → released | refunded | disputed`，以及 `disputed → released | refunded`；`released/refunded` 为终态。争议只改变状态与争议元数据，不动余额；必须通过 `ResolveDispute` 裁决后才可释放或退款，且裁决人与出款人不得相同。第一版一个 hold 只能整笔结算或整笔退回，部分结算待确认。
+
+冻结操作通过 `FreezeHold` 同事务写冻结分录与 hold；释放、退款通过 `SettleHold`、`RefundHold`，金额和冻结账户均取自 hold，调用方不能传入。第一版 `SettleHold.Fee` 必须为 0，参数仅为以后确定收费规则保留。L-03 的无状态冻结、结算、退款函数为包内私有，外部模块不能绕过状态机。锁顺序固定为：先由 `Post` 按 `account_id` 升序锁定余额行，再锁 hold 行。数据库触发器限制合法状态迁移，保护金额、账户、业务引用、冻结交易及创建时间不可变，并拒绝删除和截断。
+
+每日对账除总账恒等式外，还必须验证每个 `WALLET_FROZEN` 账户的余额等于该账户所有 `held/disputed` hold 金额之和；`VerifyHoldsMatchFrozen` 返回全部不一致账户。
 
 ---
 

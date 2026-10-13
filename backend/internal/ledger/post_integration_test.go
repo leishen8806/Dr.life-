@@ -109,7 +109,7 @@ func TestPostIntegration(t *testing.T) {
 	})
 
 	t.Run("migration down and up round trip", func(t *testing.T) {
-		if err := goose.Down(database, migrationDirectory(t)); err != nil {
+		if err := goose.DownTo(database, migrationDirectory(t), 4); err != nil {
 			t.Fatal(err)
 		}
 		var exists bool
