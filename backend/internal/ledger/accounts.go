@@ -101,15 +101,29 @@ func (s *Service) singletonAccounts(ctx context.Context) (map[string]int64, erro
 	return ids, nil
 }
 
-func requireKinds(expected map[int64]string, extra transactionCheck) transactionCheck {
+func requireKinds(expected map[int64]string, extra transactionCheck, sameOwner ...[]int64) transactionCheck {
 	return func(ctx context.Context, tx pgx.Tx) error {
+		owners := make(map[int64]*int64, len(expected))
 		for id, kind := range expected {
 			var actual string
-			if err := tx.QueryRow(ctx, `SELECT kind FROM ledger.account WHERE id=$1`, id).Scan(&actual); err != nil {
+			var owner *int64
+			if err := tx.QueryRow(ctx, `SELECT kind,owner_account FROM ledger.account WHERE id=$1`, id).Scan(&actual, &owner); err != nil {
 				return err
 			}
 			if actual != kind {
 				return fmt.Errorf("%w: account %d must be %s", ErrInvalidRequest, id, kind)
+			}
+			owners[id] = owner
+		}
+		for _, group := range sameOwner {
+			if len(group) < 2 || owners[group[0]] == nil {
+				return ErrAccountOwnerMismatch
+			}
+			owner := *owners[group[0]]
+			for _, id := range group[1:] {
+				if owners[id] == nil || *owners[id] != owner {
+					return ErrAccountOwnerMismatch
+				}
 			}
 		}
 		if extra != nil {

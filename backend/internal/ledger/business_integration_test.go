@@ -361,6 +361,92 @@ func TestBusinessPostingIntegration(t *testing.T) {
 		}
 	})
 
+	t.Run("wallet owner mismatches leave no trace", func(t *testing.T) {
+		other := mustWallet(t, e, 1600, nil)
+		checks := []struct {
+			key  string
+			call func() (ledger.PostResult, error)
+		}{
+			{"freeze:hold:owner-1601", func() (ledger.PostResult, error) {
+				return e.appService.Freeze(e.ctx, ledger.FreezeInput{RefType: "owner", RefID: 1601, WalletAvailable: buyer.Available, WalletFrozen: other.Frozen, Amount: 1, ActorID: 1})
+			}},
+			{"refund:hold:1602", func() (ledger.PostResult, error) {
+				return e.appService.RefundFrozen(e.ctx, ledger.RefundFrozenInput{HoldID: 1602, WalletFrozen: buyer.Frozen, WalletAvailable: other.Available, Amount: 1, ActorID: 2, PayerActorID: 1})
+			}},
+		}
+		for _, check := range checks {
+			if _, err := check.call(); !errors.Is(err, ledger.ErrAccountOwnerMismatch) {
+				t.Errorf("%s error=%v", check.key, err)
+			}
+			assertTxnCounts(t, e.ctx, e.admin, check.key, 0, 0, 0)
+		}
+
+		request := ledger.RefundFrozenInput{HoldID: 1603, WalletFrozen: buyer.Frozen, WalletAvailable: buyer.Available, Amount: 1, ActorID: 2, PayerActorID: 1}
+		result, err := e.appService.RefundFrozen(e.ctx, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var note string
+		if err := e.admin.QueryRow(e.ctx, `SELECT note FROM ledger.txn WHERE id=$1`, result.TxnID).Scan(&note); err != nil || note != "payer_actor:1" {
+			t.Fatalf("note=%q error=%v", note, err)
+		}
+		request.PayerActorID = 3
+		if _, err := e.appService.RefundFrozen(e.ctx, request); !errors.Is(err, ledger.ErrIdempotencyConflict) {
+			t.Fatalf("changed payer replay error=%v", err)
+		}
+		assertTxnCounts(t, e.ctx, e.admin, "refund:hold:1603", 1, 2, 1)
+	})
+
+	t.Run("advertising owner mismatches leave no trace", func(t *testing.T) {
+		otherMerchantID := int64(1610)
+		other := mustWallet(t, e, 1610, &otherMerchantID)
+		checks := []struct {
+			key  string
+			call func() (ledger.PostResult, error)
+		}{
+			{"ad_charge:ad:1611", func() (ledger.PostResult, error) {
+				return e.appService.AdCharge(e.ctx, ledger.AdTransferInput{AdID: 1611, WalletAvailable: merchant.Available, AdBudget: other.AdBudget, Amount: 1, ActorID: 1})
+			}},
+			{"ad_refund:ad:1612", func() (ledger.PostResult, error) {
+				return e.appService.AdRefund(e.ctx, ledger.AdTransferInput{AdID: 1612, WalletAvailable: other.Available, AdBudget: merchant.AdBudget, Amount: 1, ActorID: 1})
+			}},
+		}
+		for _, check := range checks {
+			if _, err := check.call(); !errors.Is(err, ledger.ErrAccountOwnerMismatch) {
+				t.Errorf("%s error=%v", check.key, err)
+			}
+			assertTxnCounts(t, e.ctx, e.admin, check.key, 0, 0, 0)
+		}
+	})
+
+	t.Run("delivery requires and preserves the original hold", func(t *testing.T) {
+		if _, err := e.appService.DeliveryRelease(e.ctx, ledger.DeliveryReleaseInput{OrderID: 1620, Amount: 1, ActorID: 2, DriverWallet: driver.Available, DriverBP: 10000, Remainder: 0, ProofID: "proof_1620"}); !errors.Is(err, ledger.ErrEscrowExceeded) {
+			t.Fatalf("release without hold error=%v", err)
+		}
+		assertTxnCounts(t, e.ctx, e.admin, "delivery_release:order:1620", 0, 0, 0)
+		if _, err := e.appService.DeliveryRefund(e.ctx, ledger.DeliveryRefundInput{OrderID: 1621, MerchantWallet: merchant.Available, Amount: 1, ActorID: 2}); !errors.Is(err, ledger.ErrEscrowExceeded) {
+			t.Fatalf("refund without hold error=%v", err)
+		}
+		assertTxnCounts(t, e.ctx, e.admin, "delivery_refund:order:1621", 0, 0, 0)
+
+		if _, err := e.appService.DeliveryHold(e.ctx, ledger.ChargeInput{ID: 1622, WalletAccountID: merchant.Available, Amount: 5, ActorID: 1}); err != nil {
+			t.Fatal(err)
+		}
+		otherMerchantID := int64(1622)
+		other := mustWallet(t, e, 1622, &otherMerchantID)
+		if _, err := e.appService.DeliveryRefund(e.ctx, ledger.DeliveryRefundInput{OrderID: 1622, MerchantWallet: other.Available, Amount: 5, ActorID: 2}); !errors.Is(err, ledger.ErrAccountOwnerMismatch) {
+			t.Fatalf("refund to another wallet error=%v", err)
+		}
+		assertTxnCounts(t, e.ctx, e.admin, "delivery_refund:order:1622", 0, 0, 0)
+		var held int64
+		if err := e.admin.QueryRow(e.ctx, `
+			SELECT COALESCE(sum(CASE p.side WHEN 'CREDIT' THEN p.amount ELSE -p.amount END),0)
+			FROM ledger.posting p JOIN ledger.txn x ON x.id=p.txn_id JOIN ledger.account a ON a.id=p.account_id
+			WHERE a.kind='DELIVERY_ESCROW' AND x.ref_type='order' AND x.ref_id=1622`).Scan(&held); err != nil || held != 5 {
+			t.Fatalf("held=%d error=%v", held, err)
+		}
+	})
+
 	t.Run("order escrow is isolated and release conflicts with refund", func(t *testing.T) {
 		if _, err := e.appService.DeliveryHold(e.ctx, ledger.ChargeInput{ID: 1401, WalletAccountID: merchant.Available, Amount: 10, ActorID: 1}); err != nil {
 			t.Fatal(err)

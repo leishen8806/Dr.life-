@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	ErrEscrowExceeded = errors.New("order delivery escrow exceeded")
-	ErrSeparationDuty = errors.New("ledger separation of duties violated")
+	ErrEscrowExceeded       = errors.New("order delivery escrow exceeded")
+	ErrSeparationDuty       = errors.New("ledger separation of duties violated")
+	ErrAccountOwnerMismatch = errors.New("ledger account owners do not match")
 )
 
 var keySegmentPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
@@ -60,7 +61,7 @@ func (s *Service) Freeze(ctx context.Context, in FreezeInput) (PostResult, error
 	req := businessRequest("freeze", in.Amount, fmt.Sprintf("freeze:hold:%s-%d", in.RefType, in.RefID), in.RefType, &in.RefID, in.ActorID,
 		Posting{AccountID: in.WalletAvailable, Side: "DEBIT", Amount: in.Amount},
 		Posting{AccountID: in.WalletFrozen, Side: "CREDIT", Amount: in.Amount})
-	return s.postBusiness(ctx, req, map[int64]string{in.WalletAvailable: "WALLET_AVAIL", in.WalletFrozen: "WALLET_FROZEN"}, nil)
+	return s.postBusiness(ctx, req, map[int64]string{in.WalletAvailable: "WALLET_AVAIL", in.WalletFrozen: "WALLET_FROZEN"}, nil, []int64{in.WalletAvailable, in.WalletFrozen})
 }
 
 type SettleInput struct {
@@ -108,7 +109,8 @@ func (s *Service) RefundFrozen(ctx context.Context, in RefundFrozenInput) (PostR
 	req := businessRequest("refund", in.Amount, fmt.Sprintf("refund:hold:%d", in.HoldID), "hold", &in.HoldID, in.ActorID,
 		Posting{AccountID: in.WalletFrozen, Side: "DEBIT", Amount: in.Amount},
 		Posting{AccountID: in.WalletAvailable, Side: "CREDIT", Amount: in.Amount})
-	return s.postBusiness(ctx, req, map[int64]string{in.WalletFrozen: "WALLET_FROZEN", in.WalletAvailable: "WALLET_AVAIL"}, nil)
+	req.Note = fmt.Sprintf("payer_actor:%d", in.PayerActorID)
+	return s.postBusiness(ctx, req, map[int64]string{in.WalletFrozen: "WALLET_FROZEN", in.WalletAvailable: "WALLET_AVAIL"}, nil, []int64{in.WalletFrozen, in.WalletAvailable})
 }
 
 type WithdrawReqInput struct{ WithdrawalID, WalletAvailable, Amount, ActorID int64 }
@@ -203,7 +205,7 @@ func (s *Service) AdRefund(ctx context.Context, in AdTransferInput) (PostResult,
 func (s *Service) adTransfer(ctx context.Context, typ, key string, debit, credit int64, in AdTransferInput) (PostResult, error) {
 	req := businessRequest(typ, in.Amount, key, "ad", &in.AdID, in.ActorID,
 		Posting{AccountID: debit, Side: "DEBIT", Amount: in.Amount}, Posting{AccountID: credit, Side: "CREDIT", Amount: in.Amount})
-	return s.postBusiness(ctx, req, map[int64]string{in.WalletAvailable: "WALLET_AVAIL", in.AdBudget: "AD_BUDGET"}, nil)
+	return s.postBusiness(ctx, req, map[int64]string{in.WalletAvailable: "WALLET_AVAIL", in.AdBudget: "AD_BUDGET"}, nil, []int64{in.WalletAvailable, in.AdBudget})
 }
 
 type AdSpendInput struct {
@@ -259,7 +261,7 @@ func (s *Service) DeliveryRelease(ctx context.Context, in DeliveryReleaseInput) 
 	}
 	req := businessRequest("delivery_release", in.Amount, fmt.Sprintf("delivery_release:order:%d", in.OrderID), "order", &in.OrderID, in.ActorID, postings...)
 	req.Note = "delivery_proof:" + in.ProofID
-	return s.postBusiness(ctx, req, expected, escrowCheck(ids["DELIVERY_ESCROW"], in.OrderID, in.Amount, false))
+	return s.postBusiness(ctx, req, expected, escrowCheck(ids["DELIVERY_ESCROW"], in.OrderID, in.Amount, false, nil))
 }
 
 type DeliveryRefundInput struct{ OrderID, MerchantWallet, Amount, ActorID int64 }
@@ -271,11 +273,26 @@ func (s *Service) DeliveryRefund(ctx context.Context, in DeliveryRefundInput) (P
 	}
 	req := businessRequest("delivery_refund", in.Amount, fmt.Sprintf("delivery_refund:order:%d", in.OrderID), "order", &in.OrderID, in.ActorID,
 		Posting{AccountID: ids["DELIVERY_ESCROW"], Side: "DEBIT", Amount: in.Amount}, Posting{AccountID: in.MerchantWallet, Side: "CREDIT", Amount: in.Amount})
-	return s.postBusiness(ctx, req, map[int64]string{ids["DELIVERY_ESCROW"]: "DELIVERY_ESCROW", in.MerchantWallet: "WALLET_AVAIL"}, escrowCheck(ids["DELIVERY_ESCROW"], in.OrderID, in.Amount, true))
+	return s.postBusiness(ctx, req, map[int64]string{ids["DELIVERY_ESCROW"]: "DELIVERY_ESCROW", in.MerchantWallet: "WALLET_AVAIL"}, escrowCheck(ids["DELIVERY_ESCROW"], in.OrderID, in.Amount, true, &in.MerchantWallet))
 }
 
-func escrowCheck(accountID, orderID, amount int64, rejectReleased bool) transactionCheck {
+func escrowCheck(accountID, orderID, amount int64, rejectReleased bool, refundWallet *int64) transactionCheck {
 	return func(ctx context.Context, tx pgx.Tx) error {
+		var holdWallet int64
+		if err := tx.QueryRow(ctx, `
+			SELECT p.account_id
+			FROM ledger.txn t JOIN ledger.posting p ON p.txn_id=t.id
+			JOIN ledger.account a ON a.id=p.account_id
+			WHERE t.type='delivery_hold' AND t.ref_type='order' AND t.ref_id=$1
+			  AND p.side='DEBIT' AND a.kind='WALLET_AVAIL'
+			ORDER BY t.id LIMIT 1`, orderID).Scan(&holdWallet); errors.Is(err, pgx.ErrNoRows) {
+			return ErrEscrowExceeded
+		} else if err != nil {
+			return err
+		}
+		if refundWallet != nil && holdWallet != *refundWallet {
+			return ErrAccountOwnerMismatch
+		}
 		if rejectReleased {
 			var released bool
 			if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ledger.txn WHERE type='delivery_release' AND ref_type='order' AND ref_id=$1)`, orderID).Scan(&released); err != nil {
@@ -354,9 +371,9 @@ func businessRequest(typ string, amount int64, key, refType string, refID *int64
 	return PostRequest{Type: typ, Amount: amount, IdemKey: key, RefType: refType, RefID: refID, ActorID: actorID, Postings: postings}
 }
 
-func (s *Service) postBusiness(ctx context.Context, request PostRequest, kinds map[int64]string, extra transactionCheck) (PostResult, error) {
+func (s *Service) postBusiness(ctx context.Context, request PostRequest, kinds map[int64]string, extra transactionCheck, sameOwner ...[]int64) (PostResult, error) {
 	if request.RefID != nil && *request.RefID <= 0 {
 		return PostResult{}, ErrInvalidRequest
 	}
-	return s.post(ctx, request, requireKinds(kinds, extra))
+	return s.post(ctx, request, requireKinds(kinds, extra, sameOwner...))
 }
