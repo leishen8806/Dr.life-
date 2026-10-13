@@ -8,9 +8,10 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "prebuild": "pnpm i18n:check",
     "build": "tsc --noEmit",
     "lint": "eslint src scripts",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/check-i18n.negative.mjs",
     "i18n:check": "node scripts/check-i18n.mjs"
   },
   "peerDependencies": {

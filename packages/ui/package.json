@@ -9,11 +9,13 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "prebuild": "pnpm --filter @drlife/i18n i18n:check",
     "build": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest run"
   },
   "dependencies": {
-    "@fontsource/noto-sans-khmer": "5.2.8",
+    "@drlife/i18n": "workspace:*",
     "@telegram-apps/sdk": "3.11.8"
   },
   "peerDependencies": {

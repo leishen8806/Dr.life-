@@ -22,6 +22,8 @@ pnpm install --frozen-lockfile
 
 本地后端的 `CORS_ALLOWED_ORIGINS` 需要包含上述五个来源。Mini App 在普通浏览器里会明确显示“开发模式”，并使用不含真实身份或令牌的 mock 数据。
 
+五个应用共用 `@drlife/ui` 的语言切换控件。F-07 阶段语言偏好仅保存在浏览器；A-04 接入后再登记到账户。构建前会自动校验三语词条与用户可见字符串是否仍被硬编码。
+
 ## 配置
 
 开发环境未设置 `VITE_API_BASE_URL` 时，接口客户端连接 `http://localhost:8080`。生产部署必须设置 `VITE_API_BASE_URL`，当前约定值为 `https://adminapi.settlecore.org`；生产地址不写入客户端源代码。

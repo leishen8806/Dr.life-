@@ -15,6 +15,13 @@ export type Language = "zh" | "en" | "km";
 export type TranslationKey = keyof typeof en;
 type Params = Record<string, string | number>;
 
+export interface LanguageStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+}
+
+const languageStorageKey = "drlife_lang";
+
 const locales: Record<Language, Record<TranslationKey, string>> = {
   zh,
   en,
@@ -26,6 +33,37 @@ function supportedLanguage(value?: string | null): Language | undefined {
   return language === "zh" || language === "en" || language === "km"
     ? language
     : undefined;
+}
+
+export function readLanguagePreference(
+  storage?: LanguageStorage
+): Language | undefined {
+  try {
+    const target = storage ?? globalThis.localStorage;
+    return supportedLanguage(target.getItem(languageStorageKey));
+  } catch {
+    return undefined;
+  }
+}
+
+export function storeLanguagePreference(
+  language: Language,
+  storage?: LanguageStorage
+): void {
+  try {
+    const target = storage ?? globalThis.localStorage;
+    target.setItem(languageStorageKey, language);
+  } catch {
+    // Storage is optional in restricted browsers and server-side rendering.
+  }
+}
+
+export function applyDocumentLanguage(
+  language: Language,
+  root: Pick<HTMLElement, "lang"> | undefined = globalThis.document
+    ?.documentElement
+): void {
+  if (root) root.lang = language;
 }
 
 export function resolveLanguage(
@@ -50,6 +88,10 @@ export function t(
   );
 }
 
+export function plural<T>(count: number, one: T, other: T): T {
+  return count === 1 ? one : other;
+}
+
 interface I18nContextValue {
   language: Language;
   setLanguage: (language: Language) => void;
@@ -67,7 +109,7 @@ export function I18nProvider({
 }) {
   const [language, setLanguage] = useState(initialLanguage);
   useEffect(() => {
-    document.documentElement.lang = language;
+    applyDocumentLanguage(language);
   }, [language]);
   const translate = useCallback(
     (key: TranslationKey, params: Params = {}) => t(key, params, language),
