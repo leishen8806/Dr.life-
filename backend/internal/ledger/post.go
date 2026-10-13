@@ -46,6 +46,7 @@ type beginner interface {
 type Service struct {
 	db         beginner
 	maxRetries int
+	singletons singletonCache
 }
 
 type Options struct {
@@ -94,13 +95,19 @@ type PostResult struct {
 }
 
 func (s *Service) Post(ctx context.Context, request PostRequest) (PostResult, error) {
+	return s.post(ctx, request, nil)
+}
+
+type transactionCheck func(context.Context, pgx.Tx) error
+
+func (s *Service) post(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
 	if err := validateRequest(request); err != nil {
 		return PostResult{}, err
 	}
 	var result PostResult
 	var err error
 	for attempt := 0; attempt <= s.maxRetries; attempt++ {
-		result, err = s.postOnce(ctx, request)
+		result, err = s.postOnce(ctx, request, check)
 		if err == nil || !isRetryable(err) || attempt == s.maxRetries {
 			return result, err
 		}
@@ -125,7 +132,7 @@ type accountState struct {
 	balance       int64
 }
 
-func (s *Service) postOnce(ctx context.Context, request PostRequest) (PostResult, error) {
+func (s *Service) postOnce(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return PostResult{}, err
@@ -159,6 +166,11 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest) (PostResult
 			return PostResult{}, fmt.Errorf("%w: %d", ErrAccountClosed, id)
 		}
 		accounts[id] = account
+	}
+	if check != nil {
+		if err := check(ctx, tx); err != nil {
+			return PostResult{}, err
+		}
 	}
 
 	var txnID int64
