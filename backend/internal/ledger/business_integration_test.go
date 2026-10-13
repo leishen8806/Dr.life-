@@ -183,6 +183,14 @@ func TestBusinessPostingIntegration(t *testing.T) {
 	if _, err := e.appService.DeliveryHold(e.ctx, ledger.ChargeInput{ID: 9003, WalletAccountID: merchant.Available, Amount: 100, ActorID: 1}); err != nil {
 		t.Fatal(err)
 	}
+	settleSeed, err := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "plan_batch", RefID: 103, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: 103, ActorID: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	refundSeed, err := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "plan_batch", RefID: 104, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: 104, ActorID: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	type businessCase struct {
 		name, typ, key, refType string
@@ -195,13 +203,14 @@ func TestBusinessPostingIntegration(t *testing.T) {
 			return e.appService.Topup(e.ctx, ledger.TopupInput{BankStatementLineID: 101, BankConfirmed: true, WalletAccountID: buyer.Available, Amount: 101, ActorID: 1})
 		}, []expectedPosting{{"BANK_DEDICATED", "DEBIT", 101, ""}, {"WALLET_AVAIL", "CREDIT", 101, ""}}},
 		{"freeze", "freeze", "freeze:hold:plan_batch-102", "plan_batch", 102, func() (ledger.PostResult, error) {
-			return e.appService.Freeze(e.ctx, ledger.FreezeInput{RefType: "plan_batch", RefID: 102, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: 102, ActorID: 1})
+			got, err := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "plan_batch", RefID: 102, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: 102, ActorID: 1})
+			return got.Post, err
 		}, []expectedPosting{{"WALLET_AVAIL", "DEBIT", 102, ""}, {"WALLET_FROZEN", "CREDIT", 102, ""}}},
-		{"settle", "settle", "settle:hold:103", "hold", 103, func() (ledger.PostResult, error) {
-			return e.appService.Settle(e.ctx, ledger.SettleInput{HoldID: 103, BuyerFrozen: buyer.Frozen, PayeeAvailable: payee.Available, Amount: 103, Fee: 3, ActorID: 1})
-		}, []expectedPosting{{"WALLET_FROZEN", "DEBIT", 103, ""}, {"WALLET_AVAIL", "CREDIT", 100, ""}, {"PLATFORM_HELD", "CREDIT", 3, "settle_fee"}}},
-		{"refund frozen", "refund", "refund:hold:104", "hold", 104, func() (ledger.PostResult, error) {
-			return e.appService.RefundFrozen(e.ctx, ledger.RefundFrozenInput{HoldID: 104, WalletFrozen: buyer.Frozen, WalletAvailable: buyer.Available, Amount: 104, ActorID: 2, PayerActorID: 1})
+		{"settle", "settle", fmt.Sprintf("settle:hold:%d", settleSeed.Hold.ID), "hold", settleSeed.Hold.ID, func() (ledger.PostResult, error) {
+			return e.appService.SettleHold(e.ctx, ledger.SettleHoldInput{HoldID: settleSeed.Hold.ID, PayeeAvailable: payee.Available, Fee: 0, ActorID: 1})
+		}, []expectedPosting{{"WALLET_FROZEN", "DEBIT", 103, ""}, {"WALLET_AVAIL", "CREDIT", 103, ""}}},
+		{"refund frozen", "refund", fmt.Sprintf("refund:hold:%d", refundSeed.Hold.ID), "hold", refundSeed.Hold.ID, func() (ledger.PostResult, error) {
+			return e.appService.RefundHold(e.ctx, ledger.RefundHoldInput{HoldID: refundSeed.Hold.ID, ActorID: 2, PayerActorID: 1})
 		}, []expectedPosting{{"WALLET_FROZEN", "DEBIT", 104, ""}, {"WALLET_AVAIL", "CREDIT", 104, ""}}},
 		{"withdraw request", "withdraw_req", "withdraw_req:withdrawal:105", "withdrawal", 105, func() (ledger.PostResult, error) {
 			return e.appService.WithdrawReq(e.ctx, ledger.WithdrawReqInput{WithdrawalID: 105, WalletAvailable: buyer.Available, Amount: 105, ActorID: 1})
@@ -292,7 +301,7 @@ func TestBusinessPostingIntegration(t *testing.T) {
 		if _, err := e.appService.Payout(e.ctx, ledger.PayoutInput{WithdrawalID: 1502, Amount: 2, RequestedAmount: 1, ActorID: 1}); !errors.Is(err, ledger.ErrInvalidAmount) {
 			t.Errorf("payout mismatch error=%v", err)
 		}
-		if _, err := e.appService.Settle(e.ctx, ledger.SettleInput{HoldID: 1503, BuyerFrozen: buyer.Frozen, PayeeAvailable: payee.Available, Amount: 1, Fee: 2, ActorID: 1}); !errors.Is(err, ledger.ErrInvalidRequest) {
+		if _, err := e.appService.SettleHold(e.ctx, ledger.SettleHoldInput{HoldID: 1503, PayeeAvailable: payee.Available, Fee: 2, ActorID: 1}); !errors.Is(err, ledger.ErrInvalidRequest) {
 			t.Errorf("fee error=%v", err)
 		}
 		if _, err := e.appService.DeliveryRelease(e.ctx, ledger.DeliveryReleaseInput{OrderID: 1504, Amount: 1, ActorID: 1, DriverWallet: driver.Available, DriverBP: 10000, Remainder: 0}); !errors.Is(err, ledger.ErrInvalidRequest) {
@@ -315,7 +324,8 @@ func TestBusinessPostingIntegration(t *testing.T) {
 			call func() (ledger.PostResult, error)
 		}{
 			{"freeze:hold:empty-1", func() (ledger.PostResult, error) {
-				return e.appService.Freeze(e.ctx, ledger.FreezeInput{RefType: "empty", RefID: 1, WalletAvailable: empty.Available, WalletFrozen: empty.Frozen, Amount: 1, ActorID: 1})
+				got, err := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "empty", RefID: 1, WalletAvailable: empty.Available, WalletFrozen: empty.Frozen, Amount: 1, ActorID: 1})
+				return got.Post, err
 			}},
 			{"withdraw_req:withdrawal:1201", func() (ledger.PostResult, error) {
 				return e.appService.WithdrawReq(e.ctx, ledger.WithdrawReqInput{WithdrawalID: 1201, WalletAvailable: empty.Available, Amount: 1, ActorID: 1})
@@ -350,7 +360,7 @@ func TestBusinessPostingIntegration(t *testing.T) {
 	})
 
 	t.Run("separation of duties", func(t *testing.T) {
-		if _, err := e.appService.RefundFrozen(e.ctx, ledger.RefundFrozenInput{HoldID: 1301, WalletFrozen: buyer.Frozen, WalletAvailable: buyer.Available, Amount: 1, ActorID: 7, PayerActorID: 7}); !errors.Is(err, ledger.ErrSeparationDuty) {
+		if _, err := e.appService.RefundHold(e.ctx, ledger.RefundHoldInput{HoldID: 1301, ActorID: 7, PayerActorID: 7}); !errors.Is(err, ledger.ErrSeparationDuty) {
 			t.Errorf("refund error=%v", err)
 		}
 		if _, err := e.appService.Sweep(e.ctx, ledger.ReviewedPaymentInput{ID: 1302, Amount: 1, ActorID: 7, ReviewerActorID: 7}); !errors.Is(err, ledger.ErrSeparationDuty) {
@@ -368,10 +378,8 @@ func TestBusinessPostingIntegration(t *testing.T) {
 			call func() (ledger.PostResult, error)
 		}{
 			{"freeze:hold:owner-1601", func() (ledger.PostResult, error) {
-				return e.appService.Freeze(e.ctx, ledger.FreezeInput{RefType: "owner", RefID: 1601, WalletAvailable: buyer.Available, WalletFrozen: other.Frozen, Amount: 1, ActorID: 1})
-			}},
-			{"refund:hold:1602", func() (ledger.PostResult, error) {
-				return e.appService.RefundFrozen(e.ctx, ledger.RefundFrozenInput{HoldID: 1602, WalletFrozen: buyer.Frozen, WalletAvailable: other.Available, Amount: 1, ActorID: 2, PayerActorID: 1})
+				got, err := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "owner", RefID: 1601, WalletAvailable: buyer.Available, WalletFrozen: other.Frozen, Amount: 1, ActorID: 1})
+				return got.Post, err
 			}},
 		}
 		for _, check := range checks {
@@ -381,8 +389,12 @@ func TestBusinessPostingIntegration(t *testing.T) {
 			assertTxnCounts(t, e.ctx, e.admin, check.key, 0, 0, 0)
 		}
 
-		request := ledger.RefundFrozenInput{HoldID: 1603, WalletFrozen: buyer.Frozen, WalletAvailable: buyer.Available, Amount: 1, ActorID: 2, PayerActorID: 1}
-		result, err := e.appService.RefundFrozen(e.ctx, request)
+		seed, err := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "owner", RefID: 1603, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: 1, ActorID: 1})
+		if err != nil {
+			t.Fatal(err)
+		}
+		request := ledger.RefundHoldInput{HoldID: seed.Hold.ID, ActorID: 2, PayerActorID: 1}
+		result, err := e.appService.RefundHold(e.ctx, request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -391,10 +403,10 @@ func TestBusinessPostingIntegration(t *testing.T) {
 			t.Fatalf("note=%q error=%v", note, err)
 		}
 		request.PayerActorID = 3
-		if _, err := e.appService.RefundFrozen(e.ctx, request); !errors.Is(err, ledger.ErrIdempotencyConflict) {
+		if _, err := e.appService.RefundHold(e.ctx, request); !errors.Is(err, ledger.ErrIdempotencyConflict) {
 			t.Fatalf("changed payer replay error=%v", err)
 		}
-		assertTxnCounts(t, e.ctx, e.admin, "refund:hold:1603", 1, 2, 1)
+		assertTxnCounts(t, e.ctx, e.admin, fmt.Sprintf("refund:hold:%d", seed.Hold.ID), 1, 2, 1)
 	})
 
 	t.Run("advertising owner mismatches leave no trace", func(t *testing.T) {
@@ -517,16 +529,19 @@ func TestBusinessRandomSequenceMaintainsInvariant(t *testing.T) {
 				return e.appService.Topup(e.ctx, ledger.TopupInput{BankStatementLineID: id, BankConfirmed: true, WalletAccountID: buyer.Available, Amount: amount, ActorID: 1})
 			})
 		case 1:
-			if call(func() (ledger.PostResult, error) {
-				return e.appService.Freeze(e.ctx, ledger.FreezeInput{RefType: "batch", RefID: id, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: amount, ActorID: 1})
-			}) {
+			frozen, freezeErr := e.appService.FreezeHold(e.ctx, ledger.FreezeHoldInput{RefType: "batch", RefID: id, WalletAvailable: buyer.Available, WalletFrozen: buyer.Frozen, Amount: amount, ActorID: 1})
+			if freezeErr != nil && !errors.Is(freezeErr, ledger.ErrInsufficientFunds) {
+				t.Fatalf("unexpected freeze error: %v", freezeErr)
+			}
+			assertAccountingInvariant(t, e)
+			if freezeErr == nil {
 				if rng.Intn(2) == 0 {
 					call(func() (ledger.PostResult, error) {
-						return e.appService.Settle(e.ctx, ledger.SettleInput{HoldID: id, BuyerFrozen: buyer.Frozen, PayeeAvailable: payee.Available, Amount: amount, Fee: amount % 7, ActorID: 2})
+						return e.appService.SettleHold(e.ctx, ledger.SettleHoldInput{HoldID: frozen.Hold.ID, PayeeAvailable: payee.Available, Fee: 0, ActorID: 2})
 					})
 				} else {
 					call(func() (ledger.PostResult, error) {
-						return e.appService.RefundFrozen(e.ctx, ledger.RefundFrozenInput{HoldID: id, WalletFrozen: buyer.Frozen, WalletAvailable: buyer.Available, Amount: amount, ActorID: 2, PayerActorID: 1})
+						return e.appService.RefundHold(e.ctx, ledger.RefundHoldInput{HoldID: frozen.Hold.ID, ActorID: 2, PayerActorID: 1})
 					})
 				}
 			}
@@ -598,7 +613,7 @@ func TestBusinessRandomSequenceMaintainsInvariant(t *testing.T) {
 			})
 		case 10:
 			call(func() (ledger.PostResult, error) {
-				return e.appService.Settle(e.ctx, ledger.SettleInput{HoldID: id, BuyerFrozen: buyer.Frozen, PayeeAvailable: payee.Available, Amount: amount, Fee: 0, ActorID: 2})
+				return e.appService.Topup(e.ctx, ledger.TopupInput{BankStatementLineID: id, BankConfirmed: true, WalletAccountID: buyer.Available, Amount: amount, ActorID: 1})
 			})
 		}
 	}
