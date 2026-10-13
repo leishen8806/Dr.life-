@@ -26,6 +26,9 @@ Telegram Mini App 电商平台，首版聚焦商家仓储与配送，并由平�
 | [Codex 任务提示词 F-04 与 F-08](<Dr.life+Codex任务提示词-F04与F08.md>) | OpenAPI 骨架与 CI 任务的自包含执行提示、评审重点与设置必需检查的步骤 |
 | [Codex 任务提示词 F-05 与 F-10](<Dr.life+Codex任务提示词-F05与F10.md>) | 网关中间件与密钥/信封加密任务的自包含执行提示与评审重点 |
 | [Codex 任务提示词 A-01、L-01、F-06](<Dr.life+Codex任务提示词-A01-L01-F06.md>) | iam 表、账务表与硬约束、前端工作区任务的自包含执行提示与评审重点 |
+| [Codex 任务提示词 L-04、L-05、L-06](<Dr.life+Codex任务提示词-L04-L05-L06.md>) | 冻结明细、提现与复核、冲销任务的自包含执行提示、待确认业务问题与评审重点 |
+| [Codex 任务提示词 L-03、F-07、F-11](<Dr.life+Codex任务提示词-L03-F07-F11.md>) | 业务入账封装（含分账倒挤与按单托管检查）、多语言基础、可观测性任务的自包含执行提示与评审重点 |
+| [Codex 任务提示词 P0-1 与 L-02](<Dr.life+Codex任务提示词-P01与L02.md>) | Telegram initData + Bot 池 PoC（含六个测试 Bot 准备清单）与 `Post()` 入账核心任务的自包含执行提示与评审重点 |
 | [backend/](backend/README.md) | Go 后端目录用途与设计依据 |
 | [backend/cmd/](backend/cmd/README.md) | Go 可执行程序入口 |
 | [backend/internal/](backend/internal/README.md) | 后端内部模块与平台组件 |
