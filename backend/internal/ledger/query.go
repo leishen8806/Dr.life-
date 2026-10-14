@@ -15,7 +15,7 @@ type rowQuerier interface {
 }
 
 func (s *Service) GetByID(ctx context.Context, txnID int64) (PostResult, error) {
-	return queryResult(ctx, s.db, `
+	result, err := queryResult(ctx, s.db, `
 		SELECT t.id,t.txn_no,o.payload
 		FROM ledger.txn t
 		LEFT JOIN LATERAL (
@@ -23,6 +23,16 @@ func (s *Service) GetByID(ctx context.Context, txnID int64) (PostResult, error) 
 			WHERE txn_id=t.id AND topic='ledger.txn.posted' ORDER BY id LIMIT 1
 		) o ON true
 		WHERE t.id=$1`, txnID)
+	if err != nil {
+		return PostResult{}, err
+	}
+	var reversalID int64
+	if err := s.db.QueryRow(ctx, `SELECT id FROM ledger.txn WHERE reverses_txn_id=$1`, txnID).Scan(&reversalID); err == nil {
+		result.ReversedByTxnID = &reversalID
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return PostResult{}, err
+	}
+	return result, nil
 }
 
 func (s *Service) GetByIdemKey(ctx context.Context, idemKey string) (PostResult, error) {

@@ -67,7 +67,7 @@ func TestLedgerMigrationAndConstraints(t *testing.T) {
 		if err := goose.Up(database, migrations); err != nil {
 			t.Fatal(err)
 		}
-		assertLedgerObjectCount(t, database, 9, 12)
+		assertLedgerObjectCount(t, database, 9, 13)
 	})
 
 	admin, err := pgx.Connect(ctx, dsn)
@@ -205,6 +205,27 @@ func TestLedgerMigrationAndConstraints(t *testing.T) {
 		original := insertBalanced(t, ctx, admin, "original", "original", 70, debitAccount, creditAccount, 0)
 		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.txn(txn_no,type,amount,idem_key,reverses_txn_id,actor_id) VALUES('mismatch','reversal',71,'mismatch',$1,1)`, original), "23514")
 		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.txn(id,txn_no,type,amount,idem_key,reverses_txn_id,actor_id) OVERRIDING SYSTEM VALUE VALUES(900000,'self','reversal',70,'self',900000,1)`), "23514")
+
+		insertMalformedReversal := func(key string, source int64, debit, credit int64, debitRole string) error {
+			tx, err := admin.Begin(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback(ctx)
+			var txnID int64
+			if err := tx.QueryRow(ctx, `INSERT INTO ledger.txn(txn_no,type,amount,idem_key,reverses_txn_id,actor_id) VALUES($1,'reversal',70,$1,$2,1) RETURNING id`, key, source).Scan(&txnID); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `INSERT INTO ledger.posting(txn_id,account_id,side,amount,role) VALUES($1,$2,'DEBIT',70,NULLIF($4,'')),($1,$3,'CREDIT',70,NULL)`, txnID, debit, credit, debitRole); err != nil {
+				return err
+			}
+			return tx.Commit(ctx)
+		}
+		assertSQLState(t, insertMalformedReversal("same-direction", original, debitAccount, creditAccount, ""), "23514")
+		assertSQLState(t, insertMalformedReversal("role-mismatch", original, creditAccount, debitAccount, "unexpected"), "23514")
+
+		freeze := insertBalancedType(t, ctx, admin, "freeze-original", "freeze", "freeze-original", 70, debitAccount, creditAccount, 0)
+		assertSQLState(t, insertMalformedReversal("blocked-type", freeze, creditAccount, debitAccount, ""), "23514")
 		insertBalanced(t, ctx, admin, "reversal-one", "reversal-one", 70, creditAccount, debitAccount, original)
 		assertSQLState(t, execErr(ctx, admin, `INSERT INTO ledger.txn(txn_no,type,amount,idem_key,reverses_txn_id,actor_id) VALUES('reversal-two','reversal',70,'reversal-two',$1,1)`, original), "23505")
 	})
