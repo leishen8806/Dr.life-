@@ -8,6 +8,7 @@ import (
 	"math"
 	"regexp"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -51,7 +52,11 @@ type Service struct {
 	accountGuard             AccountGuard
 	payeeCipher              PayeeCipher
 	withdrawalMetrics        WithdrawalMetrics
+	reconciliationMetrics    ReconciliationMetrics
 	largeWithdrawalThreshold int64
+	reconciliationLocation   *time.Location
+	spotCheckEvery           uint64
+	spotCheckCounter         atomic.Uint64
 	now                      func() time.Time
 }
 
@@ -60,7 +65,10 @@ type Options struct {
 	AccountGuard             AccountGuard
 	PayeeCipher              PayeeCipher
 	WithdrawalMetrics        WithdrawalMetrics
+	ReconciliationMetrics    ReconciliationMetrics
 	LargeWithdrawalThreshold int64
+	ReconciliationLocation   *time.Location
+	SpotCheckEvery           int
 	Now                      func() time.Time
 }
 
@@ -77,10 +85,19 @@ func New(db beginner, options Options) *Service {
 	if now == nil {
 		now = time.Now
 	}
+	location := options.ReconciliationLocation
+	if location == nil {
+		location = time.FixedZone("Asia/Phnom_Penh", 7*60*60)
+	}
+	spotCheckEvery := options.SpotCheckEvery
+	if spotCheckEvery < 0 {
+		spotCheckEvery = 0
+	}
 	return &Service{
 		db: db, maxRetries: maxRetries, accountGuard: options.AccountGuard,
 		payeeCipher: options.PayeeCipher, withdrawalMetrics: options.WithdrawalMetrics,
-		largeWithdrawalThreshold: threshold, now: now,
+		reconciliationMetrics: options.ReconciliationMetrics, reconciliationLocation: location,
+		largeWithdrawalThreshold: threshold, spotCheckEvery: uint64(spotCheckEvery), now: now,
 	}
 }
 
@@ -151,7 +168,13 @@ func (s *Service) postWithHooks(ctx context.Context, request PostRequest, hooks 
 	var err error
 	for attempt := 0; attempt <= s.maxRetries; attempt++ {
 		result, err = s.postOnce(ctx, request, hooks)
-		if err == nil || !isRetryable(err) || attempt == s.maxRetries {
+		if err == nil {
+			if !result.Replayed {
+				s.maybeSpotCheck(request.Postings)
+			}
+			return result, nil
+		}
+		if !isRetryable(err) || attempt == s.maxRetries {
 			return result, err
 		}
 		delay := time.Duration(1<<attempt) * 10 * time.Millisecond
