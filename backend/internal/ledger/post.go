@@ -111,10 +111,11 @@ type Balance struct {
 }
 
 type PostResult struct {
-	TxnID    int64     `json:"txn_id"`
-	TxnNo    string    `json:"txn_no"`
-	Replayed bool      `json:"-"`
-	Balances []Balance `json:"balances"`
+	TxnID           int64     `json:"txn_id"`
+	TxnNo           string    `json:"txn_no"`
+	Replayed        bool      `json:"-"`
+	ReversedByTxnID *int64    `json:"reversed_by_txn_id,omitempty"`
+	Balances        []Balance `json:"balances"`
 }
 
 func (s *Service) Post(ctx context.Context, request PostRequest) (PostResult, error) {

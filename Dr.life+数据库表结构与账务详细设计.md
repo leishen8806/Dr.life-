@@ -291,6 +291,13 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 | 6.19 | **对账差异调整** | `bank_diff` | 差异金额入 `SUSPENSE`（DR/CR `BANK_DEDICATED` 对 `SUSPENSE`） | **`SUSPENSE` 余额必须在 N 天内清零**，超期告警 |
 | — | **货款凭证**（买家线下付商家） | 不入账 | 写 `trade.payment_proof` | **不进分录**，流水页并列显示"凭证（仅留痕）" |
 
+#### 6.18 冲销补充规则
+
+- 第一版只允许冲销 `topup`、`storage_fee`、`member_fee`、`ad_charge`、`ad_spend`、`ad_refund`、`bank_diff`、`sweep`、`carrier_pay`、`adjust`。冻结与结算必须走 `hold` 状态机，提现必须走 `withdrawal` 状态机，配送托管需按订单状态处理，不能用通用冲销绕过业务状态。
+- 冲销交易必须逐条复制原分录的账户、金额、`role`、`category`，并只互换 `DEBIT` / `CREDIT`。延迟约束触发器在提交时比较两个分录多重集合，防止绕过服务直接写入不对称冲销。
+- 同一原交易最多一条冲销；冲销交易本身不能再次冲销。冲销仍执行账户余额非负检查，已花掉的充值不能用冲销强制形成客户负余额。
+- 服务调用必须携带非空原因、操作人及授权人；权限判断由 API 层执行。账务事务写 `ledger.txn.reversed` outbox 事件，审计模块消费事件并追加哈希链审计记录，账务模块不跨 schema 写审计表。
+
 ### 配套表
 ```sql
 create table ledger.hold (          -- 冻结明细
