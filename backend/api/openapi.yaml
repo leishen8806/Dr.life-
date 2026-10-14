@@ -34,6 +34,37 @@ tags:
 security:
   - bearerAuth: []
 paths:
+  /v1/public/auth/telegram:
+    post:
+      tags: [public]
+      operationId: postTelegramAuth
+      summary: Sign in with Telegram Mini App initData
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramAuthRequest"
+      responses:
+        "200":
+          description: Login succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramAuthSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/LoginFailed"
+        "403":
+          $ref: "#/components/responses/AccountBlocked"
+        "429":
+          $ref: "#/components/responses/LoginTooManyAttempts"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
   /v1/public/ping:
     get:
       tags: [public]
@@ -123,7 +154,7 @@ components:
       type: integer
       format: int32
       description: Documented application error code; ranges are described in the API description.
-      enum: [1001, 1002, 1003, 1004, 1005, 1006, 2001, 2002]
+      enum: [1001, 1002, 1003, 1004, 1005, 1006, 2001, 2002, 2003, 2004, 2005]
       x-enum-varnames:
         - InternalError
         - InvalidArgument
@@ -133,6 +164,9 @@ components:
         - MethodNotAllowed
         - Unauthenticated
         - PermissionDenied
+        - TelegramLoginFailed
+        - AccountBlocked
+        - LoginTooManyAttempts
     Messages:
       type: object
       additionalProperties: false
@@ -200,6 +234,76 @@ components:
         request_id:
           type: string
           minLength: 1
+    TelegramAuthRequest:
+      type: object
+      additionalProperties: false
+      required: [end, init_data]
+      properties:
+        end:
+          type: string
+          enum: [buyer, merchant, driver]
+        init_data:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        device_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: "^[A-Za-z0-9_:-]+$"
+    TelegramAccount:
+      type: object
+      additionalProperties: false
+      required: [public_id, role, lang, status]
+      properties:
+        public_id:
+          type: string
+        role:
+          type: string
+          enum: [buyer, merchant, driver]
+        lang:
+          type: string
+          nullable: true
+          enum: [zh, en, km]
+        status:
+          type: string
+          enum: [active, frozen, disabled]
+    TelegramAuthData:
+      type: object
+      additionalProperties: false
+      required: [access_token, access_expires_in, refresh_token, refresh_expires_in, account, needs_language, is_new_account]
+      properties:
+        access_token:
+          type: string
+        access_expires_in:
+          type: integer
+          format: int64
+          minimum: 1
+        refresh_token:
+          type: string
+        refresh_expires_in:
+          type: integer
+          format: int64
+          minimum: 1
+        account:
+          $ref: "#/components/schemas/TelegramAccount"
+        needs_language:
+          type: boolean
+        is_new_account:
+          type: boolean
+    TelegramAuthSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/TelegramAuthData"
+        request_id:
+          type: string
+          minLength: 1
   responses:
     BadRequest:
       description: Invalid request (error code 1002).
@@ -215,6 +319,24 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     Forbidden:
       description: Permission denied (error code 2002).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    LoginFailed:
+      description: Telegram login validation failed (error code 2003).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    AccountBlocked:
+      description: Account is frozen or disabled (error code 2004).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    LoginTooManyAttempts:
+      description: Too many login validation failures (error code 2005).
       content:
         application/json:
           schema:

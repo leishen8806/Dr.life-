@@ -27,10 +27,10 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 {
+	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 || cfg.TelegramInitDataMaxAge != 24*time.Hour || cfg.AccessTokenTTL != 15*time.Minute || cfg.RefreshTokenTTL != 30*24*time.Hour || cfg.LoginFailureLimit != 20 || cfg.LoginFailureWindow != 10*time.Minute || cfg.BotTokenCacheTTL != 5*time.Minute {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
-	if cfg.DatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" {
+	if cfg.DatabaseURL != "" || cfg.IAMDatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" {
 		t.Fatalf("optional URLs should be empty: %+v", cfg)
 	}
 	if len(cfg.CORSAllowedOrigins) != 0 || cfg.WebhookPrefix != "" || cfg.TrustedProxyHeader != "" || len(cfg.TrustedProxyCIDRs) != 0 {
@@ -50,6 +50,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"READ_TIMEOUT_SECONDS":           "35",
 		"IDLE_TIMEOUT_SECONDS":           "75",
 		"DATABASE_URL":                   "postgres://placeholder",
+		"IAM_DATABASE_URL":               "postgres://iam-placeholder",
 		"REPORT_DATABASE_URL":            "postgres://report-placeholder",
 		"DB_MAX_CONNS":                   "20",
 		"DB_MIN_CONNS":                   "4",
@@ -66,11 +67,17 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"RATE_LIMIT_LOGIN_PER_MINUTE":    "9",
 		"RATE_LIMIT_WITHDRAW_PER_MINUTE": "4",
 		"RATE_LIMIT_AI_PER_MINUTE":       "20",
+		"TELEGRAM_INITDATA_MAX_AGE":      "12h",
+		"ACCESS_TOKEN_TTL":               "10m",
+		"REFRESH_TOKEN_TTL":              "240h",
+		"LOGIN_FAILURE_LIMIT":            "8",
+		"LOGIN_FAILURE_WINDOW":           "3m",
+		"BOT_TOKEN_CACHE_TTL":            "2m",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSAllowedOrigins) != 2 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 {
+	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.IAMDatabaseURL != "postgres://iam-placeholder" || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSAllowedOrigins) != 2 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.TelegramInitDataMaxAge != 12*time.Hour || cfg.AccessTokenTTL != 10*time.Minute || cfg.RefreshTokenTTL != 240*time.Hour || cfg.LoginFailureLimit != 8 || cfg.LoginFailureWindow != 3*time.Minute || cfg.BotTokenCacheTTL != 2*time.Minute {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	for _, raw := range []string{"0", "-1", "abc"} {
@@ -113,6 +120,16 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 				t.Fatal("expected configuration error")
 			}
 		})
+	}
+	for _, key := range []string{"TELEGRAM_INITDATA_MAX_AGE", "ACCESS_TOKEN_TTL", "REFRESH_TOKEN_TTL", "LOGIN_FAILURE_WINDOW", "BOT_TOKEN_CACHE_TTL"} {
+		t.Run("invalid "+key, func(t *testing.T) {
+			if _, err := load(lookup(map[string]string{"APP_ENV": "test", key: "0s"})); err == nil {
+				t.Fatalf("expected invalid %s", key)
+			}
+		})
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "JWT_SIGNING_KEYS": "active:bad", "JWT_ACTIVE_KEY_ID": "active"})); err == nil {
+		t.Fatal("expected invalid JWT signing key")
 	}
 }
 

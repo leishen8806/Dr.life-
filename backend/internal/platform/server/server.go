@@ -30,6 +30,7 @@ type GatewayOptions struct {
 	IdempotencyExempt func(*http.Request) bool
 	Metrics           *observability.Metrics
 	ErrorReporter     *observability.ErrorReporter
+	Login             api.TelegramLogin
 }
 
 func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
@@ -59,7 +60,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeMethodNotAllowed))
 	})
-	gen.HandlerFromMux(api.Handler{}, router)
+	gen.HandlerFromMux(api.Handler{Login: options.Login, ClientIP: options.ClientIP}, router)
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

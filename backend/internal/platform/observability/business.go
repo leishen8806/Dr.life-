@@ -47,7 +47,7 @@ func (b *Business) AIFallback(level string) {
 	b.ai.WithLabelValues("fallback", bounded(level, "primary", "secondary", "local")).Inc()
 }
 func (b *Business) LoginValidationFailed(endpoint, reason string) {
-	b.loginFailures.WithLabelValues(bounded(endpoint, "buyer", "merchant", "driver"), bounded(reason, "expired", "invalid_hash", "invalid_user", "unknown_bot")).Inc()
+	b.loginFailures.WithLabelValues(bounded(endpoint, "buyer", "merchant", "driver"), bounded(reason, "expired", "invalid_signature", "malformed", "account_blocked", "rate_limited", "unknown_bot")).Inc()
 }
 func (b *Business) BotSent(endpoint string, bot int, success bool, reason string) {
 	status := "success"

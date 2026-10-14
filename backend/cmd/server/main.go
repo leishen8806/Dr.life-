@@ -10,10 +10,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leishen8806/Dr.life-/backend/internal/iam"
+	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 )
 
@@ -66,6 +69,49 @@ func main() {
 			AI:         gateway.Rule{Limit: cfg.RateLimitAI, Window: time.Minute},
 		}
 	}
+	var loginService *iam.Service
+	var authenticator gateway.Authenticator
+	checks := []server.ReadinessCheck{database.Ping}
+	iamDatabase := database
+	if cfg.JWTSigningConfigured {
+		if cfg.IAMDatabaseURL == "" {
+			logger.Error("IAM database URL is required when Telegram login is enabled")
+			os.Exit(1)
+		}
+		iamCfg := cfg
+		iamCfg.DatabaseURL = cfg.IAMDatabaseURL
+		iamDatabase, err = observability.NewDatabasePool(ctx, iamCfg, nil, logger)
+		if err != nil {
+			logger.Error("IAM database pool failed", "error", err)
+			os.Exit(1)
+		}
+		defer iamDatabase.Close()
+		checks = append(checks, iamDatabase.Ping)
+		jwtKeys, keyErr := iam.LoadJWTKeyringFromEnvironment()
+		if keyErr != nil {
+			logger.Error("JWT key configuration failed")
+			os.Exit(1)
+		}
+		masterKeys, keyErr := secrets.LoadFromEnvironment()
+		if keyErr != nil {
+			logger.Error("Bot token key configuration failed")
+			os.Exit(1)
+		}
+		envelope, envelopeErr := secrets.NewEnvelope(masterKeys)
+		if envelopeErr != nil {
+			logger.Error("Bot token encryption configuration failed")
+			os.Exit(1)
+		}
+		tokens := iam.TokenManager{Keys: jwtKeys, AccessTTL: cfg.AccessTokenTTL, Checker: iam.PassSessionChecker{}}
+		loginService = &iam.Service{
+			DB:       iamDatabase,
+			Verifier: telegram.PoolVerifier{Validator: telegram.NewValidator(cfg.TelegramInitDataMaxAge), Source: &telegram.DBPoolSource{DB: iamDatabase, Envelope: envelope, TTL: cfg.BotTokenCacheTTL}},
+			Tokens:   tokens, RefreshTTL: cfg.RefreshTokenTTL,
+			Failures: &iam.FailureGuard{Limiter: limiter, Rule: gateway.Rule{Limit: cfg.LoginFailureLimit, Window: cfg.LoginFailureWindow}},
+			Metrics:  metrics.Business(),
+		}
+		authenticator = iam.Authenticator{Tokens: tokens}
+	}
 
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)
 	if err != nil {
@@ -84,7 +130,12 @@ func main() {
 			AccountRules:   strictRules(cfg.RateLimitAccount),
 			Metrics:        metrics,
 			ErrorReporter:  reporter,
-		}, database.Ping),
+			Authenticator:  authenticator,
+			Login:          loginService,
+			IdempotencyExempt: func(r *http.Request) bool {
+				return r.Method == http.MethodPost && r.URL.Path == "/v1/public/auth/telegram"
+			},
+		}, checks...),
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		ReadTimeout:       cfg.ReadTimeout,
 		IdleTimeout:       cfg.IdleTimeout,

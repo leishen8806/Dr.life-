@@ -17,14 +17,17 @@ const (
 	ErrorCodeAIBase        ErrorCode = 6000
 	ErrorCodeExternalBase  ErrorCode = 7000
 
-	CodeInternalError      ErrorCode = 1001
-	CodeInvalidArgument    ErrorCode = 1002
-	CodeResourceNotFound   ErrorCode = 1003
-	CodeTooManyRequests    ErrorCode = 1004
-	CodeServiceUnavailable ErrorCode = 1005
-	CodeMethodNotAllowed   ErrorCode = 1006
-	CodeUnauthenticated    ErrorCode = 2001
-	CodePermissionDenied   ErrorCode = 2002
+	CodeInternalError        ErrorCode = 1001
+	CodeInvalidArgument      ErrorCode = 1002
+	CodeResourceNotFound     ErrorCode = 1003
+	CodeTooManyRequests      ErrorCode = 1004
+	CodeServiceUnavailable   ErrorCode = 1005
+	CodeMethodNotAllowed     ErrorCode = 1006
+	CodeUnauthenticated      ErrorCode = 2001
+	CodePermissionDenied     ErrorCode = 2002
+	CodeTelegramLoginFailed  ErrorCode = 2003
+	CodeAccountBlocked       ErrorCode = 2004
+	CodeLoginTooManyAttempts ErrorCode = 2005
 )
 
 type Messages struct {
@@ -44,14 +47,17 @@ func (e *AppError) Error() string {
 }
 
 var appErrors = map[ErrorCode]AppError{
-	CodeInternalError:      {Code: CodeInternalError, StatusCode: http.StatusInternalServerError, Message: Messages{ZH: "服务器内部错误", EN: "Internal server error", KM: "Internal server error"}},
-	CodeInvalidArgument:    {Code: CodeInvalidArgument, StatusCode: http.StatusBadRequest, Message: Messages{ZH: "请求参数无效", EN: "Invalid request parameters", KM: "Invalid request parameters"}},
-	CodeResourceNotFound:   {Code: CodeResourceNotFound, StatusCode: http.StatusNotFound, Message: Messages{ZH: "请求的资源不存在", EN: "The requested resource was not found", KM: "The requested resource was not found"}},
-	CodeTooManyRequests:    {Code: CodeTooManyRequests, StatusCode: http.StatusTooManyRequests, Message: Messages{ZH: "请求过于频繁", EN: "Too many requests", KM: "Too many requests"}},
-	CodeServiceUnavailable: {Code: CodeServiceUnavailable, StatusCode: http.StatusServiceUnavailable, Message: Messages{ZH: "服务暂时不可用", EN: "Service temporarily unavailable", KM: "Service temporarily unavailable"}},
-	CodeMethodNotAllowed:   {Code: CodeMethodNotAllowed, StatusCode: http.StatusMethodNotAllowed, Message: Messages{ZH: "请求方法不允许", EN: "Method not allowed", KM: "Method not allowed"}},
-	CodeUnauthenticated:    {Code: CodeUnauthenticated, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "请先登录", EN: "Authentication required", KM: "Authentication required"}},
-	CodePermissionDenied:   {Code: CodePermissionDenied, StatusCode: http.StatusForbidden, Message: Messages{ZH: "无权执行此操作", EN: "Permission denied", KM: "Permission denied"}},
+	CodeInternalError:        {Code: CodeInternalError, StatusCode: http.StatusInternalServerError, Message: Messages{ZH: "服务器内部错误", EN: "Internal server error", KM: "Internal server error"}},
+	CodeInvalidArgument:      {Code: CodeInvalidArgument, StatusCode: http.StatusBadRequest, Message: Messages{ZH: "请求参数无效", EN: "Invalid request parameters", KM: "Invalid request parameters"}},
+	CodeResourceNotFound:     {Code: CodeResourceNotFound, StatusCode: http.StatusNotFound, Message: Messages{ZH: "请求的资源不存在", EN: "The requested resource was not found", KM: "The requested resource was not found"}},
+	CodeTooManyRequests:      {Code: CodeTooManyRequests, StatusCode: http.StatusTooManyRequests, Message: Messages{ZH: "请求过于频繁", EN: "Too many requests", KM: "Too many requests"}},
+	CodeServiceUnavailable:   {Code: CodeServiceUnavailable, StatusCode: http.StatusServiceUnavailable, Message: Messages{ZH: "服务暂时不可用", EN: "Service temporarily unavailable", KM: "Service temporarily unavailable"}},
+	CodeMethodNotAllowed:     {Code: CodeMethodNotAllowed, StatusCode: http.StatusMethodNotAllowed, Message: Messages{ZH: "请求方法不允许", EN: "Method not allowed", KM: "Method not allowed"}},
+	CodeUnauthenticated:      {Code: CodeUnauthenticated, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "请先登录", EN: "Authentication required", KM: "Authentication required"}},
+	CodePermissionDenied:     {Code: CodePermissionDenied, StatusCode: http.StatusForbidden, Message: Messages{ZH: "无权执行此操作", EN: "Permission denied", KM: "Permission denied"}},
+	CodeTelegramLoginFailed:  {Code: CodeTelegramLoginFailed, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "登录验证失败", EN: "Login validation failed", KM: "Login validation failed"}},
+	CodeAccountBlocked:       {Code: CodeAccountBlocked, StatusCode: http.StatusForbidden, Message: Messages{ZH: "账号暂不可用", EN: "Account is unavailable", KM: "Account is unavailable"}},
+	CodeLoginTooManyAttempts: {Code: CodeLoginTooManyAttempts, StatusCode: http.StatusTooManyRequests, Message: Messages{ZH: "登录尝试过于频繁", EN: "Too many login attempts", KM: "Too many login attempts"}},
 }
 
 // TODO-KM-REVIEW: English placeholders in KM fields require review by a Khmer native speaker.

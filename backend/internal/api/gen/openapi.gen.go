@@ -12,22 +12,29 @@ import (
 
 // Defines values for ErrorCode.
 const (
-	ErrorCodeInternalError      ErrorCode = 1001
-	ErrorCodeInvalidArgument    ErrorCode = 1002
-	ErrorCodeMethodNotAllowed   ErrorCode = 1006
-	ErrorCodePermissionDenied   ErrorCode = 2002
-	ErrorCodeResourceNotFound   ErrorCode = 1003
-	ErrorCodeServiceUnavailable ErrorCode = 1005
-	ErrorCodeTooManyRequests    ErrorCode = 1004
-	ErrorCodeUnauthenticated    ErrorCode = 2001
+	ErrorCodeAccountBlocked       ErrorCode = 2004
+	ErrorCodeInternalError        ErrorCode = 1001
+	ErrorCodeInvalidArgument      ErrorCode = 1002
+	ErrorCodeLoginTooManyAttempts ErrorCode = 2005
+	ErrorCodeMethodNotAllowed     ErrorCode = 1006
+	ErrorCodePermissionDenied     ErrorCode = 2002
+	ErrorCodeResourceNotFound     ErrorCode = 1003
+	ErrorCodeServiceUnavailable   ErrorCode = 1005
+	ErrorCodeTelegramLoginFailed  ErrorCode = 2003
+	ErrorCodeTooManyRequests      ErrorCode = 1004
+	ErrorCodeUnauthenticated      ErrorCode = 2001
 )
 
 // Valid indicates whether the value is a known member of the ErrorCode enum.
 func (e ErrorCode) Valid() bool {
 	switch e {
+	case ErrorCodeAccountBlocked:
+		return true
 	case ErrorCodeInternalError:
 		return true
 	case ErrorCodeInvalidArgument:
+		return true
+	case ErrorCodeLoginTooManyAttempts:
 		return true
 	case ErrorCodeMethodNotAllowed:
 		return true
@@ -36,6 +43,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeResourceNotFound:
 		return true
 	case ErrorCodeServiceUnavailable:
+		return true
+	case ErrorCodeTelegramLoginFailed:
 		return true
 	case ErrorCodeTooManyRequests:
 		return true
@@ -106,6 +115,105 @@ func (e SuccessEnvelopeOk) Valid() bool {
 	}
 }
 
+// Defines values for TelegramAccountLang.
+const (
+	En TelegramAccountLang = "en"
+	Km TelegramAccountLang = "km"
+	Zh TelegramAccountLang = "zh"
+)
+
+// Valid indicates whether the value is a known member of the TelegramAccountLang enum.
+func (e TelegramAccountLang) Valid() bool {
+	switch e {
+	case En:
+		return true
+	case Km:
+		return true
+	case Zh:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TelegramAccountRole.
+const (
+	TelegramAccountRoleBuyer    TelegramAccountRole = "buyer"
+	TelegramAccountRoleDriver   TelegramAccountRole = "driver"
+	TelegramAccountRoleMerchant TelegramAccountRole = "merchant"
+)
+
+// Valid indicates whether the value is a known member of the TelegramAccountRole enum.
+func (e TelegramAccountRole) Valid() bool {
+	switch e {
+	case TelegramAccountRoleBuyer:
+		return true
+	case TelegramAccountRoleDriver:
+		return true
+	case TelegramAccountRoleMerchant:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TelegramAccountStatus.
+const (
+	Active   TelegramAccountStatus = "active"
+	Disabled TelegramAccountStatus = "disabled"
+	Frozen   TelegramAccountStatus = "frozen"
+)
+
+// Valid indicates whether the value is a known member of the TelegramAccountStatus enum.
+func (e TelegramAccountStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Disabled:
+		return true
+	case Frozen:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TelegramAuthRequestEnd.
+const (
+	TelegramAuthRequestEndBuyer    TelegramAuthRequestEnd = "buyer"
+	TelegramAuthRequestEndDriver   TelegramAuthRequestEnd = "driver"
+	TelegramAuthRequestEndMerchant TelegramAuthRequestEnd = "merchant"
+)
+
+// Valid indicates whether the value is a known member of the TelegramAuthRequestEnd enum.
+func (e TelegramAuthRequestEnd) Valid() bool {
+	switch e {
+	case TelegramAuthRequestEndBuyer:
+		return true
+	case TelegramAuthRequestEndDriver:
+		return true
+	case TelegramAuthRequestEndMerchant:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TelegramAuthSuccessResponseOk.
+const (
+	TelegramAuthSuccessResponseOkTrue TelegramAuthSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the TelegramAuthSuccessResponseOk enum.
+func (e TelegramAuthSuccessResponseOk) Valid() bool {
+	switch e {
+	case TelegramAuthSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // ErrorBody defines model for ErrorBody.
 type ErrorBody struct {
 	// Code Documented application error code; ranges are described in the API description.
@@ -161,6 +269,54 @@ type SuccessEnvelope struct {
 // SuccessEnvelopeOk defines model for SuccessEnvelope.Ok.
 type SuccessEnvelopeOk bool
 
+// TelegramAccount defines model for TelegramAccount.
+type TelegramAccount struct {
+	Lang     *TelegramAccountLang  `json:"lang"`
+	PublicId string                `json:"public_id"`
+	Role     TelegramAccountRole   `json:"role"`
+	Status   TelegramAccountStatus `json:"status"`
+}
+
+// TelegramAccountLang defines model for TelegramAccount.Lang.
+type TelegramAccountLang string
+
+// TelegramAccountRole defines model for TelegramAccount.Role.
+type TelegramAccountRole string
+
+// TelegramAccountStatus defines model for TelegramAccount.Status.
+type TelegramAccountStatus string
+
+// TelegramAuthData defines model for TelegramAuthData.
+type TelegramAuthData struct {
+	AccessExpiresIn  int64           `json:"access_expires_in"`
+	AccessToken      string          `json:"access_token"`
+	Account          TelegramAccount `json:"account"`
+	IsNewAccount     bool            `json:"is_new_account"`
+	NeedsLanguage    bool            `json:"needs_language"`
+	RefreshExpiresIn int64           `json:"refresh_expires_in"`
+	RefreshToken     string          `json:"refresh_token"`
+}
+
+// TelegramAuthRequest defines model for TelegramAuthRequest.
+type TelegramAuthRequest struct {
+	DeviceId *string                `json:"device_id,omitempty"`
+	End      TelegramAuthRequestEnd `json:"end"`
+	InitData string                 `json:"init_data"`
+}
+
+// TelegramAuthRequestEnd defines model for TelegramAuthRequest.End.
+type TelegramAuthRequestEnd string
+
+// TelegramAuthSuccessResponse defines model for TelegramAuthSuccessResponse.
+type TelegramAuthSuccessResponse struct {
+	Data      TelegramAuthData              `json:"data"`
+	Ok        TelegramAuthSuccessResponseOk `json:"ok"`
+	RequestId string                        `json:"request_id"`
+}
+
+// TelegramAuthSuccessResponseOk defines model for TelegramAuthSuccessResponse.Ok.
+type TelegramAuthSuccessResponseOk bool
+
 // Filter defines model for Filter.
 type Filter map[string]string
 
@@ -179,6 +335,9 @@ type Sort = string
 // XRequestID defines model for XRequestID.
 type XRequestID = string
 
+// AccountBlocked defines model for AccountBlocked.
+type AccountBlocked = ErrorEnvelope
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorEnvelope
 
@@ -187,6 +346,12 @@ type Forbidden = ErrorEnvelope
 
 // InternalServerError defines model for InternalServerError.
 type InternalServerError = ErrorEnvelope
+
+// LoginFailed defines model for LoginFailed.
+type LoginFailed = ErrorEnvelope
+
+// LoginTooManyAttempts defines model for LoginTooManyAttempts.
+type LoginTooManyAttempts = ErrorEnvelope
 
 // MethodNotAllowed defines model for MethodNotAllowed.
 type MethodNotAllowed = ErrorEnvelope
@@ -203,8 +368,14 @@ type TooManyRequests = ErrorEnvelope
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = ErrorEnvelope
 
+// PostTelegramAuthJSONRequestBody defines body for PostTelegramAuth for application/json ContentType.
+type PostTelegramAuthJSONRequestBody = TelegramAuthRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// PostTelegramAuth Sign in with Telegram Mini App initData
+	// (POST /v1/public/auth/telegram)
+	PostTelegramAuth(w http.ResponseWriter, r *http.Request)
 	// GetPublicPing Check public API availability
 	// (GET /v1/public/ping)
 	GetPublicPing(w http.ResponseWriter, r *http.Request)
@@ -213,6 +384,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// PostTelegramAuth Sign in with Telegram Mini App initData
+// (POST /v1/public/auth/telegram)
+func (_ Unimplemented) PostTelegramAuth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // GetPublicPing Check public API availability
 // (GET /v1/public/ping)
@@ -228,6 +405,20 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// PostTelegramAuth operation middleware
+func (siw *ServerInterfaceWrapper) PostTelegramAuth(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostTelegramAuth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetPublicPing operation middleware
 func (siw *ServerInterfaceWrapper) GetPublicPing(w http.ResponseWriter, r *http.Request) {
@@ -356,6 +547,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/public/auth/telegram", wrapper.PostTelegramAuth)
+	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/public/ping", wrapper.GetPublicPing)
 	})
