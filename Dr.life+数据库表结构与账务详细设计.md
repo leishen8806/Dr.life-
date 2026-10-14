@@ -310,6 +310,7 @@ create table ledger.hold (          -- 冻结明细
 create table ledger.withdrawal (
   id bigint generated always as identity primary key,
   public_id text unique not null,
+  request_key text unique not null,                       -- API Idempotency-Key；仅 A-Z/a-z/0-9/_/-，最长 100
   account_id bigint not null,                           -- 申请人账号
   amount bigint not null check (amount > 0),
   payee_account_text text not null,                     -- 收款账户（加密）
@@ -340,7 +341,11 @@ create table ledger.outbox (        -- 事务性发件箱：账已入则事件�
 
 提现状态机为：大额 `requested → review → approved → paid`，小额在申请事务中直接进入 `approved`；`requested/review/approved → cancelled`，`approved → failed`，三个结束状态均不可再修改。默认大额阈值为 1,000 美元（`10_000_000` e4），申请时写入 `requires_review` 固定判定。申请、出款确认、失败和撤销均通过 `Post` 的事务钩子把分录与提现状态一次提交；金额和申请人钱包以提现行及 `owner_account` 关系为准。全局锁顺序与 hold 相同：先按账户编号升序锁余额，再锁 withdrawal 行。
 
+提现申请必须携带 API 层传入的 `Idempotency-Key`，保存为不可变的 `request_key`；格式限定为 `[A-Za-z0-9_-]` 且最长 100 个字符。事务幂等键为 `withdraw_req:request:<request_key>`。重放时必须核对申请人账号、钱包、金额及解密后的收款账户；任一内容不同均返回幂等冲突。复核开始、复核通过、出款确认、失败和撤销分别写事务性 outbox 事件，事件只包含提现 `public_id`、金额、相关操作人和时间，不包含收款账户全文。
+
 提现前由调用方完成真正的二次验证，并通过注入的 `AccountGuard` 检查账号可提现；任一检查缺失均默认拒绝。收款账户使用信封加密，AAD 为 `withdrawal_payee:<public_id>`，普通查询只返回末四位，全文仅由专用解密方法读取。银行回单号全表唯一。L-03 的无状态 `WithdrawReq/Payout/PayoutFail` 已收为包内方法，外部只能使用提现状态机。`VerifyPendingPayoutMatchesWithdrawals` 校验单例 `PENDING_PAYOUT` 余额等于所有 `requested/review/approved` 提现之和；24 小时未完成和所有大额未完成提现进入审计关注，列表不含收款账户全文。
+
+> **待确认：** `approved` 状态撤销与银行实际付款存在并发风险。当前约束要求流程保证：一旦已提交银行转账，不得再撤销；后续接入银行适配层时需确认可执行的状态凭证和互斥方案。
 
 ---
 
