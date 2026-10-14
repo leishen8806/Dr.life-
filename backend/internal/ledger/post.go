@@ -26,6 +26,7 @@ var (
 )
 
 var idemKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+(?::[A-Za-z0-9_-]+)?$`)
+var adjustIdemKeyPattern = regexp.MustCompile(`^adjust:[A-Za-z0-9_-]+-[1-9][0-9]*$`)
 
 var validTxnTypes = map[string]struct{}{
 	"topup": {}, "freeze": {}, "settle": {}, "refund": {}, "withdraw_req": {},
@@ -135,10 +136,6 @@ type PostResult struct {
 	Balances        []Balance `json:"balances"`
 }
 
-func (s *Service) Post(ctx context.Context, request PostRequest) (PostResult, error) {
-	return s.post(ctx, request, nil)
-}
-
 type transactionCheck func(context.Context, pgx.Tx) error
 type transactionAfter func(context.Context, pgx.Tx, PostResult) error
 type transactionReplayCheck func(context.Context, pgx.Tx, PostResult) error
@@ -156,7 +153,7 @@ type transactionHooks struct {
 	skipInitialReplay bool
 }
 
-func (s *Service) post(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
+func (s *Service) postRaw(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
 	return s.postWithHooks(ctx, request, transactionHooks{check: check})
 }
 
@@ -351,7 +348,8 @@ func validateRequest(request PostRequest) error {
 	if request.Amount <= 0 {
 		return ErrInvalidAmount
 	}
-	if len(request.IdemKey) > 200 || !idemKeyPattern.MatchString(request.IdemKey) {
+	if len(request.IdemKey) > 200 || !idemKeyPattern.MatchString(request.IdemKey) &&
+		(request.Type != "adjust" || !adjustIdemKeyPattern.MatchString(request.IdemKey)) {
 		return ErrInvalidRequest
 	}
 	seen := make(map[int64]struct{}, len(request.Postings))

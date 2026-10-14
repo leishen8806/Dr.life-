@@ -377,5 +377,5 @@ func (s *Service) postBusiness(ctx context.Context, request PostRequest, kinds m
 	if request.RefID != nil && *request.RefID <= 0 {
 		return PostResult{}, ErrInvalidRequest
 	}
-	return s.post(ctx, request, requireKinds(kinds, extra, sameOwner...))
+	return s.postRaw(ctx, request, requireKinds(kinds, extra, sameOwner...))
 }
