@@ -248,7 +248,9 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 ```
 > `SUSPENSE` 使用 CREDIT 正常方向并允许暂时为负，供对账差异双向暂存；`PAYABLE_CARRIER` 第一版保持不允许负数。`allow_negative` 在创建账户时由触发器复制到 `balance`，且余额写入触发器要求两处策略一致；**客户钱包类账户永远不允许为负。**
 
-### 入账流程（账务模块唯一入口 `Post(ctx, req)`）
+### 入账流程（对外仅限强类型业务方法，通用 `post` 为包内私有实现）
+其他模块只能调用账务模块经过评审的强类型业务方法。通用入账核心不导出，不能用任意交易类型、账户和金额绕过业务校验、状态机或职责分离；测试通过仅在测试构建中存在的包装验证底层不变量。
+
 1. 校验请求：金额 > 0；分录借贷平衡；账户存在且 `open`；金额与业务单据一致（例如分账之和 = 托管金额）。
 2. **开启事务**（`READ COMMITTED` + 显式行锁）。
 3. **按 `account_id` 升序**对涉及的 `ledger.balance` 行 `SELECT … FOR UPDATE`（**固定顺序加锁，避免死锁**）。
