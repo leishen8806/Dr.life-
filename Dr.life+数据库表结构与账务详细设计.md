@@ -376,7 +376,35 @@ create table ledger.bank_statement_line (
 create table ledger.snapshot_daily (   -- 每日余额快照（用于对账、报表、审计留证）
   day date, account_id bigint, balance bigint, primary key (day, account_id)
 );
+
+-- 内部对账运行、异常明细与出款冻结（完整约束见迁移 00010）
+create table ledger.recon_run (
+  id bigint generated always as identity primary key,
+  day date not null, kind text not null check (kind in ('daily','spot')),
+  attempt integer not null, started_by bigint, force_reason text,
+  started_at timestamptz not null, finished_at timestamptz,
+  status text not null check (status in ('running','ok','failed')),
+  summary jsonb not null, unique (day, kind, attempt)
+);
+create table ledger.recon_issue (
+  id bigint generated always as identity primary key,
+  run_id bigint not null references ledger.recon_run(id), check_code text not null,
+  account_id bigint references ledger.account(id), txn_id bigint references ledger.txn(id),
+  expected bigint, actual bigint, detail text, created_at timestamptz not null
+);
+create table ledger.payout_freeze (
+  id bigint generated always as identity primary key,
+  scope text not null check (scope in ('global','account')), account_id bigint references ledger.account(id),
+  reason text not null, run_id bigint not null references ledger.recon_run(id), created_at timestamptz not null,
+  released_at timestamptz, released_by bigint, release_reason text
+);
 ```
+
+内部对账先按 `LEDGER_RECON_TIMEZONE`（默认 `Asia/Phnom_Penh`）的日界线写入只增不改的余额快照，再在**同一个只读 `REPEATABLE READ` 事务**中执行 `BALANCE_CACHE`、`TXN_BALANCED`、`IDENTITY`、`HOLD_FROZEN`、`PENDING_PAYOUT`、`REVERSAL`、`ORPHAN` 七项检查。快照重复写使用 `ON CONFLICT DO NOTHING`；已有快照与分录重算不一致时记录 `SNAPSHOT_DRIFT`。
+
+任何异常都写 `recon_issue` 与 `ledger.recon.failed` outbox 事件。单账户的 `BALANCE_CACHE` 异常建立账户级出款冻结；`TXN_BALANCED`、`IDENTITY`、`SNAPSHOT_DRIFT`、`REVERSAL`、`ORPHAN` 建立全局冻结。冻结阻止提现申请、出款确认、平台归集及承运商付款，不阻止提现失败或撤销时将款项退还用户。解除必须给出理由；人工发起的对账，其发起人不能解除自己触发的冻结。
+
+默认重复执行同一天的每日对账会返回已有完成结果。显式强制重跑必须填写原因，并以递增 `attempt` 留下新记录；因此唯一键采用 `(day, kind, attempt)`，保留每次强制重跑的审计证据。已完成运行、异常明细与每日快照不可更新、删除或截断；冻结记录仅允许一次性填写 `released_*` 字段。
 
 ### 2. 与审计中心 18 项检查的对应
 | 审计项 | 数据来源 |

@@ -10,35 +10,37 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	_ "time/tzdata"
 )
 
 type Config struct {
-	HTTPAddr           string
-	MetricsAddr        string
-	AppEnv             string
-	AppRelease         string
-	LogLevel           slog.Level
-	ShutdownTimeout    time.Duration
-	ReadHeaderTimeout  time.Duration
-	ReadTimeout        time.Duration
-	IdleTimeout        time.Duration
-	DatabaseURL        string
-	ReportDatabaseURL  string
-	DBMaxConns         int32
-	DBMinConns         int32
-	DBConnectTimeout   time.Duration
-	DBSlowQuery        time.Duration
-	SentryDSN          string
-	RedisURL           string
-	CORSAllowedOrigins []string
-	WebhookPrefix      string
-	TrustedProxyHeader string
-	TrustedProxyCIDRs  []string
-	RateLimitIP        int
-	RateLimitAccount   int
-	RateLimitLogin     int
-	RateLimitWithdraw  int
-	RateLimitAI        int
+	HTTPAddr            string
+	MetricsAddr         string
+	AppEnv              string
+	AppRelease          string
+	LogLevel            slog.Level
+	ShutdownTimeout     time.Duration
+	ReadHeaderTimeout   time.Duration
+	ReadTimeout         time.Duration
+	IdleTimeout         time.Duration
+	DatabaseURL         string
+	ReportDatabaseURL   string
+	DBMaxConns          int32
+	DBMinConns          int32
+	DBConnectTimeout    time.Duration
+	DBSlowQuery         time.Duration
+	SentryDSN           string
+	RedisURL            string
+	CORSAllowedOrigins  []string
+	WebhookPrefix       string
+	TrustedProxyHeader  string
+	TrustedProxyCIDRs   []string
+	RateLimitIP         int
+	RateLimitAccount    int
+	RateLimitLogin      int
+	RateLimitWithdraw   int
+	RateLimitAI         int
+	LedgerReconTimezone string
 }
 
 func Load() (Config, error) {
@@ -156,34 +158,42 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 			return Config{}, err
 		}
 	}
+	reconTimezone := strings.TrimSpace(getenv("LEDGER_RECON_TIMEZONE"))
+	if reconTimezone == "" {
+		reconTimezone = "Asia/Phnom_Penh"
+	}
+	if _, err := time.LoadLocation(reconTimezone); err != nil {
+		return Config{}, fmt.Errorf("LEDGER_RECON_TIMEZONE must be a valid IANA time zone")
+	}
 
 	return Config{
-		HTTPAddr:           httpAddr,
-		MetricsAddr:        metricsAddr,
-		AppEnv:             appEnv,
-		AppRelease:         strings.TrimSpace(getenv("APP_RELEASE")),
-		LogLevel:           logLevel,
-		ShutdownTimeout:    time.Duration(shutdownSeconds) * time.Second,
-		ReadHeaderTimeout:  time.Duration(readHeaderSeconds) * time.Second,
-		ReadTimeout:        time.Duration(readSeconds) * time.Second,
-		IdleTimeout:        time.Duration(idleSeconds) * time.Second,
-		DatabaseURL:        strings.TrimSpace(getenv("DATABASE_URL")),
-		ReportDatabaseURL:  strings.TrimSpace(getenv("REPORT_DATABASE_URL")),
-		DBMaxConns:         int32(dbMaxConns),
-		DBMinConns:         int32(dbMinConns),
-		DBConnectTimeout:   time.Duration(dbConnectSeconds) * time.Second,
-		DBSlowQuery:        time.Duration(dbSlowQueryMS) * time.Millisecond,
-		SentryDSN:          strings.TrimSpace(getenv("SENTRY_DSN")),
-		RedisURL:           strings.TrimSpace(getenv("REDIS_URL")),
-		CORSAllowedOrigins: corsOrigins,
-		WebhookPrefix:      publicWebhookPrefix,
-		TrustedProxyHeader: proxyHeader,
-		TrustedProxyCIDRs:  proxyCIDRs,
-		RateLimitIP:        limits[0],
-		RateLimitAccount:   limits[1],
-		RateLimitLogin:     limits[2],
-		RateLimitWithdraw:  limits[3],
-		RateLimitAI:        limits[4],
+		HTTPAddr:            httpAddr,
+		MetricsAddr:         metricsAddr,
+		AppEnv:              appEnv,
+		AppRelease:          strings.TrimSpace(getenv("APP_RELEASE")),
+		LogLevel:            logLevel,
+		ShutdownTimeout:     time.Duration(shutdownSeconds) * time.Second,
+		ReadHeaderTimeout:   time.Duration(readHeaderSeconds) * time.Second,
+		ReadTimeout:         time.Duration(readSeconds) * time.Second,
+		IdleTimeout:         time.Duration(idleSeconds) * time.Second,
+		DatabaseURL:         strings.TrimSpace(getenv("DATABASE_URL")),
+		ReportDatabaseURL:   strings.TrimSpace(getenv("REPORT_DATABASE_URL")),
+		DBMaxConns:          int32(dbMaxConns),
+		DBMinConns:          int32(dbMinConns),
+		DBConnectTimeout:    time.Duration(dbConnectSeconds) * time.Second,
+		DBSlowQuery:         time.Duration(dbSlowQueryMS) * time.Millisecond,
+		SentryDSN:           strings.TrimSpace(getenv("SENTRY_DSN")),
+		RedisURL:            strings.TrimSpace(getenv("REDIS_URL")),
+		CORSAllowedOrigins:  corsOrigins,
+		WebhookPrefix:       publicWebhookPrefix,
+		TrustedProxyHeader:  proxyHeader,
+		TrustedProxyCIDRs:   proxyCIDRs,
+		RateLimitIP:         limits[0],
+		RateLimitAccount:    limits[1],
+		RateLimitLogin:      limits[2],
+		RateLimitWithdraw:   limits[3],
+		RateLimitAI:         limits[4],
+		LedgerReconTimezone: reconTimezone,
 	}, nil
 }
 
