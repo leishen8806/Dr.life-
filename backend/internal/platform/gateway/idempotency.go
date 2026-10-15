@@ -176,17 +176,19 @@ func BindIdempotency(options IdempotencyOptions) func(http.Handler) http.Handler
 				return
 			}
 			r.Body = io.NopCloser(bytes.NewReader(body))
-			sum := sha256.Sum256(body)
-			hash := hex.EncodeToString(sum[:])
+			digest := sha256.New()
+			_, _ = digest.Write([]byte(r.URL.EscapedPath()))
+			_, _ = digest.Write([]byte{'?'})
+			_, _ = digest.Write([]byte(r.URL.RawQuery))
+			_, _ = digest.Write([]byte{'\n'})
+			_, _ = digest.Write(body)
+			hash := hex.EncodeToString(digest.Sum(nil))
 			identity, _ := IdentityFromContext(r.Context())
 			scope := identity.AccountID
 			if scope == "" {
 				scope = "anonymous"
 			}
-			route := chi.RouteContext(r.Context()).RoutePattern()
-			if route == "" {
-				route = r.URL.Path
-			}
+			route := routePattern(r)
 			storeKey := scope + ":" + r.Method + ":" + route + ":" + key
 			activeStore := options.Store
 			usingFallback := false
@@ -264,6 +266,16 @@ func BindIdempotency(options IdempotencyOptions) func(http.Handler) http.Handler
 			_ = activeStore.Complete(r.Context(), storeKey, entry, options.TTL)
 		})
 	}
+}
+
+func routePattern(r *http.Request) string {
+	routeContext := chi.RouteContext(r.Context())
+	if routeContext != nil && routeContext.Routes != nil {
+		if pattern := routeContext.Routes.Find(chi.NewRouteContext(), r.Method, r.URL.Path); pattern != "" {
+			return pattern
+		}
+	}
+	return r.URL.Path
 }
 
 type idempotencyWriter struct {

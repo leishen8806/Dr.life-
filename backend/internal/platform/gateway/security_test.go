@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -160,6 +161,27 @@ func TestIdempotencyBindsBodyAndAccount(t *testing.T) {
 	}
 	if other := request("b", `{"x":2}`); other.Code != http.StatusCreated || calls.Load() != 2 {
 		t.Fatalf("cross-account status=%d calls=%d", other.Code, calls.Load())
+	}
+}
+
+func TestIdempotencyRouteTemplateStillBindsTargetPath(t *testing.T) {
+	var calls atomic.Int32
+	router := chi.NewRouter()
+	router.Use(RequireIdempotency(nil))
+	router.Use(BindIdempotency(IdempotencyOptions{Store: NewMemoryIdempotencyStore()}))
+	router.Post("/orders/{id}", func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusCreated)
+	})
+	call := func(path string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"reason":"cancel"}`))
+		r.Header.Set("Idempotency-Key", "cancel_one")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+		return w
+	}
+	if first, conflict := call("/orders/one"), call("/orders/two"); first.Code != http.StatusCreated || conflict.Code != http.StatusUnprocessableEntity || calls.Load() != 1 {
+		t.Fatalf("first=%d conflict=%d calls=%d", first.Code, conflict.Code, calls.Load())
 	}
 }
 
