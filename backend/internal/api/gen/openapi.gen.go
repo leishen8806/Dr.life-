@@ -12,19 +12,33 @@ import (
 
 // Defines values for ErrorCode.
 const (
-	ErrorCodeInternalError      ErrorCode = 1001
-	ErrorCodeInvalidArgument    ErrorCode = 1002
-	ErrorCodeMethodNotAllowed   ErrorCode = 1006
-	ErrorCodePermissionDenied   ErrorCode = 2002
-	ErrorCodeResourceNotFound   ErrorCode = 1003
-	ErrorCodeServiceUnavailable ErrorCode = 1005
-	ErrorCodeTooManyRequests    ErrorCode = 1004
-	ErrorCodeUnauthenticated    ErrorCode = 2001
+	ErrorCodeAlreadyProcessed    ErrorCode = 1011
+	ErrorCodeIdempotencyConflict ErrorCode = 1009
+	ErrorCodeIdempotencyPending  ErrorCode = 1010
+	ErrorCodeInternalError       ErrorCode = 1001
+	ErrorCodeInvalidArgument     ErrorCode = 1002
+	ErrorCodeMethodNotAllowed    ErrorCode = 1006
+	ErrorCodePermissionDenied    ErrorCode = 2002
+	ErrorCodeRequestTooLarge     ErrorCode = 1007
+	ErrorCodeResourceNotFound    ErrorCode = 1003
+	ErrorCodeServiceUnavailable  ErrorCode = 1005
+	ErrorCodeStepUpInvalid       ErrorCode = 2004
+	ErrorCodeStepUpRequired      ErrorCode = 2003
+	ErrorCodeTooManyRequests     ErrorCode = 1004
+	ErrorCodeUnauthenticated     ErrorCode = 2001
+	ErrorCodeUnsupportedMedia    ErrorCode = 1008
+	ErrorCodeWebhookInvalid      ErrorCode = 7001
 )
 
 // Valid indicates whether the value is a known member of the ErrorCode enum.
 func (e ErrorCode) Valid() bool {
 	switch e {
+	case ErrorCodeAlreadyProcessed:
+		return true
+	case ErrorCodeIdempotencyConflict:
+		return true
+	case ErrorCodeIdempotencyPending:
+		return true
 	case ErrorCodeInternalError:
 		return true
 	case ErrorCodeInvalidArgument:
@@ -33,13 +47,23 @@ func (e ErrorCode) Valid() bool {
 		return true
 	case ErrorCodePermissionDenied:
 		return true
+	case ErrorCodeRequestTooLarge:
+		return true
 	case ErrorCodeResourceNotFound:
 		return true
 	case ErrorCodeServiceUnavailable:
 		return true
+	case ErrorCodeStepUpInvalid:
+		return true
+	case ErrorCodeStepUpRequired:
+		return true
 	case ErrorCodeTooManyRequests:
 		return true
 	case ErrorCodeUnauthenticated:
+		return true
+	case ErrorCodeUnsupportedMedia:
+		return true
+	case ErrorCodeWebhookInvalid:
 		return true
 	default:
 		return false
@@ -179,8 +203,14 @@ type Sort = string
 // XRequestID defines model for XRequestID.
 type XRequestID = string
 
+// XStepUpToken defines model for XStepUpToken.
+type XStepUpToken = string
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorEnvelope
+
+// Conflict defines model for Conflict.
+type Conflict = ErrorEnvelope
 
 // Forbidden defines model for Forbidden.
 type Forbidden = ErrorEnvelope
@@ -194,6 +224,9 @@ type MethodNotAllowed = ErrorEnvelope
 // NotFound defines model for NotFound.
 type NotFound = ErrorEnvelope
 
+// RequestTooLarge defines model for RequestTooLarge.
+type RequestTooLarge = ErrorEnvelope
+
 // ServiceUnavailable defines model for ServiceUnavailable.
 type ServiceUnavailable = ErrorEnvelope
 
@@ -202,6 +235,12 @@ type TooManyRequests = ErrorEnvelope
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = ErrorEnvelope
+
+// UnprocessableEntity defines model for UnprocessableEntity.
+type UnprocessableEntity = ErrorEnvelope
+
+// UnsupportedMediaType defines model for UnsupportedMediaType.
+type UnsupportedMediaType = ErrorEnvelope
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {

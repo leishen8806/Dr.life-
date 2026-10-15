@@ -74,6 +74,31 @@ func TestPathRoleGuard(t *testing.T) {
 	}
 }
 
+func TestAuthenticationFailuresHaveOneExternalShape(t *testing.T) {
+	handler := httpx.RequestID(Authenticate(bearerAuthenticator{}, "")(Authorize("")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))))
+	var first string
+	for _, authorization := range []string{"", "invalid", "Bearer invalid", "Bearer expired"} {
+		request := httptest.NewRequest(http.MethodGet, "/v1/buyer/x", nil)
+		request.Header.Set("Authorization", authorization)
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusUnauthorized || response.Header().Get("WWW-Authenticate") != "Bearer" {
+			t.Fatalf("authorization=%q status=%d headers=%v", authorization, response.Code, response.Header())
+		}
+		var body map[string]any
+		if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		delete(body, "request_id")
+		normalized, _ := json.Marshal(body)
+		if first == "" {
+			first = string(normalized)
+		} else if string(normalized) != first {
+			t.Fatalf("authentication failures differ: %s != %s", normalized, first)
+		}
+	}
+}
+
 func TestNonV1PathsFailClosedUnlessConfiguredAsWebhook(t *testing.T) {
 	for _, path := range []string{"/metrics", "/debug/pprof", "/admin", "/internal/x"} {
 		response := httptest.NewRecorder()
@@ -107,7 +132,7 @@ func TestPathBypassesAreRejected(t *testing.T) {
 
 func TestCORSAllowlistAndPreflight(t *testing.T) {
 	allowed := "https://miniapp.settlecore.org"
-	handler := CORS([]string{allowed})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	handler := GroupedCORS(OriginGroups{Public: []string{allowed}})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
 	for _, test := range []struct {
 		name   string
 		origin string
@@ -136,11 +161,11 @@ func TestCORSAllowlistAndPreflight(t *testing.T) {
 	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
-	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != allowed || response.Header().Get("Access-Control-Allow-Headers") != allowedHeaders || response.Header().Get("Access-Control-Expose-Headers") != "X-Request-ID" || response.Header().Get("Access-Control-Max-Age") == "" {
+	if response.Code != http.StatusNoContent || response.Header().Get("Access-Control-Allow-Origin") != allowed || response.Header().Get("Access-Control-Allow-Headers") != allowedHeaders || response.Header().Get("Access-Control-Expose-Headers") != "X-Request-ID, Idempotent-Replayed" || response.Header().Get("Access-Control-Max-Age") == "" {
 		t.Fatalf("bad preflight: status=%d headers=%v", response.Code, response.Header())
 	}
 
-	defaultHandler := CORS(nil)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	defaultHandler := GroupedCORS(OriginGroups{})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
 	response = httptest.NewRecorder()
 	request = httptest.NewRequest(http.MethodGet, "/", nil)
 	request.Header.Set("Origin", allowed)
@@ -271,7 +296,7 @@ func TestAccountLimitUsesSensitiveRuleAndAccountIdentity(t *testing.T) {
 func TestSelectRuleMatchesWholePathSegments(t *testing.T) {
 	rules := RuleSet{
 		Default: Rule{Limit: 100, Window: time.Minute}, Login: Rule{Limit: 10, Window: time.Minute},
-		Withdrawal: Rule{Limit: 5, Window: time.Minute}, AI: Rule{Limit: 30, Window: time.Minute},
+		Withdrawal: Rule{Limit: 5, Window: time.Minute}, AI: Rule{Limit: 30, Window: time.Minute}, Admin: Rule{Limit: 2, Window: time.Minute},
 	}
 	for _, test := range []struct {
 		path, group string
@@ -283,6 +308,9 @@ func TestSelectRuleMatchesWholePathSegments(t *testing.T) {
 		{"/v1/buyer/ai/chat", "ai", rules.AI},
 		{"/v1/public/auth/telegram", "login", rules.Login},
 		{"/v1/buyer/withdrawals", "withdrawal", rules.Withdrawal},
+		{"/v1/admin/users", "admin", rules.Admin},
+		{"/v1/wms/stock", "admin", rules.Admin},
+		{"/v1/admin/auth/login", "login", rules.Login},
 	} {
 		got, group := selectRule(test.path, rules)
 		if got != test.want || group != test.group {

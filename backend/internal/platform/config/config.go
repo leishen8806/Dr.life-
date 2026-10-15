@@ -14,33 +14,48 @@ import (
 )
 
 type Config struct {
-	HTTPAddr            string
-	MetricsAddr         string
-	AppEnv              string
-	AppRelease          string
-	LogLevel            slog.Level
-	ShutdownTimeout     time.Duration
-	ReadHeaderTimeout   time.Duration
-	ReadTimeout         time.Duration
-	IdleTimeout         time.Duration
-	DatabaseURL         string
-	ReportDatabaseURL   string
-	DBMaxConns          int32
-	DBMinConns          int32
-	DBConnectTimeout    time.Duration
-	DBSlowQuery         time.Duration
-	SentryDSN           string
-	RedisURL            string
-	CORSAllowedOrigins  []string
-	WebhookPrefix       string
-	TrustedProxyHeader  string
-	TrustedProxyCIDRs   []string
-	RateLimitIP         int
-	RateLimitAccount    int
-	RateLimitLogin      int
-	RateLimitWithdraw   int
-	RateLimitAI         int
-	LedgerReconTimezone string
+	HTTPAddr               string
+	MetricsAddr            string
+	AppEnv                 string
+	AppRelease             string
+	LogLevel               slog.Level
+	ShutdownTimeout        time.Duration
+	ReadHeaderTimeout      time.Duration
+	ReadTimeout            time.Duration
+	IdleTimeout            time.Duration
+	DatabaseURL            string
+	ReportDatabaseURL      string
+	DBMaxConns             int32
+	DBMinConns             int32
+	DBConnectTimeout       time.Duration
+	DBSlowQuery            time.Duration
+	SentryDSN              string
+	RedisURL               string
+	CORSBuyerOrigins       []string
+	CORSMerchantOrigins    []string
+	CORSDriverOrigins      []string
+	CORSWMSOrigins         []string
+	CORSAdminOrigins       []string
+	CORSPublicOrigins      []string
+	CORSCredentialPaths    []string
+	WebhookPrefix          string
+	WebhookMaxBodyBytes    int64
+	TrustedProxyHeader     string
+	TrustedProxyCIDRs      []string
+	AdminAllowedCIDRs      []string
+	RequestBodyMaxBytes    int64
+	RequestBodyOverrides   map[string]int64
+	ContentTypeExemptPaths []string
+	IdempotencyTTL         time.Duration
+	IdempotencyMaxBytes    int
+	FinancialPrefixes      []string
+	RateLimitIP            int
+	RateLimitAccount       int
+	RateLimitLogin         int
+	RateLimitWithdraw      int
+	RateLimitAI            int
+	RateLimitAdmin         int
+	LedgerReconTimezone    string
 }
 
 func Load() (Config, error) {
@@ -129,9 +144,29 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
-	corsOrigins, err := parseOrigins(getenv("CORS_ALLOWED_ORIGINS"))
+	defaultOrigins := map[string]string{
+		"CORS_BUYER_ORIGINS": "https://miniapp.settlecore.org", "CORS_MERCHANT_ORIGINS": "https://shop.settlecore.org",
+		"CORS_DRIVER_ORIGINS": "https://driver.settlecore.org", "CORS_WMS_ORIGINS": "https://wms.settlecore.org",
+		"CORS_ADMIN_ORIGINS":  "https://admin.settlecore.org",
+		"CORS_PUBLIC_ORIGINS": "https://miniapp.settlecore.org,https://shop.settlecore.org,https://driver.settlecore.org,https://wms.settlecore.org,https://admin.settlecore.org,https://settlecore.org",
+	}
+	cors := make(map[string][]string, len(defaultOrigins))
+	for name, fallback := range defaultOrigins {
+		raw := strings.TrimSpace(getenv(name))
+		if raw == "" {
+			raw = fallback
+		}
+		cors[name], err = parseOrigins(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("%s contains an invalid origin", name)
+		}
+		if appEnv == "dev" && !contains(cors[name], "http://localhost:5173") {
+			cors[name] = append(cors[name], "http://localhost:5173")
+		}
+	}
+	credentialPaths, err := pathList(getenv("CORS_CREDENTIAL_PATHS"))
 	if err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("CORS_CREDENTIAL_PATHS %w", err)
 	}
 	publicWebhookPrefix, err := parsePublicWebhookPrefix(getenv("PUBLIC_WEBHOOK_PREFIX"))
 	if err != nil {
@@ -148,11 +183,49 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if proxyHeader == "" && len(proxyCIDRs) != 0 {
 		return Config{}, fmt.Errorf("TRUSTED_PROXY_CIDRS requires TRUSTED_PROXY_HEADER")
 	}
-	limits := make([]int, 5)
+	adminCIDRs, err := parseCIDRs(getenv("ADMIN_ALLOWED_CIDRS"))
+	if err != nil {
+		return Config{}, fmt.Errorf("ADMIN_ALLOWED_CIDRS contains an invalid CIDR")
+	}
+	requestBodyMax, err := positiveInt(getenv, "REQUEST_BODY_MAX_BYTES", 64<<10)
+	if err != nil {
+		return Config{}, err
+	}
+	bodyOverrides, err := sizeOverrides(getenv("REQUEST_BODY_OVERRIDES"))
+	if err != nil {
+		return Config{}, fmt.Errorf("REQUEST_BODY_OVERRIDES %w", err)
+	}
+	contentTypeExempt, err := pathList(getenv("CONTENT_TYPE_EXEMPT_PATHS"))
+	if err != nil {
+		return Config{}, fmt.Errorf("CONTENT_TYPE_EXEMPT_PATHS %w", err)
+	}
+	if publicWebhookPrefix != "" && !contains(contentTypeExempt, publicWebhookPrefix) {
+		contentTypeExempt = append(contentTypeExempt, publicWebhookPrefix)
+	}
+	webhookBodyMax, err := positiveInt(getenv, "WEBHOOK_MAX_BODY_BYTES", 64<<10)
+	if err != nil {
+		return Config{}, err
+	}
+	idempotencyTTLHours, err := positiveInt(getenv, "IDEMPOTENCY_TTL_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	idempotencyMax, err := positiveInt(getenv, "IDEMPOTENCY_MAX_RESPONSE_BYTES", 64<<10)
+	if err != nil {
+		return Config{}, err
+	}
+	financialPrefixes, err := pathList(getenv("IDEMPOTENCY_FINANCIAL_PREFIXES"))
+	if err != nil {
+		return Config{}, fmt.Errorf("IDEMPOTENCY_FINANCIAL_PREFIXES %w", err)
+	}
+	if len(financialPrefixes) == 0 {
+		financialPrefixes = []string{"/v1/buyer/withdraw", "/v1/buyer/withdrawals", "/v1/ledger", "/v1/admin/finance"}
+	}
+	limits := make([]int, 6)
 	for i, item := range []struct {
 		name  string
 		value int
-	}{{"RATE_LIMIT_IP_PER_MINUTE", 600}, {"RATE_LIMIT_ACCOUNT_PER_MINUTE", 300}, {"RATE_LIMIT_LOGIN_PER_MINUTE", 10}, {"RATE_LIMIT_WITHDRAW_PER_MINUTE", 5}, {"RATE_LIMIT_AI_PER_MINUTE", 30}} {
+	}{{"RATE_LIMIT_IP_PER_MINUTE", 600}, {"RATE_LIMIT_ACCOUNT_PER_MINUTE", 300}, {"RATE_LIMIT_LOGIN_PER_MINUTE", 10}, {"RATE_LIMIT_WITHDRAW_PER_MINUTE", 5}, {"RATE_LIMIT_AI_PER_MINUTE", 30}, {"RATE_LIMIT_ADMIN_PER_MINUTE", 60}} {
 		limits[i], err = positiveInt(getenv, item.name, item.value)
 		if err != nil {
 			return Config{}, err
@@ -167,33 +240,48 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	}
 
 	return Config{
-		HTTPAddr:            httpAddr,
-		MetricsAddr:         metricsAddr,
-		AppEnv:              appEnv,
-		AppRelease:          strings.TrimSpace(getenv("APP_RELEASE")),
-		LogLevel:            logLevel,
-		ShutdownTimeout:     time.Duration(shutdownSeconds) * time.Second,
-		ReadHeaderTimeout:   time.Duration(readHeaderSeconds) * time.Second,
-		ReadTimeout:         time.Duration(readSeconds) * time.Second,
-		IdleTimeout:         time.Duration(idleSeconds) * time.Second,
-		DatabaseURL:         strings.TrimSpace(getenv("DATABASE_URL")),
-		ReportDatabaseURL:   strings.TrimSpace(getenv("REPORT_DATABASE_URL")),
-		DBMaxConns:          int32(dbMaxConns),
-		DBMinConns:          int32(dbMinConns),
-		DBConnectTimeout:    time.Duration(dbConnectSeconds) * time.Second,
-		DBSlowQuery:         time.Duration(dbSlowQueryMS) * time.Millisecond,
-		SentryDSN:           strings.TrimSpace(getenv("SENTRY_DSN")),
-		RedisURL:            strings.TrimSpace(getenv("REDIS_URL")),
-		CORSAllowedOrigins:  corsOrigins,
-		WebhookPrefix:       publicWebhookPrefix,
-		TrustedProxyHeader:  proxyHeader,
-		TrustedProxyCIDRs:   proxyCIDRs,
-		RateLimitIP:         limits[0],
-		RateLimitAccount:    limits[1],
-		RateLimitLogin:      limits[2],
-		RateLimitWithdraw:   limits[3],
-		RateLimitAI:         limits[4],
-		LedgerReconTimezone: reconTimezone,
+		HTTPAddr:               httpAddr,
+		MetricsAddr:            metricsAddr,
+		AppEnv:                 appEnv,
+		AppRelease:             strings.TrimSpace(getenv("APP_RELEASE")),
+		LogLevel:               logLevel,
+		ShutdownTimeout:        time.Duration(shutdownSeconds) * time.Second,
+		ReadHeaderTimeout:      time.Duration(readHeaderSeconds) * time.Second,
+		ReadTimeout:            time.Duration(readSeconds) * time.Second,
+		IdleTimeout:            time.Duration(idleSeconds) * time.Second,
+		DatabaseURL:            strings.TrimSpace(getenv("DATABASE_URL")),
+		ReportDatabaseURL:      strings.TrimSpace(getenv("REPORT_DATABASE_URL")),
+		DBMaxConns:             int32(dbMaxConns),
+		DBMinConns:             int32(dbMinConns),
+		DBConnectTimeout:       time.Duration(dbConnectSeconds) * time.Second,
+		DBSlowQuery:            time.Duration(dbSlowQueryMS) * time.Millisecond,
+		SentryDSN:              strings.TrimSpace(getenv("SENTRY_DSN")),
+		RedisURL:               strings.TrimSpace(getenv("REDIS_URL")),
+		CORSBuyerOrigins:       cors["CORS_BUYER_ORIGINS"],
+		CORSMerchantOrigins:    cors["CORS_MERCHANT_ORIGINS"],
+		CORSDriverOrigins:      cors["CORS_DRIVER_ORIGINS"],
+		CORSWMSOrigins:         cors["CORS_WMS_ORIGINS"],
+		CORSAdminOrigins:       cors["CORS_ADMIN_ORIGINS"],
+		CORSPublicOrigins:      cors["CORS_PUBLIC_ORIGINS"],
+		CORSCredentialPaths:    credentialPaths,
+		WebhookPrefix:          publicWebhookPrefix,
+		WebhookMaxBodyBytes:    int64(webhookBodyMax),
+		TrustedProxyHeader:     proxyHeader,
+		TrustedProxyCIDRs:      proxyCIDRs,
+		AdminAllowedCIDRs:      adminCIDRs,
+		RequestBodyMaxBytes:    int64(requestBodyMax),
+		RequestBodyOverrides:   bodyOverrides,
+		ContentTypeExemptPaths: contentTypeExempt,
+		IdempotencyTTL:         time.Duration(idempotencyTTLHours) * time.Hour,
+		IdempotencyMaxBytes:    idempotencyMax,
+		FinancialPrefixes:      financialPrefixes,
+		RateLimitIP:            limits[0],
+		RateLimitAccount:       limits[1],
+		RateLimitLogin:         limits[2],
+		RateLimitWithdraw:      limits[3],
+		RateLimitAI:            limits[4],
+		RateLimitAdmin:         limits[5],
+		LedgerReconTimezone:    reconTimezone,
 	}, nil
 }
 
@@ -216,12 +304,12 @@ func parsePublicWebhookPrefix(raw string) (string, error) {
 func parseOrigins(raw string) ([]string, error) {
 	values, err := commaSeparated(raw)
 	if err != nil {
-		return nil, fmt.Errorf("CORS_ALLOWED_ORIGINS contains an empty value")
+		return nil, fmt.Errorf("origin list contains an empty value")
 	}
 	for _, value := range values {
 		parsed, parseErr := url.Parse(value)
 		if parseErr != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
-			return nil, fmt.Errorf("CORS_ALLOWED_ORIGINS contains an invalid origin")
+			return nil, fmt.Errorf("origin list contains an invalid origin")
 		}
 	}
 	return values, nil
@@ -252,6 +340,48 @@ func commaSeparated(raw string) ([]string, error) {
 		}
 	}
 	return parts, nil
+}
+
+func pathList(raw string) ([]string, error) {
+	values, err := commaSeparated(raw)
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range values {
+		if !strings.HasPrefix(value, "/") || strings.Contains(value, "//") || strings.Contains(value, "..") {
+			return nil, fmt.Errorf("must contain absolute safe paths")
+		}
+	}
+	return values, nil
+}
+
+func contains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func sizeOverrides(raw string) (map[string]int64, error) {
+	values, err := commaSeparated(raw)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]int64, len(values))
+	for _, value := range values {
+		parts := strings.SplitN(value, "=", 2)
+		if len(parts) != 2 || !strings.HasPrefix(parts[0], "/") {
+			return nil, fmt.Errorf("must use /path=bytes entries")
+		}
+		size, parseErr := strconv.ParseInt(parts[1], 10, 64)
+		if parseErr != nil || size <= 0 {
+			return nil, fmt.Errorf("must use positive byte limits")
+		}
+		result[parts[0]] = size
+	}
+	return result, nil
 }
 
 func positiveInt(getenv func(string) string, name string, defaultValue int) (int, error) {

@@ -14,8 +14,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 )
@@ -43,6 +45,92 @@ func TestOpenAPIContract(t *testing.T) {
 	if got := documentedErrorCodes(t, doc); !equalInts(got, want) {
 		t.Fatalf("documented error codes %v do not match httpx constants %v", got, want)
 	}
+	for path, item := range doc.Paths.Map() {
+		for method, operation := range item.Operations() {
+			if _, ok := operation.Extensions["x-roles"]; !ok {
+				t.Errorf("%s %s is missing operation-level x-roles", strings.ToUpper(method), path)
+			}
+		}
+	}
+}
+
+type matrixAuthenticator struct{}
+
+func (matrixAuthenticator) Authenticate(r *http.Request) (gateway.Identity, bool, error) {
+	role := gateway.Role(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	return gateway.Identity{AccountID: "matrix-account", Role: role}, true, nil
+}
+
+func TestOpenAPIAuthorizationMatrix(t *testing.T) {
+	doc := loadSpec(t)
+	rule := gateway.Rule{Limit: 1000, Window: time.Minute}
+	handler := server.NewHandlerWithGateway(nil, server.GatewayOptions{
+		AppEnv: "dev", OriginGroups: gateway.DefaultOriginGroups("dev"), Authenticator: matrixAuthenticator{},
+		Limiter: gateway.NewMemoryLimiter(), IPRules: gateway.RuleSet{Default: rule, Login: rule, Withdrawal: rule, AI: rule},
+		AccountRules: gateway.RuleSet{Default: rule, Login: rule, Withdrawal: rule, AI: rule},
+	})
+	for path, item := range doc.Paths.Map() {
+		for method, operation := range item.Operations() {
+			roles := extensionRoles(t, operation.Extensions["x-roles"])
+			requestPath := replacePathParameters(path)
+			if len(roles) == 1 && roles[0] == "none" {
+				response := httptest.NewRecorder()
+				handler.ServeHTTP(response, httptest.NewRequest(strings.ToUpper(method), requestPath, nil))
+				if response.Code == http.StatusUnauthorized || response.Code == http.StatusForbidden {
+					t.Errorf("public %s %s returned %d", method, path, response.Code)
+				}
+				continue
+			}
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, httptest.NewRequest(strings.ToUpper(method), requestPath, nil))
+			if response.Code != http.StatusUnauthorized {
+				t.Errorf("unauthenticated %s %s returned %d", method, path, response.Code)
+			}
+			wrong := httptest.NewRequest(strings.ToUpper(method), requestPath, nil)
+			wrong.Header.Set("Authorization", "Bearer "+wrongRole(roles))
+			response = httptest.NewRecorder()
+			handler.ServeHTTP(response, wrong)
+			if response.Code != http.StatusForbidden {
+				t.Errorf("wrong-role %s %s returned %d", method, path, response.Code)
+			}
+		}
+	}
+}
+
+func extensionRoles(t *testing.T, value any) []string {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roles []string
+	if err := json.Unmarshal(raw, &roles); err != nil || len(roles) == 0 {
+		t.Fatalf("invalid x-roles: %v", value)
+	}
+	return roles
+}
+
+func replacePathParameters(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		if strings.HasPrefix(part, "{") && strings.HasSuffix(part, "}") {
+			parts[i] = "test"
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
+func wrongRole(roles []string) string {
+	for _, candidate := range []string{"buyer", "merchant", "driver", "wms", "admin"} {
+		found := false
+		for _, allowed := range roles {
+			found = found || allowed == candidate
+		}
+		if !found {
+			return candidate
+		}
+	}
+	return "invalid"
 }
 
 func TestPublicPingMatchesOpenAPI(t *testing.T) {

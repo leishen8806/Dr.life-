@@ -30,7 +30,7 @@ export interface components {
          * @description Documented application error code; ranges are described in the API description.
          * @enum {integer}
          */
-        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 2001 | 2002;
+        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 7001;
         Messages: {
             zh: string;
             en: string;
@@ -136,6 +136,43 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
+        /** @description Request is already processing or its completed response cannot be replayed (error code 1010 or 1011). */
+        Conflict: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Request body exceeds the configured route limit (error code 1007). */
+        RequestTooLarge: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description JSON write request does not use application/json (error code 1008). */
+        UnsupportedMediaType: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Idempotency key was reused with different request content (error code 1009). */
+        UnprocessableEntity: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
     };
     parameters: {
         /** @description One-based page number. */
@@ -152,9 +189,16 @@ export interface components {
         IdempotencyKey: string;
         /** @description Optional caller request identifier. Invalid values are replaced by the server. */
         XRequestID: string;
+        /** @description Single-use token scoped to a declared high-risk action and account. */
+        XStepUpToken: string;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description True when the stored response for an identical request is replayed. */
+        IdempotentReplayed: "true";
+        /** @description Seconds before retrying an in-progress or rate-limited request. */
+        RetryAfter: number;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
