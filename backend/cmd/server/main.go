@@ -103,7 +103,7 @@ func main() {
 		AccountRules:   strictRules(cfg.RateLimitAccount),
 		BodyPolicy:     gateway.BodyPolicy{DefaultBytes: cfg.RequestBodyMaxBytes, Overrides: cfg.RequestBodyOverrides, ExemptPaths: cfg.ContentTypeExemptPaths},
 		Idempotency: gateway.IdempotencyOptions{
-				Store: idempotencyStore, FallbackStore: gateway.NewMemoryIdempotencyStore(), TTL: cfg.IdempotencyTTL, MaxResponseBytes: cfg.IdempotencyMaxBytes,
+			Store: idempotencyStore, FallbackStore: gateway.NewMemoryIdempotencyStore(), TTL: cfg.IdempotencyTTL, MaxResponseBytes: cfg.IdempotencyMaxBytes,
 			FinancialPrefixes: cfg.FinancialPrefixes,
 		},
 		Metrics:       metrics,
