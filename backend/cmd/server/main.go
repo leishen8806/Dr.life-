@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
@@ -41,6 +42,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer database.Close()
+
+	directory := catalogDirectory{db: database}
+	catalogService := catalog.New(catalog.NewPgStore(database), catalog.Options{Merchants: directory})
 
 	clientIP, err := gateway.NewClientIPResolver(cfg.TrustedProxyHeader, cfg.TrustedProxyCIDRs)
 	if err != nil {
@@ -108,6 +112,9 @@ func main() {
 		},
 		Metrics:       metrics,
 		ErrorReporter: reporter,
+		Catalog:       catalogService,
+		Merchants:     directory,
+		Logger:        logger,
 	}, database.Ping)
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)
 	// WriteTimeout stays unset so future real-time streams can remain open.
