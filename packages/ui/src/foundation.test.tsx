@@ -31,6 +31,16 @@ function findButton(node: ReactNode, label: string): { props: Record<string, unk
     .find(Boolean);
 }
 
+function expectWrappingRule(styles: string, selector: string) {
+  let start = styles.indexOf(selector);
+  while (start >= 0) {
+    const end = styles.indexOf("}", start);
+    if (styles.slice(start, end).includes("overflow-wrap: anywhere")) return;
+    start = styles.indexOf(selector, start + selector.length);
+  }
+  expect.fail(`${selector} must allow long text to wrap`);
+}
+
 describe("foundation components", () => {
   it("renders the reusable shell with accessible navigation and snapshots", () => {
     const navigation = BottomNavigation({
@@ -74,7 +84,13 @@ describe("foundation components", () => {
     expect(loading.props.role).toBe("status");
     expect(loading.props.className).toContain("drl-loading");
     const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
-    expect(styles).toContain(".drl-bottom-navigation__label");
-    expect(styles).toMatch(/\.drl-loading[\s\S]*?overflow-wrap: anywhere/);
+    [
+      ".drl-loading",
+      ".drl-app-header__slogan",
+      ".drl-bottom-navigation__label",
+      ".drl-list-item__content > strong",
+      ".drl-list-item small",
+      ".drl-list-item__trailing"
+    ].forEach((selector) => expectWrappingRule(styles, selector));
   });
 });

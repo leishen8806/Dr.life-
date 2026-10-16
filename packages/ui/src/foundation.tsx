@@ -108,7 +108,7 @@ export function Stepper({
     <ol className="drl-stepper">
       {steps.map((step, index) => (
         <li
-          key={index}
+          key={step}
           className={index <= current ? "is-complete" : undefined}
           aria-current={index === current ? "step" : undefined}
         >
