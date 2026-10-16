@@ -1,37 +1,114 @@
 groups:
   - name: drlife
     rules:
+      # 可用性
+      - alert: BackendDown
+        expr: up{job="drlife-backend"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Backend is unreachable or not scraped", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#backenddown"}
+      # 错误率
       - alert: HTTP5xxErrorRateHigh
         expr: sum(rate(drlife_http_requests_total{status_class="5xx"}[5m])) / clamp_min(sum(rate(drlife_http_requests_total[5m])), 0.001) > 0.05
         for: 5m
         labels: {severity: warning}
-        annotations: {summary: "5xx error rate is above 5%"}
+        annotations: {summary: "5xx error rate is above 5%", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#http5xxerrorratehigh"}
+      # 延迟（查询 P95<500ms、写 P95<1s 为 Q-06 验收指标；P99 阈值为草案，待压测校准）
       - alert: QueryP95LatencyHigh
         expr: histogram_quantile(0.95, sum by (le) (rate(drlife_http_request_duration_seconds_bucket{method="GET"}[5m]))) > 0.5
         for: 10m
         labels: {severity: warning}
-        annotations: {summary: "Query P95 is above 500 ms"}
+        annotations: {summary: "Query P95 is above 500 ms", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#queryp95latencyhigh"}
       - alert: WriteP95LatencyHigh
         expr: histogram_quantile(0.95, sum by (le) (rate(drlife_http_request_duration_seconds_bucket{method!="GET"}[5m]))) > 1
         for: 10m
         labels: {severity: warning}
-        annotations: {summary: "Write P95 is above 1 second"}
-      - alert: LoginValidationFailuresHigh
-        expr: sum(rate(drlife_login_validation_failures_total[5m])) > 0.1
-        for: 5m
-        labels: {severity: warning}
-        annotations: {summary: "Login validation failures increased"}
-      - alert: BotSendSuccessRateLow
-        expr: sum(rate(drlife_bot_sends_total{status="success"}[10m])) / clamp_min(sum(rate(drlife_bot_sends_total[10m])), 0.001) < 0.95 and sum(rate(drlife_bot_sends_total[10m])) > 0
+        annotations: {summary: "Write P95 is above 1 second", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#writep95latencyhigh"}
+      - alert: RequestP99LatencyHigh
+        expr: histogram_quantile(0.99, sum by (le) (rate(drlife_http_request_duration_seconds_bucket[5m]))) > 2
         for: 10m
         labels: {severity: warning}
-        annotations: {summary: "Bot send success rate is below 95%"}
-      - alert: LedgerReconciliationMismatch
-        expr: increase(drlife_ledger_reconciliation_mismatches_total[5m]) > 0
-        labels: {severity: critical}
-        annotations: {summary: "A ledger reconciliation mismatch was detected"}
+        annotations: {summary: "Request P99 is above 2 seconds", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#requestp99latencyhigh"}
+      # 数据库连接池
+      - alert: DBConnectionPoolExhausted
+        expr: drlife_db_pool_idle_connections == 0 and drlife_db_pool_acquired_connections > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Database connection pool has no idle connections", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#dbconnectionpoolexhausted"}
+      - alert: DBConnectionPoolWaitHigh
+        expr: rate(drlife_db_pool_acquire_wait_seconds_total[5m]) > 0.25
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Acquiring a database connection waits more than 25% of the time", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#dbconnectionpoolwaithigh"}
       - alert: SlowQueriesHigh
         expr: sum(rate(drlife_db_slow_queries_total[5m])) > 0.2
         for: 5m
         labels: {severity: warning}
-        annotations: {summary: "Slow query rate increased"}
+        annotations: {summary: "Slow query rate increased", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#slowquerieshigh"}
+      # 队列积压（依赖 asynq 指标采集；队列模块接入前无序列，不会触发，也不代表队列正常）
+      - alert: QueueBacklogHigh
+        expr: max(asynq_tasks_enqueued_total{state="pending"}) > 1000
+        for: 15m
+        labels: {severity: warning}
+        annotations: {summary: "Pending queue tasks are above 1000", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#queuebackloghigh"}
+      # 账务异常
+      - alert: LedgerPostFailuresHigh
+        expr: sum(rate(drlife_ledger_posts_total{status="failure"}[5m])) > 0.1
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Ledger post failures increased", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#ledgerpostfailureshigh"}
+      - alert: LedgerUnbalancedPost
+        expr: increase(drlife_ledger_posts_total{status="failure",reason="unbalanced"}[10m]) > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "A ledger entry failed the debit/credit balance check", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#ledgerunbalancedpost"}
+      # 对账差异
+      - alert: LedgerReconciliationMismatch
+        expr: increase(drlife_ledger_reconciliation_mismatches_total[5m]) > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "A ledger reconciliation mismatch was detected", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#ledgerreconciliationmismatch"}
+      - alert: LedgerReconciliationRunFailed
+        expr: increase(drlife_ledger_reconciliation_runs_total{status="failed"}[1h]) > 0
+        for: 5m
+        labels: {severity: critical}
+        annotations: {summary: "The daily ledger reconciliation run failed", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#ledgerreconciliationrunfailed"}
+      # 提现超时
+      - alert: WithdrawalOverdue
+        expr: increase(drlife_withdrawals_total{event="overdue"}[1h]) > 0
+        for: 5m
+        labels: {severity: critical}
+        annotations: {summary: "A withdrawal passed its review or payout deadline", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#withdrawaloverdue"}
+      # Bot 受限与发送失败率
+      - alert: BotSendSuccessRateLow
+        expr: sum(rate(drlife_bot_sends_total{status="success"}[10m])) / clamp_min(sum(rate(drlife_bot_sends_total[10m])), 0.001) < 0.95 and sum(rate(drlife_bot_sends_total[10m])) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations: {summary: "Bot send success rate is below 95%", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#botsendsuccessratelow"}
+      - alert: BotRateLimited
+        expr: sum(rate(drlife_bot_sends_total{status="failure",reason="rate_limited"}[10m])) > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Telegram is rate limiting bot sends", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#botratelimited"}
+      # AI 回退率
+      - alert: AIFallbackRateHigh
+        expr: sum(rate(drlife_ai_requests_total{event="fallback"}[15m])) / clamp_min(sum(rate(drlife_ai_requests_total{event="request"}[15m])), 0.001) > 0.5 and sum(rate(drlife_ai_requests_total{event="request"}[15m])) > 0
+        for: 15m
+        labels: {severity: warning}
+        annotations: {summary: "AI fallback rate is above 50%", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#aifallbackratehigh"}
+      - alert: LoginValidationFailuresHigh
+        expr: sum(rate(drlife_login_validation_failures_total[5m])) > 0.1
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Login validation failures increased", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#loginvalidationfailureshigh"}
+      # 磁盘与证书（依赖 node_exporter / blackbox_exporter；未部署时无序列、不会触发）
+      - alert: DiskSpaceLow
+        expr: node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs|overlay",mountpoint!~"/run.*"} / node_filesystem_size_bytes{fstype!~"tmpfs|ramfs|overlay",mountpoint!~"/run.*"} < 0.10
+        for: 15m
+        labels: {severity: critical}
+        annotations: {summary: "Filesystem free space is below 10%", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#diskspacelow"}
+      - alert: CertificateExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 14 * 24 * 3600
+        for: 1h
+        labels: {severity: warning}
+        annotations: {summary: "A TLS certificate expires within 14 days", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#certificateexpiringsoon"}

@@ -39,4 +39,4 @@ docker run --rm --entrypoint=promtool -v "$PWD/deploy/observability/prometheus:/
 
 - 前端 Sentry 在各前端应用进入业务开发后接入。
 - 集中日志尚未选择 Loki 或 ELK。
-- 告警通知渠道和值班升级流程由 Q-04 确定；当前规则只在 Prometheus 中求值。
+- 告警通知渠道（Telegram / 邮件 / PagerDuty）未接入，需审批；值班与升级流程见 `../../docs/ops/oncall.md`。
