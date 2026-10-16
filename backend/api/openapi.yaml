@@ -39,6 +39,7 @@ paths:
       tags: [public]
       operationId: getPublicPing
       summary: Check public API availability
+      x-roles: ["none"]
       security: []
       responses:
         "200":
@@ -118,12 +119,32 @@ components:
         minLength: 1
         maxLength: 64
         pattern: "^[A-Za-z0-9_-]+$"
+    XStepUpToken:
+      name: X-Step-Up-Token
+      in: header
+      required: true
+      description: Single-use token scoped to a declared high-risk action and account.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 4096
+  headers:
+    IdempotentReplayed:
+      description: True when the stored response for an identical request is replayed.
+      schema:
+        type: string
+        enum: ["true"]
+    RetryAfter:
+      description: Seconds before retrying an in-progress or rate-limited request.
+      schema:
+        type: integer
+        minimum: 1
   schemas:
     ErrorCode:
       type: integer
       format: int32
       description: Documented application error code; ranges are described in the API description.
-      enum: [1001, 1002, 1003, 1004, 1005, 1006, 2001, 2002]
+      enum: [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 2001, 2002, 2003, 2004, 7001]
       x-enum-varnames:
         - InternalError
         - InvalidArgument
@@ -131,8 +152,16 @@ components:
         - TooManyRequests
         - ServiceUnavailable
         - MethodNotAllowed
+        - RequestTooLarge
+        - UnsupportedMedia
+        - IdempotencyConflict
+        - IdempotencyPending
+        - AlreadyProcessed
         - Unauthenticated
         - PermissionDenied
+        - StepUpRequired
+        - StepUpInvalid
+        - WebhookInvalid
     Messages:
       type: object
       additionalProperties: false
@@ -245,6 +274,33 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     MethodNotAllowed:
       description: HTTP method is not allowed (error code 1006).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Conflict:
+      description: Request is already processing or its completed response cannot be replayed (error code 1010 or 1011).
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    RequestTooLarge:
+      description: Request body exceeds the configured route limit (error code 1007).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    UnsupportedMediaType:
+      description: JSON write request does not use application/json (error code 1008).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    UnprocessableEntity:
+      description: Idempotency key was reused with different request content (error code 1009).
       content:
         application/json:
           schema:

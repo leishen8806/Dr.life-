@@ -19,15 +19,28 @@ import (
 
 type ReadinessCheck func(context.Context) error
 
+func NewHTTPServer(addr string, handler http.Handler, readHeaderTimeout, readTimeout, idleTimeout time.Duration) *http.Server {
+	return &http.Server{
+		Addr: addr, Handler: handler, ReadHeaderTimeout: readHeaderTimeout, ReadTimeout: readTimeout,
+		IdleTimeout: idleTimeout, MaxHeaderBytes: 16 << 10,
+	}
+}
+
 type GatewayOptions struct {
-	AllowedOrigins    []string
+	AppEnv            string
+	OriginGroups      gateway.OriginGroups
 	WebhookPrefix     string
+	WebhookBindings   map[string]gateway.WebhookVerifier
+	WebhookMaxBody    int64
 	ClientIP          gateway.ClientIPResolver
+	AdminAccess       gateway.AdminAccess
 	Limiter           gateway.Limiter
 	Authenticator     gateway.Authenticator
 	IPRules           gateway.RuleSet
 	AccountRules      gateway.RuleSet
 	IdempotencyExempt func(*http.Request) bool
+	Idempotency       gateway.IdempotencyOptions
+	BodyPolicy        gateway.BodyPolicy
 	Metrics           *observability.Metrics
 	ErrorReporter     *observability.ErrorReporter
 }
@@ -35,6 +48,7 @@ type GatewayOptions struct {
 func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
 	rule := gateway.Rule{Limit: 100000, Window: time.Minute}
 	return NewHandlerWithGateway(logger, GatewayOptions{
+		AppEnv: "dev", OriginGroups: gateway.DefaultOriginGroups("dev"),
 		Limiter: gateway.NewMemoryLimiter(), IPRules: gateway.RuleSet{Default: rule, Login: rule, Withdrawal: rule, AI: rule}, AccountRules: gateway.RuleSet{Default: rule, Login: rule, Withdrawal: rule, AI: rule},
 	}, checks...)
 }
@@ -42,17 +56,22 @@ func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
 func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks ...ReadinessCheck) http.Handler {
 	router := chi.NewRouter()
 	router.Use(httpx.RequestID)
+	router.Use(gateway.SecurityHeaders(options.AppEnv))
 	if options.Metrics != nil {
 		router.Use(options.Metrics.HTTPMiddleware)
 	}
 	router.Use(httpx.RequestLogger(logger, gateway.RoleFromContext))
 	router.Use(observability.Recover(logger, options.ErrorReporter))
-	router.Use(gateway.CORS(options.AllowedOrigins))
+	router.Use(gateway.GroupedCORS(options.OriginGroups))
 	router.Use(gateway.LimitByIP(options.Limiter, options.ClientIP, options.IPRules))
+	router.Use(options.AdminAccess.Middleware)
+	router.Use(gateway.VerifyWebhooks(options.WebhookPrefix, options.WebhookMaxBody, options.WebhookBindings))
 	router.Use(gateway.Authenticate(options.Authenticator, options.WebhookPrefix))
 	router.Use(gateway.Authorize(options.WebhookPrefix))
+	router.Use(gateway.LimitRequestBody(options.BodyPolicy))
 	router.Use(gateway.LimitByAccount(options.Limiter, options.AccountRules))
 	router.Use(gateway.RequireIdempotency(options.IdempotencyExempt))
+	router.Use(gateway.BindIdempotency(options.Idempotency))
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
 	})

@@ -30,12 +30,12 @@ func Authenticate(auth Authenticator, publicWebhookPrefix string) func(http.Hand
 				return
 			}
 			if auth == nil {
-				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+				writeUnauthenticated(w, r)
 				return
 			}
 			identity, ok, err := auth.Authenticate(r)
 			if err != nil || !ok || identity.AccountID == "" || !validRole(identity.Role) {
-				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+				writeUnauthenticated(w, r)
 				return
 			}
 			withIdentity(r, identity)
@@ -58,7 +58,7 @@ func Authorize(publicWebhookPrefix string) func(http.Handler) http.Handler {
 			}
 			identity, ok := IdentityFromContext(r.Context())
 			if !ok {
-				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+				writeUnauthenticated(w, r)
 				return
 			}
 			if identity.Role != target.role {
@@ -68,6 +68,11 @@ func Authorize(publicWebhookPrefix string) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func writeUnauthenticated(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("WWW-Authenticate", "Bearer")
+	httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
 }
 
 func classifyPath(path, publicWebhookPrefix string) audience {
