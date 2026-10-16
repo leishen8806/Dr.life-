@@ -1,4 +1,5 @@
 import { Children, isValidElement, type ReactNode } from "react";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   AppHeader,
@@ -19,6 +20,14 @@ function findByRole(node: ReactNode, role: string): { props: Record<string, unkn
   if (node.props.role === role) return node as { props: Record<string, unknown> };
   return Children.toArray(node.props.children)
     .map((child) => findByRole(child, role))
+    .find(Boolean);
+}
+
+function findButton(node: ReactNode, label: string): { props: Record<string, unknown> } | undefined {
+  if (!isValidElement<{ children?: ReactNode }>(node)) return undefined;
+  if (node.type === "button" && node.props.children === label) return node as { props: Record<string, unknown> };
+  return Children.toArray(node.props.children)
+    .map((child) => findButton(child, label))
     .find(Boolean);
 }
 
@@ -43,7 +52,7 @@ describe("foundation components", () => {
     expect(navigation.props["aria-label"]).toBe("Primary navigation");
   });
 
-  it("exposes dialogs, close controls, and state actions to keyboard users", () => {
+  it("keeps dialog close controls keyboard reachable", () => {
     const close = vi.fn();
     const retry = vi.fn();
     const sheet = BottomSheet({ open: true, title: "Options", closeLabel: "Close", onClose: close, children: "Content" });
@@ -53,13 +62,19 @@ describe("foundation components", () => {
 
     expect(findByRole(sheet, "dialog")?.props["aria-modal"]).toBe("true");
     expect(findByRole(confirm, "alertdialog")?.props["aria-modal"]).toBe("true");
+    expect(findButton(confirm, "Cancel")?.props.autoFocus).toBe(true);
+    (findByRole(confirm, "alertdialog")?.props.onKeyDown as (event: { key: string }) => void)({ key: "Escape" });
+    expect(close).toHaveBeenCalledOnce();
     expect(findByRole(empty, "status")).toBeDefined();
     expect(findByRole(error, "alert")).toBeDefined();
   });
 
-  it("keeps loading labels and Khmer text untruncated", () => {
+  it("marks loading and long-text containers for wrapping", () => {
     const loading = Loading({ label: "កំពុងផ្ទុកព័ត៌មានសម្រាប់ការដឹកជញ្ជូនរបស់អ្នក" });
     expect(loading.props.role).toBe("status");
     expect(loading.props.className).toContain("drl-loading");
+    const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+    expect(styles).toContain(".drl-bottom-navigation__label");
+    expect(styles).toMatch(/\.drl-loading[\s\S]*?overflow-wrap: anywhere/);
   });
 });

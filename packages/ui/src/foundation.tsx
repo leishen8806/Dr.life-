@@ -53,7 +53,7 @@ export function BottomNavigation({
             <span className="drl-bottom-navigation__icon" aria-hidden="true">
               {item.icon}
             </span>
-            <span>{item.label}</span>
+            <span className="drl-bottom-navigation__label">{item.label}</span>
             {item.badge !== undefined && (
               <span className="drl-bottom-navigation__badge">{item.badge}</span>
             )}
@@ -108,7 +108,7 @@ export function Stepper({
     <ol className="drl-stepper">
       {steps.map((step, index) => (
         <li
-          key={step}
+          key={index}
           className={index <= current ? "is-complete" : undefined}
           aria-current={index === current ? "step" : undefined}
         >
@@ -254,7 +254,7 @@ export function ConfirmDialog({
         <h2>{title}</h2>
         <p>{description}</p>
         <footer>
-          <button type="button" onClick={onCancel}>{cancelLabel}</button>
+          <button type="button" autoFocus onClick={onCancel}>{cancelLabel}</button>
           <button type="button" className="drl-button--danger" onClick={onConfirm}>{confirmLabel}</button>
         </footer>
       </section>

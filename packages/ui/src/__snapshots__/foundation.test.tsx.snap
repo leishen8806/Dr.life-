@@ -91,7 +91,9 @@ exports[`foundation components > renders the reusable shell with accessible navi
       >
         ⌂
       </span>
-      <span>
+      <span
+        className="drl-bottom-navigation__label"
+      >
         Home
       </span>
     </button>
@@ -106,7 +108,9 @@ exports[`foundation components > renders the reusable shell with accessible navi
       >
         ●
       </span>
-      <span>
+      <span
+        className="drl-bottom-navigation__label"
+      >
         Me
       </span>
       <span

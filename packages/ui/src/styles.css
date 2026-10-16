@@ -71,8 +71,10 @@ body {
 .drl-loading {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--drl-space-2);
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .drl-loading__mark {
@@ -117,6 +119,7 @@ body {
 .drl-app-header__slogan {
   margin: 0;
   font-size: var(--drl-font-size-sm);
+  overflow-wrap: anywhere;
 }
 
 .drl-app-header__actions {
@@ -136,6 +139,7 @@ body {
 .drl-bottom-navigation__item {
   position: relative;
   display: grid;
+  flex: 1 1 0;
   justify-items: center;
   min-width: 0;
   border: 0;
@@ -152,6 +156,13 @@ body {
 
 .drl-bottom-navigation__icon {
   font-size: var(--drl-font-size-lg);
+}
+
+.drl-bottom-navigation__label,
+.drl-list-item__content > strong,
+.drl-list-item small,
+.drl-list-item__trailing {
+  overflow-wrap: anywhere;
 }
 
 .drl-bottom-navigation__badge {
