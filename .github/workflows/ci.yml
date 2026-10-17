@@ -121,7 +121,7 @@ jobs:
           cache-dependency-path: backend/go.sum
       - name: Run PostgreSQL integration tests
         working-directory: backend
-        run: go test -count=1 -run '^TestDatabaseFramework$' -v ./internal/platform/db
+        run: go test -count=1 -v ./internal/platform/db ./internal/ledger
 
   docker-image:
     needs: changes
