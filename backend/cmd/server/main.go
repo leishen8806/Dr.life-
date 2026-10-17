@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hibiken/asynq"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
@@ -22,6 +23,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/overload"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 )
@@ -104,6 +106,34 @@ func main() {
 		auditStore = &platformaudit.Store{DB: auditDatabase, Metrics: metrics.Business()}
 		auditReadiness = auditDatabase.Ping
 		go monitorAuditAnchor(ctx, auditStore, logger)
+	}
+
+	if cfg.QueueRedisURL != "" {
+		queueCollector, queueErr := queue.NewMetricsCollector(cfg.QueueRedisURL, queue.AllQueues,
+			func(ctx context.Context) (int64, time.Duration, error) { return queue.OutboxLag(ctx, database) })
+		if queueErr != nil {
+			logger.Error("queue metrics configuration failed", "error", queueErr)
+			os.Exit(1)
+		}
+		defer queueCollector.Close()
+		queueRedis, queueErr := asynq.ParseRedisURI(cfg.QueueRedisURL)
+		if queueErr != nil {
+			logger.Error("queue Redis configuration failed", "error", queueErr)
+			os.Exit(1)
+		}
+		queueClient := asynq.NewClient(queueRedis)
+		defer queueClient.Close()
+		// The registry is empty until business modules register scheduled task types.
+		scheduler, queueErr := queue.NewScheduler(queue.NewEnqueuer(queueClient, queue.NewRegistry(), queue.EnqueueOptions{}), nil)
+		if queueErr != nil {
+			logger.Error("queue scheduler configuration failed", "error", queueErr)
+			os.Exit(1)
+		}
+		go scheduler.Run(ctx)
+		if queueErr := metrics.RegisterCollector(queueCollector.WithScheduler(scheduler.LastRun)); queueErr != nil {
+			logger.Error("queue metrics registration failed", "error", queueErr)
+			os.Exit(1)
+		}
 	}
 
 	clientIP, err := gateway.NewClientIPResolver(cfg.TrustedProxyHeader, cfg.TrustedProxyCIDRs)

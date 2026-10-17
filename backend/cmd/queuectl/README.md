@@ -69,6 +69,16 @@ Task IDs, user IDs, and payload values are never used as labels. Task types are
 the registered queue types only; unregistered types are grouped as
 `unregistered`.
 
+## Process wiring
+
+- `cmd/server` registers the collector on the internal metrics listener and
+  starts the asynq scheduler when `QUEUE_REDIS_URL` is set. Both application
+  instances run the scheduler; fixed task IDs make duplicate enqueues harmless.
+- `cmd/worker` passes the same collector to asynq as the task observer, so task
+  durations are recorded by queue and registered type.
+- `outbox lag` reads `ledger.outbox` directly in read-only mode. This is an
+  accepted shortcut until the ledger module exposes a read API.
+
 Alert rules live in `deploy/observability/prometheus/alerts.yml`: dead-letter
 growth, per-queue wait SLA (`critical` 10s, `default` 60s, `notify` 120s;
 `batch` never alerts), outbox lag above 60s, queue Redis memory above 70%,

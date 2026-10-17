@@ -28,7 +28,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, "queue Redis configuration error:", err)
 		os.Exit(1)
 	}
-	worker, err := queue.NewWorker(cfg.QueueRedisURL, queue.NewRegistry(), queue.WorkerOptions{ShutdownTimeout: cfg.ShutdownTimeout, Logger: logx.NewLogger(cfg.LogLevel, os.Stdout)})
+	queueMetrics, err := queue.NewMetricsCollector(cfg.QueueRedisURL, queue.AllQueues, nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "queue metrics configuration error:", err)
+		os.Exit(1)
+	}
+	defer queueMetrics.Close()
+	worker, err := queue.NewWorker(cfg.QueueRedisURL, queue.NewRegistry(), queue.WorkerOptions{ShutdownTimeout: cfg.ShutdownTimeout, Logger: logx.NewLogger(cfg.LogLevel, os.Stdout), Observer: queueMetrics})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "worker configuration error:", err)
 		os.Exit(1)
