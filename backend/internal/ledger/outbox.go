@@ -24,14 +24,17 @@ type OutboxBatch struct {
 
 // OldestUnsentOutboxAge returns zero when every committed event was sent.
 func (s *Service) OldestUnsentOutboxAge(ctx context.Context) (time.Duration, error) {
-	var oldest *time.Time
-	if err := s.db.QueryRow(ctx, `SELECT MIN(created_at) FROM ledger.outbox WHERE sent_at IS NULL`).Scan(&oldest); err != nil {
+	var ageNanoseconds int64
+	if err := s.db.QueryRow(ctx, `
+		SELECT COALESCE(GREATEST(
+			EXTRACT(EPOCH FROM now() - MIN(created_at)) * 1000000000,
+			0
+		), 0)::bigint
+		FROM ledger.outbox
+		WHERE sent_at IS NULL`).Scan(&ageNanoseconds); err != nil {
 		return 0, err
 	}
-	if oldest == nil {
-		return 0, nil
-	}
-	return time.Since(*oldest), nil
+	return time.Duration(ageNanoseconds), nil
 }
 
 func (s *Service) ClaimOutbox(ctx context.Context, limit int) (*OutboxBatch, error) {

@@ -46,4 +46,19 @@ func TestOldestUnsentOutboxAgeIntegration(t *testing.T) {
 			t.Fatalf("age=%s, want 0", age)
 		}
 	})
+
+	t.Run("future timestamps do not produce negative lag", func(t *testing.T) {
+		if _, err := e.admin.Exec(e.ctx, `
+			INSERT INTO ledger.outbox(topic,payload,created_at)
+			VALUES ('ledger.test.future','{}',now() + interval '2 minutes')`); err != nil {
+			t.Fatal(err)
+		}
+		age, err := e.appService.OldestUnsentOutboxAge(e.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if age != 0 {
+			t.Fatalf("age=%s, want 0", age)
+		}
+	})
 }
