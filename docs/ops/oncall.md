@@ -224,3 +224,39 @@ docker run --rm --entrypoint=promtool -v "$PWD/deploy/observability/prometheus:/
 - 通知渠道接入方式与责任人（当前人工巡检，响应时限能否成立取决于此）。
 - 值班名单与轮值表（本文只定角色与层级）。
 - 阈值校准：P99、磁盘、队列积压为草案值，待 Q-06 压测与试点实测后调整。
+
+### QueueDeadLettersGrowing
+
+- 含义：死信队列持续增长（任务重试耗尽）。
+- 先查：`queuectl` 查看死信与失败原因；worker 日志中该任务类型的错误；上游依赖（Telegram、银行适配器）是否故障。
+- 处置：修复根因后用 queuectl 重放；**不得直接删除死信**（会丢通知与对账任务）。
+
+### QueueWaitSLABreached
+
+- 含义：最老的待处理任务等待时间超过该队列 SLA。
+- 先查：worker 是否在跑、并发是否打满；队列 Redis 连通性；同期是否有大批量入队。
+- 处置：扩 worker 或暂停低优先级入队；critical 队列优先；不得清空队列。
+
+### OutboxRelayLagHigh
+
+- 含义：账务 outbox 转发滞后超过 60 秒（未转发事件堆积）。
+- 先查：转发进程是否存活；queue Redis 是否可写；`ledger` outbox 滞后接口与数据库时钟。
+- 处置：恢复转发进程；事件依赖幂等消费，重复转发安全；不得手工改 outbox 状态。
+
+### QueueRedisMemoryHigh
+
+- 含义：队列 Redis 内存超过 maxmemory 的 70%。
+- 先查：积压任务数与负载大小；是否有任务异常膨胀；确认实例为 noeviction + AOF。
+- 处置：先消化积压或扩容；**不得改成 eviction 策略**（会静默丢任务）。
+
+### QueueMetricsCollectorDown
+
+- 含义：队列指标采集器读不到队列 Redis，队列相关告警可能失明。
+- 先查：采集器日志；Redis 连通性与认证；是否部署变更。
+- 处置：恢复采集；此期间人工用 queuectl 检查队列状态。
+
+### QueueSchedulerMissed
+
+- 含义：调度器超过 3 分钟没有触发（对账、定时任务可能漏跑）。
+- 先查：worker/调度进程是否存活；是否有多实例选主问题；队列 Redis 状态。
+- 处置：恢复调度进程；确认错过的周期性任务是否需要手工补跑（对账先看 L-07 状态）。

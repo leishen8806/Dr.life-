@@ -17,10 +17,16 @@ var ErrQueueRedisEviction = errors.New("queue Redis maxmemory-policy must be noe
 
 type Handler func(context.Context, *asynq.Task) error
 
+// TaskObserver records task execution without seeing payloads.
+type TaskObserver interface {
+	ObserveTask(queueName, taskType string, duration time.Duration, err error)
+}
+
 type WorkerOptions struct {
 	Concurrency     map[string]int
 	ShutdownTimeout time.Duration
 	Logger          *slog.Logger
+	Observer        TaskObserver
 }
 
 type Worker struct {
@@ -28,6 +34,7 @@ type Worker struct {
 	servers  map[string]*asynq.Server
 	handlers map[string]Handler
 	logger   *slog.Logger
+	observer TaskObserver
 	mu       sync.RWMutex
 }
 
@@ -47,7 +54,7 @@ func NewWorker(redisURL string, registry *Registry, options WorkerOptions) (*Wor
 			}
 		}
 	}
-	worker := &Worker{registry: registry, servers: make(map[string]*asynq.Server, len(defaults)), handlers: make(map[string]Handler), logger: options.Logger}
+	worker := &Worker{registry: registry, servers: make(map[string]*asynq.Server, len(defaults)), handlers: make(map[string]Handler), logger: options.Logger, observer: options.Observer}
 	for name, concurrency := range defaults {
 		worker.servers[name] = asynq.NewServer(opt, asynq.Config{Concurrency: concurrency, Queues: map[string]int{name: 1}, RetryDelayFunc: RetryDelay(registry), ShutdownTimeout: options.ShutdownTimeout, ErrorHandler: asynq.ErrorHandlerFunc(worker.logTaskError)})
 	}
@@ -89,8 +96,18 @@ func (w *Worker) Start(ctx context.Context) error {
 }
 
 func (w *Worker) process(ctx context.Context, queueName string, task *asynq.Task) (err error) {
-	spec, ok := w.registry.Lookup(task.Type())
-	if !ok || spec.Queue != queueName {
+	spec, registered := w.registry.Lookup(task.Type())
+	observedType := "unregistered"
+	if registered {
+		observedType = spec.Name
+	}
+	started := time.Now()
+	defer func() {
+		if w.observer != nil {
+			w.observer.ObserveTask(queueName, observedType, time.Since(started), err)
+		}
+	}()
+	if !registered || spec.Queue != queueName {
 		return fmt.Errorf("%w: %s", asynq.SkipRetry, task.Type())
 	}
 	w.mu.RLock()

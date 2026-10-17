@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -23,6 +24,7 @@ type Scheduler struct {
 	enqueuer  *Enqueuer
 	tasks     map[string]ScheduledTask
 	schedules map[string]cron.Schedule
+	lastRun   atomic.Int64
 }
 
 func NewScheduler(enqueuer *Enqueuer, tasks []ScheduledTask) (*Scheduler, error) {
@@ -47,6 +49,16 @@ func NewScheduler(enqueuer *Enqueuer, tasks []ScheduledTask) (*Scheduler, error)
 		scheduler.tasks[task.Name], scheduler.schedules[task.Name] = task, schedule
 	}
 	return scheduler, nil
+}
+
+// LastRun reports the last scheduled tick. It is a read-only metric source and
+// the zero value means the scheduler has not ticked yet.
+func (s *Scheduler) LastRun() time.Time {
+	unix := s.lastRun.Load()
+	if unix == 0 {
+		return time.Time{}
+	}
+	return time.Unix(unix, 0).UTC()
 }
 
 // EnqueueWindow is safe to call from every application instance: Redis TaskID
@@ -81,6 +93,7 @@ func (s *Scheduler) Run(ctx context.Context) {
 }
 
 func (s *Scheduler) runDue(ctx context.Context, now time.Time) {
+	s.lastRun.Store(now.UTC().Unix())
 	window := now.UTC().Truncate(time.Minute)
 	previous := window.Add(-time.Minute)
 	for name, schedule := range s.schedules {
