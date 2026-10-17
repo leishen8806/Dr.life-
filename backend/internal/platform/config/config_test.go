@@ -30,7 +30,7 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 || cfg.RateLimitAdmin != 60 || cfg.LedgerReconTimezone != "Asia/Phnom_Penh" {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
-	if cfg.DatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" {
+	if cfg.DatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" || cfg.QueueRedisURL != "" {
 		t.Fatalf("optional URLs should be empty: %+v", cfg)
 	}
 	if len(cfg.CORSBuyerOrigins) != 2 || cfg.CORSBuyerOrigins[1] != "http://localhost:5173" || len(cfg.CORSPublicOrigins) != 7 || cfg.WebhookPrefix != "" || cfg.TrustedProxyHeader != "" || len(cfg.TrustedProxyCIDRs) != 0 {
@@ -60,6 +60,8 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"DB_SLOW_QUERY_MS":               "250",
 		"SENTRY_DSN":                     "https://public@example.invalid/1",
 		"REDIS_URL":                      "redis://placeholder",
+		"QUEUE_REDIS_URL":                "redis://queue-placeholder",
+		"QUEUE_ALLOW_EVICTION":           "true",
 		"CORS_BUYER_ORIGINS":             "https://buyer.example",
 		"CORS_CREDENTIAL_PATHS":          "/v1/admin/auth/refresh",
 		"PUBLIC_WEBHOOK_PREFIX":          "/webhooks/telegram",
@@ -84,7 +86,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" {
+	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.QueueRedisURL != "redis://queue-placeholder" || !cfg.QueueAllowEviction || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	for _, raw := range []string{"0", "-1", "abc"} {
@@ -125,6 +127,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"bad admin cidr":      {"APP_ENV": "test", "ADMIN_ALLOWED_CIDRS": "bad"},
 		"bad credential path": {"APP_ENV": "test", "CORS_CREDENTIAL_PATHS": "relative"},
 		"bad body override":   {"APP_ENV": "test", "REQUEST_BODY_OVERRIDES": "/x=nope"},
+		"bad queue eviction":  {"APP_ENV": "test", "QUEUE_ALLOW_EVICTION": "maybe"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := load(lookup(env)); err == nil {
