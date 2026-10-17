@@ -24,7 +24,7 @@ var publicServiceMethods = []string{
 	"DeliveryHold", "DeliveryRefund", "DeliveryRelease", "DisputeHold", "EnsureWallet",
 	"FailWithdrawal", "FreezeHold", "GetByID", "GetByIdemKey", "GetHold", "GetReconciliationRun",
 	"GetReversalOf", "GetWithdrawal", "ListHoldsByAccount", "ListLargePending",
-	"ListOverdueWithdrawals", "ListPayoutFreezes", "MemberFee", "RefundHold",
+	"ListOverdueWithdrawals", "ListPayoutFreezes", "MemberFee", "OldestUnsentOutboxAge", "RefundHold",
 	"ReleasePayoutFreeze", "RequestWithdrawal", "ResolveDispute", "Reverse",
 	"RunDailyReconciliation", "SettleHold", "SnapshotDaily", "StartReview", "StorageFee",
 	"Sweep", "Topup", "VerifyHoldsMatchFrozen", "VerifyPendingPayoutMatchesWithdrawals",
