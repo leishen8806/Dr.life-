@@ -201,6 +201,9 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest, hooks trans
 		return PostResult{}, err
 	}
 	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, "SET LOCAL statement_timeout = '15s'"); err != nil {
+		return PostResult{}, err
+	}
 	if !hooks.skipInitialReplay {
 		if result, replayErr := loadExisting(ctx, tx, request); replayErr == nil {
 			if hooks.replayCheck != nil {
