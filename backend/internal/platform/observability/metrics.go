@@ -24,6 +24,9 @@ type Metrics struct {
 	bulkheadInFlight *prometheus.GaugeVec
 	bulkheadWait     *prometheus.HistogramVec
 	bulkheadRejected *prometheus.CounterVec
+	brownoutLevel    prometheus.Gauge
+	brownoutHeavy    prometheus.Gauge
+	brownoutChanges  *prometheus.CounterVec
 	business         *Business
 }
 
@@ -45,10 +48,14 @@ func NewMetrics() *Metrics {
 		bulkheadInFlight: prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "drlife_bulkhead_in_flight", Help: "Bulkhead requests currently admitted."}, []string{"class"}),
 		bulkheadWait:     prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "drlife_bulkhead_wait_seconds", Help: "Bulkhead permit wait time."}, []string{"class"}),
 		bulkheadRejected: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_bulkhead_rejections_total", Help: "Bulkhead rejections."}, []string{"class"}),
+		brownoutLevel:    prometheus.NewGauge(prometheus.GaugeOpts{Name: "drlife_brownout_level", Help: "Current brownout severity (0 is normal)."}),
+		brownoutHeavy:    prometheus.NewGauge(prometheus.GaugeOpts{Name: "drlife_brownout_heavy_limit", Help: "Current heavy concurrency limit after brownout."}),
+		brownoutChanges:  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_brownout_transitions_total", Help: "Brownout level transitions."}, []string{"from", "to"}),
 	}
 	m.business = newBusiness(registry)
 	registry.MustRegister(
 		m.requests, m.duration, m.errors, m.inFlight, m.rateLimitHits, m.authFailures, m.slowQueries, m.bulkheadInFlight, m.bulkheadWait, m.bulkheadRejected,
+		m.brownoutLevel, m.brownoutHeavy, m.brownoutChanges,
 		prometheus.NewGoCollector(), prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
 	)
 	return m
@@ -70,6 +77,24 @@ func (m *Metrics) BulkheadRelease(class string) {
 		m.bulkheadInFlight.WithLabelValues(class).Dec()
 	}
 }
+
+// BrownoutLevel records the current severity and the effective heavy limit.
+func (m *Metrics) BrownoutLevel(level, heavyLimit int) {
+	if m == nil {
+		return
+	}
+	m.brownoutLevel.Set(float64(level))
+	m.brownoutHeavy.Set(float64(heavyLimit))
+}
+
+// BrownoutTransition counts a severity change.
+func (m *Metrics) BrownoutTransition(from, to int) {
+	if m == nil {
+		return
+	}
+	m.brownoutChanges.WithLabelValues(strconv.Itoa(from), strconv.Itoa(to)).Inc()
+}
+
 func (m *Metrics) BulkheadSeries() int {
 	if m == nil {
 		return 0

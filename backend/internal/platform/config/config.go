@@ -14,53 +14,62 @@ import (
 )
 
 type Config struct {
-	HTTPAddr               string
-	MetricsAddr            string
-	AppEnv                 string
-	AppRelease             string
-	LogLevel               slog.Level
-	ShutdownTimeout        time.Duration
-	ReadHeaderTimeout      time.Duration
-	ReadTimeout            time.Duration
-	IdleTimeout            time.Duration
-	DatabaseURL            string
-	ReportDatabaseURL      string
-	DBMaxConns             int32
-	DBMinConns             int32
-	DBConnectTimeout       time.Duration
-	DBSlowQuery            time.Duration
-	SentryDSN              string
-	RedisURL               string
-	CORSBuyerOrigins       []string
-	CORSMerchantOrigins    []string
-	CORSDriverOrigins      []string
-	CORSWMSOrigins         []string
-	CORSAdminOrigins       []string
-	CORSPublicOrigins      []string
-	CORSCredentialPaths    []string
-	WebhookPrefix          string
-	WebhookMaxBodyBytes    int64
-	TrustedProxyHeader     string
-	TrustedProxyCIDRs      []string
-	AdminAllowedCIDRs      []string
-	RequestBodyMaxBytes    int64
-	RequestBodyOverrides   map[string]int64
-	ContentTypeExemptPaths []string
-	IdempotencyTTL         time.Duration
-	IdempotencyMaxBytes    int
-	FinancialPrefixes      []string
-	RateLimitIP            int
-	RateLimitAccount       int
-	RateLimitLogin         int
-	RateLimitWithdraw      int
-	RateLimitAI            int
-	RateLimitAdmin         int
-	LedgerReconTimezone    string
-	BulkheadTotal          int
-	BulkheadWait           time.Duration
-	BulkheadDrain          time.Duration
-	BulkheadLimits         map[string]int
-	BulkheadRules          map[string]string
+	HTTPAddr                       string
+	MetricsAddr                    string
+	AppEnv                         string
+	AppRelease                     string
+	LogLevel                       slog.Level
+	ShutdownTimeout                time.Duration
+	ReadHeaderTimeout              time.Duration
+	ReadTimeout                    time.Duration
+	IdleTimeout                    time.Duration
+	DatabaseURL                    string
+	ReportDatabaseURL              string
+	DBMaxConns                     int32
+	DBMinConns                     int32
+	DBConnectTimeout               time.Duration
+	DBSlowQuery                    time.Duration
+	SentryDSN                      string
+	RedisURL                       string
+	CORSBuyerOrigins               []string
+	CORSMerchantOrigins            []string
+	CORSDriverOrigins              []string
+	CORSWMSOrigins                 []string
+	CORSAdminOrigins               []string
+	CORSPublicOrigins              []string
+	CORSCredentialPaths            []string
+	WebhookPrefix                  string
+	WebhookMaxBodyBytes            int64
+	TrustedProxyHeader             string
+	TrustedProxyCIDRs              []string
+	AdminAllowedCIDRs              []string
+	RequestBodyMaxBytes            int64
+	RequestBodyOverrides           map[string]int64
+	ContentTypeExemptPaths         []string
+	IdempotencyTTL                 time.Duration
+	IdempotencyMaxBytes            int
+	FinancialPrefixes              []string
+	RateLimitIP                    int
+	RateLimitAccount               int
+	RateLimitLogin                 int
+	RateLimitWithdraw              int
+	RateLimitAI                    int
+	RateLimitAdmin                 int
+	LedgerReconTimezone            string
+	BulkheadTotal                  int
+	BulkheadWait                   time.Duration
+	BulkheadDrain                  time.Duration
+	BulkheadLimits                 map[string]int
+	BulkheadRules                  map[string]string
+	BrownoutEscalateAfter          time.Duration
+	BrownoutRecoverAfter           time.Duration
+	BrownoutP95Threshold           time.Duration
+	BrownoutP95Recovery            time.Duration
+	BrownoutDBWaitThreshold        time.Duration
+	BrownoutDBWaitRecovery         time.Duration
+	BrownoutInFlightRatioThreshold float64
+	BrownoutInFlightRatioRecovery  float64
+	BrownoutSampleInterval         time.Duration
 }
 
 func Load() (Config, error) {
@@ -273,6 +282,51 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
+	brownoutEscalateSeconds, err := durationSeconds(getenv, "BROWNOUT_ESCALATE_AFTER_SECONDS", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	brownoutRecoverSeconds, err := durationSeconds(getenv, "BROWNOUT_RECOVER_AFTER_SECONDS", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	brownoutP95ThresholdMS, err := positiveInt(getenv, "BROWNOUT_P95_THRESHOLD_MS", 2000)
+	if err != nil {
+		return Config{}, err
+	}
+	brownoutP95RecoveryMS, err := positiveInt(getenv, "BROWNOUT_P95_RECOVERY_MS", 1000)
+	if err != nil {
+		return Config{}, err
+	}
+	if brownoutP95RecoveryMS >= brownoutP95ThresholdMS {
+		return Config{}, fmt.Errorf("BROWNOUT_P95_RECOVERY_MS must be below BROWNOUT_P95_THRESHOLD_MS")
+	}
+	brownoutDBWaitMS, err := positiveInt(getenv, "BROWNOUT_DB_WAIT_THRESHOLD_MS", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	brownoutDBWaitRecoveryMS, err := positiveInt(getenv, "BROWNOUT_DB_WAIT_RECOVERY_MS", 50)
+	if err != nil {
+		return Config{}, err
+	}
+	if brownoutDBWaitRecoveryMS >= brownoutDBWaitMS {
+		return Config{}, fmt.Errorf("BROWNOUT_DB_WAIT_RECOVERY_MS must be below BROWNOUT_DB_WAIT_THRESHOLD_MS")
+	}
+	brownoutInFlightPercent, err := positiveInt(getenv, "BROWNOUT_INFLIGHT_RATIO_PERCENT", 80)
+	if err != nil || brownoutInFlightPercent > 100 {
+		return Config{}, fmt.Errorf("BROWNOUT_INFLIGHT_RATIO_PERCENT must be between 1 and 100")
+	}
+	brownoutInFlightRecoveryPercent, err := positiveInt(getenv, "BROWNOUT_INFLIGHT_RECOVERY_PERCENT", 60)
+	if err != nil || brownoutInFlightRecoveryPercent > 100 {
+		return Config{}, fmt.Errorf("BROWNOUT_INFLIGHT_RECOVERY_PERCENT must be between 1 and 100")
+	}
+	if brownoutInFlightRecoveryPercent >= brownoutInFlightPercent {
+		return Config{}, fmt.Errorf("BROWNOUT_INFLIGHT_RECOVERY_PERCENT must be below BROWNOUT_INFLIGHT_RATIO_PERCENT")
+	}
+	brownoutSampleIntervalMS, err := positiveInt(getenv, "BROWNOUT_SAMPLE_INTERVAL_MS", 1000)
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		HTTPAddr:               httpAddr,
@@ -318,6 +372,11 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		RateLimitAdmin:         limits[5],
 		LedgerReconTimezone:    reconTimezone,
 		BulkheadTotal:          bulkheadTotal, BulkheadWait: time.Duration(bulkheadWaitMS) * time.Millisecond, BulkheadDrain: time.Duration(bulkheadDrainSeconds) * time.Second, BulkheadLimits: bulkheadLimits, BulkheadRules: bulkheadRules,
+		BrownoutEscalateAfter: time.Duration(brownoutEscalateSeconds) * time.Second, BrownoutRecoverAfter: time.Duration(brownoutRecoverSeconds) * time.Second,
+		BrownoutP95Threshold: time.Duration(brownoutP95ThresholdMS) * time.Millisecond, BrownoutP95Recovery: time.Duration(brownoutP95RecoveryMS) * time.Millisecond,
+		BrownoutDBWaitThreshold: time.Duration(brownoutDBWaitMS) * time.Millisecond, BrownoutDBWaitRecovery: time.Duration(brownoutDBWaitRecoveryMS) * time.Millisecond,
+		BrownoutInFlightRatioThreshold: float64(brownoutInFlightPercent) / 100, BrownoutInFlightRatioRecovery: float64(brownoutInFlightRecoveryPercent) / 100,
+		BrownoutSampleInterval: time.Duration(brownoutSampleIntervalMS) * time.Millisecond,
 	}, nil
 }
 

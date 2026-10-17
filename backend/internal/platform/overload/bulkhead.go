@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -77,8 +78,13 @@ func DefaultConfig() Config {
 type Bulkhead struct {
 	total, nonCritical chan struct{}
 	classes            map[Class]chan struct{}
+	heavyMu            sync.Mutex
+	heavyInFlight      int
+	heavyMax           int
+	heavyLimit         atomic.Int64
 	config             Config
 	draining           atomic.Bool
+	brownout           atomic.Pointer[Brownout]
 }
 
 func New(config Config) *Bulkhead {
@@ -106,16 +112,63 @@ func New(config Config) *Bulkhead {
 	}
 	b := &Bulkhead{total: make(chan struct{}, config.Total), nonCritical: make(chan struct{}, config.Total*3/4), classes: make(map[Class]chan struct{}), config: config}
 	for _, c := range allClasses {
+		if c == Heavy {
+			continue
+		}
 		n := config.Limits.forClass(c)
 		if n < 1 {
 			n = 1
 		}
 		b.classes[c] = make(chan struct{}, n)
 	}
+	heavy := config.Limits.Heavy
+	if heavy < 1 {
+		heavy = 1
+	}
+	b.heavyMax = heavy
+	b.heavyLimit.Store(int64(heavy))
 	return b
 }
 func (b *Bulkhead) BeginDraining() { b.draining.Store(true) }
 func (b *Bulkhead) Draining() bool { return b.draining.Load() }
+
+// SetBrownout lets the bulkhead lower the heavy limit and expose the current level to handlers.
+func (b *Bulkhead) SetBrownout(brownout *Brownout) { b.brownout.Store(brownout) }
+
+// Limit reports the configured concurrency limit for a class.
+func (b *Bulkhead) Limit(class Class) int {
+	if class == Heavy {
+		return int(b.heavyLimit.Load())
+	}
+	semaphore, ok := b.classes[class]
+	if !ok {
+		return 0
+	}
+	return cap(semaphore)
+}
+
+// SetHeavyLimit adjusts the heavy limit; critical classes are never affected.
+func (b *Bulkhead) SetHeavyLimit(limit int) {
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > b.heavyMax {
+		limit = b.heavyMax
+	}
+	b.heavyLimit.Store(int64(limit))
+}
+
+// InFlight reports the number of admitted requests.
+func (b *Bulkhead) InFlight() int { return len(b.total) }
+
+// InFlightRatio reports admitted requests as a fraction of the global limit.
+func (b *Bulkhead) InFlightRatio() float64 {
+	if cap(b.total) == 0 {
+		return 0
+	}
+	return float64(len(b.total)) / float64(cap(b.total))
+}
+
 func (b *Bulkhead) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		class := b.Classify(r.URL.Path)
@@ -123,8 +176,13 @@ func (b *Bulkhead) Middleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		started := time.Now()
+		brownout := b.brownout.Load()
+		if brownout != nil {
+			defer func() { brownout.Record(time.Since(started)) }()
+		}
 		if b.Draining() {
-			b.observe(class, time.Now(), false)
+			b.observe(class, started, false)
 			reject(w, r)
 			return
 		}
@@ -135,6 +193,9 @@ func (b *Bulkhead) Middleware(next http.Handler) http.Handler {
 		defer b.release(class)
 		ctx, cancel := context.WithTimeout(r.Context(), b.config.Timeouts.forClass(class))
 		defer cancel()
+		if brownout != nil {
+			ctx = WithLevel(ctx, brownout.Level())
+		}
 		captured := &captureWriter{ResponseWriter: w}
 		next.ServeHTTP(captured, r.WithContext(ctx))
 		if ctx.Err() != nil && !captured.wrote {
@@ -194,7 +255,18 @@ func (b *Bulkhead) acquire(ctx context.Context, class Class) bool {
 	started := time.Now()
 	timer := time.NewTimer(b.config.Wait)
 	defer timer.Stop()
-	needed := []chan struct{}{b.classes[class], b.total}
+	needed := make([]chan struct{}, 0, 3)
+	heavyHeld := false
+	if class == Heavy {
+		if !b.acquireHeavy(ctx, timer) {
+			b.observe(class, started, false)
+			return false
+		}
+		heavyHeld = true
+	} else {
+		needed = append(needed, b.classes[class])
+	}
+	needed = append(needed, b.total)
 	if class != Critical {
 		needed = append(needed, b.nonCritical)
 	}
@@ -205,10 +277,16 @@ func (b *Bulkhead) acquire(ctx context.Context, class Class) bool {
 			held = append(held, semaphore)
 		case <-ctx.Done():
 			b.releaseN(held)
+			if heavyHeld {
+				b.releaseHeavy()
+			}
 			b.observe(class, started, false)
 			return false
 		case <-timer.C:
 			b.releaseN(held)
+			if heavyHeld {
+				b.releaseHeavy()
+			}
 			b.observe(class, started, false)
 			return false
 		}
@@ -216,12 +294,48 @@ func (b *Bulkhead) acquire(ctx context.Context, class Class) bool {
 	b.observe(class, started, true)
 	return true
 }
+
+func (b *Bulkhead) acquireHeavy(ctx context.Context, timer *time.Timer) bool {
+	for {
+		b.heavyMu.Lock()
+		if b.heavyInFlight < int(b.heavyLimit.Load()) {
+			b.heavyInFlight++
+			b.heavyMu.Unlock()
+			return true
+		}
+		b.heavyMu.Unlock()
+		select {
+		case <-ctx.Done():
+			return false
+		case <-timer.C:
+			return false
+		case <-time.After(time.Millisecond):
+		}
+	}
+}
+
+func (b *Bulkhead) releaseHeavy() {
+	b.heavyMu.Lock()
+	if b.heavyInFlight > 0 {
+		b.heavyInFlight--
+	}
+	b.heavyMu.Unlock()
+}
+
 func (b *Bulkhead) release(class Class) {
-	semaphores := []chan struct{}{b.classes[class], b.total}
-	if class != Critical {
+	semaphores := []chan struct{}{b.total}
+	if class == Heavy {
+		semaphores = append(semaphores, b.nonCritical)
+	} else {
+		semaphores = append(semaphores, b.classes[class])
+	}
+	if class != Critical && class != Heavy {
 		semaphores = append(semaphores, b.nonCritical)
 	}
 	b.releaseN(semaphores)
+	if class == Heavy {
+		b.releaseHeavy()
+	}
 	if b.config.Metrics != nil {
 		b.config.Metrics.BulkheadRelease(string(class))
 	}

@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/overload"
@@ -43,6 +45,43 @@ func main() {
 		os.Exit(1)
 	}
 	defer database.Close()
+
+	var waitMu sync.Mutex
+	var lastAcquireCount int64
+	var lastAcquireDuration time.Duration
+	dbWait := func() time.Duration {
+		stat := database.Stat()
+		waitMu.Lock()
+		defer waitMu.Unlock()
+		countDelta := stat.AcquireCount() - lastAcquireCount
+		durationDelta := stat.AcquireDuration() - lastAcquireDuration
+		lastAcquireCount, lastAcquireDuration = stat.AcquireCount(), stat.AcquireDuration()
+		if countDelta <= 0 {
+			return 0
+		}
+		return durationDelta / time.Duration(countDelta)
+	}
+	brownout := overload.NewBrownout(overload.BrownoutConfig{
+		BaseHeavy:              cfg.BulkheadLimits["heavy"],
+		EscalateAfter:          cfg.BrownoutEscalateAfter,
+		RecoverAfter:           cfg.BrownoutRecoverAfter,
+		P95Threshold:           cfg.BrownoutP95Threshold,
+		P95Recovery:            cfg.BrownoutP95Recovery,
+		DBWaitThreshold:        cfg.BrownoutDBWaitThreshold,
+		DBWaitRecovery:         cfg.BrownoutDBWaitRecovery,
+		InFlightRatioThreshold: cfg.BrownoutInFlightRatioThreshold,
+		InFlightRatioRecovery:  cfg.BrownoutInFlightRatioRecovery,
+	}, func() overload.Signals {
+		return overload.Signals{DBWait: dbWait(), InFlightRatio: bulkhead.InFlightRatio()}
+	}, overload.BrownoutOptions{
+		Logger:  logger,
+		Metrics: metrics,
+		OnChange: func(_ overload.BrownoutLevel, limit int) {
+			bulkhead.SetHeavyLimit(limit)
+		},
+	})
+	bulkhead.SetBrownout(brownout)
+	go brownout.Run(ctx, cfg.BrownoutSampleInterval)
 
 	clientIP, err := gateway.NewClientIPResolver(cfg.TrustedProxyHeader, cfg.TrustedProxyCIDRs)
 	if err != nil {
@@ -89,7 +128,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	handler := server.NewHandlerWithGateway(logger, server.GatewayOptions{
+	handler := httpx.ETag(server.NewHandlerWithGateway(logger, server.GatewayOptions{
 		AppEnv: cfg.AppEnv,
 		OriginGroups: gateway.OriginGroups{
 			Buyer: cfg.CORSBuyerOrigins, Merchant: cfg.CORSMerchantOrigins, Driver: cfg.CORSDriverOrigins,
@@ -111,7 +150,7 @@ func main() {
 		Metrics:       metrics,
 		ErrorReporter: reporter,
 		Bulkhead:      bulkhead,
-	}, database.Ping)
+	}, database.Ping))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)
 	// WriteTimeout stays unset so future real-time streams can remain open.
 	if cfg.MetricsAddr != "" {
