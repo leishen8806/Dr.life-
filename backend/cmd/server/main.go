@@ -14,6 +14,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/overload"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 )
 
@@ -28,6 +29,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	metrics := observability.NewMetrics()
+	bulkhead := overload.New(overload.Config{Total: cfg.BulkheadTotal, Wait: cfg.BulkheadWait, Limits: overload.Limits{Critical: cfg.BulkheadLimits["critical"], Auth: cfg.BulkheadLimits["auth"], Write: cfg.BulkheadLimits["write"], Read: cfg.BulkheadLimits["read"], Heavy: cfg.BulkheadLimits["heavy"]}, Timeouts: overload.DefaultConfig().Timeouts, Rules: routeClasses(cfg.BulkheadRules), Metrics: metrics})
 	reporter, err := observability.NewErrorReporter(cfg.SentryDSN, cfg.AppEnv, cfg.AppRelease, nil)
 	if err != nil {
 		logger.Error("Sentry configuration failed", "error", err)
@@ -108,6 +110,7 @@ func main() {
 		},
 		Metrics:       metrics,
 		ErrorReporter: reporter,
+		Bulkhead:      bulkhead,
 	}, database.Ping)
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)
 	// WriteTimeout stays unset so future real-time streams can remain open.
@@ -131,8 +134,19 @@ func main() {
 		}()
 	}
 	logger.Info("http server starting", "addr", cfg.HTTPAddr, "environment", cfg.AppEnv)
-	if err := server.Serve(ctx, httpServer, listener, cfg.ShutdownTimeout); err != nil {
+	if err := server.Serve(ctx, httpServer, listener, cfg.ShutdownTimeout, struct {
+		server.Drainer
+		Delay time.Duration
+	}{Drainer: bulkhead, Delay: cfg.BulkheadDrain}); err != nil {
 		logger.Error("http server stopped with error", "error", err)
 		os.Exit(1)
 	}
+}
+
+func routeClasses(values map[string]string) map[string]overload.Class {
+	result := make(map[string]overload.Class, len(values))
+	for path, class := range values {
+		result[path] = overload.Class(class)
+	}
+	return result
 }

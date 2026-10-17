@@ -13,15 +13,18 @@ import (
 )
 
 type Metrics struct {
-	registry      *prometheus.Registry
-	requests      *prometheus.CounterVec
-	duration      *prometheus.HistogramVec
-	errors        *prometheus.CounterVec
-	inFlight      *prometheus.GaugeVec
-	rateLimitHits *prometheus.CounterVec
-	authFailures  *prometheus.CounterVec
-	slowQueries   *prometheus.CounterVec
-	business      *Business
+	registry         *prometheus.Registry
+	requests         *prometheus.CounterVec
+	duration         *prometheus.HistogramVec
+	errors           *prometheus.CounterVec
+	inFlight         *prometheus.GaugeVec
+	rateLimitHits    *prometheus.CounterVec
+	authFailures     *prometheus.CounterVec
+	slowQueries      *prometheus.CounterVec
+	bulkheadInFlight *prometheus.GaugeVec
+	bulkheadWait     *prometheus.HistogramVec
+	bulkheadRejected *prometheus.CounterVec
+	business         *Business
 }
 
 func NewMetrics() *Metrics {
@@ -34,18 +37,50 @@ func NewMetrics() *Metrics {
 			Name: "drlife_http_request_duration_seconds", Help: "HTTP request latency.",
 			Buckets: []float64{.005, .01, .025, .05, .1, .2, .3, .5, .75, 1, 2, 5, 10},
 		}, labels),
-		errors:        prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_http_errors_total", Help: "HTTP error responses."}, labels),
-		inFlight:      prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "drlife_http_requests_in_flight", Help: "HTTP requests currently running."}, []string{"role"}),
-		rateLimitHits: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_gateway_rate_limit_hits_total", Help: "Rate-limit rejections."}, []string{"rule"}),
-		authFailures:  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_gateway_auth_failures_total", Help: "Authentication and authorization failures."}, []string{"status"}),
-		slowQueries:   prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_db_slow_queries_total", Help: "Queries above the configured latency threshold."}, []string{"fingerprint"}),
+		errors:           prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_http_errors_total", Help: "HTTP error responses."}, labels),
+		inFlight:         prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "drlife_http_requests_in_flight", Help: "HTTP requests currently running."}, []string{"role"}),
+		rateLimitHits:    prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_gateway_rate_limit_hits_total", Help: "Rate-limit rejections."}, []string{"rule"}),
+		authFailures:     prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_gateway_auth_failures_total", Help: "Authentication and authorization failures."}, []string{"status"}),
+		slowQueries:      prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_db_slow_queries_total", Help: "Queries above the configured latency threshold."}, []string{"fingerprint"}),
+		bulkheadInFlight: prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "drlife_bulkhead_in_flight", Help: "Bulkhead requests currently admitted."}, []string{"class"}),
+		bulkheadWait:     prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "drlife_bulkhead_wait_seconds", Help: "Bulkhead permit wait time."}, []string{"class"}),
+		bulkheadRejected: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_bulkhead_rejections_total", Help: "Bulkhead rejections."}, []string{"class"}),
 	}
 	m.business = newBusiness(registry)
 	registry.MustRegister(
-		m.requests, m.duration, m.errors, m.inFlight, m.rateLimitHits, m.authFailures, m.slowQueries,
+		m.requests, m.duration, m.errors, m.inFlight, m.rateLimitHits, m.authFailures, m.slowQueries, m.bulkheadInFlight, m.bulkheadWait, m.bulkheadRejected,
 		prometheus.NewGoCollector(), prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
 	)
 	return m
+}
+
+func (m *Metrics) Bulkhead(class string, wait time.Duration, admitted bool) {
+	if m == nil {
+		return
+	}
+	m.bulkheadWait.WithLabelValues(class).Observe(wait.Seconds())
+	if admitted {
+		m.bulkheadInFlight.WithLabelValues(class).Inc()
+	} else {
+		m.bulkheadRejected.WithLabelValues(class).Inc()
+	}
+}
+func (m *Metrics) BulkheadRelease(class string) {
+	if m != nil {
+		m.bulkheadInFlight.WithLabelValues(class).Dec()
+	}
+}
+func (m *Metrics) BulkheadSeries() int {
+	if m == nil {
+		return 0
+	}
+	families, _ := m.registry.Gather()
+	for _, family := range families {
+		if family.GetName() == "drlife_bulkhead_rejections_total" {
+			return len(family.Metric)
+		}
+	}
+	return 0
 }
 
 func (m *Metrics) Handler() http.Handler {

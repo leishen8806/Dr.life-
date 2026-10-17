@@ -56,6 +56,11 @@ type Config struct {
 	RateLimitAI            int
 	RateLimitAdmin         int
 	LedgerReconTimezone    string
+	BulkheadTotal          int
+	BulkheadWait           time.Duration
+	BulkheadDrain          time.Duration
+	BulkheadLimits         map[string]int
+	BulkheadRules          map[string]string
 }
 
 func Load() (Config, error) {
@@ -238,6 +243,36 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if _, err := time.LoadLocation(reconTimezone); err != nil {
 		return Config{}, fmt.Errorf("LEDGER_RECON_TIMEZONE must be a valid IANA time zone")
 	}
+	bulkheadTotal, err := positiveInt(getenv, "BULKHEAD_TOTAL", 512)
+	if err != nil {
+		return Config{}, err
+	}
+	if bulkheadTotal < 4 {
+		return Config{}, fmt.Errorf("BULKHEAD_TOTAL must be at least 4 to reserve critical capacity")
+	}
+	bulkheadWaitMS, err := positiveInt(getenv, "BULKHEAD_WAIT_MS", 100)
+	if err != nil || bulkheadWaitMS > 100 {
+		return Config{}, fmt.Errorf("BULKHEAD_WAIT_MS must be between 1 and 100")
+	}
+	bulkheadDrainSeconds, err := durationSeconds(getenv, "BULKHEAD_DRAIN_SECONDS", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	bulkheadLimits := map[string]int{"critical": bulkheadTotal, "auth": 64, "write": 128, "read": 256, "heavy": 32}
+	for class, fallback := range bulkheadLimits {
+		value, parseErr := positiveInt(getenv, "BULKHEAD_"+strings.ToUpper(class)+"_LIMIT", fallback)
+		if parseErr != nil {
+			return Config{}, parseErr
+		}
+		bulkheadLimits[class] = value
+	}
+	if bulkheadLimits["critical"] < bulkheadTotal {
+		return Config{}, fmt.Errorf("BULKHEAD_CRITICAL_LIMIT must not be below BULKHEAD_TOTAL")
+	}
+	bulkheadRules, err := routeClasses(getenv("BULKHEAD_ROUTE_CLASSES"))
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		HTTPAddr:               httpAddr,
@@ -282,7 +317,28 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		RateLimitAI:            limits[4],
 		RateLimitAdmin:         limits[5],
 		LedgerReconTimezone:    reconTimezone,
+		BulkheadTotal:          bulkheadTotal, BulkheadWait: time.Duration(bulkheadWaitMS) * time.Millisecond, BulkheadDrain: time.Duration(bulkheadDrainSeconds) * time.Second, BulkheadLimits: bulkheadLimits, BulkheadRules: bulkheadRules,
 	}, nil
+}
+
+func routeClasses(raw string) (map[string]string, error) {
+	result := map[string]string{}
+	if strings.TrimSpace(raw) == "" {
+		return result, nil
+	}
+	for _, entry := range strings.Split(raw, ",") {
+		parts := strings.SplitN(strings.TrimSpace(entry), "=", 2)
+		if len(parts) != 2 || !strings.HasPrefix(parts[0], "/") {
+			return nil, fmt.Errorf("BULKHEAD_ROUTE_CLASSES must use /prefix=class entries")
+		}
+		switch parts[1] {
+		case "critical", "auth", "write", "read", "heavy", "health":
+		default:
+			return nil, fmt.Errorf("BULKHEAD_ROUTE_CLASSES contains invalid class")
+		}
+		result[parts[0]] = parts[1]
+	}
+	return result, nil
 }
 
 func parsePublicWebhookPrefix(raw string) (string, error) {

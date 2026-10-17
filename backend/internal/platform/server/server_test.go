@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/overload"
 )
 
 func TestHealthAndReadiness(t *testing.T) {
@@ -137,5 +138,91 @@ func TestServeWaitsForInflightRequestDuringShutdown(t *testing.T) {
 	}
 	if err := <-serveDone; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestServeDrainsBeforeShutdown(t *testing.T) {
+	bulkhead := overload.New(overload.Config{Total: 2, Wait: time.Millisecond, Limits: overload.Limits{Critical: 2, Auth: 2, Write: 2, Read: 2, Heavy: 2}, Timeouts: overload.DefaultConfig().Timeouts})
+	started, release := make(chan struct{}), make(chan struct{})
+	router := http.NewServeMux()
+	router.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
+		if bulkhead.Draining() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	router.HandleFunc("/v1/public/ping", func(w http.ResponseWriter, _ *http.Request) { close(started); <-release; w.WriteHeader(http.StatusOK) })
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- Serve(ctx, &http.Server{Handler: bulkhead.Middleware(router)}, listener, time.Second, struct {
+			Drainer
+			Delay time.Duration
+		}{Drainer: bulkhead, Delay: 50 * time.Millisecond})
+	}()
+	clientDone := make(chan error, 1)
+	go func() {
+		response, err := http.Get("http://" + listener.Addr().String() + "/v1/public/ping")
+		if err == nil {
+			response.Body.Close()
+		}
+		clientDone <- err
+	}()
+	<-started
+	cancel()
+	ready := eventually(t, func() int {
+		response, err := http.Get("http://" + listener.Addr().String() + "/readyz")
+		if err != nil {
+			return 0
+		}
+		defer response.Body.Close()
+		return response.StatusCode
+	})
+	if ready != http.StatusServiceUnavailable {
+		t.Fatalf("ready status=%d", ready)
+	}
+	response, err := http.Get("http://" + listener.Addr().String() + "/v1/public/ping")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("new request status=%d", response.StatusCode)
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("shutdown completed before inflight request: %v", err)
+	case <-time.After(10 * time.Millisecond):
+	}
+	close(release)
+	if err := <-clientDone; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func eventually(t *testing.T, read func() int) int {
+	t.Helper()
+	deadline := time.NewTimer(time.Second)
+	defer deadline.Stop()
+	tick := time.NewTicker(time.Millisecond)
+	defer tick.Stop()
+	for {
+		if value := read(); value != 0 {
+			return value
+		}
+		select {
+		case <-deadline.C:
+			t.Fatal("condition did not become true")
+		case <-tick.C:
+		}
 	}
 }
