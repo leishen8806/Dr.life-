@@ -8,9 +8,14 @@ Shared HTTP helpers.
 - `CacheControl(true, maxAge, swr)` is opt-in and emits
   `public, max-age=<seconds>, stale-while-revalidate=<seconds>`; `CacheControl(false, ...)` keeps
   `no-store`. Install it inside `gateway.SecurityHeaders` so the explicit value wins.
-- `ETag` only runs for `GET /v1/public/*`. It hashes the buffered body, emits a quoted SHA-256
-  validator, and returns `304 Not Modified` with no body when `If-None-Match` matches. All other
-  routes pass through untouched and keep `no-store`. `cmd/server/main.go` wraps the router with it,
-  so new public GET routes get validators without extra wiring; `CacheControl` stays opt-in per route.
+- `ETag` only runs for `GET /v1/public/*`, and only when the route explicitly declares a public
+  cache policy (normally by installing `CacheControl`). Public paths that never declare it keep
+  `no-store` and receive no `ETag`. It hashes the buffered body with the per-request
+  `request_id` removed, emits a quoted SHA-256 validator, and returns `304 Not Modified` with no
+  body when `If-None-Match` matches. All other routes pass through untouched.
+- Install order matters: `httpx.ETag(...)` wraps the router in `cmd/server/main.go`, while
+  `CacheControl` stays inside `gateway.SecurityHeaders` on the route.
+- Known limit: `304` is decided outside the metrics middleware, so
+  `drlife_http_requests_total` still records the handler's `200` for those requests.
 
 Do not declare a public route cacheable unless its response is safe to share between users.

@@ -3,6 +3,7 @@ package httpx_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,15 +12,19 @@ import (
 )
 
 func TestPublicCacheAndETagOnDeclaredRoute(t *testing.T) {
-	handler := gateway.SecurityHeaders("test")(httpx.CacheControl(true, time.Minute, 5*time.Minute)(httpx.ETag(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"ok":true}`))
-	}))))
+	handler := httpx.ETag(httpx.RequestID(gateway.SecurityHeaders("test")(httpx.CacheControl(true, time.Minute, 5*time.Minute)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		httpx.WriteOK(w, r, map[string]bool{"pong": true})
+	})))))
 
 	first := httptest.NewRecorder()
-	handler.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/v1/public/products", nil))
+	firstRequest := httptest.NewRequest(http.MethodGet, "/v1/public/products", nil)
+	firstRequest.Header.Set("X-Request-ID", "first-request")
+	handler.ServeHTTP(first, firstRequest)
 	if first.Code != http.StatusOK {
 		t.Fatalf("first status = %d", first.Code)
+	}
+	if !strings.Contains(first.Body.String(), `"request_id":"first-request"`) {
+		t.Fatalf("first body is missing the response envelope: %s", first.Body.String())
 	}
 	if got := first.Header().Get("Cache-Control"); got != "public, max-age=60, stale-while-revalidate=300" {
 		t.Fatalf("cache-control = %q", got)
@@ -31,6 +36,7 @@ func TestPublicCacheAndETagOnDeclaredRoute(t *testing.T) {
 
 	second := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/v1/public/products", nil)
+	request.Header.Set("X-Request-ID", "second-request")
 	request.Header.Set("If-None-Match", etag)
 	handler.ServeHTTP(second, request)
 	if second.Code != http.StatusNotModified {
@@ -47,12 +53,15 @@ func TestPublicCacheAndETagOnDeclaredRoute(t *testing.T) {
 	}
 }
 
-func TestUndeclaredRouteKeepsNoStore(t *testing.T) {
-	handler := gateway.SecurityHeaders("test")(httpx.ETag(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("private"))
-	})))
+func TestUndeclaredPublicRouteKeepsNoStore(t *testing.T) {
+	handler := httpx.ETag(httpx.RequestID(gateway.SecurityHeaders("test")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		httpx.WriteOK(w, r, map[string]bool{"pong": true})
+	}))))
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/buyer/orders", nil))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/public/ping", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"pong":true`) {
+		t.Fatalf("undeclared public route status = %d body = %q", response.Code, response.Body.String())
+	}
 	if got := response.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("undeclared route cache-control = %q", got)
 	}

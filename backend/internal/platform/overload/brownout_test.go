@@ -15,7 +15,7 @@ func (c *fakeClock) Advance(d time.Duration) { c.now = c.now.Add(d) }
 
 func TestBrownoutHalvesHeavyAndNeverTouchesCritical(t *testing.T) {
 	clock := &fakeClock{now: time.Unix(1_700_000_000, 0)}
-	signals := Signals{}
+	signals := Signals{P95Set: true}
 	bulkhead := New(Config{Total: 64, Wait: time.Millisecond, Limits: Limits{Critical: 16, Auth: 4, Write: 4, Read: 4, Heavy: 8}, Timeouts: allTimeouts(time.Second)})
 	brownout := NewBrownout(BrownoutConfig{
 		BaseHeavy: 8, EscalateAfter: 5 * time.Second, RecoverAfter: 60 * time.Second,
@@ -72,7 +72,7 @@ func TestBrownoutHalvesHeavyAndNeverTouchesCritical(t *testing.T) {
 
 func TestBrownoutRequiresSustainedSignalsAndRecovery(t *testing.T) {
 	clock := &fakeClock{now: time.Unix(1_700_000_000, 0)}
-	signals := Signals{}
+	signals := Signals{P95Set: true}
 	brownout := NewBrownout(BrownoutConfig{
 		BaseHeavy: 8, EscalateAfter: 5 * time.Second, RecoverAfter: 60 * time.Second,
 		P95Threshold: 2 * time.Second, P95Recovery: time.Second,
@@ -163,5 +163,24 @@ func TestRecorderUsesRollingWindow(t *testing.T) {
 	clock.Advance(31 * time.Second)
 	if got := recorder.P95(); got != 0 {
 		t.Fatalf("p95 after window = %s, want 0", got)
+	}
+}
+
+func TestInjectedZeroP95IsNotOverridden(t *testing.T) {
+	clock := &fakeClock{now: time.Unix(1_700_000_000, 0)}
+	brownout := NewBrownout(BrownoutConfig{
+		BaseHeavy: 8, EscalateAfter: 5 * time.Second, RecoverAfter: 60 * time.Second,
+		P95Threshold: 2 * time.Second, P95Recovery: time.Second,
+		DBWaitThreshold: 100 * time.Millisecond, DBWaitRecovery: 50 * time.Millisecond,
+		InFlightRatioThreshold: .8, InFlightRatioRecovery: .6,
+	}, SignalFunc(func() Signals { return Signals{P95Set: true} }), BrownoutOptions{Now: clock.Now})
+
+	brownout.Record(10 * time.Second)
+	for i := 0; i < 10; i++ {
+		brownout.Evaluate()
+		clock.Advance(5 * time.Second)
+	}
+	if got := brownout.Level(); got != 0 {
+		t.Fatalf("injected zero P95 was overridden, level = %d", got)
 	}
 }

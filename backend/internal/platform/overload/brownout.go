@@ -29,6 +29,7 @@ const (
 // Signals are the health inputs sampled by the brownout controller.
 type Signals struct {
 	P95           time.Duration
+	P95Set        bool
 	DBWait        time.Duration
 	InFlightRatio float64
 }
@@ -170,7 +171,7 @@ func (b *Brownout) Run(ctx context.Context, interval time.Duration) {
 func (b *Brownout) Evaluate() {
 	now := b.now()
 	signals := b.source()
-	if signals.P95 == 0 {
+	if !signals.P95Set {
 		signals.P95 = b.recorder.P95()
 	}
 	b.mu.Lock()

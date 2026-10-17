@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,7 +13,8 @@ import (
 
 // CacheControl sets the response cache policy. Public responses are the only
 // ones allowed to be cached; everything else keeps the gateway's no-store
-// default. Install it inside gateway.SecurityHeaders so this value wins.
+// default. Install it inside gateway.SecurityHeaders and httpx.ETag so this
+// value wins and the validator sees the declaration.
 func CacheControl(public bool, maxAge, staleWhileRevalidate time.Duration) func(http.Handler) http.Handler {
 	publicValue := ""
 	if public {
@@ -39,8 +41,11 @@ func seconds(duration time.Duration) string {
 }
 
 // ETag adds a content-derived validator to explicitly declared public GET
-// routes and answers a matching If-None-Match with 304. Other routes are
-// forwarded untouched so the gateway's no-store policy remains in force.
+// routes and answers a matching If-None-Match with 304. A route is declared by
+// setting a public Cache-Control value (normally via CacheControl); public
+// paths without that declaration keep the gateway's no-store policy and never
+// receive an ETag. Install ETag outside the router so inner middleware and
+// handlers can still set their headers before the body is buffered.
 func ETag(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet || !strings.HasPrefix(r.URL.Path, "/v1/public/") {
@@ -61,7 +66,13 @@ func ETag(next http.Handler) http.Handler {
 			return
 		}
 
-		etag := contentETag(buffered.body.Bytes())
+		etag := contentETag(stableBody(buffered.body.Bytes()))
+		if !isPublic(buffered.header.Get("Cache-Control")) {
+			w.Header().Set("Content-Length", strconv.Itoa(buffered.body.Len()))
+			w.WriteHeader(status)
+			_, _ = w.Write(buffered.body.Bytes())
+			return
+		}
 		w.Header().Set("ETag", etag)
 		if etagMatches(r.Header.Get("If-None-Match"), etag) {
 			w.Header().Del("Content-Length")
@@ -72,6 +83,25 @@ func ETag(next http.Handler) http.Handler {
 		w.WriteHeader(status)
 		_, _ = w.Write(buffered.body.Bytes())
 	})
+}
+
+// stableBody removes the per-request envelope ID so identical payloads hash
+// identically. Non-JSON bodies are hashed as-is.
+func stableBody(body []byte) []byte {
+	var payload map[string]json.RawMessage
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return body
+	}
+	delete(payload, "request_id")
+	stable, err := json.Marshal(payload)
+	if err != nil {
+		return body
+	}
+	return stable
+}
+
+func isPublic(cacheControl string) bool {
+	return strings.HasPrefix(strings.TrimSpace(cacheControl), "public")
 }
 
 func contentETag(body []byte) string {
@@ -122,5 +152,3 @@ func (w *bufferedWriter) Write(body []byte) (int, error) {
 	}
 	return w.body.Write(body)
 }
-
-func (w *bufferedWriter) Unwrap() http.ResponseWriter { return w.target }
