@@ -1,34 +1,16 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import type { components, paths } from "./schema";
+import { ApiError } from "./errors";
+import { createIdentifier, createResilientFetch } from "./http";
 
 export type { components, operations, paths } from "./schema";
+export { ApiError } from "./errors";
+export { CircuitOpenError, createIdempotentAction, createResilientFetch, loginStormDelay, redactSensitive, retryDelay } from "./http";
 export type Language = "zh" | "en" | "km";
 type ErrorEnvelope = components["schemas"]["ErrorEnvelope"];
-type Messages = components["schemas"]["Messages"];
-
-const identifierPattern = /^[A-Za-z0-9_-]{1,64}$/;
-
-function createIdentifier(): string {
-  const value = globalThis.crypto?.randomUUID().replaceAll("-", "_");
-  if (!value || !identifierPattern.test(value))
-    throw new Error("Unable to create request identifier");
-  return value;
-}
 
 export function withIdempotencyKey(): { "Idempotency-Key": string } {
   return { "Idempotency-Key": createIdentifier() };
-}
-
-export class ApiError extends Error {
-  constructor(
-    public readonly code: ErrorEnvelope["error"]["code"],
-    public readonly messages: Messages,
-    public readonly requestId: string,
-    public readonly status: number
-  ) {
-    super(messages.en);
-    this.name = "ApiError";
-  }
 }
 
 export interface ApiClientOptions {
@@ -36,6 +18,7 @@ export interface ApiClientOptions {
   getToken?: () => string | null | undefined;
   getLanguage?: () => Language;
   fetch?: typeof globalThis.fetch;
+  resilience?: Parameters<typeof createResilientFetch>[1];
 }
 
 function defaultBaseUrl(): string {
@@ -59,7 +42,7 @@ function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
 export function createApiClient(options: ApiClientOptions = {}) {
   const client = createClient<paths>({
     baseUrl: options.baseUrl ?? defaultBaseUrl(),
-    fetch: options.fetch
+    fetch: createResilientFetch(options.fetch ?? globalThis.fetch, options.resilience)
   });
   const middleware: Middleware = {
     async onRequest({ request }) {
@@ -76,12 +59,7 @@ export function createApiClient(options: ApiClientOptions = {}) {
         .json()
         .catch(() => undefined);
       if (isErrorEnvelope(body)) {
-        throw new ApiError(
-          body.error.code,
-          body.error.message,
-          body.request_id,
-          response.status
-        );
+        throw new ApiError(body.error.code, body.request_id, response.status);
       }
       return response;
     }
