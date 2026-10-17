@@ -58,6 +58,219 @@ paths:
           $ref: "#/components/responses/InternalServerError"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /v1/public/categories:
+    get:
+      tags: [public]
+      operationId: listPublicCategories
+      summary: List enabled product categories in display order
+      x-roles: ["none"]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+      responses:
+        "200":
+          description: Enabled categories ordered by sort then code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryListSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/public/products:
+    get:
+      tags: [public]
+      operationId: listPublicProducts
+      summary: List products that are on sale for a merchant that is not disabled
+      x-roles: ["none"]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/CategoryCode"
+      responses:
+        "200":
+          description: On-sale products; products of a disabled merchant are hidden.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductListSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/merchant/products:
+    get:
+      tags: [merchant]
+      operationId: listMerchantProducts
+      summary: List the authenticated merchant products in any status
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/StatusFilter"
+      responses:
+        "200":
+          description: Products owned by the authenticated merchant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductListSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    post:
+      tags: [merchant]
+      operationId: createMerchantProduct
+      summary: Create a draft product owned by the authenticated merchant
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductCreateRequest"
+      responses:
+        "201":
+          description: Product created in draft status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/merchant/products/{public_id}:
+    parameters:
+      - $ref: "#/components/parameters/PublicID"
+    get:
+      tags: [merchant]
+      operationId: getMerchantProduct
+      summary: Read one product owned by the authenticated merchant
+      x-roles: [merchant]
+      responses:
+        "200":
+          description: The requested product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    patch:
+      tags: [merchant]
+      operationId: updateMerchantProduct
+      summary: Patch a product owned by the authenticated merchant
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdateRequest"
+      responses:
+        "200":
+          description: The updated product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/merchant/products/{public_id}/publish:
+    parameters:
+      - $ref: "#/components/parameters/PublicID"
+    post:
+      tags: [merchant]
+      operationId: publishMerchantProduct
+      summary: Publish a product; requires complete trilingual text and at least two price tiers
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: The product is on sale.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 components:
   securitySchemes:
     bearerAuth:
@@ -119,6 +332,28 @@ components:
         minLength: 1
         maxLength: 64
         pattern: "^[A-Za-z0-9_-]+$"
+    PublicID:
+      name: public_id
+      in: path
+      required: true
+      description: ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive).
+      schema:
+        type: string
+        pattern: "^[0-9a-hjkmnp-tv-z]{26}$"
+    CategoryCode:
+      name: category
+      in: query
+      description: Restrict the result to one category code.
+      schema:
+        type: string
+        pattern: "^[a-z][a-z0-9_]{1,31}$"
+    StatusFilter:
+      name: status
+      in: query
+      description: Restrict the result to one product status.
+      schema:
+        type: string
+        enum: [draft, review, on, off, rejected]
     XStepUpToken:
       name: X-Step-Up-Token
       in: header
@@ -226,6 +461,249 @@ components:
           enum: [true]
         data:
           $ref: "#/components/schemas/PingData"
+        request_id:
+          type: string
+          minLength: 1
+    LocalizedText:
+      type: object
+      additionalProperties: false
+      required: [zh, en, km]
+      description: Trilingual text; every language must be present before a product can be published.
+      properties:
+        zh:
+          type: string
+          minLength: 1
+        en:
+          type: string
+          minLength: 1
+        km:
+          type: string
+          minLength: 1
+    ProductTier:
+      type: object
+      additionalProperties: false
+      required: [min_qty, unit_price_e4]
+      properties:
+        min_qty:
+          type: string
+          description: Minimum order quantity as a decimal string; never a floating-point number.
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+        unit_price_e4:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Unit price in ten-thousandths of a US dollar.
+    ProductTierList:
+      type: array
+      minItems: 2
+      description: At least two tiers, each with a unique minimum order quantity.
+      items:
+        $ref: "#/components/schemas/ProductTier"
+    Category:
+      type: object
+      additionalProperties: false
+      required: [public_id, code, name, enabled, sort]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        code:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        name:
+          $ref: "#/components/schemas/LocalizedText"
+        enabled:
+          type: boolean
+        default_zone:
+          type: string
+        sort:
+          type: integer
+    Product:
+      type: object
+      additionalProperties: false
+      required: [public_id, category_code, name, unit, origin, status, source, tiers, updated_at]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        category_code:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        name:
+          $ref: "#/components/schemas/LocalizedText"
+        spec:
+          $ref: "#/components/schemas/LocalizedText"
+        unit:
+          type: string
+          minLength: 1
+        origin:
+          type: string
+          enum: [cn, lc]
+        lead_days:
+          type: integer
+          minimum: 0
+          nullable: true
+        vol_m3:
+          type: string
+          nullable: true
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$"
+        status:
+          type: string
+          enum: [draft, review, on, off, rejected]
+        source:
+          type: string
+          enum: [manual, amazon, shopee, a1688, csv]
+        source_ref:
+          type: string
+          nullable: true
+        std_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+        tiers:
+          $ref: "#/components/schemas/ProductTierList"
+        updated_at:
+          type: string
+          format: date-time
+    ProductCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [category_code, name, unit, origin, tiers]
+      properties:
+        category_code:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        name:
+          $ref: "#/components/schemas/LocalizedText"
+        spec:
+          $ref: "#/components/schemas/LocalizedText"
+        unit:
+          type: string
+          minLength: 1
+        origin:
+          type: string
+          enum: [cn, lc]
+        lead_days:
+          type: integer
+          minimum: 0
+          nullable: true
+        vol_m3:
+          type: string
+          nullable: true
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$"
+        source:
+          type: string
+          enum: [manual, amazon, shopee, a1688, csv]
+        source_ref:
+          type: string
+        tiers:
+          $ref: "#/components/schemas/ProductTierList"
+    ProductUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        category_code:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        name:
+          $ref: "#/components/schemas/LocalizedText"
+        spec:
+          $ref: "#/components/schemas/LocalizedText"
+        unit:
+          type: string
+          minLength: 1
+        origin:
+          type: string
+          enum: [cn, lc]
+        lead_days:
+          type: integer
+          minimum: 0
+          nullable: true
+        vol_m3:
+          type: string
+          nullable: true
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$"
+        source_ref:
+          type: string
+        status:
+          type: string
+          enum: [draft, off]
+          description: Merchants may only move a product between draft and off; on is reached through publish.
+        tiers:
+          $ref: "#/components/schemas/ProductTierList"
+    CategoryListData:
+      type: object
+      additionalProperties: false
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    ProductListData:
+      type: object
+      additionalProperties: false
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    CategoryListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/CategoryListData"
+        request_id:
+          type: string
+          minLength: 1
+    ProductListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/ProductListData"
+        request_id:
+          type: string
+          minLength: 1
+    ProductSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/Product"
         request_id:
           type: string
           minLength: 1
