@@ -173,6 +173,32 @@ func (s *PgStore) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// 先锁行再校验：发布与编辑并发时，校验依据与最终写入必须是同一个快照。
+	locked, err := lockProduct(ctx, tx, merchantID, publicID)
+	if err != nil {
+		return Product{}, err
+	}
+	effectiveStatus := locked.Status
+	if patch.Status != nil {
+		effectiveStatus = *patch.Status
+	}
+	if effectiveStatus == StatusOn {
+		name := locked.Name
+		if patch.Name != nil {
+			name = patch.Name
+		}
+		if err := ValidateLocalized("name", name); err != nil {
+			return Product{}, err
+		}
+		tiers := locked.Tiers
+		if patch.Tiers != nil {
+			tiers = patch.Tiers
+		}
+		if err := ValidateTiers(tiers); err != nil {
+			return Product{}, err
+		}
+	}
+
 	sets := []string{"updated_at = now()"}
 	args := []any{}
 	// add 只接受本函数内的常量片段，占位符由参数个数推导，客户端输入永不进入 SQL 文本。
@@ -239,7 +265,8 @@ func (s *PgStore) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 	return product, nil
 }
 
-// PublishProduct 把商品置为在售；归属与上架闸门由 Service 校验，这里再按 merchant_id 兜底。
+// PublishProduct 把商品置为在售。归属与上架门槛在 Service 预检，
+// 这里在同一事务内锁行并重新校验，避免校验后、写入前被并发 PATCH 改坏。
 func (s *PgStore) PublishProduct(ctx context.Context, merchantID int64, publicID string) (Product, error) {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -247,18 +274,19 @@ func (s *PgStore) PublishProduct(ctx context.Context, merchantID int64, publicID
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var productID int64
-	err = tx.QueryRow(ctx, `
-		UPDATE catalog.product SET status = $1, updated_at = now()
-		WHERE public_id = $2 AND merchant_id = $3
-		RETURNING id`, string(StatusOn), publicID, merchantID).Scan(&productID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return Product{}, ErrNotFound
-	}
+	locked, err := lockProduct(ctx, tx, merchantID, publicID)
 	if err != nil {
 		return Product{}, err
 	}
-	product, err := productByID(ctx, tx, productID)
+	if err := ValidateProductForPublish(locked, locked.Tiers); err != nil {
+		return Product{}, err
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE catalog.product SET status = $1, updated_at = now()
+		WHERE id = $2`, string(StatusOn), locked.ID); err != nil {
+		return Product{}, err
+	}
+	product, err := productByID(ctx, tx, locked.ID)
 	if err != nil {
 		return Product{}, err
 	}
@@ -266,6 +294,23 @@ func (s *PgStore) PublishProduct(ctx context.Context, merchantID int64, publicID
 		return Product{}, err
 	}
 	return product, nil
+}
+
+// lockProduct 以 merchant_id 为范围锁住商品行，并在同一事务里读取阶梯价。
+// 调用方必须持有 tx，锁在提交/回滚时释放。
+func lockProduct(ctx context.Context, tx pgx.Tx, merchantID int64, publicID string) (Product, error) {
+	var productID int64
+	err := tx.QueryRow(ctx, `
+		SELECT id FROM catalog.product
+		WHERE public_id = $1 AND merchant_id = $2
+		FOR UPDATE`, publicID, merchantID).Scan(&productID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Product{}, ErrNotFound
+	}
+	if err != nil {
+		return Product{}, err
+	}
+	return productByID(ctx, tx, productID)
 }
 
 func productWhere(filter ProductFilter, plan Plan) (string, []any) {
