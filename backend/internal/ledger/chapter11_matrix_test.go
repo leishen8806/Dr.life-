@@ -1,6 +1,7 @@
 package ledger_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -10,6 +11,7 @@ import (
 
 var chapter11RequiredIDs = []string{"C11-01", "C11-02", "C11-03", "C11-04", "C11-05", "C11-05a", "C11-06", "C11-07", "C11-08", "C11-09", "C11-10a", "C11-10b"}
 var matrixIDPattern = regexp.MustCompile(`(?m)^\| (C11-[^ ]+) \|`)
+var matrixDocumentCasePattern = regexp.MustCompile(`(?m)^\s*docs/TESTMATRIX\.md\) docs_only=false; backend_changed=true ;;\s*$`)
 
 type chapter11Case struct {
 	id      string
@@ -37,10 +39,40 @@ func TestChapter11MatrixRunsWhenMatrixDocumentChanges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const matrixCase = "docs/TESTMATRIX.md) docs_only=false; backend_changed=true ;;"
-	if !strings.Contains(string(workflow), matrixCase) {
-		t.Fatalf("ci must classify docs/TESTMATRIX.md as backend-changing to run the matrix guard")
+	if err := validateMatrixDocumentClassification(string(workflow)); err != nil {
+		t.Fatal(err)
 	}
+}
+
+func TestChapter11MatrixClassifierGuardRejectsUnreachableOrCommentedRule(t *testing.T) {
+	workflow, err := os.ReadFile(filepath.Join("..", "..", "..", ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const matrixCase = "docs/TESTMATRIX.md) docs_only=false; backend_changed=true ;;"
+	const documentationCase = "*.md|docs/*|LICENSE|LICENSE.*) ;;"
+	moved := strings.Replace(string(workflow), matrixCase+"\n", "", 1)
+	moved = strings.Replace(moved, documentationCase, documentationCase+"\n              "+matrixCase, 1)
+	if err := validateMatrixDocumentClassification(moved); err == nil {
+		t.Fatal("ci accepted a matrix rule after the documentation wildcard")
+	}
+	commented := strings.Replace(string(workflow), matrixCase, "# "+matrixCase, 1)
+	if err := validateMatrixDocumentClassification(commented); err == nil {
+		t.Fatal("ci accepted a commented matrix rule")
+	}
+}
+
+func validateMatrixDocumentClassification(workflow string) error {
+	match := matrixDocumentCasePattern.FindStringIndex(workflow)
+	if match == nil {
+		return fmt.Errorf("ci must classify docs/TESTMATRIX.md as backend-changing to run the matrix guard")
+	}
+	const documentationCase = "*.md|docs/*|LICENSE|LICENSE.*) ;;"
+	wildcardIndex := strings.Index(workflow, documentationCase)
+	if wildcardIndex == -1 || match[0] > wildcardIndex {
+		return fmt.Errorf("ci must classify docs/TESTMATRIX.md before the documentation wildcard")
+	}
+	return nil
 }
 
 func TestChapter11Matrix(t *testing.T) {
