@@ -9,7 +9,8 @@
 | C11-02 | 幂等 | `TestPostIntegration`、`TestHoldIntegration`、`TestWithdrawalConcurrencyIntegration`、`TestReverseConcurrencyIntegration`、`TestAdjustIntegration`：同一幂等键只入账一次。 |
 | C11-03 | 并发 | `TestPostIntegration`、`TestHoldIntegration`、`TestWithdrawalConcurrencyIntegration`、`TestReverseConcurrencyIntegration`：不超扣、不重复扣款且交叉账户无死锁。 |
 | C11-04 | 分账 | `TestAllocateBoundaries`、`TestAllocateProperty`、`TestAllocateRejectsInvalidShares`：三方分账、奇数和舍入边界之和恒等。 |
-| C11-05 | 不可变 | `TestLedgerMigrationAndConstraints`、`TestPostIntegration`、`TestHoldIntegration`、`TestSnapshotDailyImmutableAndDetectsDrift`、`TestDatabaseFramework`：流水、账务审计记录不可改删。 |
+| C11-05 | 不可变 | `TestLedgerMigrationAndConstraints`、`TestPostIntegration`、`TestHoldIntegration`、`TestSnapshotDailyImmutableAndDetectsDrift`、`TestDatabaseFramework`：ledger 流水不可改删。 |
+| C11-05a | 审计日志不可变 | **BLOCKED(Q-01)**：`audit.log` 的 UPDATE/DELETE 必须失败，哈希链连续；账务模块不跨 schema 写入审计表。 |
 | C11-06 | 冲销 | `TestReverseIntegration`、`TestReverseConcurrencyIntegration`、`TestReverseRandomSequenceIntegration`：原值恢复、仅一次冲销、链路可追溯。 |
 | C11-07 | 提现 | `TestWithdrawalWorkflowIntegration`、`TestWithdrawalConcurrencyIntegration`：职责分离、失败回滚、24 小时超时检测。 |
 | C11-08 | 对账 | **BLOCKED(L-08)**：银行文件匹配、未匹配、重复导入；差异必须入 `SUSPENSE` 并告警。 |
@@ -20,4 +21,5 @@
 ## 阻塞清单
 
 - `C11-08` — **BLOCKED(L-08)**：等待银行对账文件导入器及匹配工作流。
+- `C11-05a` — **BLOCKED(Q-01)**：等待审计日志（哈希链）模块及其 `audit.log` 不可变性断言。
 - `C11-10b` — **BLOCKED(Q-03)**：等待备份恢复流程、保留策略和演练入口。

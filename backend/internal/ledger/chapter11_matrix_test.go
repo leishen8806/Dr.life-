@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-var chapter11RequiredIDs = []string{"C11-01", "C11-02", "C11-03", "C11-04", "C11-05", "C11-06", "C11-07", "C11-08", "C11-09", "C11-10a", "C11-10b"}
+var chapter11RequiredIDs = []string{"C11-01", "C11-02", "C11-03", "C11-04", "C11-05", "C11-05a", "C11-06", "C11-07", "C11-08", "C11-09", "C11-10a", "C11-10b"}
 var matrixIDPattern = regexp.MustCompile(`(?m)^\| (C11-[^ ]+) \|`)
 
 type chapter11Case struct {
@@ -23,12 +23,24 @@ var chapter11Cases = []chapter11Case{
 	{id: "C11-03", tests: []string{"TestPostIntegration", "TestHoldIntegration", "TestWithdrawalConcurrencyIntegration", "TestReverseConcurrencyIntegration"}},
 	{id: "C11-04", tests: []string{"TestAllocateBoundaries", "TestAllocateProperty", "TestAllocateRejectsInvalidShares"}},
 	{id: "C11-05", tests: []string{"TestLedgerMigrationAndConstraints", "TestPostIntegration", "TestHoldIntegration", "TestSnapshotDailyImmutableAndDetectsDrift", "TestDatabaseFramework"}},
+	{id: "C11-05a", blocked: "Q-01"},
 	{id: "C11-06", tests: []string{"TestReverseIntegration", "TestReverseConcurrencyIntegration", "TestReverseRandomSequenceIntegration"}},
 	{id: "C11-07", tests: []string{"TestWithdrawalWorkflowIntegration", "TestWithdrawalConcurrencyIntegration"}},
 	{id: "C11-08", blocked: "L-08"},
 	{id: "C11-09", tests: []string{"TestLedgerMigrationAndConstraints", "TestPostIntegration"}},
 	{id: "C11-10a", tests: []string{"TestChapter11BackupRestoreIntegration"}},
 	{id: "C11-10b", blocked: "Q-03"},
+}
+
+func TestChapter11MatrixRunsWhenMatrixDocumentChanges(t *testing.T) {
+	workflow, err := os.ReadFile(filepath.Join("..", "..", "..", ".github", "workflows", "ci.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const matrixCase = "docs/TESTMATRIX.md) docs_only=false; backend_changed=true ;;"
+	if !strings.Contains(string(workflow), matrixCase) {
+		t.Fatalf("ci must classify docs/TESTMATRIX.md as backend-changing to run the matrix guard")
+	}
 }
 
 func TestChapter11Matrix(t *testing.T) {

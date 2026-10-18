@@ -51,6 +51,7 @@ jobs:
           infra_changed=false
           while IFS= read -r -d '' file; do
             case "$file" in
+              docs/TESTMATRIX.md) docs_only=false; backend_changed=true ;;
               *.md|docs/*|LICENSE|LICENSE.*) ;;
               *) docs_only=false ;;
             esac
