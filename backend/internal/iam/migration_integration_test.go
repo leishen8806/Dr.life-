@@ -163,6 +163,14 @@ func TestIAMMigration(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.actor (public_id,kind,ref_id) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAN','robot',2)`)
 	})
 
+	t.Run("last active super administrator cannot be disabled or deleted", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAT','Super','super@example.test','hash','super','active')`); err != nil {
+			t.Fatal(err)
+		}
+		assertSQLState(t, ctx, admin, "P0001", `UPDATE iam.admin_user SET status='disabled' WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FAT'`)
+		assertSQLState(t, ctx, admin, "P0001", `DELETE FROM iam.admin_user WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FAT'`)
+	})
+
 	t.Run("permission seeds match approved matrices", func(t *testing.T) {
 		assertAdminMatrix(t, ctx, admin)
 		assertMerchantTemplate(t, ctx, admin)
