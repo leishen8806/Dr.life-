@@ -1,0 +1,55 @@
+name: loadtest-smoke
+
+# Lightweight CI smoke: only runs when load-test files change.
+# It is NOT a required check; do not add it to branch protection.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "loadtest/**"
+      - ".github/workflows/loadtest-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start isolated load-test rig
+        run: docker compose -f loadtest/docker-compose.yml up -d --build --wait --wait-timeout 480
+
+      - name: Guard must reject TARGET_ENV=prod
+        run: |
+          set +e
+          docker run --rm -i \
+            --network drlife-loadtest_default \
+            -v "$PWD:/work" -w /work \
+            -e TARGET_ENV=prod -e BASE_URL=http://app-a:8080 \
+            grafana/k6:2.3.0 run loadtest/scenarios/smoke.js
+          code=$?
+          set -e
+          if [ "$code" -eq 0 ]; then
+            echo "GUARD FAILED: smoke accepted TARGET_ENV=prod"
+            exit 1
+          fi
+          echo "guard exit=$code (expected non-zero)"
+
+      - name: Smoke
+        env:
+          TARGET_ENV: local
+          BASE_URL: http://app-a:8080
+        run: |
+          docker run --rm -i \
+            --network drlife-loadtest_default \
+            -v "$PWD:/work" -w /work \
+            -e TARGET_ENV -e BASE_URL \
+            grafana/k6:2.3.0 run loadtest/scenarios/smoke.js
+
+      - name: Stop rig
+        if: always()
+        run: docker compose -f loadtest/docker-compose.yml down -v
