@@ -1,0 +1,8 @@
+time_utc=2026-10-23T02:01:00Z
+head=074c0e7
+node=v25.9.0
+pnpm=10.28.2
+
+COMMAND: pnpm exec tsc -p poc/driver-location-fe/tsconfig.json --noEmit
+EXIT_CODE: 0
+
