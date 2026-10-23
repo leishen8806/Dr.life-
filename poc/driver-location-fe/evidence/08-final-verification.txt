@@ -1,5 +1,5 @@
-time_utc=2026-10-23T02:01:00Z
-head=074c0e7
+time_utc=2026-10-23T02:06:44Z
+head=c8e6fe9
 node=v25.9.0
 pnpm=10.28.2
 
@@ -17,8 +17,8 @@ stdout | tests/location-queue.test.ts > driver location queue > replays every po
 stdout | tests/location-queue.test.ts > driver location queue > records a repeated idempotency key only once
 [AC-4] first=accepted firstTotal=1 second=duplicate secondTotal=1 finalReceived=1 duplicateAttempts=1
 
- ✓ tests/location-queue.test.ts > driver location queue > persists queued points across a page reload 4ms
- ✓ tests/location-queue.test.ts > driver location queue > replays every point captured during a five minute offline window 7ms
+ ✓ tests/location-queue.test.ts > driver location queue > persists queued points across a page reload 2ms
+ ✓ tests/location-queue.test.ts > driver location queue > replays every point captured during a five minute offline window 5ms
  ✓ tests/location-queue.test.ts > driver location queue > records a repeated idempotency key only once 0ms
  ✓ tests/location-queue.test.ts > driver location queue > does not upload twice when flush is called concurrently 0ms
  ✓ tests/location-queue.test.ts > driver location queue > keeps points queued when upload fails 0ms
@@ -26,8 +26,8 @@ stdout | tests/location-queue.test.ts > driver location queue > records a repeat
 
  Test Files  1 passed (1)
       Tests  6 passed (6)
-   Start at  09:01:02
-   Duration  657ms (transform 59ms, setup 0ms, import 87ms, tests 29ms, environment 0ms)
+   Start at  09:06:45
+   Duration  197ms (transform 40ms, setup 0ms, import 54ms, tests 25ms, environment 0ms)
 
 
 == TYPECHECK ==
@@ -42,5 +42,5 @@ rendering chunks...
 computing gzip size...
 dist/index.html                  2.67 kB │ gzip: 0.81 kB
 dist/assets/index-DzapKYyL.css   4.10 kB │ gzip: 1.62 kB
-dist/assets/index-BKWqo0-O.js   12.88 kB │ gzip: 5.19 kB
-✓ built in 148ms
+dist/assets/index-B8esBLTF.js   12.88 kB │ gzip: 5.19 kB
+✓ built in 91ms

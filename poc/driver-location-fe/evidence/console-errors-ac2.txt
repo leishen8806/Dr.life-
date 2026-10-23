@@ -1,0 +1,135 @@
+Total messages: 38 (Errors: 38, Warnings: 0)
+
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
+[ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations:0
+[ERROR] [location-upload] TypeError: Failed to fetch
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:3668)
+    at Object.upload (http://localhost:5180/assets/index-B8esBLTF.js:1:7040)
+    at F.runFlush (http://localhost:5180/assets/index-B8esBLTF.js:1:4884)
+    at F.flush (http://localhost:5180/assets/index-B8esBLTF.js:1:4721)
+    at G.tick (http://localhost:5180/assets/index-B8esBLTF.js:1:6198) @ http://localhost:5180/assets/index-B8esBLTF.js:0
