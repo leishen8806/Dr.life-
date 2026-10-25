@@ -163,6 +163,16 @@ func TestIAMMigration(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.actor (public_id,kind,ref_id) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAN','robot',2)`)
 	})
 
+	t.Run("account links require same Telegram person and active merchant owner", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.person (public_id,tg_user_id) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAT',2002)`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.account (public_id,person_id,role) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FAV',id,'buyer' FROM iam.person WHERE tg_user_id=2002`); err != nil {
+			t.Fatal(err)
+		}
+		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.account_link (public_id,buyer_account_id,merchant_account_id) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FAW',b.id,m.id FROM iam.account b,iam.account m WHERE b.public_id='01ARZ3NDEKTSV4RRFFQ69G5FAV' AND m.public_id='`+ownerPublicID+`'`)
+	})
+
 	t.Run("permission seeds match approved matrices", func(t *testing.T) {
 		assertAdminMatrix(t, ctx, admin)
 		assertMerchantTemplate(t, ctx, admin)
@@ -219,6 +229,9 @@ func seedFixtures(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 		t.Fatal(err)
 	}
 	if _, err := conn.Exec(ctx, `INSERT INTO iam.account (public_id,person_id,role,merchant_id) SELECT $1,p.id,'merchant_owner',m.id FROM iam.person p,iam.merchant m WHERE p.public_id=$2 AND m.public_id=$3`, ownerPublicID, personPublicID, merchantPublicID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `UPDATE iam.merchant SET owner_account_id = a.id FROM iam.account a WHERE iam.merchant.public_id=$1 AND a.public_id=$2`, merchantPublicID, ownerPublicID); err != nil {
 		t.Fatal(err)
 	}
 }
