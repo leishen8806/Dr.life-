@@ -341,7 +341,9 @@ func (s *Service) reviewedPayment(ctx context.Context, typ, refType string, in R
 	req := businessRequest(typ, in.Amount, fmt.Sprintf("%s:%s:%d", typ, refType, in.ID), refType, &in.ID, in.ActorID,
 		Posting{AccountID: source, Side: "DEBIT", Amount: in.Amount}, Posting{AccountID: ids["BANK_DEDICATED"], Side: "CREDIT", Amount: in.Amount})
 	req.Note = fmt.Sprintf("reviewer_actor:%d", in.ReviewerActorID)
-	return s.postBusiness(ctx, req, map[int64]string{source: kind, ids["BANK_DEDICATED"]: "BANK_DEDICATED"}, nil)
+	return s.postBusiness(ctx, req, map[int64]string{source: kind, ids["BANK_DEDICATED"]: "BANK_DEDICATED"}, func(ctx context.Context, tx pgx.Tx) error {
+		return checkPayoutFreeze(ctx, tx, 0)
+	})
 }
 
 type BankDiffInput struct {
@@ -375,5 +377,5 @@ func (s *Service) postBusiness(ctx context.Context, request PostRequest, kinds m
 	if request.RefID != nil && *request.RefID <= 0 {
 		return PostResult{}, ErrInvalidRequest
 	}
-	return s.post(ctx, request, requireKinds(kinds, extra, sameOwner...))
+	return s.postRaw(ctx, request, requireKinds(kinds, extra, sameOwner...))
 }

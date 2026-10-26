@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
@@ -45,13 +46,22 @@ func main() {
 	}
 	defer database.Close()
 
+	directory := catalogDirectory{db: database}
+	catalogService := catalog.New(catalog.NewPgStore(database), catalog.Options{Merchants: directory})
+
 	clientIP, err := gateway.NewClientIPResolver(cfg.TrustedProxyHeader, cfg.TrustedProxyCIDRs)
 	if err != nil {
 		logger.Error("gateway configuration failed", "error", err)
 		os.Exit(1)
 	}
+	adminAccess, err := gateway.NewAdminAccess(cfg.AppEnv, clientIP, cfg.AdminAllowedCIDRs)
+	if err != nil {
+		logger.Error("admin network configuration failed", "error", err)
+		os.Exit(1)
+	}
 	memoryLimiter := gateway.NewMemoryLimiter()
 	var limiter gateway.Limiter = memoryLimiter
+	var idempotencyStore gateway.IdempotencyStore
 	if cfg.RedisURL != "" {
 		redisLimiter, redisErr := gateway.NewRedisLimiter(cfg.RedisURL)
 		if redisErr != nil {
@@ -60,6 +70,13 @@ func main() {
 		}
 		defer redisLimiter.Close()
 		limiter = &gateway.FallbackLimiter{Primary: redisLimiter, Fallback: memoryLimiter, Logger: logger}
+		redisIdempotency, redisErr := gateway.NewRedisIdempotencyStore(cfg.RedisURL)
+		if redisErr != nil {
+			logger.Error("Redis idempotency configuration failed", "error", redisErr)
+			os.Exit(1)
+		}
+		defer redisIdempotency.Close()
+		idempotencyStore = redisIdempotency
 	}
 	strictRules := func(defaultLimit int) gateway.RuleSet {
 		return gateway.RuleSet{
@@ -67,12 +84,12 @@ func main() {
 			Login:      gateway.Rule{Limit: cfg.RateLimitLogin, Window: time.Minute},
 			Withdrawal: gateway.Rule{Limit: cfg.RateLimitWithdraw, Window: time.Minute},
 			AI:         gateway.Rule{Limit: cfg.RateLimitAI, Window: time.Minute},
+			Admin:      gateway.Rule{Limit: cfg.RateLimitAdmin, Window: time.Minute},
 		}
 	}
 	var loginService *iam.Service
 	var authenticator gateway.Authenticator
 	checks := []server.ReadinessCheck{database.Ping}
-	iamDatabase := database
 	if cfg.JWTSigningConfigured {
 		if cfg.IAMDatabaseURL == "" {
 			logger.Error("IAM database URL is required when Telegram login is enabled")
@@ -80,9 +97,9 @@ func main() {
 		}
 		iamCfg := cfg
 		iamCfg.DatabaseURL = cfg.IAMDatabaseURL
-		iamDatabase, err = observability.NewDatabasePool(ctx, iamCfg, nil, logger)
-		if err != nil {
-			logger.Error("IAM database pool failed", "error", err)
+		iamDatabase, poolErr := observability.NewDatabasePool(ctx, iamCfg, nil, logger)
+		if poolErr != nil {
+			logger.Error("IAM database pool failed", "error", poolErr)
 			os.Exit(1)
 		}
 		defer iamDatabase.Close()
@@ -119,28 +136,38 @@ func main() {
 		os.Exit(1)
 	}
 
-	httpServer := &http.Server{
-		Addr: cfg.HTTPAddr,
-		Handler: server.NewHandlerWithGateway(logger, server.GatewayOptions{
-			AllowedOrigins: cfg.CORSAllowedOrigins,
-			WebhookPrefix:  cfg.WebhookPrefix,
-			ClientIP:       clientIP,
-			Limiter:        limiter,
-			IPRules:        strictRules(cfg.RateLimitIP),
-			AccountRules:   strictRules(cfg.RateLimitAccount),
-			Metrics:        metrics,
-			ErrorReporter:  reporter,
-			Authenticator:  authenticator,
-			Login:          loginService,
-			IdempotencyExempt: func(r *http.Request) bool {
-				return r.Method == http.MethodPost && r.URL.Path == "/v1/public/auth/telegram"
-			},
-		}, checks...),
-		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
-		ReadTimeout:       cfg.ReadTimeout,
-		IdleTimeout:       cfg.IdleTimeout,
-		// WriteTimeout stays unset so future real-time streams can remain open.
-	}
+	handler := server.NewHandlerWithGateway(logger, server.GatewayOptions{
+		AppEnv: cfg.AppEnv,
+		OriginGroups: gateway.OriginGroups{
+			Buyer: cfg.CORSBuyerOrigins, Merchant: cfg.CORSMerchantOrigins, Driver: cfg.CORSDriverOrigins,
+			WMS: cfg.CORSWMSOrigins, Admin: cfg.CORSAdminOrigins, Public: cfg.CORSPublicOrigins,
+			CredentialPaths: cfg.CORSCredentialPaths,
+		},
+		WebhookPrefix:  cfg.WebhookPrefix,
+		WebhookMaxBody: cfg.WebhookMaxBodyBytes,
+		ClientIP:       clientIP,
+		AdminAccess:    adminAccess,
+		Limiter:        limiter,
+		Authenticator:  authenticator,
+		IPRules:        strictRules(cfg.RateLimitIP),
+		AccountRules:   strictRules(cfg.RateLimitAccount),
+		BodyPolicy:     gateway.BodyPolicy{DefaultBytes: cfg.RequestBodyMaxBytes, Overrides: cfg.RequestBodyOverrides, ExemptPaths: cfg.ContentTypeExemptPaths},
+		Idempotency: gateway.IdempotencyOptions{
+			Store: idempotencyStore, FallbackStore: gateway.NewMemoryIdempotencyStore(), TTL: cfg.IdempotencyTTL, MaxResponseBytes: cfg.IdempotencyMaxBytes,
+			FinancialPrefixes: cfg.FinancialPrefixes,
+		},
+		IdempotencyExempt: func(r *http.Request) bool {
+			return r.Method == http.MethodPost && r.URL.Path == "/v1/public/auth/telegram"
+		},
+		Metrics:       metrics,
+		ErrorReporter: reporter,
+		Catalog:       catalogService,
+		Merchants:     directory,
+		Logger:        logger,
+		Login:         loginService,
+	}, checks...)
+	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)
+	// WriteTimeout stays unset so future real-time streams can remain open.
 	if cfg.MetricsAddr != "" {
 		metricsListener, listenErr := net.Listen("tcp", cfg.MetricsAddr)
 		if listenErr != nil {

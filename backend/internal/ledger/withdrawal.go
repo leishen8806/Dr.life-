@@ -179,6 +179,9 @@ func (s *Service) RequestWithdrawal(ctx context.Context, in RequestWithdrawalInp
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
+		if err := checkPayoutFreeze(ctx, tx, in.WalletAvailable); err != nil {
+			return err
+		}
 		var owner *int64
 		if err := tx.QueryRow(ctx, `SELECT owner_account FROM ledger.account WHERE id=$1`, in.WalletAvailable).Scan(&owner); err != nil {
 			return err
@@ -425,6 +428,15 @@ func (s *Service) refundWithdrawal(ctx context.Context, withdrawalID int64, targ
 
 func (s *Service) withdrawalCloseHooks(snapshot Withdrawal, target string, request PostRequest, after transactionAfter) transactionHooks {
 	check := requireKinds(nil, func(ctx context.Context, tx pgx.Tx) error {
+		if target == "paid" {
+			var walletID int64
+			if err := tx.QueryRow(ctx, `SELECT id FROM ledger.account WHERE owner_account=$1 AND kind='WALLET_AVAIL'`, snapshot.AccountID).Scan(&walletID); err != nil {
+				return err
+			}
+			if err := checkPayoutFreeze(ctx, tx, walletID); err != nil {
+				return err
+			}
+		}
 		locked, err := queryWithdrawal(tx.QueryRow(ctx, withdrawalSelect+` WHERE id=$1 FOR UPDATE`, snapshot.ID))
 		if err != nil {
 			return mapWithdrawalNotFound(err)

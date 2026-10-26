@@ -62,7 +62,7 @@ func TestReverseIntegration(t *testing.T) {
 		}},
 		{"adjust", func() (ledger.PostResult, error) {
 			platform := singletonID(t, e.ctx, e.admin, "PLATFORM_HELD")
-			return e.appService.Post(e.ctx, ledger.PostRequest{Type: "adjust", Amount: 110, IdemKey: "adjust:test:6110", ActorID: 1, Postings: []ledger.Posting{
+			return ledger.PostForTest(e.ctx, e.appService, ledger.PostRequest{Type: "adjust", Amount: 110, IdemKey: "adjust:test:6110", ActorID: 1, Postings: []ledger.Posting{
 				{AccountID: buyer.Available, Side: "DEBIT", Amount: 110},
 				{AccountID: platform, Side: "CREDIT", Amount: 110},
 			}})
@@ -141,7 +141,7 @@ func TestReverseIntegration(t *testing.T) {
 		disallowed := []string{"freeze", "settle", "refund", "withdraw_req", "payout", "payout_fail", "delivery_hold", "delivery_release", "delivery_refund"}
 		bank := singletonID(t, e.ctx, e.admin, "BANK_DEDICATED")
 		for i, typ := range disallowed {
-			result, err := e.appService.Post(e.ctx, ledger.PostRequest{Type: typ, Amount: 1, IdemKey: fmt.Sprintf("blocked:test:%d", i), ActorID: 1, Postings: []ledger.Posting{
+			result, err := ledger.PostForTest(e.ctx, e.appService, ledger.PostRequest{Type: typ, Amount: 1, IdemKey: fmt.Sprintf("blocked:test:%d", i), ActorID: 1, Postings: []ledger.Posting{
 				{AccountID: bank, Side: "DEBIT", Amount: 1}, {AccountID: buyer.Available, Side: "CREDIT", Amount: 1},
 			}})
 			if err != nil {
@@ -252,7 +252,7 @@ func TestReverseRandomSequenceIntegration(t *testing.T) {
 				reversible = append(reversible, result.TxnID)
 			}
 		} else {
-			result, err = e.appService.Post(e.ctx, ledger.PostRequest{Type: "adjust", Amount: amount, IdemKey: fmt.Sprintf("adjust:random:%d", step), ActorID: 10, Postings: []ledger.Posting{
+			result, err = ledger.PostForTest(e.ctx, e.appService, ledger.PostRequest{Type: "adjust", Amount: amount, IdemKey: fmt.Sprintf("adjust:random:%d", step), ActorID: 10, Postings: []ledger.Posting{
 				{AccountID: wallet.Available, Side: "DEBIT", Amount: amount}, {AccountID: platform, Side: "CREDIT", Amount: amount},
 			}})
 			if err == nil {

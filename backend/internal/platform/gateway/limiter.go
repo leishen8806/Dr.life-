@@ -26,6 +26,7 @@ type RuleSet struct {
 	Login      Rule
 	Withdrawal Rule
 	AI         Rule
+	Admin      Rule
 }
 
 type Limiter interface {
@@ -252,6 +253,12 @@ func selectRule(path string, rules RuleSet) (Rule, string) {
 		case "ai":
 			return rules.AI, "ai"
 		}
+	}
+	if len(parts) >= 2 && (parts[1] == "admin" || parts[1] == "wms") {
+		if rules.Admin.Limit > 0 && rules.Admin.Window > 0 {
+			return rules.Admin, "admin"
+		}
+		return rules.Default, "admin"
 	}
 	if len(parts) >= 2 {
 		return rules.Default, strings.Join(parts[:2], "/")

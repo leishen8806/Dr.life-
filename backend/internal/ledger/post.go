@@ -8,6 +8,7 @@ import (
 	"math"
 	"regexp"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -25,6 +26,7 @@ var (
 )
 
 var idemKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+(?::[A-Za-z0-9_-]+)?$`)
+var adjustIdemKeyPattern = regexp.MustCompile(`^adjust:[A-Za-z0-9_-]+-[1-9][0-9]*$`)
 
 var validTxnTypes = map[string]struct{}{
 	"topup": {}, "freeze": {}, "settle": {}, "refund": {}, "withdraw_req": {},
@@ -51,7 +53,11 @@ type Service struct {
 	accountGuard             AccountGuard
 	payeeCipher              PayeeCipher
 	withdrawalMetrics        WithdrawalMetrics
+	reconciliationMetrics    ReconciliationMetrics
 	largeWithdrawalThreshold int64
+	reconciliationLocation   *time.Location
+	spotCheckEvery           uint64
+	spotCheckCounter         atomic.Uint64
 	now                      func() time.Time
 }
 
@@ -60,7 +66,10 @@ type Options struct {
 	AccountGuard             AccountGuard
 	PayeeCipher              PayeeCipher
 	WithdrawalMetrics        WithdrawalMetrics
+	ReconciliationMetrics    ReconciliationMetrics
 	LargeWithdrawalThreshold int64
+	ReconciliationLocation   *time.Location
+	SpotCheckEvery           int
 	Now                      func() time.Time
 }
 
@@ -77,10 +86,19 @@ func New(db beginner, options Options) *Service {
 	if now == nil {
 		now = time.Now
 	}
+	location := options.ReconciliationLocation
+	if location == nil {
+		location = time.FixedZone("Asia/Phnom_Penh", 7*60*60)
+	}
+	spotCheckEvery := options.SpotCheckEvery
+	if spotCheckEvery < 0 {
+		spotCheckEvery = 0
+	}
 	return &Service{
 		db: db, maxRetries: maxRetries, accountGuard: options.AccountGuard,
 		payeeCipher: options.PayeeCipher, withdrawalMetrics: options.WithdrawalMetrics,
-		largeWithdrawalThreshold: threshold, now: now,
+		reconciliationMetrics: options.ReconciliationMetrics, reconciliationLocation: location,
+		largeWithdrawalThreshold: threshold, spotCheckEvery: uint64(spotCheckEvery), now: now,
 	}
 }
 
@@ -118,10 +136,6 @@ type PostResult struct {
 	Balances        []Balance `json:"balances"`
 }
 
-func (s *Service) Post(ctx context.Context, request PostRequest) (PostResult, error) {
-	return s.post(ctx, request, nil)
-}
-
 type transactionCheck func(context.Context, pgx.Tx) error
 type transactionAfter func(context.Context, pgx.Tx, PostResult) error
 type transactionReplayCheck func(context.Context, pgx.Tx, PostResult) error
@@ -139,7 +153,7 @@ type transactionHooks struct {
 	skipInitialReplay bool
 }
 
-func (s *Service) post(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
+func (s *Service) postRaw(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
 	return s.postWithHooks(ctx, request, transactionHooks{check: check})
 }
 
@@ -151,7 +165,13 @@ func (s *Service) postWithHooks(ctx context.Context, request PostRequest, hooks 
 	var err error
 	for attempt := 0; attempt <= s.maxRetries; attempt++ {
 		result, err = s.postOnce(ctx, request, hooks)
-		if err == nil || !isRetryable(err) || attempt == s.maxRetries {
+		if err == nil {
+			if !result.Replayed {
+				s.maybeSpotCheck(request.Postings)
+			}
+			return result, nil
+		}
+		if !isRetryable(err) || attempt == s.maxRetries {
 			return result, err
 		}
 		delay := time.Duration(1<<attempt) * 10 * time.Millisecond
@@ -328,7 +348,8 @@ func validateRequest(request PostRequest) error {
 	if request.Amount <= 0 {
 		return ErrInvalidAmount
 	}
-	if len(request.IdemKey) > 200 || !idemKeyPattern.MatchString(request.IdemKey) {
+	if len(request.IdemKey) > 200 || !idemKeyPattern.MatchString(request.IdemKey) &&
+		(request.Type != "adjust" || !adjustIdemKeyPattern.MatchString(request.IdemKey)) {
 		return ErrInvalidRequest
 	}
 	seen := make(map[int64]struct{}, len(request.Postings))
