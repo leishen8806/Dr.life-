@@ -287,30 +287,53 @@ func (s *Service) startReconciliationRun(ctx context.Context, day time.Time, kin
 		if loadErr != nil {
 			return ReconciliationRun{}, false, loadErr
 		}
-		if run.Status == "running" {
-			if s.now().Sub(run.StartedAt) < s.reconciliationRunTimeout {
-				if !opts.Force {
-					return run, true, ErrReconciliationRunning
-				}
-			} else {
-				summary, marshalErr := json.Marshal(map[string]int{"STALE_RUN": 1})
-				if marshalErr != nil {
-					return ReconciliationRun{}, false, marshalErr
-				}
-				finished := s.now()
-				if _, updateErr := tx.Exec(ctx, `UPDATE ledger.recon_run SET status='failed',finished_at=$2,summary=$3 WHERE id=$1`, run.ID, finished, summary); updateErr != nil {
-					return ReconciliationRun{}, false, updateErr
-				}
-				payload, marshalErr := json.Marshal(map[string]any{"run_id": run.ID, "day": day.Format("2006-01-02"), "occurred_at": finished})
-				if marshalErr != nil {
-					return ReconciliationRun{}, false, marshalErr
-				}
-				if _, insertErr := tx.Exec(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES('ledger.recon.stale_run',$1)`, payload); insertErr != nil {
-					return ReconciliationRun{}, false, insertErr
-				}
-				opts.Force, opts.Reason = true, "stale reconciliation run replaced"
+		now := s.now()
+		rows, queryErr := tx.Query(ctx, `SELECT id,started_at FROM ledger.recon_run WHERE day=$1 AND kind=$2 AND status='running' FOR UPDATE`, day, kind)
+		if queryErr != nil {
+			return ReconciliationRun{}, false, queryErr
+		}
+		latestWasStale := false
+		staleRunIDs := make([]int64, 0)
+		for rows.Next() {
+			var runningID int64
+			var startedAt time.Time
+			if scanErr := rows.Scan(&runningID, &startedAt); scanErr != nil {
+				rows.Close()
+				return ReconciliationRun{}, false, scanErr
 			}
-		} else if !opts.Force {
+			if now.Sub(startedAt) >= s.reconciliationRunTimeout {
+				staleRunIDs = append(staleRunIDs, runningID)
+				if runningID == run.ID {
+					latestWasStale = true
+				}
+			}
+		}
+		if rows.Err() != nil {
+			rows.Close()
+			return ReconciliationRun{}, false, rows.Err()
+		}
+		rows.Close()
+		for _, runningID := range staleRunIDs {
+			summary, marshalErr := json.Marshal(map[string]int{"STALE_RUN": 1})
+			if marshalErr != nil {
+				return ReconciliationRun{}, false, marshalErr
+			}
+			if _, updateErr := tx.Exec(ctx, `UPDATE ledger.recon_run SET status='failed',finished_at=$2,summary=$3 WHERE id=$1`, runningID, now, summary); updateErr != nil {
+				return ReconciliationRun{}, false, updateErr
+			}
+			payload, marshalErr := json.Marshal(map[string]any{"run_id": runningID, "day": day.Format("2006-01-02"), "occurred_at": now})
+			if marshalErr != nil {
+				return ReconciliationRun{}, false, marshalErr
+			}
+			if _, insertErr := tx.Exec(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES('ledger.recon.stale_run',$1)`, payload); insertErr != nil {
+				return ReconciliationRun{}, false, insertErr
+			}
+		}
+		if latestWasStale {
+			opts.Force, opts.Reason = true, "stale reconciliation run replaced"
+		} else if run.Status == "running" && !opts.Force {
+			return run, true, ErrReconciliationRunning
+		} else if run.Status != "running" && !opts.Force {
 			if err := tx.Commit(ctx); err != nil {
 				return ReconciliationRun{}, false, err
 			}
