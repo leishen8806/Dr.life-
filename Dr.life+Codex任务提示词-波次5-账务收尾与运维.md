@@ -42,33 +42,44 @@
 
 ---
 
-## L-09 账务查询接口（流水、详情、对账表、导出）
+## L-09a 账务只读查询接口（L-09b 导出、L-09c 凭证并列另卡）
+
+> 2026-10-26 董事会授权收窄：原 L-09 拆为 L-09a（本节，CMP-32）、L-09b 导出（CMP-485，待 F-14/S-03/Q-01）、L-09c 货款凭证并列（CMP-486，待 T-06）。
 
 ```text
 你在 Dr.life+ 仓库工作（私有仓库 leishen8806/Dr.life-，默认分支 main）。请基于 origin/main 最新提交新建独立 worktree，不要在用户的 E:\Dr.life+ 主工作目录里改；只提交到本任务分支并发起 PR，不要推 main，不要合并。
 【通用规则】先读 AGENTS.md（第 4 节规则全部适用）和《开发任务拆分与验收》第十二章清单；文档标“待确认/⚠️”的地方不要自己拍板，按保守默认实现并在 PR 里列出；已合并迁移一律不改，只能新增（取序号见 backend/migrations/README.md）；改表同步《数据库表结构与账务详细设计》，改接口先改 backend/api/openapi.yaml 再生成；权限、范围、脱敏全在服务端，资源范围条件来自令牌，别人的资源一律返回 404；后台写操作写审计（Q-01 未合并前调用 audit.Writer 接口，用 fake 实现）；三语文案齐全，新增高棉语草案带 TODO-KM-REVIEW；日志与错误不含密钥、令牌、完整手机号、聊天原文；测试用真实 PostgreSQL（testcontainers）与 -race，权限与状态机必须有专项测试；金额一律 bigint（0.0001 美元），不得用 float；外部系统一律经适配层并提供模拟实现；跨模块只通过接口或事件，不直接读写别人的 schema；完成标准：go vet、-race、集成测试、OpenAPI 无差异、ci-gate 全绿；PR 描述写明做了什么、没做什么、验收逐条结果、待确认事项、对文档的影响。
 
-【任务】L-09 账务查询接口（流水、详情、对账表、导出）
-【分支】task/L-09-ledger-queries
-【依赖】L-02、L-07、T-06、A-06、S-02（report 池）、F-14
+【任务】L-09a 账务只读查询接口（流水、详情、对账表、本人钱包流水）
+【分支】task/L-09a-ledger-queries
+【依赖】L-02、L-07、S-02（report 池）。A-06b（RBAC）、T-06、F-14 未合并：用可注入接口 + 生产 fail-closed / 默认空实现
 【先阅读】
 1. Dr.life+交互文档.md 平台『资金流水与对账』与买家/商家钱包页；prototype/index.html 资金流水与对账页；Dr.life+平台后台权限与审计规范.md（资金权限、脱敏）
 2. backend/internal/ledger/（API 表面白名单守卫测试：新增导出只读方法必须更新白名单并说明）；Dr.life+开发任务拆分与验收.md：L-09、T-06
 【范围——要做】
 1. 只读查询服务（ledger 包内，走 `report` 池，**用户视角与后台视角分开**）：流水列表（按类型/关键词/时间范围/账户；**keyset 分页**，page_size ≤ 100）、详情（交易头 + 全部分录 + 分账明细 + 关联单据引用 + 操作人）、账户对账表（账户、系统余额、流水推算余额、差异）、用户钱包流水（只含本人账户的分录，对方信息脱敏）、提现与充值记录。
 2. **无资金权限的角色看不到**：后台 `fund`/`fin` 模块 view 才能访问资金接口；商家员工按 `fin` 模块权限；买家/司机只看自己的钱包。
-3. **货款凭证并列显示**：通过 trade 的只读接口 `ListProofs` 取凭证，在响应里并列返回并标注『凭证（仅留痕）』（`kind=proof`），**不进入 ledger 的数据与合计**（测试：合计只含真实分录）。
-4. 导出 CSV：异步（创建导出任务 → S-03 batch → F-14 → 短期签名链接），与列表筛选一致（测试：同一过滤条件的导出行数与列表总数一致）、CSV 公式注入转义、**导出动作写审计**（谁、过滤条件、行数）、导出权限与列表一致、敏感字段按权限脱敏。
-5. 接口（OpenAPI 先行）：/v1/admin/ledger/*、/v1/merchant/wallet/*、/v1/buyer/wallet/*、/v1/driver/wallet/*；统一响应金额为 e4 整数 + 展示用格式化辅助（USD；KHR 用固化汇率）。
+3. **可注入接口（本卡定义）**：`AccountDirectory.Resolve(ctx, accountPublicID)`（ledger 内定义，允许 iam 包补**只读**实现，查 iam.account 取 id/role/merchant_id/status）；`AdminPermissionChecker.Can(ctx, adminID, module, level)`（A-06b 合并前生产接线**全部拒绝**，仅测试 fake 放行，不得猜权限）；`ProofLister`（默认返回空，响应结构保留 `kind: txn|proof`，凭证不计入任何合计，真实接入属 L-09c）。
+4. **不做**：CSV 导出（L-09b）、凭证真实对接（L-09c）、/wallet 余额汇总与提现（L-13）。
+5. **HTTP 合同（OpenAPI 先行）**：
+   - 后台：`GET /v1/admin/ledger/txns`、`/txns/{txn_no}`（含全部分录）、`/accounts`（对账表：account_ref 脱敏、kind、system_balance、recomputed_balance、diff、last_checked_at，支持 diff!=0 过滤，读 ledger.snapshot_daily / recon_run，缓存 60 秒）、`/accounts/{account_ref}/postings`。
+   - 用户：`/v1/{buyer|merchant|driver}/wallet/transactions`、`/{txn_no}`；只含本人账户分录，对方显示通用标签（平台、配送托管、银行、装修资金）；商家按 `fin` view，无权限员工 403；他人资源 404。
+   - 分页与过滤：keyset，page_size ≤ 100；默认近 30 天、区间 ≤ 366 天、时区 Asia/Phnom_Penh；过滤 type/from/to/amount_min/amount_max/ref_type/ref_id/reversed，account_ref 仅后台。
+   - 关键词 `q` 只匹配：txn_no 前缀（不区分大小写）、ref（`order:123` 或纯数字 = ref_id）、bank_ref（精确，仅充值/出款类）；后台有 `sens` view 时可按所有者 public_id 精确检索。**不检索** idem_key、note、收款账户。
+   - 响应金额为 e4 整数；不返回 idem_key、outbox、复核/发起人身份。
+   - 脱敏：无 `sens` 的后台——所有者 public_id 只显示末 4 位、actor 显示角色+末 4 位、bank_ref 末 4 位；有 `sens` 完整，且每次查看未脱敏详情写审计事件（audit.Writer + fake）；收款账户任何角色只显示末 4 位（明文仅走 L-13 `/payee`）。
+   - data_scope 非空的管理员访问 admin 账务接口一律 403（保守默认）。
+   - 错误：无资金权限 403、他人资源 404、参数非法 400。
 6. 性能：常规列表 P95 < 500 ms（本地 100 万分录基准写进 PR）；索引评审（EXPLAIN）；账户对账表分块计算，不在请求内全表扫描（可读快照/缓存 60 秒）。
 【验收标准】
-① 参照原型资金流水与对账页；货款凭证并列显示『仅留痕』且不影响合计
-② 导出与列表一致；权限与脱敏正确（无资金权限 403）；导出写审计
+① 参照原型资金流水与对账页；用户视角只含本人分录且不泄露他人信息
+② 权限与脱敏正确（无资金权限 403，他人资源 404）；关键词只命中允许字段（idem_key/note 不可检索）
 ③ keyset 分页稳定（并发写入下不重复不遗漏）；基准达标
 ④ go vet、-race、ci-gate 全绿；API 表面白名单已更新并说明理由
 【待确认（不要自己拍板，PR 里列出）】
 - 流水页对用户展示的对方信息粒度（默认只显示业务类型与单据号）
-【红线】不得返回他人账户明细；不得把凭证计入余额或合计；不得在请求线程里同步生成大导出。
+- data_scope 管理员是否可看分区域账务（默认 403）
+【红线】不得返回他人账户明细；不得把凭证计入余额或合计；A-06b 前不得把权限检查接成放行。
 ```
 
 ---
