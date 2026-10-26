@@ -128,6 +128,7 @@ func main() {
 		}
 	}
 	var loginService *iam.Service
+	var sessionService *iam.SessionService
 	var authenticator gateway.Authenticator
 	checks := []server.ReadinessCheck{database.Ping}
 	if cfg.JWTSigningConfigured {
@@ -159,11 +160,23 @@ func main() {
 			logger.Error("Bot token encryption configuration failed")
 			os.Exit(1)
 		}
-		tokens := iam.TokenManager{Keys: jwtKeys, AccessTTL: cfg.AccessTokenTTL, Checker: iam.PassSessionChecker{}}
+		var sessionCache iam.SessionCache
+		if cfg.RedisURL != "" {
+			redisSessions, redisErr := iam.NewRedisSessionCache(cfg.RedisURL)
+			if redisErr != nil {
+				logger.Error("Redis session configuration failed", "error", redisErr)
+				os.Exit(1)
+			}
+			defer redisSessions.Close()
+			sessionCache = redisSessions
+		}
+		checker := iam.DBSessionChecker{DB: iamDatabase, Cache: sessionCache, IdleTTL: cfg.SessionIdleTTL}
+		tokens := iam.TokenManager{Keys: jwtKeys, AccessTTL: cfg.AccessTokenTTL, Issuer: cfg.TokenIssuer, LegacyAcceptUntil: cfg.TokenLegacyAcceptUntil, Checker: checker}
+		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}}
 		loginService = &iam.Service{
 			DB:       iamDatabase,
 			Verifier: telegram.PoolVerifier{Validator: telegram.NewValidator(cfg.TelegramInitDataMaxAge), Source: &telegram.DBPoolSource{DB: iamDatabase, Envelope: envelope, TTL: cfg.BotTokenCacheTTL}},
-			Tokens:   tokens, RefreshTTL: cfg.RefreshTokenTTL,
+			Tokens:   tokens, RefreshTTL: cfg.RefreshTokenTTL, IdleTTL: cfg.SessionIdleTTL, MaxSessions: cfg.SessionMaxPerAccount, SessionCache: sessionCache,
 			Failures: &iam.FailureGuard{Limiter: limiter, Rule: gateway.Rule{Limit: cfg.LoginFailureLimit, Window: cfg.LoginFailureWindow}},
 			Metrics:  metrics.Business(),
 		}
@@ -197,7 +210,7 @@ func main() {
 			FinancialPrefixes: cfg.FinancialPrefixes,
 		},
 		IdempotencyExempt: func(r *http.Request) bool {
-			return r.Method == http.MethodPost && r.URL.Path == "/v1/public/auth/telegram"
+			return r.Method == http.MethodPost && (r.URL.Path == "/v1/public/auth/telegram" || r.URL.Path == "/v1/public/auth/refresh")
 		},
 		Metrics:       metrics,
 		ErrorReporter: reporter,
@@ -205,6 +218,7 @@ func main() {
 		Merchants:     directory,
 		Logger:        logger,
 		Login:         loginService,
+		Sessions:      sessionService,
 		Bulkhead:      bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)

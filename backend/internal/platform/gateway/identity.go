@@ -18,6 +18,7 @@ const (
 type Identity struct {
 	AccountID string
 	Role      Role
+	SessionID string
 }
 
 type Authenticator interface {

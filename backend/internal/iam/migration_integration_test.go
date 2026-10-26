@@ -65,7 +65,7 @@ func TestIAMMigration(t *testing.T) {
 	}
 
 	t.Run("up down up is reversible", func(t *testing.T) {
-		assertIAMTableCount(t, database, 16)
+		assertIAMTableCount(t, database, 17)
 		if err := goose.DownTo(database, migrationsDir, 2); err != nil {
 			t.Fatal(err)
 		}
@@ -73,7 +73,7 @@ func TestIAMMigration(t *testing.T) {
 		if err := goose.Up(database, migrationsDir); err != nil {
 			t.Fatal(err)
 		}
-		assertIAMTableCount(t, database, 16)
+		assertIAMTableCount(t, database, 17)
 	})
 
 	admin, err := pgx.Connect(ctx, dsn)
@@ -92,7 +92,7 @@ func TestIAMMigration(t *testing.T) {
 			FROM information_schema.columns c WHERE c.table_schema = 'iam'`).Scan(&identityCount, &publicIDCount, &badTimestamp); err != nil {
 			t.Fatal(err)
 		}
-		if identityCount != 13 || publicIDCount != 13 || badTimestamp != 0 {
+		if identityCount != 14 || publicIDCount != 14 || badTimestamp != 0 {
 			t.Fatalf("identity columns=%d, public IDs=%d, bad timestamps=%d", identityCount, publicIDCount, badTimestamp)
 		}
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.person (public_id, tg_user_id) VALUES ('bad-ulid', 1)`)
@@ -122,17 +122,17 @@ func TestIAMMigration(t *testing.T) {
 
 	t.Run("session indexes exist", func(t *testing.T) {
 		var count int
-		if err := admin.QueryRow(ctx, `SELECT count(*) FROM pg_indexes WHERE schemaname='iam' AND tablename='session' AND indexname IN ('ix_session_account_id','ix_session_expires_at')`).Scan(&count); err != nil {
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM pg_indexes WHERE schemaname='iam' AND tablename='session' AND indexname IN ('ix_session_account_id','ix_session_expires_at','ix_session_family_id','ix_session_previous_hash','ix_session_active_account')`).Scan(&count); err != nil {
 			t.Fatal(err)
 		}
-		if count != 2 {
-			t.Fatalf("session index count=%d, want 2", count)
+		if count != 5 {
+			t.Fatalf("session index count=%d, want 5", count)
 		}
-		if err := admin.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='iam' AND data_type='bytea' AND (table_name,column_name) IN (('person','phone_enc'),('merchant','phone_enc'),('merchant','address_enc'),('merchant','contact_enc'),('bot','token_enc'),('bot','webhook_secret_enc'),('session','refresh_token_hash'),('merchant_staff','phone_enc'),('merchant_staff','phone_hash'),('admin_user','totp_secret_enc'))`).Scan(&count); err != nil {
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='iam' AND data_type='bytea' AND (table_name,column_name) IN (('person','phone_enc'),('merchant','phone_enc'),('merchant','address_enc'),('merchant','contact_enc'),('bot','token_enc'),('bot','webhook_secret_enc'),('session','refresh_token_hash'),('session','previous_hash'),('merchant_staff','phone_enc'),('merchant_staff','phone_hash'),('admin_user','totp_secret_enc'))`).Scan(&count); err != nil {
 			t.Fatal(err)
 		}
-		if count != 10 {
-			t.Fatalf("sensitive bytea column count=%d, want 10", count)
+		if count != 11 {
+			t.Fatalf("sensitive bytea column count=%d, want 11", count)
 		}
 	})
 
@@ -198,6 +198,7 @@ func TestIAMMigration(t *testing.T) {
 			`SELECT password_hash FROM iam.admin_user`,
 			`SELECT totp_secret_enc FROM iam.admin_user`,
 			`SELECT refresh_token_hash FROM iam.session`,
+			`SELECT previous_hash FROM iam.session`,
 			`SELECT phone_enc FROM iam.person`,
 		} {
 			assertSQLState(t, ctx, reportLogin, "42501", statement)

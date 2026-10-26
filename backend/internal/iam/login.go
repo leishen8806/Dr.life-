@@ -46,13 +46,16 @@ type LoginResult struct {
 }
 
 type Service struct {
-	DB         *pgxpool.Pool
-	Verifier   telegram.PoolVerifier
-	Tokens     TokenManager
-	RefreshTTL time.Duration
-	Failures   *FailureGuard
-	Metrics    LoginMetrics
-	Now        func() time.Time
+	DB           *pgxpool.Pool
+	Verifier     telegram.PoolVerifier
+	Tokens       TokenManager
+	RefreshTTL   time.Duration
+	IdleTTL      time.Duration
+	MaxSessions  int
+	SessionCache SessionCache
+	Failures     *FailureGuard
+	Metrics      LoginMetrics
+	Now          func() time.Time
 }
 
 func (s *Service) Login(ctx context.Context, input LoginInput) (LoginResult, error) {
@@ -140,15 +143,46 @@ func (s *Service) loginValidated(ctx context.Context, input LoginInput, verified
 			return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
 		}
 	}
-	refresh, refreshHash, err := NewRefreshToken()
-	if err != nil {
-		return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
-	}
 	sessionPublicID, err := ids.NewULID()
 	if err != nil {
 		return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO iam.session(public_id,account_id,refresh_token_hash,device_id,ip,expires_at) VALUES($1,$2,$3,NULLIF($4,''),$5,$6)`, sessionPublicID, account.ID, refreshHash, input.DeviceID, nullableIP(input.IP), now.Add(s.RefreshTTL)); err != nil {
+	refresh, refreshHash, refreshKID, err := s.Tokens.IssueRefresh(ctx, sessionPublicID, 0)
+	if err != nil {
+		return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
+	}
+	var epoch int64
+	if err := tx.QueryRow(ctx, `SELECT token_epoch FROM iam.account WHERE id=$1 FOR UPDATE`, account.ID).Scan(&epoch); err != nil {
+		return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
+	}
+	maxSessions := s.MaxSessions
+	if maxSessions <= 0 {
+		maxSessions = 5
+	}
+	rows, err := tx.Query(ctx, `UPDATE iam.session SET revoked_at=$1,revoked_reason='session_limit',updated_at=$1 WHERE id IN (SELECT id FROM iam.session WHERE account_id=$2 AND revoked_at IS NULL ORDER BY created_at DESC,id DESC OFFSET $3) RETURNING public_id,expires_at`, now, account.ID, maxSessions-1)
+	if err != nil {
+		return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
+	}
+	type revokedSession struct {
+		id      string
+		expires time.Time
+	}
+	var revoked []revokedSession
+	for rows.Next() {
+		var item revokedSession
+		if err := rows.Scan(&item.id, &item.expires); err != nil {
+			rows.Close()
+			return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
+		}
+		revoked = append(revoked, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
+	}
+	rows.Close()
+	expiresAt := now.Add(s.RefreshTTL)
+	if _, err := tx.Exec(ctx, `INSERT INTO iam.session(public_id,account_id,family_id,refresh_token_hash,refresh_kid,device_id,ip,expires_at,last_used_at) VALUES($1,$2,$1,$3,$4,NULLIF($5,''),$6,$7,$8)`, sessionPublicID, account.ID, refreshHash, refreshKID, input.DeviceID, nullableIP(input.IP), expiresAt, now); err != nil {
 		return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
 	access, err := s.Tokens.IssueAccess(ctx, account.PublicID, gatewayRole(role), sessionPublicID)
@@ -160,6 +194,16 @@ func (s *Service) loginValidated(ctx context.Context, input LoginInput, verified
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
+	}
+	if s.SessionCache != nil {
+		for _, item := range revoked {
+			_ = s.SessionCache.Revoke(ctx, item.id, positiveTTL(now, item.expires))
+		}
+		idleTTL := s.IdleTTL
+		if idleTTL <= 0 {
+			idleTTL = 24 * time.Hour
+		}
+		_ = s.SessionCache.Put(ctx, account.PublicID, sessionPublicID, epoch, cacheTTL(now, expiresAt, now.Add(idleTTL)))
 	}
 	return LoginResult{AccessToken: access, AccessExpiresIn: int64(s.Tokens.AccessTTL / time.Second), RefreshToken: refresh, RefreshExpiresIn: int64(s.RefreshTTL / time.Second), Account: LoginAccount{PublicID: account.PublicID, Role: gatewayRole(role), Lang: account.Lang, Status: account.Status}, NeedsLanguage: account.Lang == nil, IsNewAccount: isNew}, nil
 }
