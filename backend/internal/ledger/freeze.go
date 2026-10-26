@@ -7,6 +7,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+type spotCheckDropMetrics interface {
+	ReconSpotCheckDropped()
+}
+
 func (s *Service) maybeSpotCheck(postings []Posting) {
 	if s.spotCheckEvery == 0 || s.spotCheckCounter.Add(1)%s.spotCheckEvery != 0 {
 		return
@@ -19,22 +23,33 @@ func (s *Service) maybeSpotCheck(postings []Posting) {
 	for id := range accountSet {
 		accountIDs = append(accountIDs, id)
 	}
+	s.spotCheckMu.Lock()
+	if s.spotCheckClosed {
+		s.spotCheckMu.Unlock()
+		return
+	}
+	select {
+	case s.spotCheckSem <- struct{}{}:
+		s.spotCheckWG.Add(1)
+		s.spotCheckMu.Unlock()
+	default:
+		s.spotCheckMu.Unlock()
+		if metrics, ok := s.reconciliationMetrics.(spotCheckDropMetrics); ok {
+			metrics.ReconSpotCheckDropped()
+		}
+		return
+	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer func() { <-s.spotCheckSem; s.spotCheckWG.Done() }()
+		ctx, cancel := context.WithTimeout(s.spotCheckCtx, 30*time.Second)
 		defer cancel()
 		_ = s.runSpotCheck(ctx, accountIDs)
 	}()
 }
 
 func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
-	day, _ := s.reconciliationDay(s.now())
-	run, _, err := s.startReconciliationRun(ctx, day, "spot", ReconciliationOptions{Force: true, Reason: "automatic posting spot check"})
-	if err != nil {
-		return err
-	}
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
-		s.failReconciliationRun(ctx, run.ID, err)
 		return err
 	}
 	issues, err := checkBalanceCache(ctx, tx, accountIDs)
@@ -44,7 +59,14 @@ func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 		_ = tx.Rollback(ctx)
 	}
 	if err != nil {
-		s.failReconciliationRun(ctx, run.ID, err)
+		return err
+	}
+	if len(issues) == 0 {
+		return nil
+	}
+	day, _ := s.reconciliationDay(s.now())
+	run, _, err := s.startReconciliationRun(ctx, day, "spot", ReconciliationOptions{Force: true, Reason: "automatic posting spot check"})
+	if err != nil {
 		return err
 	}
 	_, err = s.finishReconciliationRun(ctx, run, issues)
@@ -52,4 +74,19 @@ func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 		s.failReconciliationRun(ctx, run.ID, err)
 	}
 	return err
+}
+
+func (s *Service) StopSpotChecks(ctx context.Context) error {
+	s.spotCheckMu.Lock()
+	s.spotCheckClosed = true
+	s.spotCheckMu.Unlock()
+	s.spotCheckCancel()
+	done := make(chan struct{})
+	go func() { s.spotCheckWG.Wait(); close(done) }()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

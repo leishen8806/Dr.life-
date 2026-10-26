@@ -18,6 +18,13 @@ type reconMetrics struct {
 	mismatches map[string]int
 }
 
+func reconciliationService(e businessEnv, options ledger.Options) *ledger.Service {
+	if options.Now == nil {
+		options.Now = func() time.Time { return time.Now().AddDate(0, 0, 2) }
+	}
+	return ledger.New(e.app, options)
+}
+
 func (m *reconMetrics) ReconRun(ok bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -35,7 +42,7 @@ func (m *reconMetrics) ReconMismatch(code string, count int) {
 func TestReconciliationNormalAndForcedRuns(t *testing.T) {
 	e := newBusinessEnv(t)
 	metrics := &reconMetrics{}
-	service := ledger.New(e.app, ledger.Options{ReconciliationMetrics: metrics})
+	service := reconciliationService(e, ledger.Options{ReconciliationMetrics: metrics})
 	wallet := mustWallet(t, e, 9101, nil)
 	if _, err := service.Topup(e.ctx, ledger.TopupInput{ManualConfirmation: "recon-normal", BankConfirmed: true, WalletAccountID: wallet.Available, Amount: 1_000, ActorID: 1}); err != nil {
 		t.Fatal(err)
@@ -65,10 +72,40 @@ func TestReconciliationNormalAndForcedRuns(t *testing.T) {
 	}
 }
 
+func TestReconciliationRejectsOpenBusinessDayWithoutSideEffects(t *testing.T) {
+	e := newBusinessEnv(t)
+	location := time.FixedZone("recon-test", 7*60*60)
+	now := time.Date(2026, time.October, 26, 8, 0, 0, 0, location)
+	service := ledger.New(e.app, ledger.Options{ReconciliationLocation: location, Now: func() time.Time { return now }})
+	today := time.Date(2026, time.October, 26, 0, 0, 0, 0, location)
+
+	for _, day := range []time.Time{today, today.AddDate(0, 0, 1)} {
+		if _, err := service.SnapshotDaily(e.ctx, day); !errors.Is(err, ledger.ErrReconciliationDayOpen) {
+			t.Fatalf("snapshot %s err=%v", day, err)
+		}
+		if _, err := service.RunDailyReconciliation(e.ctx, day, ledger.ReconciliationOptions{}); !errors.Is(err, ledger.ErrReconciliationDayOpen) {
+			t.Fatalf("reconciliation %s err=%v", day, err)
+		}
+	}
+	var snapshots, runs, freezes int
+	if err := e.admin.QueryRow(e.ctx, `SELECT count(*) FROM ledger.snapshot_daily`).Scan(&snapshots); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.admin.QueryRow(e.ctx, `SELECT count(*) FROM ledger.recon_run`).Scan(&runs); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.admin.QueryRow(e.ctx, `SELECT count(*) FROM ledger.payout_freeze`).Scan(&freezes); err != nil {
+		t.Fatal(err)
+	}
+	if snapshots != 0 || runs != 0 || freezes != 0 {
+		t.Fatalf("open day created side effects: snapshots=%d runs=%d freezes=%d", snapshots, runs, freezes)
+	}
+}
+
 func TestReconciliationAccountFreeze(t *testing.T) {
 	e := newBusinessEnv(t)
 	metrics := &reconMetrics{}
-	service := ledger.New(e.app, ledger.Options{
+	service := reconciliationService(e, ledger.Options{
 		AccountGuard: withdrawalGuard{}, PayeeCipher: withdrawalCipher(t),
 		ReconciliationMetrics: metrics,
 	})
@@ -129,7 +166,7 @@ func TestReconciliationAccountFreeze(t *testing.T) {
 
 func TestReconciliationGlobalFreezeAndRelease(t *testing.T) {
 	e := newBusinessEnv(t)
-	service := ledger.New(e.app, ledger.Options{AccountGuard: withdrawalGuard{}, PayeeCipher: withdrawalCipher(t)})
+	service := reconciliationService(e, ledger.Options{AccountGuard: withdrawalGuard{}, PayeeCipher: withdrawalCipher(t)})
 	wallet := mustWallet(t, e, 9301, nil)
 	if _, err := service.Topup(e.ctx, ledger.TopupInput{ManualConfirmation: "recon-global", BankConfirmed: true, WalletAccountID: wallet.Available, Amount: 2_000, ActorID: 1}); err != nil {
 		t.Fatal(err)
@@ -217,7 +254,7 @@ func TestReconciliationGlobalFreezeAndRelease(t *testing.T) {
 
 func TestSnapshotDailyImmutableAndDetectsDrift(t *testing.T) {
 	e := newBusinessEnv(t)
-	service := ledger.New(e.app, ledger.Options{})
+	service := reconciliationService(e, ledger.Options{})
 	wallet := mustWallet(t, e, 9401, nil)
 	if _, err := service.Topup(e.ctx, ledger.TopupInput{ManualConfirmation: "snapshot-drift", BankConfirmed: true, WalletAccountID: wallet.Available, Amount: 100, ActorID: 1}); err != nil {
 		t.Fatal(err)
@@ -295,7 +332,7 @@ func TestReconciliationDetectsTriggerBypass(t *testing.T) {
 	if _, err := e.admin.Exec(e.ctx, `ALTER TABLE ledger.posting ENABLE TRIGGER USER; ALTER TABLE ledger.txn ENABLE TRIGGER USER`); err != nil {
 		t.Fatal(err)
 	}
-	run, err := ledger.New(e.app, ledger.Options{}).RunDailyReconciliation(e.ctx, time.Now(), ledger.ReconciliationOptions{InitiatedBy: 1})
+	run, err := reconciliationService(e, ledger.Options{}).RunDailyReconciliation(e.ctx, time.Now(), ledger.ReconciliationOptions{InitiatedBy: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +345,7 @@ func TestReconciliationDetectsTriggerBypass(t *testing.T) {
 
 func TestReconciliationDetectsHoldAndPendingPayoutMismatch(t *testing.T) {
 	e := newBusinessEnv(t)
-	service := ledger.New(e.app, ledger.Options{AccountGuard: withdrawalGuard{}, PayeeCipher: withdrawalCipher(t)})
+	service := reconciliationService(e, ledger.Options{AccountGuard: withdrawalGuard{}, PayeeCipher: withdrawalCipher(t)})
 	wallet := mustWallet(t, e, 9451, nil)
 	if _, err := service.Topup(e.ctx, ledger.TopupInput{ManualConfirmation: "recon-linked", BankConfirmed: true, WalletAccountID: wallet.Available, Amount: 1_000, ActorID: 1}); err != nil {
 		t.Fatal(err)
@@ -339,11 +376,45 @@ func TestReconciliationDetectsHoldAndPendingPayoutMismatch(t *testing.T) {
 			t.Fatalf("missing %s: %+v", code, run.Issues)
 		}
 	}
+	freezes, err := service.ListPayoutFreezes(e.ctx, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var global, frozenWallet bool
+	for _, freeze := range freezes {
+		global = global || freeze.Scope == "global"
+		frozenWallet = frozenWallet || (freeze.Scope == "account" && freeze.AccountID != nil && *freeze.AccountID == wallet.Available)
+	}
+	if !global || !frozenWallet {
+		t.Fatalf("hold/payout mismatch freezes global=%t wallet=%t freezes=%+v", global, frozenWallet, freezes)
+	}
+}
+
+func TestReconciliationReplacesStaleRunningAttempt(t *testing.T) {
+	e := newBusinessEnv(t)
+	now := time.Date(2026, time.October, 26, 12, 0, 0, 0, time.UTC)
+	service := ledger.New(e.app, ledger.Options{Now: func() time.Time { return now }, ReconciliationRunTimeout: time.Minute})
+	day := now.AddDate(0, 0, -1)
+	if _, err := e.admin.Exec(e.ctx, `INSERT INTO ledger.recon_run(day,kind,attempt,started_at) VALUES($1,'daily',1,$2)`, day, now.Add(-2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	run, err := service.RunDailyReconciliation(e.ctx, day, ledger.ReconciliationOptions{})
+	if err != nil || run.Attempt != 2 || run.Status != "ok" {
+		t.Fatalf("replacement run=%+v err=%v", run, err)
+	}
+	var staleStatus string
+	var staleSummary string
+	if err := e.admin.QueryRow(e.ctx, `SELECT status,summary::text FROM ledger.recon_run WHERE day=$1 AND kind='daily' AND attempt=1`, day).Scan(&staleStatus, &staleSummary); err != nil {
+		t.Fatal(err)
+	}
+	if staleStatus != "failed" || !strings.Contains(staleSummary, "STALE_RUN") {
+		t.Fatalf("stale run status=%s summary=%s", staleStatus, staleSummary)
+	}
 }
 
 func TestReconciliationBusinessSequenceHasNoFalsePositive(t *testing.T) {
 	e := newBusinessEnv(t)
-	service := ledger.New(e.app, ledger.Options{AccountGuard: withdrawalGuard{}, PayeeCipher: withdrawalCipher(t)})
+	service := reconciliationService(e, ledger.Options{AccountGuard: withdrawalGuard{}, PayeeCipher: withdrawalCipher(t)})
 	buyer := mustWallet(t, e, 9471, nil)
 	merchant := mustWallet(t, e, 9472, nil)
 	topup, err := service.Topup(e.ctx, ledger.TopupInput{ManualConfirmation: "recon-sequence-buyer", BankConfirmed: true, WalletAccountID: buyer.Available, Amount: 2_000, ActorID: 1})
@@ -375,7 +446,7 @@ func TestReconciliationBusinessSequenceHasNoFalsePositive(t *testing.T) {
 
 func TestReconciliationConcurrentPostingHasNoFalsePositive(t *testing.T) {
 	e := newBusinessEnv(t)
-	service := ledger.New(e.app, ledger.Options{})
+	service := reconciliationService(e, ledger.Options{})
 	wallet := mustWallet(t, e, 9501, nil)
 	start := make(chan struct{})
 	errs := make(chan error, 100)
@@ -410,15 +481,29 @@ func TestReconciliationConcurrentPostingHasNoFalsePositive(t *testing.T) {
 func TestSpotCheckIsAsynchronousAndFreezesMismatch(t *testing.T) {
 	e := newBusinessEnv(t)
 	wallet := mustWallet(t, e, 9601, nil)
-	base := ledger.New(e.app, ledger.Options{})
+	base := reconciliationService(e, ledger.Options{})
 	if _, err := base.Topup(e.ctx, ledger.TopupInput{ManualConfirmation: "spot-base", BankConfirmed: true, WalletAccountID: wallet.Available, Amount: 100, ActorID: 1}); err != nil {
 		t.Fatal(err)
+	}
+	clean := reconciliationService(e, ledger.Options{SpotCheckEvery: 1})
+	if _, err := clean.Topup(e.ctx, ledger.TopupInput{ManualConfirmation: "spot-clean", BankConfirmed: true, WalletAccountID: wallet.Available, Amount: 1, ActorID: 2}); err != nil {
+		t.Fatal(err)
+	}
+	if err := clean.StopSpotChecks(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	var cleanRuns int
+	if err := e.admin.QueryRow(e.ctx, `SELECT count(*) FROM ledger.recon_run WHERE kind='spot'`).Scan(&cleanRuns); err != nil {
+		t.Fatal(err)
+	}
+	if cleanRuns != 0 {
+		t.Fatalf("clean spot check created %d reconciliation runs", cleanRuns)
 	}
 	if _, err := e.admin.Exec(e.ctx, `UPDATE ledger.balance SET balance=balance+1 WHERE account_id=$1`, wallet.Available); err != nil {
 		t.Fatal(err)
 	}
 	metrics := &reconMetrics{}
-	service := ledger.New(e.app, ledger.Options{SpotCheckEvery: 1, ReconciliationMetrics: metrics})
+	service := reconciliationService(e, ledger.Options{SpotCheckEvery: 1, ReconciliationMetrics: metrics})
 	if _, err := service.Topup(e.ctx, ledger.TopupInput{ManualConfirmation: "spot-trigger", BankConfirmed: true, WalletAccountID: wallet.Available, Amount: 1, ActorID: 2}); err != nil {
 		t.Fatalf("posting must not wait for or inherit spot-check failure: %v", err)
 	}
@@ -496,7 +581,7 @@ func TestReconciliationScale(t *testing.T) {
 		t.Fatal(err)
 	}
 	started := time.Now()
-	run, err := ledger.New(e.app, ledger.Options{}).RunDailyReconciliation(e.ctx, time.Now(), ledger.ReconciliationOptions{})
+	run, err := reconciliationService(e, ledger.Options{}).RunDailyReconciliation(e.ctx, time.Now(), ledger.ReconciliationOptions{})
 	elapsed := time.Since(started)
 	if err != nil || run.Status != "ok" || len(run.Issues) != 0 {
 		t.Fatalf("scale run=%+v err=%v elapsed=%s", run, err, elapsed)

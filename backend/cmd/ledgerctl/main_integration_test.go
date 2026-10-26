@@ -64,7 +64,7 @@ func TestLedgerctlCommandsIntegration(t *testing.T) {
 	}
 	defer pool.Close()
 	service := ledger.New(pool, ledger.Options{})
-	day := time.Now()
+	day := time.Now().AddDate(0, 0, -1)
 	var stdout, stderr bytes.Buffer
 	if code := execute(ctx, command{name: "snapshot", day: day}, service, &stdout, &stderr); code != 0 {
 		t.Fatalf("snapshot exit=%d stderr=%s", code, stderr.String())

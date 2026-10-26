@@ -27,6 +27,7 @@ var publicServiceMethods = []string{
 	"ListOverdueWithdrawals", "ListPayoutFreezes", "MemberFee", "OldestUnsentOutboxAge", "RefundHold",
 	"ReleasePayoutFreeze", "RequestWithdrawal", "ResolveDispute", "Reverse",
 	"RunDailyReconciliation", "SettleHold", "SnapshotDaily", "StartReview", "StorageFee",
+	"StopSpotChecks",
 	"Sweep", "Topup", "VerifyHoldsMatchFrozen", "VerifyPendingPayoutMatchesWithdrawals",
 }
 

@@ -8,6 +8,7 @@ import (
 	"math"
 	"regexp"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -58,6 +59,13 @@ type Service struct {
 	reconciliationLocation   *time.Location
 	spotCheckEvery           uint64
 	spotCheckCounter         atomic.Uint64
+	spotCheckSem             chan struct{}
+	spotCheckCtx             context.Context
+	spotCheckCancel          context.CancelFunc
+	spotCheckMu              sync.Mutex
+	spotCheckClosed          bool
+	spotCheckWG              sync.WaitGroup
+	reconciliationRunTimeout time.Duration
 	now                      func() time.Time
 }
 
@@ -70,6 +78,8 @@ type Options struct {
 	LargeWithdrawalThreshold int64
 	ReconciliationLocation   *time.Location
 	SpotCheckEvery           int
+	SpotCheckConcurrency     int
+	ReconciliationRunTimeout time.Duration
 	Now                      func() time.Time
 }
 
@@ -94,11 +104,22 @@ func New(db beginner, options Options) *Service {
 	if spotCheckEvery < 0 {
 		spotCheckEvery = 0
 	}
+	spotCheckConcurrency := options.SpotCheckConcurrency
+	if spotCheckConcurrency <= 0 {
+		spotCheckConcurrency = 4
+	}
+	runTimeout := options.ReconciliationRunTimeout
+	if runTimeout <= 0 {
+		runTimeout = 30 * time.Minute
+	}
+	spotCtx, spotCancel := context.WithCancel(context.Background())
 	return &Service{
 		db: db, maxRetries: maxRetries, accountGuard: options.AccountGuard,
 		payeeCipher: options.PayeeCipher, withdrawalMetrics: options.WithdrawalMetrics,
 		reconciliationMetrics: options.ReconciliationMetrics, reconciliationLocation: location,
 		largeWithdrawalThreshold: threshold, spotCheckEvery: uint64(spotCheckEvery), now: now,
+		spotCheckSem: make(chan struct{}, spotCheckConcurrency), spotCheckCtx: spotCtx, spotCheckCancel: spotCancel,
+		reconciliationRunTimeout: runTimeout,
 	}
 }
 

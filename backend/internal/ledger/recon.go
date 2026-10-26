@@ -29,6 +29,8 @@ var (
 	ErrPayoutFreezeReleased      = errors.New("ledger payout freeze already released")
 	ErrFreezeReleaseSeparation   = errors.New("payout freeze releaser must differ from reconciliation initiator")
 	ErrReconciliationForceReason = errors.New("forced reconciliation requires a reason")
+	ErrReconciliationDayOpen     = errors.New("reconciliation day has not ended")
+	ErrReconciliationRunning     = errors.New("ledger reconciliation is already running")
 )
 
 type ReconciliationMetrics interface {
@@ -103,6 +105,9 @@ type freezeReleasedEvent struct {
 }
 
 func (s *Service) SnapshotDaily(ctx context.Context, day time.Time) (SnapshotResult, error) {
+	if !s.reconciliationDayClosed(day) {
+		return SnapshotResult{}, ErrReconciliationDayOpen
+	}
 	day, cutoff := s.reconciliationDay(day)
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
 	if err != nil {
@@ -152,6 +157,9 @@ func (s *Service) SnapshotDaily(ctx context.Context, day time.Time) (SnapshotRes
 func (s *Service) RunDailyReconciliation(ctx context.Context, day time.Time, opts ReconciliationOptions) (ReconciliationRun, error) {
 	if opts.Force && strings.TrimSpace(opts.Reason) == "" {
 		return ReconciliationRun{}, ErrReconciliationForceReason
+	}
+	if !s.reconciliationDayClosed(day) {
+		return ReconciliationRun{}, ErrReconciliationDayOpen
 	}
 	day, _ = s.reconciliationDay(day)
 	run, existing, err := s.startReconciliationRun(ctx, day, "daily", opts)
@@ -272,16 +280,38 @@ func (s *Service) startReconciliationRun(ctx context.Context, day time.Time, kin
 		return ReconciliationRun{}, false, err
 	}
 	var existingID int64
-	err = tx.QueryRow(ctx, `SELECT id FROM ledger.recon_run WHERE day=$1 AND kind=$2 ORDER BY attempt DESC LIMIT 1`, day, kind).Scan(&existingID)
-	if err == nil && !opts.Force {
+	err = tx.QueryRow(ctx, `SELECT id FROM ledger.recon_run WHERE day=$1 AND kind=$2 ORDER BY attempt DESC LIMIT 1 FOR UPDATE`, day, kind).Scan(&existingID)
+	if err == nil {
 		run, loadErr := s.loadReconciliationRun(ctx, tx, existingID)
 		if loadErr != nil {
 			return ReconciliationRun{}, false, loadErr
 		}
-		if err := tx.Commit(ctx); err != nil {
-			return ReconciliationRun{}, false, err
+		if run.Status == "running" {
+			if s.now().Sub(run.StartedAt) < s.reconciliationRunTimeout {
+				return run, true, ErrReconciliationRunning
+			}
+			summary, marshalErr := json.Marshal(map[string]int{"STALE_RUN": 1})
+			if marshalErr != nil {
+				return ReconciliationRun{}, false, marshalErr
+			}
+			finished := s.now()
+			if _, updateErr := tx.Exec(ctx, `UPDATE ledger.recon_run SET status='failed',finished_at=$2,summary=$3 WHERE id=$1`, run.ID, finished, summary); updateErr != nil {
+				return ReconciliationRun{}, false, updateErr
+			}
+			payload, marshalErr := json.Marshal(map[string]any{"run_id": run.ID, "day": day.Format("2006-01-02"), "occurred_at": finished})
+			if marshalErr != nil {
+				return ReconciliationRun{}, false, marshalErr
+			}
+			if _, insertErr := tx.Exec(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES('ledger.recon.stale_run',$1)`, payload); insertErr != nil {
+				return ReconciliationRun{}, false, insertErr
+			}
+			opts.Force, opts.Reason = true, "stale reconciliation run replaced"
+		} else if !opts.Force {
+			if err := tx.Commit(ctx); err != nil {
+				return ReconciliationRun{}, false, err
+			}
+			return run, true, nil
 		}
-		return run, true, nil
 	}
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return ReconciliationRun{}, false, err
@@ -331,13 +361,19 @@ func (s *Service) finishReconciliationRun(ctx context.Context, run Reconciliatio
 		}
 	}
 	for accountID := range accountSet {
-		if countsForAccount(issues, CheckBalanceCache, accountID) > 0 {
-			if _, err := tx.Exec(ctx, `INSERT INTO ledger.payout_freeze(scope,account_id,reason,run_id) VALUES('account',$1,'BALANCE_CACHE mismatch',$2) ON CONFLICT DO NOTHING`, accountID, run.ID); err != nil {
+		freezeAccountID := accountID
+		if countsForAccount(issues, CheckHoldFrozen, accountID) > 0 {
+			if err := tx.QueryRow(ctx, `SELECT a.id FROM ledger.account f JOIN ledger.account a ON a.owner_account=f.owner_account WHERE f.id=$1 AND f.kind='WALLET_FROZEN' AND a.kind='WALLET_AVAIL'`, accountID).Scan(&freezeAccountID); err != nil {
+				return ReconciliationRun{}, err
+			}
+		}
+		if countsForAccount(issues, CheckBalanceCache, accountID) > 0 || countsForAccount(issues, CheckHoldFrozen, accountID) > 0 {
+			if _, err := tx.Exec(ctx, `INSERT INTO ledger.payout_freeze(scope,account_id,reason,run_id) VALUES('account',$1,$2,$3) ON CONFLICT DO NOTHING`, freezeAccountID, "account reconciliation mismatch", run.ID); err != nil {
 				return ReconciliationRun{}, err
 			}
 		}
 	}
-	for _, code := range []string{CheckTxnBalanced, CheckIdentity, CheckSnapshotDrift, CheckReversal, CheckOrphan} {
+	for _, code := range []string{CheckPendingPayout, CheckTxnBalanced, CheckIdentity, CheckSnapshotDrift, CheckReversal, CheckOrphan} {
 		if counts[code] > 0 {
 			if _, err := tx.Exec(ctx, `INSERT INTO ledger.payout_freeze(scope,reason,run_id) VALUES('global',$1,$2) ON CONFLICT DO NOTHING`, code+" mismatch", run.ID); err != nil {
 				return ReconciliationRun{}, err
@@ -633,6 +669,12 @@ func (s *Service) reconciliationDay(day time.Time) (time.Time, time.Time) {
 	local := day.In(s.reconciliationLocation)
 	start := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, s.reconciliationLocation)
 	return start, start.AddDate(0, 0, 1).UTC()
+}
+
+func (s *Service) reconciliationDayClosed(day time.Time) bool {
+	start, _ := s.reconciliationDay(day)
+	today, _ := s.reconciliationDay(s.now())
+	return start.Before(today)
 }
 
 func checkPayoutFreeze(ctx context.Context, tx pgx.Tx, accountID int64) error {
