@@ -176,7 +176,7 @@ func CheckSeparationOfDuties(matrix AdminMatrix) []SeparationConflict {
 		if canEdit(ModuleSensitive) {
 			findings = append(findings, SeparationConflict{WarningSensitiveEditing, role, "warning"})
 		}
-		if canEdit(ModuleDisputes) && canEdit(ModuleWithdrawals) {
+		if canEdit(ModuleMerchants) && canEdit(ModuleWithdrawals) {
 			findings = append(findings, SeparationConflict{WarningMerchantWithdrawal, role, "warning"})
 		}
 		if canEdit(ModuleIntegration) && canEdit(ModuleWithdrawals) {

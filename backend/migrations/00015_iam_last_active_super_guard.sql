@@ -9,6 +9,15 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     IF OLD.role = 'super' AND OLD.status = 'active'
+       AND (TG_OP = 'DELETE' OR NEW.role <> 'super' OR NEW.status <> 'active') THEN
+        -- Serialize concurrent removals. Without this lock two transactions that each
+        -- remove a different super administrator both see the other as still active
+        -- (neither change is committed yet) and together leave zero active supers.
+        -- The EXISTS check below runs after the lock is granted, so under READ COMMITTED
+        -- it sees the first transaction's committed result.
+        PERFORM pg_advisory_xact_lock(hashtextextended('iam.last_active_super', 0));
+    END IF;
+    IF OLD.role = 'super' AND OLD.status = 'active'
        AND (TG_OP = 'DELETE' OR NEW.role <> 'super' OR NEW.status <> 'active')
        AND NOT EXISTS (
            SELECT 1

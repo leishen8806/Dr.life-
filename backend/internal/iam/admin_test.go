@@ -38,6 +38,22 @@ func TestSeparationOfDutiesRejectsDisputeAndWithdrawalCombination(t *testing.T) 
 	}
 }
 
+func TestSeparationOfDutiesWarnsMerchantVerificationWithWithdrawal(t *testing.T) {
+	matrix := DefaultAdminMatrix()
+	matrix.Set(RoleOperations, ModuleWithdrawals, PermissionEdit)
+	if !containsConflict(CheckSeparationOfDuties(matrix), WarningMerchantWithdrawal) {
+		t.Fatal("ops with merchant edit and withdrawal edit must raise the merchant/withdrawal warning")
+	}
+
+	// Dispute plus withdrawal is a hard conflict, but it must not masquerade as the merchant warning
+	// when the role cannot edit merchants.
+	matrix = DefaultAdminMatrix()
+	matrix.Set(RoleFinance, ModuleDisputes, PermissionEdit)
+	if containsConflict(CheckSeparationOfDuties(matrix), WarningMerchantWithdrawal) {
+		t.Fatal("finance cannot edit merchants; the merchant/withdrawal warning must not fire")
+	}
+}
+
 func TestMaskPhoneRequiresSensitivePermission(t *testing.T) {
 	if got := MaskPhone("+85512345678", PermissionNone); got != "•••" {
 		t.Fatalf("masked phone = %q, want bullets", got)

@@ -171,6 +171,60 @@ func TestIAMMigration(t *testing.T) {
 		assertSQLState(t, ctx, admin, "P0001", `DELETE FROM iam.admin_user WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FAT'`)
 	})
 
+	t.Run("concurrent removals cannot leave zero active super administrators", func(t *testing.T) {
+		// Start from exactly two active supers (the earlier subtest left one).
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAU','Super Two','super2@example.test','hash','super','active')`); err != nil {
+			t.Fatal(err)
+		}
+		for round := 0; round < 25; round++ {
+			if _, err := admin.Exec(ctx, `UPDATE iam.admin_user SET status='active' WHERE role='super'`); err != nil {
+				t.Fatal(err)
+			}
+			start := make(chan struct{})
+			results := make(chan error, 2)
+			for _, id := range []string{"01ARZ3NDEKTSV4RRFFQ69G5FAT", "01ARZ3NDEKTSV4RRFFQ69G5FAU"} {
+				go func(publicID string) {
+					conn, err := pgx.Connect(ctx, dsn)
+					if err != nil {
+						results <- err
+						return
+					}
+					defer conn.Close(ctx)
+					<-start
+					tx, err := conn.Begin(ctx)
+					if err != nil {
+						results <- err
+						return
+					}
+					if _, err := tx.Exec(ctx, `UPDATE iam.admin_user SET status='disabled' WHERE public_id=$1`, publicID); err != nil {
+						_ = tx.Rollback(ctx)
+						results <- err
+						return
+					}
+					results <- tx.Commit(ctx)
+				}(id)
+			}
+			close(start)
+			failures := 0
+			for i := 0; i < 2; i++ {
+				if err := <-results; err != nil {
+					var pgErr *pgconn.PgError
+					if !errors.As(err, &pgErr) || pgErr.Code != "P0001" {
+						t.Fatalf("round %d: unexpected error %v", round, err)
+					}
+					failures++
+				}
+			}
+			var active int
+			if err := admin.QueryRow(ctx, `SELECT count(*) FROM iam.admin_user WHERE role='super' AND status='active'`).Scan(&active); err != nil {
+				t.Fatal(err)
+			}
+			if active < 1 || failures != 1 {
+				t.Fatalf("round %d: active supers=%d failures=%d, want at least one active and exactly one rejected removal", round, active, failures)
+			}
+		}
+	})
+
 	t.Run("permission seeds match approved matrices", func(t *testing.T) {
 		assertAdminMatrix(t, ctx, admin)
 		assertMerchantTemplate(t, ctx, admin)
