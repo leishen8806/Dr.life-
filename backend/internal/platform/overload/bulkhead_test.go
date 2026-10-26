@@ -1,8 +1,10 @@
 package overload
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,7 +19,7 @@ func TestClassesRemainIsolatedAtConcurrency(t *testing.T) {
 	for _, class := range []Class{Critical, Auth, Write, Read, Heavy} {
 		class := class
 		t.Run(string(class), func(t *testing.T) {
-			b := New(Config{Total: 12, Wait: time.Millisecond, Limits: Limits{Critical: 2, Auth: 2, Write: 2, Read: 2, Heavy: 2}, Timeouts: allTimeouts(time.Second)})
+			b := New(Config{Total: 12, Wait: 100 * time.Millisecond, Limits: Limits{Critical: 2, Auth: 2, Write: 2, Read: 2, Heavy: 2}, Timeouts: allTimeouts(time.Second)})
 			block := make(chan struct{})
 			started := make(chan struct{}, 2)
 			var finished sync.WaitGroup
@@ -78,6 +80,23 @@ func TestConfiguredTemplateClassifiesConcretePath(t *testing.T) {
 	}
 }
 
+func TestDefaultAuthClassificationCoversEveryAudience(t *testing.T) {
+	b := New(DefaultConfig())
+	for _, path := range []string{
+		"/v1/public/auth/telegram", "/v1/buyer/auth/refresh", "/v1/merchant/auth/session",
+		"/v1/driver/auth/session", "/v1/admin/auth/login", "/v1/wms/auth/login",
+	} {
+		if got := b.Classify(path); got != Auth {
+			t.Errorf("Classify(%q) = %q, want %q", path, got, Auth)
+		}
+	}
+	for _, path := range []string{"/v1/merchant/authors", "/v1/admin/authorize"} {
+		if got := b.Classify(path); got == Auth {
+			t.Errorf("Classify(%q) unexpectedly returned auth", path)
+		}
+	}
+}
+
 func TestOverloadRejectsWithinWaitAndSetsRetryAfter(t *testing.T) {
 	b := New(Config{Total: 4, Wait: 20 * time.Millisecond, Limits: Limits{Critical: 4, Auth: 4, Write: 4, Read: 1, Heavy: 4}, Timeouts: allTimeouts(time.Second)})
 	release, started := make(chan struct{}), make(chan struct{})
@@ -116,6 +135,114 @@ func TestHealthIsUnlimitedAndDeadlineCancelsHandler(t *testing.T) {
 	if timeout.Code != http.StatusServiceUnavailable || !containsCode(timeout.Body.String(), httpx.CodeServiceUnavailable) {
 		t.Fatalf("timeout status=%d body=%s", timeout.Code, timeout.Body.String())
 	}
+}
+
+func TestSSEDeadlineExemptionAndResponseControllerFlush(t *testing.T) {
+	config := Config{
+		Total: 4, Wait: time.Millisecond,
+		Limits:             Limits{Critical: 4, Auth: 4, Write: 4, Read: 4, Heavy: 4},
+		Timeouts:           Timeouts{Critical: time.Second, Auth: time.Second, Write: 5 * time.Millisecond, Read: 5 * time.Millisecond, Heavy: time.Second},
+		DeadlineExemptions: map[string]bool{"/v1/buyer/events": true},
+	}
+	b := New(config)
+	response := httptest.NewRecorder()
+	b.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(15 * time.Millisecond)
+		if err := r.Context().Err(); err != nil {
+			t.Fatalf("SSE context was cancelled: %v", err)
+		}
+		unwrapper, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok || unwrapper.Unwrap() != response {
+			t.Fatal("captureWriter did not expose the underlying writer")
+		}
+		if err := http.NewResponseController(w).Flush(); err != nil {
+			t.Fatalf("flush through captureWriter: %v", err)
+		}
+	})).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/buyer/events", nil))
+	if response.Code != http.StatusOK || !response.Flushed {
+		t.Fatalf("SSE response status=%d flushed=%v", response.Code, response.Flushed)
+	}
+	if !b.deadlineExempt("/v1/buyer/events/stream") || b.deadlineExempt("/v1/buyer/events-other") || New(Config{DeadlineExemptions: map[string]bool{"/v1/buyer/orders": true}}).deadlineExempt("/v1/buyer/orders") {
+		t.Fatal("deadline exemption matched a non-SSE route")
+	}
+
+	deadlineObserved := make(chan struct{})
+	normal := httptest.NewRecorder()
+	b.Middleware(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+		close(deadlineObserved)
+	})).ServeHTTP(normal, httptest.NewRequest(http.MethodGet, "/v1/buyer/orders", nil))
+	select {
+	case <-deadlineObserved:
+	case <-time.After(time.Second):
+		t.Fatal("ordinary route did not observe deadline")
+	}
+	if normal.Code != http.StatusServiceUnavailable {
+		t.Fatalf("ordinary route status=%d, want 503", normal.Code)
+	}
+}
+
+func TestRejectedRequestsDoNotAffectBrownoutP95(t *testing.T) {
+	clock := &fakeClock{now: time.Unix(1_700_000_000, 0)}
+	brownout := NewBrownout(BrownoutConfig{BaseHeavy: 1}, nil, BrownoutOptions{Now: clock.Now})
+	brownout.Record(time.Millisecond)
+	want := brownout.recorder.P95()
+	metrics := observability.NewMetrics()
+	b := New(Config{Total: 2, Wait: 40 * time.Millisecond, Limits: Limits{Critical: 2, Auth: 2, Write: 2, Read: 1, Heavy: 2}, Timeouts: allTimeouts(time.Second), Metrics: metrics})
+	b.SetBrownout(brownout)
+	release, started, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		b.Middleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { close(started); <-release })).ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/v1/public/ping", nil))
+	}()
+	<-started
+	response := httptest.NewRecorder()
+	handlerRan := false
+	b.Middleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { handlerRan = true })).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/public/ping", nil))
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status=%d, want 503", response.Code)
+	}
+	if got := brownout.recorder.P95(); got != want {
+		t.Fatalf("rejected request changed P95 from %s to %s", want, got)
+	}
+	metricsResponse := httptest.NewRecorder()
+	observability.MetricsHandler(metrics).ServeHTTP(metricsResponse, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if !strings.Contains(metricsResponse.Body.String(), `drlife_bulkhead_rejections_total{class="read"} 1`) {
+		t.Fatalf("rejected request was not counted separately:\n%s", metricsResponse.Body.String())
+	}
+	close(release)
+	<-done
+	if handlerRan {
+		t.Fatal("rejected handler ran")
+	}
+}
+
+func TestHeavyWaiterWakesWhenDynamicLimitIncreases(t *testing.T) {
+	b := New(Config{Total: 4, Wait: 100 * time.Millisecond, Limits: Limits{Critical: 4, Auth: 4, Write: 4, Read: 4, Heavy: 2}, Timeouts: allTimeouts(time.Second)})
+	b.SetHeavyLimit(1)
+	if !b.acquire(context.Background(), Heavy) {
+		t.Fatal("first heavy acquire failed")
+	}
+	acquired := make(chan bool, 1)
+	go func() { acquired <- b.acquire(context.Background(), Heavy) }()
+	deadline := time.Now().Add(time.Second)
+	for len(b.heavyWake) != 0 && time.Now().Before(deadline) {
+		runtime.Gosched()
+	}
+	if len(b.heavyWake) != 0 {
+		t.Fatal("heavy waiter did not block on the notification channel")
+	}
+	b.SetHeavyLimit(2)
+	select {
+	case ok := <-acquired:
+		if !ok {
+			t.Fatal("heavy waiter was rejected")
+		}
+	case <-time.After(50 * time.Millisecond):
+		t.Fatal("heavy waiter was not notified after limit increase")
+	}
+	b.release(Heavy)
+	b.release(Heavy)
 }
 
 func TestDrainingRejectsNewRequestsAndMetricsStayLowCardinality(t *testing.T) {

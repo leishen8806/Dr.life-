@@ -3,9 +3,11 @@ package overload
 import (
 	"context"
 	"log/slog"
+	"math"
+	"math/bits"
 	"net/http"
-	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
@@ -272,17 +274,17 @@ func LevelMiddleware(source func() BrownoutLevel) func(http.Handler) http.Handle
 	}
 }
 
-type sample struct {
-	at    time.Time
-	value time.Duration
+type recorder struct {
+	now    func() time.Time
+	slices []histogramSlice
 }
 
-type recorder struct {
-	mu      sync.Mutex
-	window  time.Duration
-	now     func() time.Time
-	samples []sample
-}
+const (
+	histogramSubBuckets = 4
+	histogramBuckets    = 1 + 63*histogramSubBuckets
+)
+
+type histogramSlice [histogramBuckets]atomic.Uint64
 
 func newRecorder(window time.Duration, now func() time.Time) *recorder {
 	if window <= 0 {
@@ -291,43 +293,95 @@ func newRecorder(window time.Duration, now func() time.Time) *recorder {
 	if now == nil {
 		now = time.Now
 	}
-	return &recorder{window: window, now: now}
+	sliceCount := int((window + time.Second - 1) / time.Second)
+	return &recorder{now: now, slices: make([]histogramSlice, sliceCount)}
 }
 
 func (r *recorder) Record(value time.Duration) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	now := r.now()
-	r.prune(now)
-	r.samples = append(r.samples, sample{at: now, value: value})
+	second := r.now().Unix()
+	cell := &r.slices[positiveMod(second, int64(len(r.slices)))][durationBucket(value)]
+	// Pack the second and count together so a reused slice can rotate without a lock.
+	tag := uint64(uint32(second)) << 32
+	for {
+		current := cell.Load()
+		if current>>32 != tag>>32 {
+			if cell.CompareAndSwap(current, tag|1) {
+				return
+			}
+			continue
+		}
+		if uint32(current) == math.MaxUint32 || cell.CompareAndSwap(current, current+1) {
+			return
+		}
+	}
 }
 
 func (r *recorder) P95() time.Duration {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.prune(r.now())
-	if len(r.samples) == 0 {
+	now := r.now().Unix()
+	counts := [histogramBuckets]uint64{}
+	var total uint64
+	for second := now - int64(len(r.slices)) + 1; second <= now; second++ {
+		slice := &r.slices[positiveMod(second, int64(len(r.slices)))]
+		tag := uint64(uint32(second))
+		for bucket := range slice {
+			value := slice[bucket].Load()
+			if value>>32 == tag {
+				count := uint64(uint32(value))
+				counts[bucket] += count
+				total += count
+			}
+		}
+	}
+	if total == 0 {
 		return 0
 	}
-	values := make([]time.Duration, len(r.samples))
-	for i, item := range r.samples {
-		values[i] = item.value
+	rank := (95*total + 99) / 100
+	var seen uint64
+	for bucket, count := range counts {
+		seen += count
+		if seen >= rank {
+			return bucketUpperBound(bucket)
+		}
 	}
-	sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
-	rank := (95*len(values)+99)/100 - 1
-	if rank < 0 {
-		rank = 0
-	}
-	return values[rank]
+	return time.Duration(math.MaxInt64)
 }
 
-func (r *recorder) prune(now time.Time) {
-	cutoff := now.Add(-r.window)
-	first := 0
-	for first < len(r.samples) && !r.samples[first].at.After(cutoff) {
-		first++
+func durationBucket(value time.Duration) int {
+	if value <= 0 {
+		return 0
 	}
-	if first > 0 {
-		r.samples = append(r.samples[:0], r.samples[first:]...)
+	nanoseconds := uint64(value)
+	exponent := bits.Len64(nanoseconds) - 1
+	base := uint64(1) << exponent
+	subBucket := int(((nanoseconds - base) * histogramSubBuckets) / base)
+	if subBucket >= histogramSubBuckets {
+		subBucket = histogramSubBuckets - 1
 	}
+	return 1 + exponent*histogramSubBuckets + subBucket
+}
+
+func bucketUpperBound(bucket int) time.Duration {
+	if bucket <= 0 {
+		return 0
+	}
+	bucket--
+	exponent, subBucket := bucket/histogramSubBuckets, bucket%histogramSubBuckets
+	base := uint64(1) << exponent
+	width := base / histogramSubBuckets
+	if width == 0 {
+		width = 1
+	}
+	upper := base + width*uint64(subBucket+1) - 1
+	if upper > math.MaxInt64 {
+		return time.Duration(math.MaxInt64)
+	}
+	return time.Duration(upper)
+}
+
+func positiveMod(value, divisor int64) int {
+	result := value % divisor
+	if result < 0 {
+		result += divisor
+	}
+	return int(result)
 }

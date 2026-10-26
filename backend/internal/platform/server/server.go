@@ -73,6 +73,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.Use(httpx.RequestLogger(logger, gateway.RoleFromContext))
 	router.Use(observability.Recover(logger, options.ErrorReporter))
 	router.Use(gateway.GroupedCORS(options.OriginGroups))
+	router.Use(options.Bulkhead.Middleware)
 	router.Use(gateway.LimitByIP(options.Limiter, options.ClientIP, options.IPRules))
 	router.Use(options.AdminAccess.Middleware)
 	router.Use(gateway.VerifyWebhooks(options.WebhookPrefix, options.WebhookMaxBody, options.WebhookBindings))
@@ -82,7 +83,6 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.Use(gateway.LimitByAccount(options.Limiter, options.AccountRules))
 	router.Use(gateway.RequireIdempotency(options.IdempotencyExempt))
 	router.Use(gateway.BindIdempotency(options.Idempotency))
-	router.Use(options.Bulkhead.Middleware)
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
 	})

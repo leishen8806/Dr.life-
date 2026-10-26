@@ -62,6 +62,7 @@ type Config struct {
 	BulkheadDrain                  time.Duration
 	BulkheadLimits                 map[string]int
 	BulkheadRules                  map[string]string
+	BulkheadDeadlineExemptions     map[string]bool
 	BrownoutEscalateAfter          time.Duration
 	BrownoutRecoverAfter           time.Duration
 	BrownoutP95Threshold           time.Duration
@@ -292,6 +293,10 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
+	bulkheadDeadlineExemptions, err := sseDeadlineExemptions(getenv("BULKHEAD_DEADLINE_EXEMPT_PATHS"))
+	if err != nil {
+		return Config{}, err
+	}
 	brownoutEscalateSeconds, err := durationSeconds(getenv, "BROWNOUT_ESCALATE_AFTER_SECONDS", 5)
 	if err != nil {
 		return Config{}, err
@@ -414,7 +419,7 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		RateLimitAI:            limits[4],
 		RateLimitAdmin:         limits[5],
 		LedgerReconTimezone:    reconTimezone,
-		BulkheadTotal:          bulkheadTotal, BulkheadWait: time.Duration(bulkheadWaitMS) * time.Millisecond, BulkheadDrain: time.Duration(bulkheadDrainSeconds) * time.Second, BulkheadLimits: bulkheadLimits, BulkheadRules: bulkheadRules,
+		BulkheadTotal:          bulkheadTotal, BulkheadWait: time.Duration(bulkheadWaitMS) * time.Millisecond, BulkheadDrain: time.Duration(bulkheadDrainSeconds) * time.Second, BulkheadLimits: bulkheadLimits, BulkheadRules: bulkheadRules, BulkheadDeadlineExemptions: bulkheadDeadlineExemptions,
 		BrownoutEscalateAfter: time.Duration(brownoutEscalateSeconds) * time.Second, BrownoutRecoverAfter: time.Duration(brownoutRecoverSeconds) * time.Second,
 		BrownoutP95Threshold: time.Duration(brownoutP95ThresholdMS) * time.Millisecond, BrownoutP95Recovery: time.Duration(brownoutP95RecoveryMS) * time.Millisecond,
 		BrownoutDBWaitThreshold: time.Duration(brownoutDBWaitMS) * time.Millisecond, BrownoutDBWaitRecovery: time.Duration(brownoutDBWaitRecoveryMS) * time.Millisecond,
@@ -447,6 +452,22 @@ func routeClasses(raw string) (map[string]string, error) {
 			return nil, fmt.Errorf("BULKHEAD_ROUTE_CLASSES contains invalid class")
 		}
 		result[parts[0]] = parts[1]
+	}
+	return result, nil
+}
+
+func sseDeadlineExemptions(raw string) (map[string]bool, error) {
+	paths, err := pathList(raw)
+	if err != nil {
+		return nil, fmt.Errorf("BULKHEAD_DEADLINE_EXEMPT_PATHS %w", err)
+	}
+	result := make(map[string]bool, len(paths))
+	for _, path := range paths {
+		parts := strings.Split(strings.Trim(path, "/"), "/")
+		if len(parts) != 3 || parts[0] != "v1" || parts[2] != "events" || !contains([]string{"buyer", "merchant", "driver", "wms", "admin"}, parts[1]) {
+			return nil, fmt.Errorf("BULKHEAD_DEADLINE_EXEMPT_PATHS only accepts /v1/{end}/events SSE prefixes")
+		}
+		result[path] = true
 	}
 	return result, nil
 }

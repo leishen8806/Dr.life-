@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -157,13 +159,71 @@ func TestRecorderUsesRollingWindow(t *testing.T) {
 		recorder.Record(time.Duration(i) * time.Millisecond)
 		clock.Advance(time.Millisecond)
 	}
-	if got := recorder.P95(); got != 95*time.Millisecond {
-		t.Fatalf("p95 = %s, want 95ms", got)
+	if got := recorder.P95(); got < 95*time.Millisecond || got > 101*time.Millisecond {
+		t.Fatalf("estimated p95 = %s, want bucket containing 95ms", got)
 	}
 	clock.Advance(31 * time.Second)
 	if got := recorder.P95(); got != 0 {
 		t.Fatalf("p95 after window = %s, want 0", got)
 	}
+}
+
+func BenchmarkRecorderRecord(b *testing.B) {
+	for _, requestsPerSecond := range []int{500, 5000} {
+		requestsPerSecond := requestsPerSecond
+		b.Run(strconv.Itoa(requestsPerSecond)+"_rps", func(b *testing.B) {
+			clock := &fakeClock{now: time.Unix(1_700_000_000, 0)}
+			newValue := newRecorder(30*time.Second, clock.Now)
+			oldValue := newOldRecorder(30*time.Second, clock.Now)
+			for range requestsPerSecond * 30 {
+				newValue.Record(10 * time.Millisecond)
+				oldValue.Record(10 * time.Millisecond)
+			}
+			b.Run("fixed_histogram", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					newValue.Record(10 * time.Millisecond)
+				}
+			})
+			b.Run("original_slice", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					oldValue.Record(10 * time.Millisecond)
+				}
+			})
+		})
+	}
+}
+
+type oldSample struct {
+	at    time.Time
+	value time.Duration
+}
+
+type oldRecorder struct {
+	mu      sync.Mutex
+	window  time.Duration
+	now     func() time.Time
+	samples []oldSample
+}
+
+func newOldRecorder(window time.Duration, now func() time.Time) *oldRecorder {
+	return &oldRecorder{window: window, now: now}
+}
+
+func (r *oldRecorder) Record(value time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	now := r.now()
+	cutoff := now.Add(-r.window)
+	first := 0
+	for first < len(r.samples) && !r.samples[first].at.After(cutoff) {
+		first++
+	}
+	if first > 0 {
+		r.samples = append(r.samples[:0], r.samples[first:]...)
+	}
+	r.samples = append(r.samples, oldSample{at: now, value: value})
 }
 
 func TestInjectedZeroP95IsNotOverridden(t *testing.T) {
