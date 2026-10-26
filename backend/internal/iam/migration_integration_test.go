@@ -245,6 +245,10 @@ func TestIAMMigration(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer pool.Close()
+		// Earlier subtests leave an active link for this pair; start from a clean state.
+		if _, err := admin.Exec(ctx, `UPDATE iam.account_link SET unlinked_at=now() WHERE unlinked_at IS NULL`); err != nil {
+			t.Fatal(err)
+		}
 		service := iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: pool}, ids.NewULID)
 
 		link, err := service.Link(ctx, ownerPublicID, buyerPublicID)
