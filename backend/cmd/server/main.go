@@ -14,6 +14,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
@@ -88,6 +89,21 @@ func main() {
 	go brownout.Run(ctx, cfg.BrownoutSampleInterval)
 	directory := catalogDirectory{db: database}
 	catalogService := catalog.New(catalog.NewPgStore(database), catalog.Options{Merchants: directory})
+	var auditStore *platformaudit.Store
+	var auditReadiness server.ReadinessCheck
+	if cfg.AuditDatabaseURL != "" {
+		auditCfg := cfg
+		auditCfg.DatabaseURL = cfg.AuditDatabaseURL
+		auditDatabase, poolErr := observability.NewDatabasePool(ctx, auditCfg, nil, logger)
+		if poolErr != nil {
+			logger.Error("audit database pool failed", "error", poolErr)
+			os.Exit(1)
+		}
+		defer auditDatabase.Close()
+		auditStore = &platformaudit.Store{DB: auditDatabase, Metrics: metrics.Business()}
+		auditReadiness = auditDatabase.Ping
+		go monitorAuditAnchor(ctx, auditStore, logger)
+	}
 
 	clientIP, err := gateway.NewClientIPResolver(cfg.TrustedProxyHeader, cfg.TrustedProxyCIDRs)
 	if err != nil {
@@ -130,6 +146,9 @@ func main() {
 	var loginService *iam.Service
 	var authenticator gateway.Authenticator
 	checks := []server.ReadinessCheck{database.Ping}
+	if auditReadiness != nil {
+		checks = append(checks, auditReadiness)
+	}
 	if cfg.JWTSigningConfigured {
 		if cfg.IAMDatabaseURL == "" {
 			logger.Error("IAM database URL is required when Telegram login is enabled")
@@ -205,6 +224,7 @@ func main() {
 		Merchants:     directory,
 		Logger:        logger,
 		Login:         loginService,
+		Audit:         auditStore,
 		Bulkhead:      bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)
@@ -235,6 +255,27 @@ func main() {
 	}{Drainer: bulkhead, Delay: cfg.BulkheadDrain}); err != nil {
 		logger.Error("http server stopped with error", "error", err)
 		os.Exit(1)
+	}
+}
+
+func monitorAuditAnchor(ctx context.Context, store *platformaudit.Store, logger interface {
+	WarnContext(context.Context, string, ...any)
+}) {
+	check := func() {
+		if _, err := store.CheckAnchorFreshness(ctx, time.Now()); err != nil && ctx.Err() == nil {
+			logger.WarnContext(ctx, "audit anchor freshness check failed")
+		}
+	}
+	check()
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			check()
+		}
 	}
 }
 

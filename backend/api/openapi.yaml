@@ -34,6 +34,55 @@ tags:
 security:
   - bearerAuth: []
 paths:
+  /v1/admin/audit:
+    get:
+      tags: [admin]
+      operationId: listAdminAudit
+      summary: Query immutable audit records
+      description: Requires the aud view permission. Detail is returned only with aud edit permission.
+      x-roles: [admin]
+      parameters:
+        - name: from
+          in: query
+          schema: {type: string, format: date-time}
+        - name: to
+          in: query
+          schema: {type: string, format: date-time}
+        - name: actor_id
+          in: query
+          schema: {type: integer, format: int64, minimum: 1}
+        - name: action
+          in: query
+          schema: {type: string}
+        - name: target
+          in: query
+          schema: {type: string}
+        - name: before_id
+          in: query
+          description: Return records with ids lower than this cursor.
+          schema: {type: integer, format: int64, minimum: 1}
+        - name: page_size
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        "200":
+          description: Audit page ordered by descending id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditListSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
   /v1/public/auth/telegram:
     post:
       tags: [public]
@@ -816,6 +865,42 @@ components:
         request_id:
           type: string
           minLength: 1
+    AuditRecord:
+      type: object
+      additionalProperties: false
+      required: [id, ts, actor_id, actor_role, action, target, detail, request_id]
+      properties:
+        id: {type: integer, format: int64}
+        ts: {type: string, format: date-time}
+        actor_id: {type: integer, format: int64}
+        actor_role: {type: string}
+        action: {type: string}
+        target: {type: string}
+        detail:
+          type: object
+          additionalProperties: true
+        ip: {type: string}
+        request_id: {type: string}
+    AuditListData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/AuditRecord"}
+        next_before_id:
+          type: integer
+          format: int64
+          nullable: true
+    AuditListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/AuditListData"}
+        request_id: {type: string, minLength: 1}
   responses:
     BadRequest:
       description: Invalid request (error code 1002).

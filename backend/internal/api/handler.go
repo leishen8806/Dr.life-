@@ -13,6 +13,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 )
@@ -40,10 +41,62 @@ type Handler struct {
 	Logger    *slog.Logger
 	Login     TelegramLogin
 	ClientIP  gateway.ClientIPResolver
+	Audit     *platformaudit.Store
 }
 
 func (Handler) GetPublicPing(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, map[string]bool{"pong": true})
+}
+
+func (h Handler) ListAdminAudit(w http.ResponseWriter, r *http.Request, params gen.ListAdminAuditParams) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return
+	}
+	if identity.Role != gateway.RoleAdmin || !identity.HasPermission("aud", "view") {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return
+	}
+	if h.Audit == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	query := platformaudit.Query{From: params.From, To: params.To, ActorID: params.ActorId}
+	if params.Action != nil {
+		query.Action = platformaudit.Action(*params.Action)
+	}
+	if params.Target != nil {
+		query.Target = *params.Target
+	}
+	if params.BeforeId != nil {
+		query.BeforeID = *params.BeforeId
+	}
+	if params.PageSize != nil {
+		query.Limit = *params.PageSize
+	}
+	page, err := h.Audit.List(r.Context(), query)
+	if err != nil {
+		if h.Logger != nil {
+			h.Logger.ErrorContext(r.Context(), "audit query failed", "request_id", httpx.RequestIDFromContext(r.Context()))
+		}
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInternalError))
+		return
+	}
+	items := make([]gen.AuditRecord, 0, len(page.Items))
+	for _, record := range page.Items {
+		var detail map[string]any
+		if err := json.Unmarshal(record.Detail, &detail); err != nil {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInternalError))
+			return
+		}
+		item := gen.AuditRecord{Id: record.ID, Ts: record.Time, ActorId: record.ActorID, ActorRole: record.ActorRole, Action: string(record.Action), Target: record.Target, Detail: detail, RequestId: record.RequestID}
+		if record.IP != "" {
+			item.Ip = &record.IP
+		}
+		items = append(items, item)
+	}
+	httpx.WriteOK(w, r, gen.AuditListData{Items: items, NextBeforeId: page.NextBefore})
 }
 
 func (h Handler) PostTelegramAuth(w http.ResponseWriter, r *http.Request) {

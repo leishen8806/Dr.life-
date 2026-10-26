@@ -13,6 +13,7 @@ import (
 	api "github.com/leishen8806/Dr.life-/backend/internal/api"
 	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
@@ -50,6 +51,7 @@ type GatewayOptions struct {
 	Merchants         api.MerchantResolver
 	Logger            *slog.Logger
 	Login             api.TelegramLogin
+	Audit             *platformaudit.Store
 }
 
 func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
@@ -62,6 +64,9 @@ func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
 
 func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks ...ReadinessCheck) http.Handler {
 	router := chi.NewRouter()
+	if options.AdminAccess.AppEnv == "" {
+		options.AdminAccess.AppEnv = options.AppEnv
+	}
 	if options.Bulkhead == nil {
 		options.Bulkhead = overload.New(overload.DefaultConfig())
 	}
@@ -89,7 +94,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeMethodNotAllowed))
 	})
-	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, ClientIP: options.ClientIP}, router)
+	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, ClientIP: options.ClientIP, Audit: options.Audit}, router)
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

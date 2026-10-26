@@ -13,6 +13,21 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for AuditListSuccessResponseOk.
+const (
+	AuditListSuccessResponseOkTrue AuditListSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the AuditListSuccessResponseOk enum.
+func (e AuditListSuccessResponseOk) Valid() bool {
+	switch e {
+	case AuditListSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CategoryListSuccessResponseOk.
 const (
 	CategoryListSuccessResponseOkTrue CategoryListSuccessResponseOk = true
@@ -493,6 +508,35 @@ func (e ListMerchantProductsParamsStatus) Valid() bool {
 	}
 }
 
+// AuditListData defines model for AuditListData.
+type AuditListData struct {
+	Items        []AuditRecord `json:"items"`
+	NextBeforeId *int64        `json:"next_before_id,omitempty"`
+}
+
+// AuditListSuccessResponse defines model for AuditListSuccessResponse.
+type AuditListSuccessResponse struct {
+	Data      AuditListData              `json:"data"`
+	Ok        AuditListSuccessResponseOk `json:"ok"`
+	RequestId string                     `json:"request_id"`
+}
+
+// AuditListSuccessResponseOk defines model for AuditListSuccessResponse.Ok.
+type AuditListSuccessResponseOk bool
+
+// AuditRecord defines model for AuditRecord.
+type AuditRecord struct {
+	Action    string                 `json:"action"`
+	ActorId   int64                  `json:"actor_id"`
+	ActorRole string                 `json:"actor_role"`
+	Detail    map[string]interface{} `json:"detail"`
+	Id        int64                  `json:"id"`
+	Ip        *string                `json:"ip,omitempty"`
+	RequestId string                 `json:"request_id"`
+	Target    string                 `json:"target"`
+	Ts        time.Time              `json:"ts"`
+}
+
 // Category defines model for Category.
 type Category struct {
 	Code        string  `json:"code"`
@@ -835,6 +879,19 @@ type UnprocessableEntity = ErrorEnvelope
 // UnsupportedMediaType defines model for UnsupportedMediaType.
 type UnsupportedMediaType = ErrorEnvelope
 
+// ListAdminAuditParams defines parameters for ListAdminAudit.
+type ListAdminAuditParams struct {
+	From    *time.Time `form:"from,omitempty" json:"from,omitempty"`
+	To      *time.Time `form:"to,omitempty" json:"to,omitempty"`
+	ActorId *int64     `form:"actor_id,omitempty" json:"actor_id,omitempty"`
+	Action  *string    `form:"action,omitempty" json:"action,omitempty"`
+	Target  *string    `form:"target,omitempty" json:"target,omitempty"`
+
+	// BeforeId Return records with ids lower than this cursor.
+	BeforeId *int64 `form:"before_id,omitempty" json:"before_id,omitempty"`
+	PageSize *int   `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
 // ListMerchantProductsParams defines parameters for ListMerchantProducts.
 type ListMerchantProductsParams struct {
 	// Page One-based page number.
@@ -909,6 +966,9 @@ type PostTelegramAuthJSONRequestBody = TelegramAuthRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListAdminAudit Query immutable audit records
+	// (GET /v1/admin/audit)
+	ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams)
 	// ListMerchantProducts List the authenticated merchant products in any status
 	// (GET /v1/merchant/products)
 	ListMerchantProducts(w http.ResponseWriter, r *http.Request, params ListMerchantProductsParams)
@@ -941,6 +1001,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// ListAdminAudit Query immutable audit records
+// (GET /v1/admin/audit)
+func (_ Unimplemented) ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // ListMerchantProducts List the authenticated merchant products in any status
 // (GET /v1/merchant/products)
@@ -1004,6 +1070,117 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAdminAudit operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminAudit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminAuditParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "actor_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actor_id", r.URL.Query(), &params.ActorId, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "action" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "action", r.URL.Query(), &params.Action, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "action"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "action", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "target" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "target", r.URL.Query(), &params.Target, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "target"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "target", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "before_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before_id", r.URL.Query(), &params.BeforeId, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminAudit(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListMerchantProducts operation middleware
 func (siw *ServerInterfaceWrapper) ListMerchantProducts(w http.ResponseWriter, r *http.Request) {
@@ -1528,6 +1705,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/audit", wrapper.ListAdminAudit)
+	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/public/auth/telegram", wrapper.PostTelegramAuth)
 	})

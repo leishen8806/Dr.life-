@@ -73,6 +73,16 @@ groups:
         for: 5m
         labels: {severity: critical}
         annotations: {summary: "The daily ledger reconciliation run failed", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#ledgerreconciliationrunfailed"}
+      - alert: AuditChainVerificationFailed
+        expr: increase(drlife_audit_verify_failures_total[10m]) > 0
+        for: 1m
+        labels: {severity: critical}
+        annotations: {summary: "Audit hash-chain verification failed", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#auditchainverificationfailed"}
+      - alert: AuditAnchorMissing
+        expr: drlife_audit_anchor_missing == 1
+        for: 15m
+        labels: {severity: critical}
+        annotations: {summary: "The audit chain has not been anchored in the last 24 hours", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#auditanchormissing"}
       # 提现超时
       - alert: WithdrawalOverdue
         expr: increase(drlife_withdrawals_total{event="overdue"}[1h]) > 0

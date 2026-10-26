@@ -426,12 +426,17 @@ create table ledger.payout_freeze (
 ```sql
 create table audit.log (
   id bigint generated always as identity primary key,
-  ts timestamptz not null default now(),
-  actor_id bigint not null, actor_role text, action text not null, target text, detail jsonb,   -- 含前后值
-  ip inet, request_id text,
-  prev_hash bytea, hash bytea not null        -- hash = sha256(prev_hash || ts || actor_id || action || target || detail)
+  ts timestamptz not null,
+  actor_id bigint not null, actor_role text not null, action text not null, target text not null,
+  detail jsonb not null,                      -- 含脱敏后的前后值
+  ip inet, request_id text not null,
+  prev_hash bytea not null, hash bytea not null
 );
--- 只给 INSERT、SELECT 权限；触发器拒绝 UPDATE/DELETE；每日把当天最后一个 hash 写入异地（防止整表被替换）
+-- chain_head 单行加锁串行化追加；event_seen 按 event_id 幂等；anchor 保存每日链尾；check_result 供 18 项检查。
+-- hash = SHA-256(每字段 uint64 大端长度前缀 + 字段内容)：prev_hash、UTC RFC3339Nano 时间、actor_id、
+-- actor_role、action、target、规范 JSON detail、ip、request_id；创世 prev_hash 为 32 字节全零。
+-- audit_writer 只给 INSERT、SELECT 和受限链头函数 EXECUTE；触发器拒绝 UPDATE/DELETE/TRUNCATE；
+-- 每日把当天最后一个 hash 写入异地（防止整表被替换）。锚点异地位置待运维确认，审计默认永久保留。
 ```
 
 ---
