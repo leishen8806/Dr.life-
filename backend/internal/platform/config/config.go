@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net"
@@ -70,6 +71,15 @@ type Config struct {
 	BrownoutInFlightRatioThreshold float64
 	BrownoutInFlightRatioRecovery  float64
 	BrownoutSampleInterval         time.Duration
+	IAMDatabaseURL                 string
+	TelegramInitDataMaxAge         time.Duration
+	AccessTokenTTL                 time.Duration
+	RefreshTokenTTL                time.Duration
+	LoginFailureLimit              int
+	LoginFailureWindow             time.Duration
+	BotTokenCacheTTL               time.Duration
+	JWTActiveKeyID                 string
+	JWTSigningConfigured           bool
 }
 
 func Load() (Config, error) {
@@ -327,6 +337,38 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
+	telegramMaxAge, err := positiveDuration(getenv, "TELEGRAM_INITDATA_MAX_AGE", 24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	accessTTL, err := positiveDuration(getenv, "ACCESS_TOKEN_TTL", 15*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	refreshTTL, err := positiveDuration(getenv, "REFRESH_TOKEN_TTL", 30*24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	loginFailureLimit, err := positiveInt(getenv, "LOGIN_FAILURE_LIMIT", 20)
+	if err != nil {
+		return Config{}, err
+	}
+	loginFailureWindow, err := positiveDuration(getenv, "LOGIN_FAILURE_WINDOW", 10*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	botTokenCacheTTL, err := positiveDuration(getenv, "BOT_TOKEN_CACHE_TTL", 5*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	jwtActiveKeyID := strings.TrimSpace(getenv("JWT_ACTIVE_KEY_ID"))
+	jwtKeys := strings.TrimSpace(getenv("JWT_SIGNING_KEYS"))
+	jwtConfigured := jwtKeys != "" || jwtActiveKeyID != ""
+	if jwtConfigured {
+		if err := validateSigningKeys(jwtKeys, jwtActiveKeyID); err != nil {
+			return Config{}, err
+		}
+	}
 
 	return Config{
 		HTTPAddr:               httpAddr,
@@ -339,6 +381,7 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		ReadTimeout:            time.Duration(readSeconds) * time.Second,
 		IdleTimeout:            time.Duration(idleSeconds) * time.Second,
 		DatabaseURL:            strings.TrimSpace(getenv("DATABASE_URL")),
+		IAMDatabaseURL:         strings.TrimSpace(getenv("IAM_DATABASE_URL")),
 		ReportDatabaseURL:      strings.TrimSpace(getenv("REPORT_DATABASE_URL")),
 		DBMaxConns:             int32(dbMaxConns),
 		DBMinConns:             int32(dbMinConns),
@@ -377,6 +420,14 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		BrownoutDBWaitThreshold: time.Duration(brownoutDBWaitMS) * time.Millisecond, BrownoutDBWaitRecovery: time.Duration(brownoutDBWaitRecoveryMS) * time.Millisecond,
 		BrownoutInFlightRatioThreshold: float64(brownoutInFlightPercent) / 100, BrownoutInFlightRatioRecovery: float64(brownoutInFlightRecoveryPercent) / 100,
 		BrownoutSampleInterval: time.Duration(brownoutSampleIntervalMS) * time.Millisecond,
+		TelegramInitDataMaxAge: telegramMaxAge,
+		AccessTokenTTL:         accessTTL,
+		RefreshTokenTTL:        refreshTTL,
+		LoginFailureLimit:      loginFailureLimit,
+		LoginFailureWindow:     loginFailureWindow,
+		BotTokenCacheTTL:       botTokenCacheTTL,
+		JWTActiveKeyID:         jwtActiveKeyID,
+		JWTSigningConfigured:   jwtConfigured,
 	}, nil
 }
 
@@ -521,4 +572,54 @@ func durationSeconds(getenv func(string) string, name string, defaultValue int) 
 		return 0, fmt.Errorf("%s must be a positive integer", name)
 	}
 	return parsed, nil
+}
+
+func positiveDuration(getenv func(string) string, name string, defaultValue time.Duration) (time.Duration, error) {
+	raw := strings.TrimSpace(getenv(name))
+	if raw == "" {
+		return defaultValue, nil
+	}
+	value, err := time.ParseDuration(raw)
+	if err != nil || value <= 0 {
+		return 0, fmt.Errorf("%s must be a positive Go duration", name)
+	}
+	return value, nil
+}
+
+func validateSigningKeys(raw, active string) error {
+	if raw == "" || active == "" {
+		return fmt.Errorf("JWT_SIGNING_KEYS and JWT_ACTIVE_KEY_ID must be set together")
+	}
+	found := false
+	seen := make(map[string]struct{})
+	for _, entry := range strings.Split(raw, ",") {
+		id, encoded, ok := strings.Cut(strings.TrimSpace(entry), ":")
+		key, decodeErr := base64.StdEncoding.DecodeString(encoded)
+		if !ok || !validKeyID(id) || decodeErr != nil || len(key) != 32 {
+			return fmt.Errorf("JWT_SIGNING_KEYS must contain kid:base64 entries with 32-byte keys")
+		}
+		if _, exists := seen[id]; exists {
+			return fmt.Errorf("JWT_SIGNING_KEYS contains a duplicate key id")
+		}
+		seen[id] = struct{}{}
+		if id == active {
+			found = true
+		}
+	}
+	if !found {
+		return fmt.Errorf("JWT_ACTIVE_KEY_ID must identify a configured signing key")
+	}
+	return nil
+}
+
+func validKeyID(id string) bool {
+	if len(id) < 1 || len(id) > 64 {
+		return false
+	}
+	for _, r := range id {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') && r != '-' && r != '_' && r != '.' {
+			return false
+		}
+	}
+	return true
 }
