@@ -50,12 +50,17 @@ func TestAuditIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer admin.Close(ctx)
-	writerDSN := createAuditLogin(t, ctx, admin, dsn)
+	writerDSN := createLogin(t, ctx, admin, dsn, "test_audit", "audit_writer")
 	pool, err := pgxpool.New(ctx, writerDSN)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pool.Close()
+	reportPool, err := pgxpool.New(ctx, createLogin(t, ctx, admin, dsn, "test_audit_report", "report_ro"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reportPool.Close()
 	metricState := &fakeAuditMetrics{}
 	store := &Store{DB: pool, Metrics: metricState, Now: func() time.Time { return time.Now().UTC() }}
 
@@ -110,6 +115,14 @@ func TestAuditIntegration(t *testing.T) {
 		if err := pool.QueryRow(ctx, `SELECT count(*) FROM audit.event_seen WHERE event_id=$1`, event.EventID).Scan(&count); err != nil || count != 1 {
 			t.Fatalf("event count=%d err=%v", count, err)
 		}
+	})
+
+	t.Run("report role can read but not mutate", func(t *testing.T) {
+		var count int
+		if err := reportPool.QueryRow(ctx, `SELECT count(*) FROM audit.log`).Scan(&count); err != nil || count == 0 {
+			t.Fatalf("report count=%d err=%v", count, err)
+		}
+		assertSQLState(t, reportPool, `INSERT INTO audit.check_result(day,check_id,severity,detail) VALUES (current_date,'x','normal','{}')`, "42501")
 	})
 
 	t.Run("one thousand concurrent appends form one chain", func(t *testing.T) {
@@ -232,16 +245,17 @@ func migrationDirectory(t *testing.T) string {
 	return filepath.Join(filepath.Dir(file), "..", "..", "..", "migrations")
 }
 
-func createAuditLogin(t *testing.T, ctx context.Context, admin *pgx.Conn, dsn string) string {
+func createLogin(t *testing.T, ctx context.Context, admin *pgx.Conn, dsn, login, role string) string {
 	t.Helper()
-	if _, err := admin.Exec(ctx, `CREATE ROLE test_audit LOGIN PASSWORD 'test-only'; GRANT audit_writer TO test_audit`); err != nil {
+	statement := fmt.Sprintf(`CREATE ROLE %s LOGIN PASSWORD 'test-only'; GRANT %s TO %s`, pgx.Identifier{login}.Sanitize(), pgx.Identifier{role}.Sanitize(), pgx.Identifier{login}.Sanitize())
+	if _, err := admin.Exec(ctx, statement); err != nil {
 		t.Fatal(err)
 	}
 	parsed, err := url.Parse(dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsed.User = url.UserPassword("test_audit", "test-only")
+	parsed.User = url.UserPassword(login, "test-only")
 	return parsed.String()
 }
 
