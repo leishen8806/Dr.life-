@@ -87,6 +87,15 @@ func TestAuditLogMigration(t *testing.T) {
 	t.Run("administrator cannot bypass immutable rows", func(t *testing.T) {
 		assertSQLState(t, ctx, admin, "55000", `UPDATE audit.log SET action='tampered' WHERE id=1`)
 		assertSQLState(t, ctx, admin, "55000", `DELETE FROM audit.log WHERE id=1`)
+		assertSQLState(t, ctx, admin, "55000", `TRUNCATE audit.log`)
+	})
+
+	t.Run("writer cannot truncate and separator character is rejected", func(t *testing.T) {
+		writer := createLogin(t, ctx, admin, dsn, "q01_audit_truncate", "audit_writer")
+		defer writer.Close(ctx)
+		assertSQLState(t, ctx, writer, "42501", `TRUNCATE audit.log`)
+		assertSQLState(t, ctx, writer, "23514", "INSERT INTO audit.log (actor_id, action, target) VALUES (1, 'a'||chr(31)||'b', 'x')")
+		assertSQLState(t, ctx, writer, "23514", "INSERT INTO audit.log (actor_id, action, target) VALUES (1, 'a', 'x'||chr(31)||'y')")
 	})
 
 	t.Run("concurrent inserts form one continuous chain", func(t *testing.T) {
@@ -134,7 +143,7 @@ func TestAuditLogMigration(t *testing.T) {
 	})
 
 	t.Run("migration is reversible before audit records are retained", func(t *testing.T) {
-		if err := goose.DownTo(database, migrationDirectory(t), 10); err != nil {
+		if err := goose.DownTo(database, migrationDirectory(t), 13); err != nil {
 			t.Fatal(err)
 		}
 		var count int

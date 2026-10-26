@@ -18,7 +18,11 @@ CREATE TABLE audit.log (
     ip inet,
     request_id text,
     prev_hash bytea CHECK (prev_hash IS NULL OR octet_length(prev_hash) = 32),
-    hash bytea NOT NULL UNIQUE CHECK (octet_length(hash) = 32)
+    hash bytea NOT NULL UNIQUE CHECK (octet_length(hash) = 32),
+    -- The hash payload joins fields with chr(31); forbidding it in free-text fields keeps the encoding unambiguous.
+    CONSTRAINT ck_audit_log_no_separator CHECK (
+        position(chr(31) in action) = 0 AND (target IS NULL OR position(chr(31) in target) = 0)
+    )
 );
 CREATE INDEX ix_audit_log_ts ON audit.log (ts);
 CREATE INDEX ix_audit_log_actor_id ON audit.log (actor_id, ts DESC);
@@ -96,6 +100,10 @@ CREATE TRIGGER tr_audit_log_reject_mutation
 BEFORE UPDATE OR DELETE ON audit.log
 FOR EACH ROW EXECUTE FUNCTION audit.reject_log_mutation();
 
+CREATE TRIGGER tr_audit_log_reject_truncate
+BEFORE TRUNCATE ON audit.log
+FOR EACH STATEMENT EXECUTE FUNCTION audit.reject_log_mutation();
+
 REVOKE ALL ON audit.chain_state FROM audit_writer, report_ro;
 REVOKE ALL ON audit.log FROM audit_writer;
 GRANT SELECT, INSERT ON audit.log TO audit_writer;
@@ -110,4 +118,4 @@ DROP TABLE audit.chain_state;
 DROP FUNCTION audit.reject_log_mutation();
 DROP FUNCTION audit.assign_log_hash();
 DROP FUNCTION audit.log_hash_payload(bytea, timestamptz, bigint, text, text, jsonb);
-DROP EXTENSION pgcrypto;
+-- pgcrypto is intentionally left installed: other migrations or roles may rely on it.
