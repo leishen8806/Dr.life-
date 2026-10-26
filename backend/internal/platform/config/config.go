@@ -62,6 +62,7 @@ type Config struct {
 	BulkheadDrain                  time.Duration
 	BulkheadLimits                 map[string]int
 	BulkheadRules                  map[string]string
+	BulkheadCriticalPrefixes       []string
 	BulkheadDeadlineExemptions     map[string]bool
 	BrownoutEscalateAfter          time.Duration
 	BrownoutRecoverAfter           time.Duration
@@ -278,7 +279,7 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
-	bulkheadLimits := map[string]int{"critical": bulkheadTotal, "auth": 64, "write": 128, "read": 256, "heavy": 32}
+	bulkheadLimits := map[string]int{"critical": bulkheadTotal, "auth": 64, "write": 128, "read": 256, "heavy": 32, "stream": 256}
 	for class, fallback := range bulkheadLimits {
 		value, parseErr := positiveInt(getenv, "BULKHEAD_"+strings.ToUpper(class)+"_LIMIT", fallback)
 		if parseErr != nil {
@@ -290,6 +291,10 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		return Config{}, fmt.Errorf("BULKHEAD_CRITICAL_LIMIT must not be below BULKHEAD_TOTAL")
 	}
 	bulkheadRules, err := routeClasses(getenv("BULKHEAD_ROUTE_CLASSES"))
+	if err != nil {
+		return Config{}, err
+	}
+	bulkheadCriticalPrefixes, err := criticalPrefixes(getenv("BULKHEAD_CRITICAL_PREFIXES"))
 	if err != nil {
 		return Config{}, err
 	}
@@ -419,7 +424,7 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		RateLimitAI:            limits[4],
 		RateLimitAdmin:         limits[5],
 		LedgerReconTimezone:    reconTimezone,
-		BulkheadTotal:          bulkheadTotal, BulkheadWait: time.Duration(bulkheadWaitMS) * time.Millisecond, BulkheadDrain: time.Duration(bulkheadDrainSeconds) * time.Second, BulkheadLimits: bulkheadLimits, BulkheadRules: bulkheadRules, BulkheadDeadlineExemptions: bulkheadDeadlineExemptions,
+		BulkheadTotal:          bulkheadTotal, BulkheadWait: time.Duration(bulkheadWaitMS) * time.Millisecond, BulkheadDrain: time.Duration(bulkheadDrainSeconds) * time.Second, BulkheadLimits: bulkheadLimits, BulkheadRules: bulkheadRules, BulkheadCriticalPrefixes: bulkheadCriticalPrefixes, BulkheadDeadlineExemptions: bulkheadDeadlineExemptions,
 		BrownoutEscalateAfter: time.Duration(brownoutEscalateSeconds) * time.Second, BrownoutRecoverAfter: time.Duration(brownoutRecoverSeconds) * time.Second,
 		BrownoutP95Threshold: time.Duration(brownoutP95ThresholdMS) * time.Millisecond, BrownoutP95Recovery: time.Duration(brownoutP95RecoveryMS) * time.Millisecond,
 		BrownoutDBWaitThreshold: time.Duration(brownoutDBWaitMS) * time.Millisecond, BrownoutDBWaitRecovery: time.Duration(brownoutDBWaitRecoveryMS) * time.Millisecond,
@@ -454,6 +459,22 @@ func routeClasses(raw string) (map[string]string, error) {
 		result[parts[0]] = parts[1]
 	}
 	return result, nil
+}
+
+func criticalPrefixes(raw string) ([]string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return []string{"/v1/buyer/withdraw*", "/v1/merchant/withdraw*", "/v1/driver/withdraw*", "/v1/ledger", "/v1/admin/finance"}, nil
+	}
+	prefixes, err := commaSeparated(raw)
+	if err != nil {
+		return nil, fmt.Errorf("BULKHEAD_CRITICAL_PREFIXES contains an empty value")
+	}
+	for _, prefix := range prefixes {
+		if !strings.HasPrefix(prefix, "/") || strings.Contains(prefix, "//") || strings.Contains(prefix, "..") || strings.Count(prefix, "*") > 1 || strings.Contains(strings.TrimSuffix(prefix, "*"), "*") {
+			return nil, fmt.Errorf("BULKHEAD_CRITICAL_PREFIXES must contain absolute path prefixes with an optional trailing wildcard")
+		}
+	}
+	return prefixes, nil
 }
 
 func sseDeadlineExemptions(raw string) (map[string]bool, error) {

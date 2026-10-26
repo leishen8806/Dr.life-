@@ -23,12 +23,13 @@ const (
 	Write    Class = "write"
 	Read     Class = "read"
 	Heavy    Class = "heavy"
+	Stream   Class = "stream"
 	Health   Class = "health"
 )
 
-var allClasses = []Class{Critical, Auth, Write, Read, Heavy}
+var allClasses = []Class{Critical, Auth, Write, Read, Heavy, Stream}
 
-type Limits struct{ Critical, Auth, Write, Read, Heavy int }
+type Limits struct{ Critical, Auth, Write, Read, Heavy, Stream int }
 
 func (l Limits) forClass(c Class) int {
 	switch c {
@@ -40,6 +41,8 @@ func (l Limits) forClass(c Class) int {
 		return l.Write
 	case Heavy:
 		return l.Heavy
+	case Stream:
+		return l.Stream
 	default:
 		return l.Read
 	}
@@ -68,12 +71,18 @@ type Config struct {
 	Limits             Limits
 	Timeouts           Timeouts
 	Rules              map[string]Class
+	CriticalPrefixes   []string
 	DeadlineExemptions map[string]bool
 	Metrics            *observability.Metrics
 }
 
 func DefaultConfig() Config {
-	return Config{Total: 512, Wait: 100 * time.Millisecond, Limits: Limits{Critical: 512, Auth: 64, Write: 128, Read: 256, Heavy: 32}, Timeouts: Timeouts{Critical: 10 * time.Second, Auth: 5 * time.Second, Write: 10 * time.Second, Read: 5 * time.Second, Heavy: 30 * time.Second}}
+	return Config{
+		Total: 512, Wait: 100 * time.Millisecond,
+		Limits:           Limits{Critical: 512, Auth: 64, Write: 128, Read: 256, Heavy: 32, Stream: 256},
+		Timeouts:         Timeouts{Critical: 10 * time.Second, Auth: 5 * time.Second, Write: 10 * time.Second, Read: 5 * time.Second, Heavy: 30 * time.Second},
+		CriticalPrefixes: []string{"/v1/buyer/withdraw*", "/v1/merchant/withdraw*", "/v1/driver/withdraw*", "/v1/ledger", "/v1/admin/finance"},
+	}
 }
 
 type Bulkhead struct {
@@ -111,6 +120,9 @@ func New(config Config) *Bulkhead {
 	}
 	if config.Timeouts.Heavy <= 0 {
 		config.Timeouts.Heavy = defaults.Heavy
+	}
+	if len(config.CriticalPrefixes) == 0 {
+		config.CriticalPrefixes = DefaultConfig().CriticalPrefixes
 	}
 	b := &Bulkhead{total: make(chan struct{}, config.Total), nonCritical: make(chan struct{}, config.Total*3/4), classes: make(map[Class]chan struct{}), heavyWake: make(chan struct{}, 1), config: config}
 	for _, c := range allClasses {
@@ -195,7 +207,7 @@ func (b *Bulkhead) Middleware(next http.Handler) http.Handler {
 			defer func() { brownout.Record(time.Since(started)) }()
 		}
 		ctx, cancel := r.Context(), func() {}
-		if !b.deadlineExempt(r.URL.Path) {
+		if class != Stream {
 			ctx, cancel = context.WithTimeout(ctx, b.config.Timeouts.forClass(class))
 		}
 		defer cancel()
@@ -212,6 +224,12 @@ func (b *Bulkhead) Middleware(next http.Handler) http.Handler {
 
 // Classify picks the longest matching configured prefix or template, then documented defaults.
 func (b *Bulkhead) Classify(path string) Class {
+	if path == "/healthz" || path == "/readyz" {
+		return Health
+	}
+	if b.deadlineExempt(path) {
+		return Stream
+	}
 	best := 0
 	picked := Class("")
 	for prefix, class := range b.config.Rules {
@@ -223,19 +241,41 @@ func (b *Bulkhead) Classify(path string) Class {
 		return picked
 	}
 	switch {
-	case path == "/healthz" || path == "/readyz":
-		return Health
 	case isAuthPath(path):
 		return Auth
-	case strings.Contains(path, "withdraw") || strings.HasPrefix(path, "/v1/ledger") || strings.HasPrefix(path, "/v1/admin/finance"):
+	case matchesCriticalPrefix(path, b.config.CriticalPrefixes):
 		return Critical
-	case strings.Contains(path, "/search") || strings.Contains(path, "/ai") || strings.Contains(path, "/export") || strings.Contains(path, "/report"):
+	case hasHeavySegment(path):
 		return Heavy
 	case strings.HasPrefix(path, "/v1/public/ping") || strings.HasPrefix(path, "/v1/public/"):
 		return Read
 	default:
 		return Write
 	}
+}
+
+func matchesCriticalPrefix(path string, prefixes []string) bool {
+	for _, configured := range prefixes {
+		prefix, wildcard := strings.CutSuffix(configured, "*")
+		if wildcard && strings.HasPrefix(path, prefix) {
+			return true
+		}
+		if !wildcard && (path == prefix || strings.HasPrefix(path, strings.TrimSuffix(prefix, "/")+"/")) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasHeavySegment(path string) bool {
+	for _, segment := range strings.Split(strings.Trim(path, "/"), "/") {
+		for _, prefix := range []string{"search", "ai", "export", "report"} {
+			if segment == prefix || strings.HasPrefix(segment, prefix+"-") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func isAuthPath(path string) bool {
@@ -290,7 +330,9 @@ func (b *Bulkhead) acquire(ctx context.Context, class Class) bool {
 	defer timer.Stop()
 	needed := make([]chan struct{}, 0, 3)
 	heavyHeld := false
-	if class == Heavy {
+	if class == Stream {
+		needed = append(needed, b.classes[Stream])
+	} else if class == Heavy {
 		if !b.acquireHeavy(ctx, timer) {
 			b.observe(class, started, false)
 			return false
@@ -299,9 +341,11 @@ func (b *Bulkhead) acquire(ctx context.Context, class Class) bool {
 	} else {
 		needed = append(needed, b.classes[class])
 	}
-	needed = append(needed, b.total)
-	if class != Critical {
-		needed = append(needed, b.nonCritical)
+	if class != Stream {
+		needed = append(needed, b.total)
+		if class != Critical {
+			needed = append(needed, b.nonCritical)
+		}
 	}
 	held := make([]chan struct{}, 0, len(needed))
 	for _, semaphore := range needed {
@@ -372,13 +416,17 @@ func (b *Bulkhead) signalHeavy() {
 }
 
 func (b *Bulkhead) release(class Class) {
-	semaphores := []chan struct{}{b.total}
-	if class == Heavy {
+	semaphores := make([]chan struct{}, 0, 3)
+	if class == Stream {
+		semaphores = append(semaphores, b.classes[Stream])
+	} else if class == Heavy {
+		semaphores = append(semaphores, b.total)
 		semaphores = append(semaphores, b.nonCritical)
 	} else {
+		semaphores = append(semaphores, b.total)
 		semaphores = append(semaphores, b.classes[class])
 	}
-	if class != Critical && class != Heavy {
+	if class != Critical && class != Heavy && class != Stream {
 		semaphores = append(semaphores, b.nonCritical)
 	}
 	b.releaseN(semaphores)

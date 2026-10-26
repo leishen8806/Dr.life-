@@ -97,6 +97,58 @@ func TestDefaultAuthClassificationCoversEveryAudience(t *testing.T) {
 	}
 }
 
+func TestDefaultClassificationUsesExactSegmentsAndCriticalPrefixes(t *testing.T) {
+	b := New(DefaultConfig())
+	tests := []struct {
+		path string
+		want Class
+	}{
+		{"/v1/buyer/withdraw", Critical},
+		{"/v1/merchant/withdrawals", Critical},
+		{"/v1/driver/withdraw-request", Critical},
+		{"/v1/ledger", Critical},
+		{"/v1/ledger/transactions", Critical},
+		{"/v1/admin/finance/reconcile", Critical},
+		{"/v1/buyer/search", Heavy},
+		{"/v1/buyer/search-suggestions", Heavy},
+		{"/v1/merchant/ai-chat", Heavy},
+		{"/v1/admin/export-csv", Heavy},
+		{"/v1/wms/report-daily", Heavy},
+		{"/anything/withdraw", Write},
+		{"/v1/public/withdraw-x", Read},
+		{"/v1/admin/withdraw", Write},
+		{"/v1/buyer/air-conditioners", Write},
+		{"/v1/public/air-conditioners", Read},
+		{"/v1/public/searching", Read},
+		{"/v1/public/reporting", Read},
+		{"/v1/buyer/daily-report", Write},
+	}
+	for _, test := range tests {
+		t.Run(test.path, func(t *testing.T) {
+			if got := b.Classify(test.path); got != test.want {
+				t.Fatalf("Classify(%q) = %q, want %q", test.path, got, test.want)
+			}
+		})
+	}
+}
+
+func TestConfiguredCriticalPrefixesReplaceDefaults(t *testing.T) {
+	b := New(Config{CriticalPrefixes: []string{"/v1/admin/payout*", "/v1/custom"}})
+	for _, test := range []struct {
+		path string
+		want Class
+	}{
+		{"/v1/admin/payout-batch", Critical},
+		{"/v1/custom/operation", Critical},
+		{"/v1/customary", Write},
+		{"/v1/buyer/withdraw", Write},
+	} {
+		if got := b.Classify(test.path); got != test.want {
+			t.Errorf("Classify(%q) = %q, want %q", test.path, got, test.want)
+		}
+	}
+}
+
 func TestOverloadRejectsWithinWaitAndSetsRetryAfter(t *testing.T) {
 	b := New(Config{Total: 4, Wait: 20 * time.Millisecond, Limits: Limits{Critical: 4, Auth: 4, Write: 4, Read: 1, Heavy: 4}, Timeouts: allTimeouts(time.Second)})
 	release, started := make(chan struct{}), make(chan struct{})
@@ -180,6 +232,48 @@ func TestSSEDeadlineExemptionAndResponseControllerFlush(t *testing.T) {
 	if normal.Code != http.StatusServiceUnavailable {
 		t.Fatalf("ordinary route status=%d, want 503", normal.Code)
 	}
+}
+
+func TestStreamCapacityIsIndependentFromOrdinaryRequests(t *testing.T) {
+	b := New(Config{
+		Total: 4, Wait: 10 * time.Millisecond,
+		Limits:             Limits{Critical: 4, Auth: 4, Write: 1, Read: 1, Heavy: 1, Stream: 1},
+		Timeouts:           allTimeouts(time.Second),
+		DeadlineExemptions: map[string]bool{"/v1/buyer/events": true},
+	})
+	if got := b.Classify("/v1/buyer/events"); got != Stream {
+		t.Fatalf("SSE class = %q, want %q", got, Stream)
+	}
+	if got := b.Limit(Stream); got != 1 {
+		t.Fatalf("stream limit = %d, want 1", got)
+	}
+
+	release, started, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	streamHandler := b.Middleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		close(started)
+		<-release
+	}))
+	go func() {
+		defer close(done)
+		streamHandler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/v1/buyer/events", nil))
+	}()
+	<-started
+	if got := b.InFlight(); got != 0 {
+		t.Fatalf("stream request consumed total capacity: in_flight=%d", got)
+	}
+
+	full := httptest.NewRecorder()
+	streamHandler.ServeHTTP(full, httptest.NewRequest(http.MethodGet, "/v1/buyer/events", nil))
+	if full.Code != http.StatusServiceUnavailable {
+		t.Fatalf("second stream status=%d, want 503", full.Code)
+	}
+	read := httptest.NewRecorder()
+	b.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })).ServeHTTP(read, httptest.NewRequest(http.MethodGet, "/v1/public/ping", nil))
+	if read.Code != http.StatusNoContent {
+		t.Fatalf("read status=%d while stream full, want 204", read.Code)
+	}
+	close(release)
+	<-done
 }
 
 func TestRejectedRequestsDoNotAffectBrownoutP95(t *testing.T) {
