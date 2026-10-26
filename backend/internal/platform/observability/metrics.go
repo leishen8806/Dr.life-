@@ -183,6 +183,14 @@ func (m *Metrics) RegisterPool(pool *pgxpool.Pool) {
 	)
 }
 
+// RegisterCollector adds an external Prometheus collector to the metrics endpoint.
+func (m *Metrics) RegisterCollector(collector prometheus.Collector) error {
+	if m == nil || collector == nil {
+		return nil
+	}
+	return m.registry.Register(collector)
+}
+
 func roleForPath(path string) string {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	if len(parts) >= 2 && parts[0] == "v1" {

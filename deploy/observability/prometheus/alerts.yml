@@ -122,3 +122,43 @@ groups:
         for: 1h
         labels: {severity: warning}
         annotations: {summary: "A TLS certificate expires within 14 days", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#certificateexpiringsoon"}
+
+      # --- Queue operations (S-03c) ---
+      - alert: QueueDeadLettersGrowing
+        expr: delta(drlife_queue_dead_letters[10m]) > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Queue dead letters are growing", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#queuedeadlettersgrowing"}
+
+      - alert: QueueWaitSLABreached
+        expr: |
+          drlife_queue_oldest_task_seconds{queue="critical"} > 10
+          or drlife_queue_oldest_task_seconds{queue="default"} > 60
+          or drlife_queue_oldest_task_seconds{queue="notify"} > 120
+        for: 1m
+        labels: {severity: warning}
+        annotations: {summary: "Oldest queued task is older than its queue SLA", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#queuewaitslabreached"}
+
+      - alert: OutboxRelayLagHigh
+        expr: drlife_outbox_oldest_seconds > 60
+        for: 2m
+        labels: {severity: warning}
+        annotations: {summary: "Outbox relay lag is above 60 seconds", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#outboxrelaylaghigh"}
+
+      - alert: QueueRedisMemoryHigh
+        expr: drlife_queue_redis_memory_ratio > 0.7
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Queue Redis memory is above 70% of maxmemory", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#queueredismemoryhigh"}
+
+      - alert: QueueMetricsCollectorDown
+        expr: drlife_queue_collector_up == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Queue metrics collector cannot read the queue Redis", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#queuemetricscollectordown"}
+
+      - alert: QueueSchedulerMissed
+        expr: time() - drlife_scheduler_last_run_timestamp_seconds > 180
+        for: 5m
+        labels: {severity: critical}
+        annotations: {summary: "Scheduler has not ticked for more than 3 minutes", runbook_url: "https://github.com/leishen8806/Dr.life-/blob/main/docs/ops/oncall.md#queueschedulermissed"}
