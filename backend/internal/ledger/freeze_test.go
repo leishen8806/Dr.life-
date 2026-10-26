@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -62,5 +63,39 @@ func TestSpotCheckFailureRecordsMetric(t *testing.T) {
 	}
 	if recorder.failed != 1 {
 		t.Fatalf("failed=%d, want 1", recorder.failed)
+	}
+}
+
+func TestStopSpotChecksDrainsBeforeCancellation(t *testing.T) {
+	service := New(nil, Options{})
+	release := make(chan struct{})
+	canceled := make(chan bool, 1)
+	service.spotCheckWG.Add(1)
+	go func() {
+		defer service.spotCheckWG.Done()
+		<-release
+		select {
+		case <-service.spotCheckCtx.Done():
+			canceled <- true
+		default:
+			canceled <- false
+		}
+	}()
+
+	stopped := make(chan error, 1)
+	go func() { stopped <- service.StopSpotChecks(context.Background()) }()
+
+	select {
+	case <-service.spotCheckCtx.Done():
+		t.Fatal("spot check canceled before in-flight work drained")
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(release)
+
+	if err := <-stopped; err != nil {
+		t.Fatal(err)
+	}
+	if <-canceled {
+		t.Fatal("in-flight spot check was canceled")
 	}
 }

@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -47,7 +48,7 @@ func (s *Service) maybeSpotCheck(postings []Posting) {
 func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
-		s.recordSpotCheckFailure()
+		s.recordSpotCheckFailure(err)
 		return err
 	}
 	issues, err := checkBalanceCache(ctx, tx, accountIDs)
@@ -57,7 +58,7 @@ func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 		_ = tx.Rollback(ctx)
 	}
 	if err != nil {
-		s.recordSpotCheckFailure()
+		s.recordSpotCheckFailure(err)
 		return err
 	}
 	if len(issues) == 0 {
@@ -66,7 +67,7 @@ func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 	day, _ := s.reconciliationDay(s.now())
 	run, _, err := s.startReconciliationRun(ctx, day, "spot", ReconciliationOptions{Force: true, Reason: "automatic posting spot check"})
 	if err != nil {
-		s.recordSpotCheckFailure()
+		s.recordSpotCheckFailure(err)
 		return err
 	}
 	_, err = s.finishReconciliationRun(ctx, run, issues)
@@ -76,24 +77,36 @@ func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 	return err
 }
 
-func (s *Service) recordSpotCheckFailure() {
+func (s *Service) recordSpotCheckFailure(err error) {
 	if s.reconciliationMetrics != nil {
 		s.reconciliationMetrics.ReconRun(false)
 	}
-	slog.Error("ledger spot check failed")
+	slog.Error("ledger spot check failed", "error_type", spotCheckErrorType(err))
+}
+
+func spotCheckErrorType(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "deadline_exceeded"
+	default:
+		return "reconciliation"
+	}
 }
 
 func (s *Service) StopSpotChecks(ctx context.Context) error {
 	s.spotCheckMu.Lock()
 	s.spotCheckClosed = true
 	s.spotCheckMu.Unlock()
-	s.spotCheckCancel()
 	done := make(chan struct{})
 	go func() { s.spotCheckWG.Wait(); close(done) }()
 	select {
 	case <-done:
+		s.spotCheckCancel()
 		return nil
 	case <-ctx.Done():
+		s.spotCheckCancel()
 		return ctx.Err()
 	}
 }
