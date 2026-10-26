@@ -503,6 +503,36 @@ func TestForcedReconciliationReclaimsOlderRunningAttempt(t *testing.T) {
 	}
 }
 
+func TestReconciliationReclaimsOlderStaleAttemptBeforeReturningRunning(t *testing.T) {
+	e := newBusinessEnv(t)
+	now := time.Date(2026, time.October, 26, 12, 0, 0, 0, time.UTC)
+	service := ledger.New(e.app, ledger.Options{Now: func() time.Time { return now }, ReconciliationRunTimeout: time.Minute})
+	day := now.AddDate(0, 0, -1)
+	for attempt, startedAt := range []time.Time{now.Add(-2 * time.Minute), now} {
+		forceReason := ""
+		if attempt > 0 {
+			forceReason = "operator rerun"
+		}
+		if _, err := e.admin.Exec(e.ctx, `INSERT INTO ledger.recon_run(day,kind,attempt,force_reason,started_at) VALUES($1,'daily',$2,NULLIF($3,''),$4)`, day, attempt+1, forceReason, startedAt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := service.RunDailyReconciliation(e.ctx, day, ledger.ReconciliationOptions{}); !errors.Is(err, ledger.ErrReconciliationRunning) {
+		t.Fatalf("RunDailyReconciliation error=%v, want ErrReconciliationRunning", err)
+	}
+	var status string
+	var staleEvents int
+	if err := e.admin.QueryRow(e.ctx, `SELECT status FROM ledger.recon_run WHERE day=$1 AND kind='daily' AND attempt=1`, day).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.admin.QueryRow(e.ctx, `SELECT count(*) FROM ledger.outbox WHERE topic='ledger.recon.stale_run'`).Scan(&staleEvents); err != nil {
+		t.Fatal(err)
+	}
+	if status != "failed" || staleEvents != 1 {
+		t.Fatalf("older attempt status=%s stale_events=%d, want failed and 1", status, staleEvents)
+	}
+}
+
 func TestReconciliationBusinessSequenceHasNoFalsePositive(t *testing.T) {
 	e := newBusinessEnv(t)
 	service := reconciliationService(e, ledger.Options{AccountGuard: withdrawalGuard{}, PayeeCipher: withdrawalCipher(t)})

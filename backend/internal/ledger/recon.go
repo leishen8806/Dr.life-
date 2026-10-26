@@ -332,6 +332,9 @@ func (s *Service) startReconciliationRun(ctx context.Context, day time.Time, kin
 		if latestWasStale {
 			opts.Force, opts.Reason = true, "stale reconciliation run replaced"
 		} else if run.Status == "running" && !opts.Force {
+			if err := tx.Commit(ctx); err != nil {
+				return ReconciliationRun{}, false, err
+			}
 			return run, true, ErrReconciliationRunning
 		} else if run.Status != "running" && !opts.Force {
 			if err := tx.Commit(ctx); err != nil {
