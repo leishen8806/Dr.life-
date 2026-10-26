@@ -36,7 +36,7 @@ func TestAccountLinkServiceOwnerOnlyAndImmutableBusinessData(t *testing.T) {
 }
 
 func TestAccountLinkServiceCandidateBuyersUsesIAMRepository(t *testing.T) {
-	repo := &fakeAccountLinkRepository{candidates: map[string][]AccountLinkCandidate{"merchant": {{AccountID: "buyer"}}}}
+	repo := &fakeAccountLinkRepository{owners: map[string]bool{"merchant": true}, candidates: map[string][]AccountLinkCandidate{"merchant": {{AccountID: "buyer"}}}}
 	service := NewAccountLinkService(repo, func() (string, error) { return "unused", nil })
 
 	candidates, err := service.CandidateBuyers(context.Background(), "merchant")
@@ -45,6 +45,15 @@ func TestAccountLinkServiceCandidateBuyersUsesIAMRepository(t *testing.T) {
 	}
 	if len(candidates) != 1 || candidates[0].AccountID != "buyer" {
 		t.Fatalf("candidates=%+v", candidates)
+	}
+}
+
+func TestAccountLinkServiceCandidateBuyersRequiresActiveMerchantOwner(t *testing.T) {
+	repo := &fakeAccountLinkRepository{owners: map[string]bool{"staff": false}, candidates: map[string][]AccountLinkCandidate{"staff": {{AccountID: "buyer"}}}}
+	service := NewAccountLinkService(repo, func() (string, error) { return "unused", nil })
+
+	if _, err := service.CandidateBuyers(context.Background(), "staff"); !errors.Is(err, ErrAccountLinkForbidden) {
+		t.Fatalf("CandidateBuyers error=%v, want forbidden", err)
 	}
 }
 
