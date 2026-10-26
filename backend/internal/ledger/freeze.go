@@ -2,14 +2,11 @@ package ledger
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
-
-type spotCheckDropMetrics interface {
-	ReconSpotCheckDropped()
-}
 
 func (s *Service) maybeSpotCheck(postings []Posting) {
 	if s.spotCheckEvery == 0 || s.spotCheckCounter.Add(1)%s.spotCheckEvery != 0 {
@@ -34,8 +31,8 @@ func (s *Service) maybeSpotCheck(postings []Posting) {
 		s.spotCheckMu.Unlock()
 	default:
 		s.spotCheckMu.Unlock()
-		if metrics, ok := s.reconciliationMetrics.(spotCheckDropMetrics); ok {
-			metrics.ReconSpotCheckDropped()
+		if s.reconciliationMetrics != nil {
+			s.reconciliationMetrics.ReconSpotCheckDropped()
 		}
 		return
 	}
@@ -50,6 +47,7 @@ func (s *Service) maybeSpotCheck(postings []Posting) {
 func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
+		s.recordSpotCheckFailure()
 		return err
 	}
 	issues, err := checkBalanceCache(ctx, tx, accountIDs)
@@ -59,6 +57,7 @@ func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 		_ = tx.Rollback(ctx)
 	}
 	if err != nil {
+		s.recordSpotCheckFailure()
 		return err
 	}
 	if len(issues) == 0 {
@@ -67,6 +66,7 @@ func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 	day, _ := s.reconciliationDay(s.now())
 	run, _, err := s.startReconciliationRun(ctx, day, "spot", ReconciliationOptions{Force: true, Reason: "automatic posting spot check"})
 	if err != nil {
+		s.recordSpotCheckFailure()
 		return err
 	}
 	_, err = s.finishReconciliationRun(ctx, run, issues)
@@ -74,6 +74,13 @@ func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 		s.failReconciliationRun(ctx, run.ID, err)
 	}
 	return err
+}
+
+func (s *Service) recordSpotCheckFailure() {
+	if s.reconciliationMetrics != nil {
+		s.reconciliationMetrics.ReconRun(false)
+	}
+	slog.Error("ledger spot check failed")
 }
 
 func (s *Service) StopSpotChecks(ctx context.Context) error {

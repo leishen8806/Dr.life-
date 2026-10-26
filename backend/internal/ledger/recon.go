@@ -36,6 +36,7 @@ var (
 type ReconciliationMetrics interface {
 	ReconRun(ok bool)
 	ReconMismatch(checkCode string, count int)
+	ReconSpotCheckDropped()
 }
 
 type ReconIssue struct {
@@ -288,24 +289,27 @@ func (s *Service) startReconciliationRun(ctx context.Context, day time.Time, kin
 		}
 		if run.Status == "running" {
 			if s.now().Sub(run.StartedAt) < s.reconciliationRunTimeout {
-				return run, true, ErrReconciliationRunning
+				if !opts.Force {
+					return run, true, ErrReconciliationRunning
+				}
+			} else {
+				summary, marshalErr := json.Marshal(map[string]int{"STALE_RUN": 1})
+				if marshalErr != nil {
+					return ReconciliationRun{}, false, marshalErr
+				}
+				finished := s.now()
+				if _, updateErr := tx.Exec(ctx, `UPDATE ledger.recon_run SET status='failed',finished_at=$2,summary=$3 WHERE id=$1`, run.ID, finished, summary); updateErr != nil {
+					return ReconciliationRun{}, false, updateErr
+				}
+				payload, marshalErr := json.Marshal(map[string]any{"run_id": run.ID, "day": day.Format("2006-01-02"), "occurred_at": finished})
+				if marshalErr != nil {
+					return ReconciliationRun{}, false, marshalErr
+				}
+				if _, insertErr := tx.Exec(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES('ledger.recon.stale_run',$1)`, payload); insertErr != nil {
+					return ReconciliationRun{}, false, insertErr
+				}
+				opts.Force, opts.Reason = true, "stale reconciliation run replaced"
 			}
-			summary, marshalErr := json.Marshal(map[string]int{"STALE_RUN": 1})
-			if marshalErr != nil {
-				return ReconciliationRun{}, false, marshalErr
-			}
-			finished := s.now()
-			if _, updateErr := tx.Exec(ctx, `UPDATE ledger.recon_run SET status='failed',finished_at=$2,summary=$3 WHERE id=$1`, run.ID, finished, summary); updateErr != nil {
-				return ReconciliationRun{}, false, updateErr
-			}
-			payload, marshalErr := json.Marshal(map[string]any{"run_id": run.ID, "day": day.Format("2006-01-02"), "occurred_at": finished})
-			if marshalErr != nil {
-				return ReconciliationRun{}, false, marshalErr
-			}
-			if _, insertErr := tx.Exec(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES('ledger.recon.stale_run',$1)`, payload); insertErr != nil {
-				return ReconciliationRun{}, false, insertErr
-			}
-			opts.Force, opts.Reason = true, "stale reconciliation run replaced"
 		} else if !opts.Force {
 			if err := tx.Commit(ctx); err != nil {
 				return ReconciliationRun{}, false, err
@@ -360,10 +364,14 @@ func (s *Service) finishReconciliationRun(ctx context.Context, run Reconciliatio
 			return ReconciliationRun{}, err
 		}
 	}
+	globalFreezeReason := ""
 	for accountID := range accountSet {
 		freezeAccountID := accountID
 		if countsForAccount(issues, CheckHoldFrozen, accountID) > 0 {
-			if err := tx.QueryRow(ctx, `SELECT a.id FROM ledger.account f JOIN ledger.account a ON a.owner_account=f.owner_account WHERE f.id=$1 AND f.kind='WALLET_FROZEN' AND a.kind='WALLET_AVAIL'`, accountID).Scan(&freezeAccountID); err != nil {
+			if err := tx.QueryRow(ctx, `SELECT a.id FROM ledger.account f JOIN ledger.account a ON a.owner_account=f.owner_account WHERE f.id=$1 AND f.kind='WALLET_FROZEN' AND a.kind='WALLET_AVAIL'`, accountID).Scan(&freezeAccountID); errors.Is(err, pgx.ErrNoRows) {
+				globalFreezeReason = CheckHoldFrozen + " wallet mapping missing"
+				continue
+			} else if err != nil {
 				return ReconciliationRun{}, err
 			}
 		}
@@ -373,12 +381,17 @@ func (s *Service) finishReconciliationRun(ctx context.Context, run Reconciliatio
 			}
 		}
 	}
-	for _, code := range []string{CheckPendingPayout, CheckTxnBalanced, CheckIdentity, CheckSnapshotDrift, CheckReversal, CheckOrphan} {
-		if counts[code] > 0 {
-			if _, err := tx.Exec(ctx, `INSERT INTO ledger.payout_freeze(scope,reason,run_id) VALUES('global',$1,$2) ON CONFLICT DO NOTHING`, code+" mismatch", run.ID); err != nil {
-				return ReconciliationRun{}, err
+	if globalFreezeReason == "" {
+		for _, code := range []string{CheckPendingPayout, CheckTxnBalanced, CheckIdentity, CheckSnapshotDrift, CheckReversal, CheckOrphan} {
+			if counts[code] > 0 {
+				globalFreezeReason = code + " mismatch"
+				break
 			}
-			break
+		}
+	}
+	if globalFreezeReason != "" {
+		if _, err := tx.Exec(ctx, `INSERT INTO ledger.payout_freeze(scope,reason,run_id) VALUES('global',$1,$2) ON CONFLICT DO NOTHING`, globalFreezeReason, run.ID); err != nil {
+			return ReconciliationRun{}, err
 		}
 	}
 	status := "ok"

@@ -38,6 +38,7 @@ func (m *reconMetrics) ReconMismatch(code string, count int) {
 	}
 	m.mismatches[code] += count
 }
+func (m *reconMetrics) ReconSpotCheckDropped() {}
 
 func TestReconciliationNormalAndForcedRuns(t *testing.T) {
 	e := newBusinessEnv(t)
@@ -388,6 +389,68 @@ func TestReconciliationDetectsHoldAndPendingPayoutMismatch(t *testing.T) {
 	if !global || !frozenWallet {
 		t.Fatalf("hold/payout mismatch freezes global=%t wallet=%t freezes=%+v", global, frozenWallet, freezes)
 	}
+}
+
+func TestReconciliationHoldMismatchWithoutAvailableWalletFreezesGlobally(t *testing.T) {
+	e := newBusinessEnv(t)
+	service := reconciliationService(e, ledger.Options{})
+	var frozenID int64
+	if err := e.admin.QueryRow(e.ctx, `INSERT INTO ledger.account(kind,normal_side,owner_account) VALUES('WALLET_FROZEN','CREDIT',99001) RETURNING id`).Scan(&frozenID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.admin.Exec(e.ctx, `UPDATE ledger.balance SET balance=50 WHERE account_id=$1`, frozenID); err != nil {
+		t.Fatal(err)
+	}
+	run, err := service.RunDailyReconciliation(e.ctx, time.Now(), ledger.ReconciliationOptions{})
+	if err != nil || !hasIssue(run.Issues, ledger.CheckHoldFrozen) {
+		t.Fatalf("run=%+v err=%v", run, err)
+	}
+	freezes, err := service.ListPayoutFreezes(e.ctx, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, freeze := range freezes {
+		if freeze.Scope == "global" {
+			return
+		}
+	}
+	t.Fatalf("missing global freeze: %+v", freezes)
+}
+
+func TestSpotCheckRetriesBehindFreshRunningAttempt(t *testing.T) {
+	e := newBusinessEnv(t)
+	wallet := mustWallet(t, e, 99002, nil)
+	location := time.FixedZone("spot-test", 7*60*60)
+	now := time.Now().In(location)
+	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
+	if _, err := e.admin.Exec(e.ctx, `INSERT INTO ledger.recon_run(day,kind,attempt,started_at) VALUES($1,'spot',1,$2)`, day, now); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.admin.Exec(e.ctx, `UPDATE ledger.balance SET balance=balance+1 WHERE account_id=$1`, wallet.Available); err != nil {
+		t.Fatal(err)
+	}
+	service := ledger.New(e.app, ledger.Options{SpotCheckEvery: 1, ReconciliationLocation: location, Now: func() time.Time { return now }})
+	if _, err := service.Topup(e.ctx, ledger.TopupInput{ManualConfirmation: "spot-retry", BankConfirmed: true, WalletAccountID: wallet.Available, Amount: 1, ActorID: 1}); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		freezes, err := service.ListPayoutFreezes(e.ctx, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, freeze := range freezes {
+			if freeze.Scope == "account" && freeze.AccountID != nil && *freeze.AccountID == wallet.Available {
+				if err := service.StopSpotChecks(e.ctx); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	_ = service.StopSpotChecks(e.ctx)
+	t.Fatal("missing account freeze")
 }
 
 func TestReconciliationReplacesStaleRunningAttempt(t *testing.T) {
