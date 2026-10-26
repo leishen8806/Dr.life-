@@ -148,10 +148,23 @@ kill -TERM <pid> 观察日志；make docker
 ## F-03 数据库与迁移框架
 
 ```text
-你在 Dr.life+ 仓库工作（私有仓库 leishen8806/Dr.life-，默认分支 main）。F-01（仓库结构）、F-02（Go 服务骨架）已合并。
+你在 Dr.life+ 仓库工作（私有仓库 leishen8806/Dr.life-，默认分支 main）。F-01（仓库结构）、F-02（Go 服务骨架）已合并，main 当前在 de884eb。
 
 【任务】F-03 数据库与迁移框架
 【分支】task/F-03-db-migrations，只提交到这个分支并发起 PR，不要推 main。
+【工作目录】请基于 origin/main（de884eb 或更新）新建一个**独立 worktree** 在其中工作，不要在用户的 E:\Dr.life+ 主工作目录里直接改。
+
+【开工前必须先做：环境预检（Docker 不可用时不要空转）】
+本任务强依赖 Docker（docker-compose 开发数据库 + testcontainers 集成测试）。写任何代码之前，先在你的运行环境里依次执行并记录结果：
+  1. docker version          → 必须同时看到 Client 和 Server 两段；只有 Client、报 "failed to connect to the docker API" 说明引擎没起来
+  2. docker info --format "{{.ServerVersion}} | {{.OperatingSystem}} | mem={{.MemTotal}}"
+  3. docker run --rm hello-world
+内存要求：Docker 的 mem 值（MemTotal）应 ≥ 6 GiB（约 6442450944 字节）。低于这个值，PostgreSQL + 测试容器 + 迁移并发时容易被内核杀掉（OOM）。在 Windows 上，WSL 的内存上限来自 %USERPROFILE%\.wslconfig 的 memory=…，改完需要执行 wsl --shutdown 再重启 Docker Desktop；这些是用户的系统设置，**你不要自己改**，只提示用户。
+如果预检失败（引擎不可用、hello-world 失败、内存不足）：
+  - **立即停止，不要重试超过 2 次，不要反复等待或轮询，也不要用 SQLite、内存数据库、mock 代替真实 PostgreSQL 来"凑"测试。**
+  - 向用户报告：失败的是哪一条命令、完整错误文本、docker info 的内容（如有）、你判断的原因和需要用户做的事（例如"启动 Docker Desktop 并等待 Engine running""把 .wslconfig 的 memory 调到 8GB 后执行 wsl --shutdown"）。
+  - 此时只允许做**不需要 Docker 的部分**并明确标注：SQL 迁移文件、backend/internal/platform/db/ 的代码、Makefile、docker-compose.dev.yml、README；并在 PR 描述里把所有依赖 Docker 的验收项逐条标为"未验证（原因：…）"。**绝不能声称依赖 Docker 的验收项已通过。**
+预检通过后，把 docker version / docker info 的关键行（Server Version、OS、MemTotal）贴进 PR 描述的"运行环境"小节，作为验证证据。
 
 【先阅读（按顺序）】
 1. AGENTS.md（第 4 节规则 8 和账务规则 1–7、第 5 节迁移约定）
@@ -203,10 +216,23 @@ kill -TERM <pid> 观察日志；make docker
 □ `make db-reset` 在 APP_ENV 不是 dev 时拒绝执行（测试或手动验证并写在 PR 里）
 □ /readyz 在数据库不可用时返回 503，可用时 200
 □ `go vet ./... && go test ./...` 通过（集成测试需要 Docker，在 PR 里说明运行条件）
+□ PR 描述含"运行环境"小节：docker version / docker info 关键行（Server Version、OS、MemTotal ≥ 6 GiB）；若预检失败，则所有依赖 Docker 的项逐条标为"未验证（原因）"，不得声称通过
 □ backend/migrations/README.md 写清迁移规则；PR 描述列出新增依赖及理由
 
-【如何验证（你会亲自跑）】
-make db-up db-migrate && psql 检查 \dn、\du；make db-rollback 再 make db-migrate；go test ./... ；停掉数据库容器后 curl /readyz。
+【如何验证（你会亲自跑；按顺序，前一步失败就停下报告，不要硬往下做）】
+0. 预检（见上文，必须先通过）：
+   docker version
+   docker info --format "{{.ServerVersion}} | {{.OperatingSystem}} | mem={{.MemTotal}}"
+   docker run --rm hello-world
+   （MemTotal 应 ≥ 6 GiB；Docker 引擎刚启动时可能需要 1–3 分钟，**最多等待 3 分钟**，仍不可用就停下报告）
+1. cd backend && make db-up db-migrate
+   在 compose 里确认两个容器 healthy：docker compose -f ../docker-compose.dev.yml ps
+2. 用 psql（可经 docker exec 进入容器）检查：\dn（10 个 schema）、\du（11 个权限角色 + 各模块登录角色）
+3. make db-rollback 回滚到 0，再 make db-migrate
+4. go vet ./... && go test ./...（集成测试会用 testcontainers 起 PostgreSQL，可能需要拉取镜像，首次较慢；单个测试包超时请设为 5 分钟并说明）
+5. 停掉数据库容器后：curl -i localhost:8080/readyz 应为 503；恢复后应为 200
+6. 清理：make db-down，确认没有遗留测试容器（docker ps -a）
+Docker 内存紧张时的现象（出现就如实报告，不要掩盖）：容器反复重启、`docker info` 偶发超时、测试里数据库连接被重置、日志里出现 "Out of memory" / "Killed"。
 
 【遇到不确定】
 不要猜测，写进 PR 描述"待确认"；权限规则以《数据库表结构与账务详细设计》第一章为准；与文档冲突时以文档为准并提出。
@@ -223,7 +249,7 @@ make db-up db-migrate && psql 检查 \dn、\du；make db-rollback 再 make db-mi
 |---|---|
 | F-01 | 有没有误改设计文档正文；`.gitattributes` 是否导致大量文件被改；CODEOWNERS 路径是否覆盖账务/权限/迁移/接口规范 |
 | F-02 | 错误响应三语是否齐全（高棉语 TODO 是否列出）；日志脱敏是否真的有测试；有没有偷偷引入框架或 ORM；优雅停机测试是否稳定 |
-| F-03 | **权限边界测试是否真的用不同登录身份做**（不是只查语句）；迁移里有没有密码；Down 是否真的可逆；有没有顺手建了业务表 |
+| F-03 | **权限边界测试是否真的用不同登录身份做**（不是只查语句）；迁移里有没有密码；Down 是否真的可逆；有没有顺手建了业务表；PR 里有没有"运行环境"证据（docker info、MemTotal）；有没有用 SQLite/内存库/mock 代替真实 PostgreSQL；有没有擅自改 .wslconfig 等系统设置 |
 
 ## 后续任务的提示词怎么来
 其余任务（F-04 起）按同一格式生成：**角色说明 → 任务与分支 → 先阅读的文档章节 → 背景 → 文件归属 → 范围（做/不做）→ 验收标准 → 如何验证 → 遇到不确定 → 完成后**。内容来自《开发任务拆分与验收》里该任务的交付物与验收标准。需要时告诉我下一批是哪些任务。
