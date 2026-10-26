@@ -28,8 +28,9 @@ func (s *Store) Verify(ctx context.Context, fromID, toID int64) error {
 	}
 	defer rows.Close()
 	previous := GenesisHash
+	var lastID int64
 	if fromID > 1 {
-		if err := s.DB.QueryRow(ctx, `SELECT hash FROM audit.log WHERE id < $1 ORDER BY id DESC LIMIT 1`, fromID).Scan(&previous); err != nil {
+		if err := s.DB.QueryRow(ctx, `SELECT id,hash FROM audit.log WHERE id < $1 ORDER BY id DESC LIMIT 1`, fromID).Scan(&lastID, &previous); err != nil {
 			return fmt.Errorf("load audit predecessor: %w", err)
 		}
 	}
@@ -50,8 +51,27 @@ func (s *Store) Verify(ctx context.Context, fromID, toID int64) error {
 			return s.verificationFailure(record.ID, "hash mismatch")
 		}
 		previous = record.Hash
+		lastID = record.ID
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+	if toID == 0 {
+		var headID *int64
+		var headHash []byte
+		if err := s.DB.QueryRow(ctx, `SELECT last_id,last_hash FROM audit.chain_head WHERE singleton`).Scan(&headID, &headHash); err != nil {
+			return fmt.Errorf("load audit chain head: %w", err)
+		}
+		if headID == nil {
+			if lastID != 0 || !bytes.Equal(previous, GenesisHash) {
+				return s.verificationFailure(lastID, "chain head mismatch")
+			}
+		} else if lastID != *headID || !bytes.Equal(previous, headHash) {
+			return s.verificationFailure(*headID, "chain head mismatch")
+		}
+	}
+	return nil
 }
 
 func (s *Store) verificationFailure(id int64, reason string) error {

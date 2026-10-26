@@ -11,3 +11,5 @@ go run ./cmd/auditctl anchor --day 2026-10-25 --file ./var/audit-anchors.jsonl
 锚定日按 UTC 计算。本地文件接收器只用于开发与验证；异地不可变对象存储的地址与实现待运维任务确认。审计日志默认永久保留。
 
 PostgreSQL 会在触发器之前检查表权限。因此管理员的 UPDATE/DELETE/TRUNCATE 会被不可变触发器以 SQLSTATE `55000` 拒绝，而只有 SELECT/INSERT 的 `audit_writer` 会更早以 `42501` 拒绝。不能为了统一错误码而向应用角色开放修改权限。
+
+新增审计动作时，必须同时更新 `validActions` 枚举集合和对应测试；未登记的动作会在追加前被拒绝。

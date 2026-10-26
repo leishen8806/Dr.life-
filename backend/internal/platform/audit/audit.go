@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -141,8 +141,13 @@ func validateAndCanonicalize(entry *Entry, now time.Time) ([]byte, error) {
 	if entry.ActorID <= 0 || entry.ActorRole == "" || entry.Target == "" || entry.RequestID == "" {
 		return nil, errors.New("audit actor, role, target and request ID are required")
 	}
-	if entry.IP != "" && net.ParseIP(entry.IP) == nil {
-		return nil, errors.New("audit IP is invalid")
+	if entry.IP != "" {
+		address, err := netip.ParseAddr(entry.IP)
+		if err != nil || address.Zone() != "" {
+			return nil, errors.New("audit IP is invalid")
+		}
+		// Keep IPv4-mapped IPv6 addresses mapped so this matches PostgreSQL inet host().
+		entry.IP = address.String()
 	}
 	if entry.Time.IsZero() {
 		entry.Time = now

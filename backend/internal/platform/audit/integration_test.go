@@ -191,6 +191,51 @@ func TestAuditIntegration(t *testing.T) {
 		}
 	})
 
+	t.Run("IP normalization matches PostgreSQL inet", func(t *testing.T) {
+		for index, test := range []struct {
+			input string
+			want  string
+		}{
+			{"2001:DB8::A", "2001:db8::a"},
+			{"2001:0db8:0000:0000:0000:0000:0000:0001", "2001:db8::1"},
+			{"::FFFF:192.0.2.128", "::ffff:192.0.2.128"},
+		} {
+			entry := fixtureEntry(int64(3000 + index))
+			entry.IP = test.input
+			record, err := store.Append(ctx, entry)
+			if err != nil {
+				t.Fatalf("append %q: %v", test.input, err)
+			}
+			if record.IP != test.want {
+				t.Fatalf("IP %q stored as %q, want %q", test.input, record.IP, test.want)
+			}
+		}
+		if err := store.Verify(ctx, 0, 0); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("missing tail disagrees with chain head", func(t *testing.T) {
+		var lastID int64
+		if err := admin.QueryRow(ctx, `SELECT last_id FROM audit.chain_head WHERE singleton`).Scan(&lastID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `ALTER TABLE audit.log DISABLE TRIGGER audit_log_no_update`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `DELETE FROM audit.log WHERE id=$1`, lastID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `ALTER TABLE audit.log ENABLE TRIGGER audit_log_no_update`); err != nil {
+			t.Fatal(err)
+		}
+		err := store.Verify(ctx, 0, 0)
+		var chainErr *ChainError
+		if !errors.As(err, &chainErr) || chainErr.ID != lastID || chainErr.Reason != "chain head mismatch" {
+			t.Fatalf("verify error=%v, want chain head mismatch at id %d", err, lastID)
+		}
+	})
+
 	t.Run("tamper reports first changed row", func(t *testing.T) {
 		var id int64
 		if err := admin.QueryRow(ctx, `SELECT id FROM audit.log ORDER BY id OFFSET 10 LIMIT 1`).Scan(&id); err != nil {
