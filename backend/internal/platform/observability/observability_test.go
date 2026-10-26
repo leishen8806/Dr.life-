@@ -127,12 +127,17 @@ func TestBusinessMetricMethods(t *testing.T) {
 	b.LedgerPosted()
 	b.LedgerFailed("unbalanced")
 	b.ReconciliationMismatch()
+	b.AuditAppend(true)
+	b.AuditAppend(false)
+	b.AuditVerifyFailure()
+	b.AuditAnchorMissing(true)
 	b.ReconRun(true)
 	b.ReconRun(false)
 	b.ReconMismatch("BALANCE_CACHE", 2)
 	for _, name := range []string{
 		"drlife_orders_total", "drlife_withdrawals_total", "drlife_ai_requests_total", "drlife_bot_sends_total",
 		"drlife_login_validation_failures_total", "drlife_session_refresh_total", "drlife_ledger_posts_total", "drlife_ledger_reconciliation_runs_total", "drlife_ledger_reconciliation_mismatches_total",
+		"drlife_audit_appends_total", "drlife_audit_verify_failures_total", "drlife_audit_anchor_missing",
 	} {
 		if len(metricFamily(t, metrics, name).Metric) == 0 {
 			t.Fatalf("%s has no samples", name)

@@ -74,6 +74,7 @@ type Config struct {
 	BrownoutInFlightRatioRecovery  float64
 	BrownoutSampleInterval         time.Duration
 	IAMDatabaseURL                 string
+	AuditDatabaseURL               string
 	TelegramInitDataMaxAge         time.Duration
 	AccessTokenTTL                 time.Duration
 	RefreshTokenTTL                time.Duration
@@ -420,6 +421,7 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		IdleTimeout:            time.Duration(idleSeconds) * time.Second,
 		DatabaseURL:            strings.TrimSpace(getenv("DATABASE_URL")),
 		IAMDatabaseURL:         strings.TrimSpace(getenv("IAM_DATABASE_URL")),
+		AuditDatabaseURL:       strings.TrimSpace(getenv("AUDIT_DATABASE_URL")),
 		ReportDatabaseURL:      strings.TrimSpace(getenv("REPORT_DATABASE_URL")),
 		DBMaxConns:             int32(dbMaxConns),
 		DBMinConns:             int32(dbMinConns),

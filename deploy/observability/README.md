@@ -24,7 +24,7 @@ docker run --rm --entrypoint=promtool -v "$PWD/deploy/observability/prometheus:/
 | HTTP | `drlife_http_requests_total`, `drlife_http_request_duration_seconds`, `drlife_http_errors_total`, `drlife_http_requests_in_flight` | `role`, `route`, `method`, `status_class`；进行中请求只用 `role` |
 | 网关 | `drlife_gateway_rate_limit_hits_total`, `drlife_gateway_auth_failures_total` | 固定规则类别或 401/403 |
 | 数据库 | `drlife_db_pool_*`, `drlife_db_slow_queries_total` | 慢查询只用语句指纹 |
-| 业务 | `drlife_orders_total`, `drlife_withdrawals_total`, `drlife_ai_requests_total`, `drlife_bot_sends_total`, `drlife_login_validation_failures_total`, `drlife_ledger_posts_total`, `drlife_ledger_reconciliation_mismatches_total` | 固定枚举；未知值归为 `other` |
+| 业务 | `drlife_orders_total`, `drlife_withdrawals_total`, `drlife_ai_requests_total`, `drlife_bot_sends_total`, `drlife_login_validation_failures_total`, `drlife_ledger_posts_total`, `drlife_ledger_reconciliation_mismatches_total`, `drlife_audit_appends_total`, `drlife_audit_verify_failures_total`, `drlife_audit_anchor_missing` | 固定枚举；未知值归为 `other`；审计锚点缺失为 0/1 gauge |
 | Go | `go_*`, `process_*` | Prometheus 默认采集器 |
 
 `route` 始终取 chi 路由模式，例如 `/v1/buyer/orders/{id}`；未匹配请求为 `unmatched`。HTTP 方法只允许 `GET`、`POST`、`PUT`、`PATCH`、`DELETE`、`OPTIONS`、`HEAD`，其他方法统一为 `OTHER`；状态码也只归入固定的 `1xx` 至 `5xx` 或 `other`。慢查询指纹最多记录 256 个；超过上限的新指纹统一计入固定的 `overflow` 序列，以保留告警计数，同时不记录其模板日志或创建新指纹标签。禁止把原始路径、账号、手机号、订单号或任意错误文本放进标签。新增业务失败原因必须先扩充代码中的固定枚举。

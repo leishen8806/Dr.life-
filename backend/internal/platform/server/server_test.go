@@ -68,6 +68,34 @@ func TestHealthAndReadiness(t *testing.T) {
 	}
 }
 
+func TestAuditEndpointRequiresAudViewPermission(t *testing.T) {
+	rule := gateway.Rule{Limit: 1000, Window: time.Minute}
+	newHandler := func(permissions map[string]string) http.Handler {
+		return NewHandlerWithGateway(nil, GatewayOptions{
+			AppEnv: "dev", OriginGroups: gateway.DefaultOriginGroups("dev"),
+			Limiter: gateway.NewMemoryLimiter(), Authenticator: fixedAdminAuthenticator{permissions: permissions},
+			IPRules: gateway.RuleSet{Default: rule, Admin: rule}, AccountRules: gateway.RuleSet{Default: rule, Admin: rule},
+		})
+	}
+	request := func(handler http.Handler) int {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/v1/admin/audit", nil))
+		return recorder.Code
+	}
+	if got := request(newHandler(nil)); got != http.StatusForbidden {
+		t.Fatalf("without aud permission status=%d", got)
+	}
+	if got := request(newHandler(map[string]string{"aud": "view"})); got != http.StatusServiceUnavailable {
+		t.Fatalf("with aud view status=%d", got)
+	}
+}
+
+type fixedAdminAuthenticator struct{ permissions map[string]string }
+
+func (a fixedAdminAuthenticator) Authenticate(*http.Request) (gateway.Identity, bool, error) {
+	return gateway.Identity{AccountID: "admin_test", Role: gateway.RoleAdmin, Permissions: a.permissions}, true, nil
+}
+
 func TestMetricsAreNotExposedOnPublicHandler(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/metrics", nil)
 	response := httptest.NewRecorder()
