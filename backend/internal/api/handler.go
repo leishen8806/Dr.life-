@@ -96,7 +96,7 @@ func (h Handler) ListPublicProducts(w http.ResponseWriter, r *http.Request, para
 		h.writeError(w, r, err)
 		return
 	}
-	httpx.WriteOK(w, r, productListData(page))
+	httpx.WriteOK(w, r, publicProductListData(page))
 }
 
 func (h Handler) ListMerchantProducts(w http.ResponseWriter, r *http.Request, params gen.ListMerchantProductsParams) {
@@ -334,6 +334,19 @@ func productListData(page catalog.ProductPage) gen.ProductListData {
 	items := make([]gen.Product, 0, len(page.Items))
 	for _, item := range page.Items {
 		items = append(items, toGenProduct(item))
+	}
+	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}
+}
+
+// publicProductListData 是匿名浏览的投影：供应商来源与内部标准分不属于买家可见信息。
+// 商家列表/详情继续使用 productListData，保留这些字段供商家核对。
+func publicProductListData(page catalog.ProductPage) gen.ProductListData {
+	items := make([]gen.Product, 0, len(page.Items))
+	for _, item := range page.Items {
+		product := toGenProduct(item)
+		product.SourceRef = nil
+		product.StdScore = nil
+		items = append(items, product)
 	}
 	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}
 }

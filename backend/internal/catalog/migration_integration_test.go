@@ -12,10 +12,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
+
+	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 )
 
 const (
@@ -107,6 +110,93 @@ func TestCatalogMigration(t *testing.T) {
 	})
 
 	seedCatalogFixtures(t, ctx, admin)
+
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	store := catalog.NewPgStore(pool)
+
+	t.Run("publish revalidates the locked row", func(t *testing.T) {
+		const publicID = "01ARZ3NDEKTSV4RRFFQ69G5FC0"
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.product (public_id, merchant_id, category_id, name, unit, origin, status)
+			SELECT $1, 42, id, '{"zh":"瓷砖","en":"Tiles","km":""}'::jsonb, 'pcs', 'cn', 'draft'
+			FROM catalog.category WHERE code = $2`, publicID, scratchCategoryCode); err != nil {
+			t.Fatal(err)
+		}
+		for _, tier := range []struct {
+			minQty string
+			price  int64
+		}{{"10", 140000}, {"100", 120000}} {
+			if _, err := admin.Exec(ctx, `
+				INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4)
+				SELECT id, $2::text::numeric, $3 FROM catalog.product WHERE public_id = $1`,
+				publicID, tier.minQty, tier.price); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		if _, err := store.PublishProduct(ctx, 42, publicID); err == nil {
+			t.Fatal("PublishProduct accepted a product whose name is not trilingual")
+		} else {
+			var validation *catalog.ValidationError
+			if !errors.As(err, &validation) {
+				t.Fatalf("PublishProduct error = %v, want *catalog.ValidationError", err)
+			}
+		}
+		var status string
+		if err := admin.QueryRow(ctx, `SELECT status FROM catalog.product WHERE public_id = $1`, publicID).Scan(&status); err != nil {
+			t.Fatal(err)
+		}
+		if status != string(catalog.StatusDraft) {
+			t.Fatalf("status = %q, want draft after a rejected publish", status)
+		}
+	})
+
+	t.Run("update revalidates an on-sale product's locked row", func(t *testing.T) {
+		const publicID = "01ARZ3NDEKTSV4RRFFQ69G5FC1"
+		const originalName = `{"zh":"瓷砖","en":"Tiles","km":"ក្បឿង"}`
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.product (public_id, merchant_id, category_id, name, unit, origin, status)
+			SELECT $1, 42, id, $2::jsonb, 'pcs', 'cn', 'on'
+			FROM catalog.category WHERE code = $3`, publicID, originalName, scratchCategoryCode); err != nil {
+			t.Fatal(err)
+		}
+		for _, tier := range []struct {
+			minQty string
+			price  int64
+		}{{"10", 140000}, {"100", 120000}} {
+			if _, err := admin.Exec(ctx, `
+				INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4)
+				SELECT id, $2::text::numeric, $3 FROM catalog.product WHERE public_id = $1`,
+				publicID, tier.minQty, tier.price); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		blankKm := catalog.LocalizedText{
+			catalog.LangZH: "瓷砖",
+			catalog.LangEN: "Tiles",
+			catalog.LangKM: "   ",
+		}
+		if _, err := store.UpdateProduct(ctx, 42, publicID, catalog.ProductPatch{Name: blankKm}); err == nil {
+			t.Fatal("UpdateProduct blanked a published product's Khmer name")
+		} else {
+			var validation *catalog.ValidationError
+			if !errors.As(err, &validation) {
+				t.Fatalf("UpdateProduct error = %v, want *catalog.ValidationError", err)
+			}
+		}
+		var km string
+		if err := admin.QueryRow(ctx, `SELECT name->>'km' FROM catalog.product WHERE public_id = $1`, publicID).Scan(&km); err != nil {
+			t.Fatal(err)
+		}
+		if km == "" {
+			t.Fatal("the rejected update still cleared the Khmer name")
+		}
+	})
 
 	t.Run("category constraints", func(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23514", fmt.Sprintf(`INSERT INTO catalog.category (public_id, code, name) VALUES ('bad-ulid', 'bad_cat', '%s')`, productNameJSON))

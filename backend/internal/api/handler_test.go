@@ -506,3 +506,57 @@ func TestUpdateRejectsIllegalNumbers(t *testing.T) {
 		})
 	}
 }
+
+// 公开商品列表不得暴露供应商内部字段（source_ref / std_score）；
+// 商家自己的列表仍须保留这些字段，供商家核对来源与标准分。
+func TestPublicProductListHidesSupplierFields(t *testing.T) {
+	score := 88
+	store := &stubStore{products: []catalog.Product{{
+		PublicID:   merchantULID,
+		MerchantID: merchantID,
+		Status:     catalog.StatusOn,
+		Name:       completeName,
+		SourceRef:  "supplier-ref-1",
+		StdScore:   &score,
+	}}}
+
+	public := catalogHandler(store, activeDirectory(), nil)
+	recorder := serve(t, public, httptest.NewRequest(http.MethodGet, "/v1/public/products", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("public status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	item := firstProductItem(t, recorder)
+	for _, field := range []string{"source_ref", "std_score"} {
+		if _, leaked := item[field]; leaked {
+			t.Fatalf("public product leaked %s: %s", field, recorder.Body.String())
+		}
+	}
+
+	merchant := catalogHandler(store, activeDirectory(), merchantAuth())
+	recorder = serve(t, merchant, httptest.NewRequest(http.MethodGet, "/v1/merchant/products", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("merchant status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	item = firstProductItem(t, recorder)
+	for _, field := range []string{"source_ref", "std_score"} {
+		if _, present := item[field]; !present {
+			t.Fatalf("merchant product lost %s: %s", field, recorder.Body.String())
+		}
+	}
+}
+
+func firstProductItem(t *testing.T, recorder *httptest.ResponseRecorder) map[string]json.RawMessage {
+	t.Helper()
+	var body struct {
+		Data struct {
+			Items []map[string]json.RawMessage `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode product list: %v body=%s", err, recorder.Body.String())
+	}
+	if len(body.Data.Items) != 1 {
+		t.Fatalf("items = %d, want 1; body=%s", len(body.Data.Items), recorder.Body.String())
+	}
+	return body.Data.Items[0]
+}
