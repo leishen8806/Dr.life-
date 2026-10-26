@@ -12,9 +12,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	api "github.com/leishen8806/Dr.life-/backend/internal/api"
 	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
+	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/overload"
 )
 
 type ReadinessCheck func(context.Context) error
@@ -43,6 +46,13 @@ type GatewayOptions struct {
 	BodyPolicy        gateway.BodyPolicy
 	Metrics           *observability.Metrics
 	ErrorReporter     *observability.ErrorReporter
+	Bulkhead          *overload.Bulkhead
+	Catalog           *catalog.Service
+	Merchants         api.MerchantResolver
+	Logger            *slog.Logger
+	Login             api.TelegramLogin
+	Audit             *platformaudit.Store
+	Sessions          api.SessionManagement
 }
 
 func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
@@ -55,6 +65,12 @@ func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
 
 func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks ...ReadinessCheck) http.Handler {
 	router := chi.NewRouter()
+	if options.AdminAccess.AppEnv == "" {
+		options.AdminAccess.AppEnv = options.AppEnv
+	}
+	if options.Bulkhead == nil {
+		options.Bulkhead = overload.New(overload.DefaultConfig())
+	}
 	router.Use(httpx.RequestID)
 	router.Use(gateway.SecurityHeaders(options.AppEnv))
 	if options.Metrics != nil {
@@ -63,6 +79,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.Use(httpx.RequestLogger(logger, gateway.RoleFromContext))
 	router.Use(observability.Recover(logger, options.ErrorReporter))
 	router.Use(gateway.GroupedCORS(options.OriginGroups))
+	router.Use(options.Bulkhead.Middleware)
 	router.Use(gateway.LimitByIP(options.Limiter, options.ClientIP, options.IPRules))
 	router.Use(options.AdminAccess.Middleware)
 	router.Use(gateway.VerifyWebhooks(options.WebhookPrefix, options.WebhookMaxBody, options.WebhookBindings))
@@ -78,13 +95,17 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeMethodNotAllowed))
 	})
-	gen.HandlerFromMux(api.Handler{}, router)
+	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, Sessions: options.Sessions, ClientIP: options.ClientIP, Audit: options.Audit}, router)
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"ok":true}`))
 	})
 	router.Get("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if options.Bulkhead.Draining() {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+			return
+		}
 		for _, check := range checks {
 			if err := check(r.Context()); err != nil {
 				if logger != nil {
@@ -99,7 +120,12 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	return router
 }
 
-func Serve(ctx context.Context, srv *http.Server, listener net.Listener, shutdownTimeout time.Duration) error {
+type Drainer interface{ BeginDraining() }
+
+func Serve(ctx context.Context, srv *http.Server, listener net.Listener, shutdownTimeout time.Duration, draining ...struct {
+	Drainer
+	Delay time.Duration
+}) error {
 	serveResult := make(chan error, 1)
 	go func() { serveResult <- srv.Serve(listener) }()
 	select {
@@ -109,6 +135,19 @@ func Serve(ctx context.Context, srv *http.Server, listener net.Listener, shutdow
 		}
 		return err
 	case <-ctx.Done():
+	}
+	for _, drain := range draining {
+		drain.BeginDraining()
+		timer := time.NewTimer(drain.Delay)
+		select {
+		case <-timer.C:
+		case err := <-serveResult:
+			timer.Stop()
+			if errors.Is(err, http.ErrServerClosed) {
+				return nil
+			}
+			return err
+		}
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)

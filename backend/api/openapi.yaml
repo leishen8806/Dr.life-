@@ -34,6 +34,230 @@ tags:
 security:
   - bearerAuth: []
 paths:
+  /v1/admin/audit:
+    get:
+      tags: [admin]
+      operationId: listAdminAudit
+      summary: Query immutable audit records
+      description: Requires the aud view permission. Detail is returned only with aud edit permission.
+      x-roles: [admin]
+      parameters:
+        - name: from
+          in: query
+          schema: {type: string, format: date-time}
+        - name: to
+          in: query
+          schema: {type: string, format: date-time}
+        - name: actor_id
+          in: query
+          schema: {type: integer, format: int64, minimum: 1}
+        - name: action
+          in: query
+          schema: {type: string}
+        - name: target
+          in: query
+          schema: {type: string}
+        - name: before_id
+          in: query
+          description: Return records with ids lower than this cursor.
+          schema: {type: integer, format: int64, minimum: 1}
+        - name: page_size
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        "200":
+          description: Audit page ordered by descending id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditListSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/public/auth/telegram:
+    post:
+      tags: [public]
+      operationId: postTelegramAuth
+      summary: Sign in with Telegram Mini App initData
+      x-roles: ["none"]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TelegramAuthRequest"
+      responses:
+        "200":
+          description: Login succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelegramAuthSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/LoginFailed"
+        "403":
+          $ref: "#/components/responses/AccountBlocked"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/LoginTooManyAttempts"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/public/auth/refresh:
+    post:
+      tags: [public]
+      operationId: postAuthRefresh
+      summary: Rotate a Mini App refresh token
+      x-roles: ["none"]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200": { $ref: "#/components/responses/RefreshSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AccountBlocked" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/buyer/auth/logout:
+    post:
+      tags: [buyer]
+      operationId: postBuyerAuthLogout
+      summary: Revoke the current buyer session
+      x-roles: [buyer]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/merchant/auth/logout:
+    post:
+      tags: [merchant]
+      operationId: postMerchantAuthLogout
+      summary: Revoke the current merchant session
+      x-roles: [merchant]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/driver/auth/logout:
+    post:
+      tags: [driver]
+      operationId: postDriverAuthLogout
+      summary: Revoke the current driver session
+      x-roles: [driver]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/buyer/me/sessions:
+    get:
+      tags: [buyer]
+      operationId: getBuyerMeSessions
+      summary: List the current buyer account sessions
+      x-roles: [buyer]
+      responses:
+        "200": { $ref: "#/components/responses/SessionListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/sessions:
+    get:
+      tags: [merchant]
+      operationId: getMerchantMeSessions
+      summary: List the current merchant account sessions
+      x-roles: [merchant]
+      responses:
+        "200": { $ref: "#/components/responses/SessionListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/me/sessions:
+    get:
+      tags: [driver]
+      operationId: getDriverMeSessions
+      summary: List the current driver account sessions
+      x-roles: [driver]
+      responses:
+        "200": { $ref: "#/components/responses/SessionListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/me/sessions/{id}:
+    delete:
+      tags: [buyer]
+      operationId: deleteBuyerMeSession
+      summary: Revoke one session owned by the current buyer account
+      x-roles: [buyer]
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/sessions/{id}:
+    delete:
+      tags: [merchant]
+      operationId: deleteMerchantMeSession
+      summary: Revoke one session owned by the current merchant account
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/me/sessions/{id}:
+    delete:
+      tags: [driver]
+      operationId: deleteDriverMeSession
+      summary: Revoke one session owned by the current driver account
+      x-roles: [driver]
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /v1/public/ping:
     get:
       tags: [public]
@@ -58,13 +282,226 @@ paths:
           $ref: "#/components/responses/InternalServerError"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /v1/public/categories:
+    get:
+      tags: [public]
+      operationId: listPublicCategories
+      summary: List enabled product categories in display order
+      x-roles: ["none"]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+      responses:
+        "200":
+          description: Enabled categories ordered by sort then code.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryListSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/public/products:
+    get:
+      tags: [public]
+      operationId: listPublicProducts
+      summary: List products that are on sale for a merchant that is not disabled
+      x-roles: ["none"]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/CategoryCode"
+      responses:
+        "200":
+          description: On-sale products; products of a disabled merchant are hidden.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductListSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/merchant/products:
+    get:
+      tags: [merchant]
+      operationId: listMerchantProducts
+      summary: List the authenticated merchant products in any status
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/StatusFilter"
+      responses:
+        "200":
+          description: Products owned by the authenticated merchant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductListSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    post:
+      tags: [merchant]
+      operationId: createMerchantProduct
+      summary: Create a draft product owned by the authenticated merchant
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductCreateRequest"
+      responses:
+        "201":
+          description: Product created in draft status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/merchant/products/{public_id}:
+    parameters:
+      - $ref: "#/components/parameters/PublicID"
+    get:
+      tags: [merchant]
+      operationId: getMerchantProduct
+      summary: Read one product owned by the authenticated merchant
+      x-roles: [merchant]
+      responses:
+        "200":
+          description: The requested product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    patch:
+      tags: [merchant]
+      operationId: updateMerchantProduct
+      summary: Patch a product owned by the authenticated merchant
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdateRequest"
+      responses:
+        "200":
+          description: The updated product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+  /v1/merchant/products/{public_id}/publish:
+    parameters:
+      - $ref: "#/components/parameters/PublicID"
+    post:
+      tags: [merchant]
+      operationId: publishMerchantProduct
+      summary: Publish a product; requires complete trilingual text and at least two price tiers
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: The product is on sale.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT containing the account role; a role/path mismatch returns HTTP 403.
+      description: HS256 access JWT with typ=at+jwt, iss=drlife, and an audience bound to the path end (for example drlife:buyer).
   parameters:
     Page:
       name: page
@@ -119,6 +556,36 @@ components:
         minLength: 1
         maxLength: 64
         pattern: "^[A-Za-z0-9_-]+$"
+    PublicID:
+      name: public_id
+      in: path
+      required: true
+      description: ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive).
+      schema:
+        type: string
+        pattern: "^[0-9a-hjkmnp-tv-z]{26}$"
+    SessionID:
+      name: id
+      in: path
+      required: true
+      description: Lowercase ULID of a session owned by the authenticated account.
+      schema:
+        type: string
+        pattern: "^[0-9a-hjkmnp-tv-z]{26}$"
+    CategoryCode:
+      name: category
+      in: query
+      description: Restrict the result to one category code.
+      schema:
+        type: string
+        pattern: "^[a-z][a-z0-9_]{1,31}$"
+    StatusFilter:
+      name: status
+      in: query
+      description: Restrict the result to one product status.
+      schema:
+        type: string
+        enum: [draft, review, on, off, rejected]
     XStepUpToken:
       name: X-Step-Up-Token
       in: header
@@ -144,7 +611,7 @@ components:
       type: integer
       format: int32
       description: Documented application error code; ranges are described in the API description.
-      enum: [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 2001, 2002, 2003, 2004, 7001]
+      enum: [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 7001]
       x-enum-varnames:
         - InternalError
         - InvalidArgument
@@ -161,6 +628,9 @@ components:
         - PermissionDenied
         - StepUpRequired
         - StepUpInvalid
+        - TelegramLoginFailed
+        - AccountBlocked
+        - LoginTooManyAttempts
         - WebhookInvalid
     Messages:
       type: object
@@ -229,7 +699,445 @@ components:
         request_id:
           type: string
           minLength: 1
+    TelegramAuthRequest:
+      type: object
+      additionalProperties: false
+      required: [end, init_data]
+      properties:
+        end:
+          type: string
+          enum: [buyer, merchant, driver]
+        init_data:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        device_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: "^[A-Za-z0-9_:-]+$"
+    TelegramAccount:
+      type: object
+      additionalProperties: false
+      required: [public_id, role, lang, status]
+      properties:
+        public_id:
+          type: string
+        role:
+          type: string
+          enum: [buyer, merchant, driver]
+        lang:
+          type: string
+          nullable: true
+          enum: [zh, en, km]
+        status:
+          type: string
+          enum: [active, frozen, disabled]
+    TelegramAuthData:
+      type: object
+      additionalProperties: false
+      required: [access_token, access_expires_in, refresh_token, refresh_expires_in, account, needs_language, is_new_account]
+      properties:
+        access_token:
+          type: string
+        access_expires_in:
+          type: integer
+          format: int64
+          minimum: 1
+        refresh_token:
+          type: string
+        refresh_expires_in:
+          type: integer
+          format: int64
+          minimum: 1
+        account:
+          $ref: "#/components/schemas/TelegramAccount"
+        needs_language:
+          type: boolean
+        is_new_account:
+          type: boolean
+    TelegramAuthSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/TelegramAuthData"
+        request_id:
+          type: string
+          minLength: 1
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+          minLength: 32
+          maxLength: 512
+    RefreshData:
+      type: object
+      additionalProperties: false
+      required: [access_token, access_expires_in, refresh_token, refresh_expires_in]
+      properties:
+        access_token: { type: string }
+        access_expires_in: { type: integer, format: int64, minimum: 1 }
+        refresh_token: { type: string }
+        refresh_expires_in: { type: integer, format: int64, minimum: 1 }
+    RefreshSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/RefreshData" }
+        request_id: { type: string, minLength: 1 }
+    Session:
+      type: object
+      additionalProperties: false
+      required: [public_id, last_used_at, expires_at]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        device_id: { type: string, nullable: true }
+        ip_prefix:
+          type: string
+          nullable: true
+          description: Masked IPv4 /24 or IPv6 /64 prefix.
+        last_used_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+    SessionListData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Session" }
+    SessionListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/SessionListData" }
+        request_id: { type: string, minLength: 1 }
+    ActionData:
+      type: object
+      additionalProperties: false
+      required: [revoked]
+      properties:
+        revoked: { type: boolean, enum: [true] }
+    ActionSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ActionData" }
+        request_id: { type: string, minLength: 1 }
+    LocalizedText:
+      type: object
+      additionalProperties: false
+      required: [zh, en, km]
+      description: Trilingual text; every language must be present before a product can be published.
+      properties:
+        zh:
+          type: string
+          minLength: 1
+        en:
+          type: string
+          minLength: 1
+        km:
+          type: string
+          minLength: 1
+    ProductTier:
+      type: object
+      additionalProperties: false
+      required: [min_qty, unit_price_e4]
+      properties:
+        min_qty:
+          type: string
+          description: Minimum order quantity as a decimal string; never a floating-point number.
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+        unit_price_e4:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Unit price in ten-thousandths of a US dollar.
+    ProductTierList:
+      type: array
+      minItems: 2
+      description: At least two tiers, each with a unique minimum order quantity.
+      items:
+        $ref: "#/components/schemas/ProductTier"
+    Category:
+      type: object
+      additionalProperties: false
+      required: [public_id, code, name, enabled, sort]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        code:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        name:
+          $ref: "#/components/schemas/LocalizedText"
+        enabled:
+          type: boolean
+        default_zone:
+          type: string
+        sort:
+          type: integer
+    Product:
+      type: object
+      additionalProperties: false
+      required: [public_id, category_code, name, unit, origin, status, source, tiers, updated_at]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        category_code:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        name:
+          $ref: "#/components/schemas/LocalizedText"
+        spec:
+          $ref: "#/components/schemas/LocalizedText"
+        unit:
+          type: string
+          minLength: 1
+        origin:
+          type: string
+          enum: [cn, lc]
+        lead_days:
+          type: integer
+          minimum: 0
+          nullable: true
+        vol_m3:
+          type: string
+          nullable: true
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$"
+        status:
+          type: string
+          enum: [draft, review, on, off, rejected]
+        source:
+          type: string
+          enum: [manual, amazon, shopee, a1688, csv]
+        source_ref:
+          type: string
+          nullable: true
+        std_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+        tiers:
+          $ref: "#/components/schemas/ProductTierList"
+        updated_at:
+          type: string
+          format: date-time
+    ProductCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [category_code, name, unit, origin, tiers]
+      properties:
+        category_code:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        name:
+          $ref: "#/components/schemas/LocalizedText"
+        spec:
+          $ref: "#/components/schemas/LocalizedText"
+        unit:
+          type: string
+          minLength: 1
+        origin:
+          type: string
+          enum: [cn, lc]
+        lead_days:
+          type: integer
+          minimum: 0
+          nullable: true
+        vol_m3:
+          type: string
+          nullable: true
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$"
+        source:
+          type: string
+          enum: [manual, amazon, shopee, a1688, csv]
+        source_ref:
+          type: string
+        tiers:
+          $ref: "#/components/schemas/ProductTierList"
+    ProductUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        category_code:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        name:
+          $ref: "#/components/schemas/LocalizedText"
+        spec:
+          $ref: "#/components/schemas/LocalizedText"
+        unit:
+          type: string
+          minLength: 1
+        origin:
+          type: string
+          enum: [cn, lc]
+        lead_days:
+          type: integer
+          minimum: 0
+          nullable: true
+        vol_m3:
+          type: string
+          nullable: true
+          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,4})?$"
+        source_ref:
+          type: string
+        status:
+          type: string
+          enum: [draft, off]
+          description: Merchants may only move a product between draft and off; on is reached through publish.
+        tiers:
+          $ref: "#/components/schemas/ProductTierList"
+    CategoryListData:
+      type: object
+      additionalProperties: false
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    ProductListData:
+      type: object
+      additionalProperties: false
+      required: [items, page, page_size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    CategoryListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/CategoryListData"
+        request_id:
+          type: string
+          minLength: 1
+    ProductListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/ProductListData"
+        request_id:
+          type: string
+          minLength: 1
+    ProductSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/Product"
+        request_id:
+          type: string
+          minLength: 1
+    AuditRecord:
+      type: object
+      additionalProperties: false
+      required: [id, ts, actor_id, actor_role, action, target, detail, request_id]
+      properties:
+        id: {type: integer, format: int64}
+        ts: {type: string, format: date-time}
+        actor_id: {type: integer, format: int64}
+        actor_role: {type: string}
+        action: {type: string}
+        target: {type: string}
+        detail:
+          type: object
+          additionalProperties: true
+        ip: {type: string}
+        request_id: {type: string}
+    AuditListData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/AuditRecord"}
+        next_before_id:
+          type: integer
+          format: int64
+          nullable: true
+    AuditListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/AuditListData"}
+        request_id: {type: string, minLength: 1}
   responses:
+    RefreshSucceeded:
+      description: Refresh token rotated successfully.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RefreshSuccessResponse"
+    SessionListSucceeded:
+      description: Active sessions owned by the authenticated account.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SessionListSuccessResponse"
+    ActionSucceeded:
+      description: Session revocation succeeded.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ActionSuccessResponse"
     BadRequest:
       description: Invalid request (error code 1002).
       content:
@@ -244,6 +1152,27 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     Forbidden:
       description: Permission denied (error code 2002).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    LoginFailed:
+      description: Telegram login validation failed (error code 2005).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    AccountBlocked:
+      description: Account is frozen or disabled (error code 2006).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    LoginTooManyAttempts:
+      description: Too many login validation failures (error code 2007).
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
       content:
         application/json:
           schema:

@@ -1,0 +1,35 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.16 [39m[90mE:/VirtualAIOffice/pc-worktrees/CMP-24-p0-9-poc[39m
+
+node.exe : 
+At C:\Users\Administrator\AppData\Roaming\npm\pnpm.ps1:24 char:5
++     & "node$exe"  "$basedir/node_modules/pnpm/bin/pnpm.cjs" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m poc/driver-location-fe/tests/location-queue.test.ts[2m [ poc/driver-location-fe/tests/locati
+on-queue.test.ts ][22m
+[31m[1mError[22m: Cannot find module '../src/http-uploader' imported from 'E:/VirtualAIOffice/pc-worktrees/CMP-24-p0
+-9-poc/poc/driver-location-fe/tests/location-queue.test.ts'[39m
+[36m [2m❯[22m poc/driver-location-fe/tests/location-queue.test.ts:[2m2:1[22m[39m
+    [90m  1| [39m[35mimport[39m { afterEach[33m,[39m describe[33m,[39m expect[33m,[39m it[33m,[39m vi } [3
+5mfrom[39m [32m"vitest"[39m[33m;[39m
+    [90m  2| [39m[35mimport[39m { createHttpUploader } [35mfrom[39m [32m"../src/http-uploader"[39m[33m;[39m
+    [90m   | [39m[31m^[39m
+    [90m  3| [39mimport { LocationQueue, MemoryQueueStorage } from "../src/location-que…
+    [90m  4| [39m[35mimport[39m { [33mLocationSampler[39m } [35mfrom[39m [32m"../src/location-sampler"[39m[3
+3m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'ERR_MODULE_NOT_FOUND' }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [2mno tests[22m
+[2m   Start at [22m 08:46:51
+[2m   Duration [22m 706ms[2m (transform 153ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)[22m
+

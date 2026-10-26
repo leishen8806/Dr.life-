@@ -15,10 +15,14 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
+
+	"github.com/leishen8806/Dr.life-/backend/internal/iam"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 )
 
 const (
@@ -65,7 +69,7 @@ func TestIAMMigration(t *testing.T) {
 	}
 
 	t.Run("up down up is reversible", func(t *testing.T) {
-		assertIAMTableCount(t, database, 16)
+		assertIAMTableCount(t, database, 17)
 		if err := goose.DownTo(database, migrationsDir, 2); err != nil {
 			t.Fatal(err)
 		}
@@ -73,7 +77,7 @@ func TestIAMMigration(t *testing.T) {
 		if err := goose.Up(database, migrationsDir); err != nil {
 			t.Fatal(err)
 		}
-		assertIAMTableCount(t, database, 16)
+		assertIAMTableCount(t, database, 17)
 	})
 
 	admin, err := pgx.Connect(ctx, dsn)
@@ -92,7 +96,7 @@ func TestIAMMigration(t *testing.T) {
 			FROM information_schema.columns c WHERE c.table_schema = 'iam'`).Scan(&identityCount, &publicIDCount, &badTimestamp); err != nil {
 			t.Fatal(err)
 		}
-		if identityCount != 13 || publicIDCount != 13 || badTimestamp != 0 {
+		if identityCount != 14 || publicIDCount != 14 || badTimestamp != 0 {
 			t.Fatalf("identity columns=%d, public IDs=%d, bad timestamps=%d", identityCount, publicIDCount, badTimestamp)
 		}
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.person (public_id, tg_user_id) VALUES ('bad-ulid', 1)`)
@@ -122,17 +126,17 @@ func TestIAMMigration(t *testing.T) {
 
 	t.Run("session indexes exist", func(t *testing.T) {
 		var count int
-		if err := admin.QueryRow(ctx, `SELECT count(*) FROM pg_indexes WHERE schemaname='iam' AND tablename='session' AND indexname IN ('ix_session_account_id','ix_session_expires_at')`).Scan(&count); err != nil {
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM pg_indexes WHERE schemaname='iam' AND tablename='session' AND indexname IN ('ix_session_account_id','ix_session_expires_at','ix_session_family_id','ix_session_previous_hash','ix_session_active_account')`).Scan(&count); err != nil {
 			t.Fatal(err)
 		}
-		if count != 2 {
-			t.Fatalf("session index count=%d, want 2", count)
+		if count != 5 {
+			t.Fatalf("session index count=%d, want 5", count)
 		}
-		if err := admin.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='iam' AND data_type='bytea' AND (table_name,column_name) IN (('person','phone_enc'),('merchant','phone_enc'),('merchant','address_enc'),('merchant','contact_enc'),('bot','token_enc'),('bot','webhook_secret_enc'),('session','refresh_token_hash'),('merchant_staff','phone_enc'),('merchant_staff','phone_hash'),('admin_user','totp_secret_enc'))`).Scan(&count); err != nil {
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema='iam' AND data_type='bytea' AND (table_name,column_name) IN (('person','phone_enc'),('merchant','phone_enc'),('merchant','address_enc'),('merchant','contact_enc'),('bot','token_enc'),('bot','webhook_secret_enc'),('session','refresh_token_hash'),('session','previous_hash'),('merchant_staff','phone_enc'),('merchant_staff','phone_hash'),('admin_user','totp_secret_enc'))`).Scan(&count); err != nil {
 			t.Fatal(err)
 		}
-		if count != 10 {
-			t.Fatalf("sensitive bytea column count=%d, want 10", count)
+		if count != 11 {
+			t.Fatalf("sensitive bytea column count=%d, want 11", count)
 		}
 	})
 
@@ -161,6 +165,125 @@ func TestIAMMigration(t *testing.T) {
 		}
 		assertSQLState(t, ctx, admin, "23505", `INSERT INTO iam.actor (public_id,kind,ref_id) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAM','system',1)`)
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.actor (public_id,kind,ref_id) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAN','robot',2)`)
+	})
+
+	t.Run("last active super administrator cannot be disabled or deleted", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAT','Super','super@example.test','hash','super','active')`); err != nil {
+			t.Fatal(err)
+		}
+		assertSQLState(t, ctx, admin, "P0001", `UPDATE iam.admin_user SET status='disabled' WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FAT'`)
+		assertSQLState(t, ctx, admin, "P0001", `DELETE FROM iam.admin_user WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FAT'`)
+	})
+
+	t.Run("concurrent removals cannot leave zero active super administrators", func(t *testing.T) {
+		// Start from exactly two active supers (the earlier subtest left one).
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAZ','Super Two','super2@example.test','hash','super','active')`); err != nil {
+			t.Fatal(err)
+		}
+		for round := 0; round < 25; round++ {
+			if _, err := admin.Exec(ctx, `UPDATE iam.admin_user SET status='active' WHERE role='super'`); err != nil {
+				t.Fatal(err)
+			}
+			start := make(chan struct{})
+			results := make(chan error, 2)
+			for _, id := range []string{"01ARZ3NDEKTSV4RRFFQ69G5FAT", "01ARZ3NDEKTSV4RRFFQ69G5FAZ"} {
+				go func(publicID string) {
+					conn, err := pgx.Connect(ctx, dsn)
+					if err != nil {
+						results <- err
+						return
+					}
+					defer conn.Close(ctx)
+					<-start
+					tx, err := conn.Begin(ctx)
+					if err != nil {
+						results <- err
+						return
+					}
+					if _, err := tx.Exec(ctx, `UPDATE iam.admin_user SET status='disabled' WHERE public_id=$1`, publicID); err != nil {
+						_ = tx.Rollback(ctx)
+						results <- err
+						return
+					}
+					results <- tx.Commit(ctx)
+				}(id)
+			}
+			close(start)
+			failures := 0
+			for i := 0; i < 2; i++ {
+				if err := <-results; err != nil {
+					var pgErr *pgconn.PgError
+					if !errors.As(err, &pgErr) || pgErr.Code != "P0001" {
+						t.Fatalf("round %d: unexpected error %v", round, err)
+					}
+					failures++
+				}
+			}
+			var active int
+			if err := admin.QueryRow(ctx, `SELECT count(*) FROM iam.admin_user WHERE role='super' AND status='active'`).Scan(&active); err != nil {
+				t.Fatal(err)
+			}
+			if active < 1 || failures != 1 {
+				t.Fatalf("round %d: active supers=%d failures=%d, want at least one active and exactly one rejected removal", round, active, failures)
+			}
+		}
+	})
+
+	t.Run("account links require same Telegram person and active merchant owner", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.person (public_id,tg_user_id) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAT',2002)`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.account (public_id,person_id,role) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FAV',id,'buyer' FROM iam.person WHERE tg_user_id=2002`); err != nil {
+			t.Fatal(err)
+		}
+		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.account_link (public_id,buyer_account_id,merchant_account_id) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FAW',b.id,m.id FROM iam.account b,iam.account m WHERE b.public_id='01ARZ3NDEKTSV4RRFFQ69G5FAV' AND m.public_id='`+ownerPublicID+`'`)
+	})
+
+	t.Run("account link service links and unlinks with one distinct audit row per action", func(t *testing.T) {
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pool.Close()
+		// Earlier subtests leave an active link for this pair; start from a clean state.
+		if _, err := admin.Exec(ctx, `UPDATE iam.account_link SET unlinked_at=now() WHERE unlinked_at IS NULL`); err != nil {
+			t.Fatal(err)
+		}
+		service := iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: pool}, ids.NewULID)
+
+		link, err := service.Link(ctx, ownerPublicID, buyerPublicID)
+		if err != nil {
+			t.Fatalf("first link: %v", err)
+		}
+		if _, err := service.Link(ctx, ownerPublicID, buyerPublicID); !errors.Is(err, iam.ErrAccountLinkExists) {
+			t.Fatalf("duplicate active link error = %v, want ErrAccountLinkExists", err)
+		}
+		// A buyer belonging to a different Telegram person is not a candidate.
+		if _, err := service.Link(ctx, ownerPublicID, "01ARZ3NDEKTSV4RRFFQ69G5FAV"); !errors.Is(err, iam.ErrAccountLinkForbidden) {
+			t.Fatalf("other person's buyer error = %v, want ErrAccountLinkForbidden", err)
+		}
+		if err := service.Unlink(ctx, ownerPublicID, link.PublicID); err != nil {
+			t.Fatalf("unlink: %v", err)
+		}
+		if err := service.Unlink(ctx, ownerPublicID, link.PublicID); !errors.Is(err, iam.ErrAccountLinkNotFound) {
+			t.Fatalf("second unlink error = %v, want ErrAccountLinkNotFound", err)
+		}
+		// Link and unlink again: the unlink entry used to reuse the link's identifier as the log row's
+		// public_id, which violates the unique constraint on the second cycle.
+		again, err := service.Link(ctx, ownerPublicID, buyerPublicID)
+		if err != nil {
+			t.Fatalf("relink: %v", err)
+		}
+		if err := service.Unlink(ctx, ownerPublicID, again.PublicID); err != nil {
+			t.Fatalf("second unlink cycle: %v", err)
+		}
+		var rows, distinct int
+		if err := admin.QueryRow(ctx, `SELECT count(*), count(DISTINCT public_id) FROM iam.merchant_op_log WHERE action IN ('account_linked','account_unlinked')`).Scan(&rows, &distinct); err != nil {
+			t.Fatal(err)
+		}
+		if rows != 4 || distinct != 4 {
+			t.Fatalf("audit rows=%d distinct ids=%d, want 4 and 4", rows, distinct)
+		}
 	})
 
 	t.Run("permission seeds match approved matrices", func(t *testing.T) {
@@ -198,6 +321,7 @@ func TestIAMMigration(t *testing.T) {
 			`SELECT password_hash FROM iam.admin_user`,
 			`SELECT totp_secret_enc FROM iam.admin_user`,
 			`SELECT refresh_token_hash FROM iam.session`,
+			`SELECT previous_hash FROM iam.session`,
 			`SELECT phone_enc FROM iam.person`,
 		} {
 			assertSQLState(t, ctx, reportLogin, "42501", statement)
@@ -218,6 +342,9 @@ func seedFixtures(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 		t.Fatal(err)
 	}
 	if _, err := conn.Exec(ctx, `INSERT INTO iam.account (public_id,person_id,role,merchant_id) SELECT $1,p.id,'merchant_owner',m.id FROM iam.person p,iam.merchant m WHERE p.public_id=$2 AND m.public_id=$3`, ownerPublicID, personPublicID, merchantPublicID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(ctx, `UPDATE iam.merchant SET owner_account_id = a.id FROM iam.account a WHERE iam.merchant.public_id=$1 AND a.public_id=$2`, merchantPublicID, ownerPublicID); err != nil {
 		t.Fatal(err)
 	}
 }

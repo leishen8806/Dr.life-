@@ -16,8 +16,15 @@ const (
 )
 
 type Identity struct {
-	AccountID string
-	Role      Role
+	AccountID   string
+	Role        Role
+	SessionID   string
+	Permissions map[string]string
+}
+
+func (i Identity) HasPermission(module, level string) bool {
+	value := i.Permissions[module]
+	return value == level || value == "edit"
 }
 
 type Authenticator interface {

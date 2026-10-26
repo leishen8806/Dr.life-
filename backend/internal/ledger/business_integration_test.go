@@ -23,6 +23,7 @@ import (
 
 type businessEnv struct {
 	ctx          context.Context
+	container    testcontainers.Container
 	admin, app   *pgxpool.Pool
 	adminService *ledger.Service
 	appService   *ledger.Service
@@ -92,7 +93,7 @@ func newBusinessEnv(t *testing.T) businessEnv {
 		t.Fatal(err)
 	}
 	t.Cleanup(app.Close)
-	return businessEnv{ctx: ctx, admin: admin, app: app, adminService: ledger.New(admin, ledger.Options{}), appService: ledger.New(app, ledger.Options{})}
+	return businessEnv{ctx: ctx, container: container, admin: admin, app: app, adminService: ledger.New(admin, ledger.Options{}), appService: ledger.New(app, ledger.Options{})}
 }
 
 func TestBusinessPostingIntegration(t *testing.T) {

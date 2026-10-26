@@ -28,6 +28,16 @@ var roles = []role{
 	{"app_report", "report_ro", "REPORT_DB_PASSWORD"},
 }
 
+// app_catalog 跑 cmd/server：组装根实现 catalog 的出站端口时要读两列 iam 数据，
+// 所以按登录用户（而不是 catalog_rw）授最小列权限；catalog 模块本身仍只碰 catalog schema。
+var extraGrants = map[string][]string{
+	"app_catalog": {
+		"GRANT USAGE ON SCHEMA iam TO app_catalog",
+		"GRANT SELECT (id, status) ON iam.merchant TO app_catalog",
+		"GRANT SELECT (public_id, status, merchant_id) ON iam.account TO app_catalog",
+	},
+}
+
 func main() {
 	ctx := context.Background()
 	databaseURL := os.Getenv("MIGRATION_DATABASE_URL")
@@ -72,6 +82,11 @@ func ensureRole(ctx context.Context, conn *pgx.Conn, role role, password string)
 	grant := fmt.Sprintf("GRANT %s TO %s", pgx.Identifier{role.permission}.Sanitize(), pgx.Identifier{role.login}.Sanitize())
 	if _, err := conn.Exec(ctx, grant); err != nil {
 		return fmt.Errorf("grant %s: %w", role.login, err)
+	}
+	for _, statement := range extraGrants[role.login] {
+		if _, err := conn.Exec(ctx, statement); err != nil {
+			return fmt.Errorf("extra grant %s: %w", role.login, err)
+		}
 	}
 	return nil
 }

@@ -1,0 +1,24 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.16 [39m[90mE:/VirtualAIOffice/pc-worktrees/CMP-24-p0-9-poc/poc/driver-location-fe[39m
+
+[90mstdout[2m | tests/location-queue.test.ts[2m > [22m[2mdriver location queue[2m > [22m[2mpersists queued points across a page reload
+[22m[39m[AC-2] queuedBeforeReload=1 queuedAfterReload=1
+
+[90mstdout[2m | tests/location-queue.test.ts[2m > [22m[2mdriver location queue[2m > [22m[2mreplays every point captured during a five minute offline window
+[22m[39m[AC-3] N=60 received=60 uniqueKeys=60 duplicateAttempts=0 uploaded=60 pendingAfter=0
+
+[90mstdout[2m | tests/location-queue.test.ts[2m > [22m[2mdriver location queue[2m > [22m[2mrecords a repeated idempotency key only once
+[22m[39m[AC-4] first=accepted firstTotal=1 second=duplicate secondTotal=1 finalReceived=1 duplicateAttempts=1
+
+ [32m✓[39m tests/location-queue.test.ts[2m > [22mdriver location queue[2m > [22mpersists queued points across a page reload[32m 2[2mms[22m[39m
+ [32m✓[39m tests/location-queue.test.ts[2m > [22mdriver location queue[2m > [22mreplays every point captured during a five minute offline window[32m 5[2mms[22m[39m
+ [32m✓[39m tests/location-queue.test.ts[2m > [22mdriver location queue[2m > [22mrecords a repeated idempotency key only once[32m 0[2mms[22m[39m
+ [32m✓[39m tests/location-queue.test.ts[2m > [22mdriver location queue[2m > [22mdoes not upload twice when flush is called concurrently[32m 0[2mms[22m[39m
+ [32m✓[39m tests/location-queue.test.ts[2m > [22mdriver location queue[2m > [22mkeeps points queued when upload fails[32m 0[2mms[22m[39m
+ [32m✓[39m tests/location-queue.test.ts[2m > [22mdriver location queue[2m > [22msends the point id as the Idempotency-Key header[32m 11[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m   Start at [22m 08:48:51
+[2m   Duration [22m 170ms[2m (transform 37ms, setup 0ms, import 50ms, tests 20ms, environment 0ms)[22m
+

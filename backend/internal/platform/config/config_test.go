@@ -27,10 +27,10 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 || cfg.RateLimitAdmin != 60 || cfg.LedgerReconTimezone != "Asia/Phnom_Penh" {
+	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 || cfg.RateLimitAdmin != 60 || cfg.LedgerReconTimezone != "Asia/Phnom_Penh" || cfg.TelegramInitDataMaxAge != 24*time.Hour || cfg.AccessTokenTTL != 15*time.Minute || cfg.RefreshTokenTTL != 7*24*time.Hour || cfg.RefreshTokenGrace != 10*time.Second || cfg.SessionIdleTTL != 24*time.Hour || cfg.SessionMaxPerAccount != 5 || cfg.TokenIssuer != "drlife" || !cfg.TokenLegacyAcceptUntil.IsZero() || cfg.LoginFailureLimit != 20 || cfg.LoginFailureWindow != 10*time.Minute || cfg.BotTokenCacheTTL != 5*time.Minute {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
-	if cfg.DatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" || cfg.QueueRedisURL != "" {
+	if cfg.DatabaseURL != "" || cfg.IAMDatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" || cfg.QueueRedisURL != "" {
 		t.Fatalf("optional URLs should be empty: %+v", cfg)
 	}
 	if len(cfg.CORSBuyerOrigins) != 2 || cfg.CORSBuyerOrigins[1] != "http://localhost:5173" || len(cfg.CORSPublicOrigins) != 7 || cfg.WebhookPrefix != "" || cfg.TrustedProxyHeader != "" || len(cfg.TrustedProxyCIDRs) != 0 {
@@ -38,6 +38,81 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	}
 	if cfg.RequestBodyMaxBytes != 64<<10 || cfg.WebhookMaxBodyBytes != 64<<10 || cfg.IdempotencyTTL != 24*time.Hour || cfg.IdempotencyMaxBytes != 64<<10 || len(cfg.FinancialPrefixes) != 4 {
 		t.Fatalf("unexpected security defaults: %+v", cfg)
+	}
+	if cfg.BulkheadTotal != 512 || cfg.BulkheadWait != 100*time.Millisecond || cfg.BulkheadDrain != 5*time.Second || cfg.BulkheadLimits["critical"] != 512 || cfg.BulkheadLimits["heavy"] != 32 || cfg.BulkheadLimits["stream"] != 256 || len(cfg.BulkheadCriticalPrefixes) != 5 || len(cfg.BulkheadDeadlineExemptions) != 0 {
+		t.Fatalf("unexpected bulkhead defaults: %+v", cfg)
+	}
+	if cfg.BrownoutEscalateAfter != 5*time.Second || cfg.BrownoutRecoverAfter != 60*time.Second ||
+		cfg.BrownoutP95Threshold != 2*time.Second || cfg.BrownoutP95Recovery != time.Second ||
+		cfg.BrownoutDBWaitThreshold != 100*time.Millisecond || cfg.BrownoutDBWaitRecovery != 50*time.Millisecond ||
+		cfg.BrownoutInFlightRatioThreshold != .8 || cfg.BrownoutInFlightRatioRecovery != .6 || cfg.BrownoutSampleInterval != time.Second {
+		t.Fatalf("unexpected brownout defaults: %+v", cfg)
+	}
+}
+
+func TestLoadBrownoutConfiguration(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{
+		"APP_ENV": "test", "BROWNOUT_ESCALATE_AFTER_SECONDS": "3", "BROWNOUT_RECOVER_AFTER_SECONDS": "90",
+		"BROWNOUT_P95_THRESHOLD_MS": "3000", "BROWNOUT_P95_RECOVERY_MS": "1500",
+		"BROWNOUT_DB_WAIT_THRESHOLD_MS": "200", "BROWNOUT_DB_WAIT_RECOVERY_MS": "80",
+		"BROWNOUT_INFLIGHT_RATIO_PERCENT": "75", "BROWNOUT_INFLIGHT_RECOVERY_PERCENT": "40",
+		"BROWNOUT_SAMPLE_INTERVAL_MS": "500",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BrownoutEscalateAfter != 3*time.Second || cfg.BrownoutRecoverAfter != 90*time.Second ||
+		cfg.BrownoutP95Threshold != 3*time.Second || cfg.BrownoutP95Recovery != 1500*time.Millisecond ||
+		cfg.BrownoutDBWaitThreshold != 200*time.Millisecond || cfg.BrownoutDBWaitRecovery != 80*time.Millisecond ||
+		cfg.BrownoutInFlightRatioThreshold != .75 || cfg.BrownoutInFlightRatioRecovery != .4 || cfg.BrownoutSampleInterval != 500*time.Millisecond {
+		t.Fatalf("unexpected brownout config: %+v", cfg)
+	}
+	for _, env := range []map[string]string{
+		{"BROWNOUT_P95_RECOVERY_MS": "2000"},
+		{"BROWNOUT_DB_WAIT_RECOVERY_MS": "100"},
+		{"BROWNOUT_INFLIGHT_RECOVERY_PERCENT": "80"},
+		{"BROWNOUT_INFLIGHT_RATIO_PERCENT": "101"},
+		{"BROWNOUT_ESCALATE_AFTER_SECONDS": "0"},
+		{"BROWNOUT_SAMPLE_INTERVAL_MS": "bad"},
+	} {
+		env["APP_ENV"] = "test"
+		if _, err := load(lookup(env)); err == nil {
+			t.Fatalf("invalid brownout configuration accepted: %+v", env)
+		}
+	}
+}
+
+func TestLoadBulkheadConfiguration(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_TOTAL": "20", "BULKHEAD_WAIT_MS": "50", "BULKHEAD_DRAIN_SECONDS": "3", "BULKHEAD_READ_LIMIT": "7", "BULKHEAD_STREAM_LIMIT": "9", "BULKHEAD_ROUTE_CLASSES": "/v1/x=heavy,/v1/y=critical", "BULKHEAD_CRITICAL_PREFIXES": "/v1/admin/payout*,/v1/custom", "BULKHEAD_DEADLINE_EXEMPT_PATHS": "/v1/buyer/events,/v1/admin/events"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BulkheadTotal != 20 || cfg.BulkheadWait != 50*time.Millisecond || cfg.BulkheadDrain != 3*time.Second || cfg.BulkheadLimits["read"] != 7 || cfg.BulkheadLimits["stream"] != 9 || cfg.BulkheadRules["/v1/x"] != "heavy" || len(cfg.BulkheadCriticalPrefixes) != 2 || cfg.BulkheadCriticalPrefixes[0] != "/v1/admin/payout*" || !cfg.BulkheadDeadlineExemptions["/v1/buyer/events"] || !cfg.BulkheadDeadlineExemptions["/v1/admin/events"] {
+		t.Fatalf("unexpected bulkhead config: %+v", cfg)
+	}
+	for _, value := range []string{"0", "101", "bad"} {
+		if _, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_WAIT_MS": value})); err == nil {
+			t.Fatalf("wait=%q accepted", value)
+		}
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_TOTAL": "3"})); err == nil {
+		t.Fatal("BULKHEAD_TOTAL below the critical reserve minimum was accepted")
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_TOTAL": "20", "BULKHEAD_CRITICAL_LIMIT": "19"})); err == nil {
+		t.Fatal("critical capacity below total was accepted")
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_STREAM_LIMIT": "0"})); err == nil {
+		t.Fatal("zero stream capacity was accepted")
+	}
+	for _, path := range []string{"/v1/buyer/orders", "/v1/public/events", "/events", "/v1/buyer/events/stream"} {
+		if _, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_DEADLINE_EXEMPT_PATHS": path})); err == nil {
+			t.Fatalf("non-SSE deadline exemption %q was accepted", path)
+		}
+	}
+	for _, prefixes := range []string{"relative", "/v1/**", "/v1/*/bad", "/v1//withdraw", "/v1/../withdraw"} {
+		if _, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_CRITICAL_PREFIXES": prefixes})); err == nil {
+			t.Fatalf("invalid critical prefixes %q accepted", prefixes)
+		}
 	}
 }
 
@@ -53,6 +128,8 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"READ_TIMEOUT_SECONDS":           "35",
 		"IDLE_TIMEOUT_SECONDS":           "75",
 		"DATABASE_URL":                   "postgres://placeholder",
+		"IAM_DATABASE_URL":               "postgres://iam-placeholder",
+		"AUDIT_DATABASE_URL":             "postgres://audit-placeholder",
 		"REPORT_DATABASE_URL":            "postgres://report-placeholder",
 		"DB_MAX_CONNS":                   "20",
 		"DB_MIN_CONNS":                   "4",
@@ -82,11 +159,22 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"RATE_LIMIT_AI_PER_MINUTE":       "20",
 		"RATE_LIMIT_ADMIN_PER_MINUTE":    "40",
 		"LEDGER_RECON_TIMEZONE":          "UTC",
+		"TELEGRAM_INITDATA_MAX_AGE":      "12h",
+		"ACCESS_TOKEN_TTL":               "10m",
+		"REFRESH_TOKEN_TTL":              "240h",
+		"REFRESH_TOKEN_GRACE":            "12s",
+		"SESSION_IDLE_TTL":               "12h",
+		"SESSION_MAX_PER_ACCOUNT":        "3",
+		"TOKEN_ISSUER":                   "drlife-staging",
+		"TOKEN_LEGACY_ACCEPT_UNTIL":      "2027-01-02T03:04:05Z",
+		"LOGIN_FAILURE_LIMIT":            "8",
+		"LOGIN_FAILURE_WINDOW":           "3m",
+		"BOT_TOKEN_CACHE_TTL":            "2m",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.QueueRedisURL != "redis://queue-placeholder" || !cfg.QueueAllowEviction || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" {
+	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.IAMDatabaseURL != "postgres://iam-placeholder" || cfg.AuditDatabaseURL != "postgres://audit-placeholder" || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.QueueRedisURL != "redis://queue-placeholder" || !cfg.QueueAllowEviction || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" || cfg.TelegramInitDataMaxAge != 12*time.Hour || cfg.AccessTokenTTL != 10*time.Minute || cfg.RefreshTokenTTL != 240*time.Hour || cfg.RefreshTokenGrace != 12*time.Second || cfg.SessionIdleTTL != 12*time.Hour || cfg.SessionMaxPerAccount != 3 || cfg.TokenIssuer != "drlife-staging" || !cfg.TokenLegacyAcceptUntil.Equal(time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC)) || cfg.LoginFailureLimit != 8 || cfg.LoginFailureWindow != 3*time.Minute || cfg.BotTokenCacheTTL != 2*time.Minute {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	for _, raw := range []string{"0", "-1", "abc"} {
@@ -109,6 +197,16 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 				t.Fatalf("expected invalid %s error", key)
 			}
 		})
+	}
+	for _, key := range []string{"TELEGRAM_INITDATA_MAX_AGE", "ACCESS_TOKEN_TTL", "REFRESH_TOKEN_TTL", "REFRESH_TOKEN_GRACE", "SESSION_IDLE_TTL", "LOGIN_FAILURE_WINDOW", "BOT_TOKEN_CACHE_TTL"} {
+		t.Run("invalid "+key, func(t *testing.T) {
+			if _, err := load(lookup(map[string]string{"APP_ENV": "test", key: "0s"})); err == nil {
+				t.Fatalf("expected invalid %s", key)
+			}
+		})
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "JWT_SIGNING_KEYS": "active:bad", "JWT_ACTIVE_KEY_ID": "active"})); err == nil {
+		t.Fatal("expected invalid JWT signing key")
 	}
 	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "DB_MAX_CONNS": "2", "DB_MIN_CONNS": "3"})); err == nil {
 		t.Fatal("expected DB_MIN_CONNS greater than DB_MAX_CONNS to fail")
