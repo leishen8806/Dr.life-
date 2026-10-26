@@ -86,7 +86,7 @@
 
 【任务】A-05 商户员工与角色权限
 【分支】task/A-05-merchant-staff
-【依赖】A-01、A-02、A-03、A-10（商户存在）、S-01
+【依赖】A-01、A-02、A-03、商户记录（A-10 合并前用测试夹具创建 merchant，A-10 合并后联调）、S-01
 【先阅读】
 1. Dr.life+数据库表结构与账务详细设计.md 第二章（merchant_staff、merchant_role_perm、template、merchant_op_log）
 2. Dr.life+交互文档.md 第三章（商家端：我的 → 员工管理，三页签、右上「员工管理 +」弹窗）与第一章 2
