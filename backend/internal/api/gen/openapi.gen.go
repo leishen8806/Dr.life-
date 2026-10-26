@@ -13,6 +13,36 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for ActionDataRevoked.
+const (
+	ActionDataRevokedTrue ActionDataRevoked = true
+)
+
+// Valid indicates whether the value is a known member of the ActionDataRevoked enum.
+func (e ActionDataRevoked) Valid() bool {
+	switch e {
+	case ActionDataRevokedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ActionSuccessResponseOk.
+const (
+	ActionSuccessResponseOkTrue ActionSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the ActionSuccessResponseOk enum.
+func (e ActionSuccessResponseOk) Valid() bool {
+	switch e {
+	case ActionSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AuditListSuccessResponseOk.
 const (
 	AuditListSuccessResponseOkTrue AuditListSuccessResponseOk = true
@@ -340,6 +370,36 @@ func (e ProductUpdateRequestStatus) Valid() bool {
 	}
 }
 
+// Defines values for RefreshSuccessResponseOk.
+const (
+	RefreshSuccessResponseOkTrue RefreshSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the RefreshSuccessResponseOk enum.
+func (e RefreshSuccessResponseOk) Valid() bool {
+	switch e {
+	case RefreshSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SessionListSuccessResponseOk.
+const (
+	SessionListSuccessResponseOkTrue SessionListSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the SessionListSuccessResponseOk enum.
+func (e SessionListSuccessResponseOk) Valid() bool {
+	switch e {
+	case SessionListSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SuccessEnvelopeOk.
 const (
 	SuccessEnvelopeOkTrue SuccessEnvelopeOk = true
@@ -507,6 +567,24 @@ func (e ListMerchantProductsParamsStatus) Valid() bool {
 		return false
 	}
 }
+
+// ActionData defines model for ActionData.
+type ActionData struct {
+	Revoked ActionDataRevoked `json:"revoked"`
+}
+
+// ActionDataRevoked defines model for ActionData.Revoked.
+type ActionDataRevoked bool
+
+// ActionSuccessResponse defines model for ActionSuccessResponse.
+type ActionSuccessResponse struct {
+	Data      ActionData              `json:"data"`
+	Ok        ActionSuccessResponseOk `json:"ok"`
+	RequestId string                  `json:"request_id"`
+}
+
+// ActionSuccessResponseOk defines model for ActionSuccessResponse.Ok.
+type ActionSuccessResponseOk bool
 
 // AuditListData defines model for AuditListData.
 type AuditListData struct {
@@ -746,6 +824,55 @@ type ProductUpdateRequestOrigin string
 // ProductUpdateRequestStatus Merchants may only move a product between draft and off; on is reached through publish.
 type ProductUpdateRequestStatus string
 
+// RefreshData defines model for RefreshData.
+type RefreshData struct {
+	AccessExpiresIn  int64  `json:"access_expires_in"`
+	AccessToken      string `json:"access_token"`
+	RefreshExpiresIn int64  `json:"refresh_expires_in"`
+	RefreshToken     string `json:"refresh_token"`
+}
+
+// RefreshRequest defines model for RefreshRequest.
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+// RefreshSuccessResponse defines model for RefreshSuccessResponse.
+type RefreshSuccessResponse struct {
+	Data      RefreshData              `json:"data"`
+	Ok        RefreshSuccessResponseOk `json:"ok"`
+	RequestId string                   `json:"request_id"`
+}
+
+// RefreshSuccessResponseOk defines model for RefreshSuccessResponse.Ok.
+type RefreshSuccessResponseOk bool
+
+// Session defines model for Session.
+type Session struct {
+	DeviceId  *string   `json:"device_id,omitempty"`
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// IpPrefix Masked IPv4 /24 or IPv6 /64 prefix.
+	IpPrefix   *string   `json:"ip_prefix,omitempty"`
+	LastUsedAt time.Time `json:"last_used_at"`
+	PublicId   string    `json:"public_id"`
+}
+
+// SessionListData defines model for SessionListData.
+type SessionListData struct {
+	Items []Session `json:"items"`
+}
+
+// SessionListSuccessResponse defines model for SessionListSuccessResponse.
+type SessionListSuccessResponse struct {
+	Data      SessionListData              `json:"data"`
+	Ok        SessionListSuccessResponseOk `json:"ok"`
+	RequestId string                       `json:"request_id"`
+}
+
+// SessionListSuccessResponseOk defines model for SessionListSuccessResponse.Ok.
+type SessionListSuccessResponseOk bool
+
 // SuccessEnvelope defines model for SuccessEnvelope.
 type SuccessEnvelope struct {
 	Data      interface{}       `json:"data"`
@@ -822,6 +949,9 @@ type PageSize = int
 // PublicID defines model for PublicID.
 type PublicID = string
 
+// SessionID defines model for SessionID.
+type SessionID = string
+
 // Sort defines model for Sort.
 type Sort = string
 
@@ -836,6 +966,9 @@ type XStepUpToken = string
 
 // AccountBlocked defines model for AccountBlocked.
 type AccountBlocked = ErrorEnvelope
+
+// ActionSucceeded defines model for ActionSucceeded.
+type ActionSucceeded = ActionSuccessResponse
 
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorEnvelope
@@ -861,11 +994,17 @@ type MethodNotAllowed = ErrorEnvelope
 // NotFound defines model for NotFound.
 type NotFound = ErrorEnvelope
 
+// RefreshSucceeded defines model for RefreshSucceeded.
+type RefreshSucceeded = RefreshSuccessResponse
+
 // RequestTooLarge defines model for RequestTooLarge.
 type RequestTooLarge = ErrorEnvelope
 
 // ServiceUnavailable defines model for ServiceUnavailable.
 type ServiceUnavailable = ErrorEnvelope
+
+// SessionListSucceeded defines model for SessionListSucceeded.
+type SessionListSucceeded = SessionListSuccessResponse
 
 // TooManyRequests defines model for TooManyRequests.
 type TooManyRequests = ErrorEnvelope
@@ -890,6 +1029,42 @@ type ListAdminAuditParams struct {
 	// BeforeId Return records with ids lower than this cursor.
 	BeforeId *int64 `form:"before_id,omitempty" json:"before_id,omitempty"`
 	PageSize *int   `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// PostBuyerAuthLogoutParams defines parameters for PostBuyerAuthLogout.
+type PostBuyerAuthLogoutParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DeleteBuyerMeSessionParams defines parameters for DeleteBuyerMeSession.
+type DeleteBuyerMeSessionParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PostDriverAuthLogoutParams defines parameters for PostDriverAuthLogout.
+type PostDriverAuthLogoutParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DeleteDriverMeSessionParams defines parameters for DeleteDriverMeSession.
+type DeleteDriverMeSessionParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PostMerchantAuthLogoutParams defines parameters for PostMerchantAuthLogout.
+type PostMerchantAuthLogoutParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DeleteMerchantMeSessionParams defines parameters for DeleteMerchantMeSession.
+type DeleteMerchantMeSessionParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
 // ListMerchantProductsParams defines parameters for ListMerchantProducts.
@@ -961,6 +1136,9 @@ type CreateMerchantProductJSONRequestBody = ProductCreateRequest
 // UpdateMerchantProductJSONRequestBody defines body for UpdateMerchantProduct for application/json ContentType.
 type UpdateMerchantProductJSONRequestBody = ProductUpdateRequest
 
+// PostAuthRefreshJSONRequestBody defines body for PostAuthRefresh for application/json ContentType.
+type PostAuthRefreshJSONRequestBody = RefreshRequest
+
 // PostTelegramAuthJSONRequestBody defines body for PostTelegramAuth for application/json ContentType.
 type PostTelegramAuthJSONRequestBody = TelegramAuthRequest
 
@@ -969,6 +1147,33 @@ type ServerInterface interface {
 	// ListAdminAudit Query immutable audit records
 	// (GET /v1/admin/audit)
 	ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams)
+	// PostBuyerAuthLogout Revoke the current buyer session
+	// (POST /v1/buyer/auth/logout)
+	PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request, params PostBuyerAuthLogoutParams)
+	// GetBuyerMeSessions List the current buyer account sessions
+	// (GET /v1/buyer/me/sessions)
+	GetBuyerMeSessions(w http.ResponseWriter, r *http.Request)
+	// DeleteBuyerMeSession Revoke one session owned by the current buyer account
+	// (DELETE /v1/buyer/me/sessions/{id})
+	DeleteBuyerMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteBuyerMeSessionParams)
+	// PostDriverAuthLogout Revoke the current driver session
+	// (POST /v1/driver/auth/logout)
+	PostDriverAuthLogout(w http.ResponseWriter, r *http.Request, params PostDriverAuthLogoutParams)
+	// GetDriverMeSessions List the current driver account sessions
+	// (GET /v1/driver/me/sessions)
+	GetDriverMeSessions(w http.ResponseWriter, r *http.Request)
+	// DeleteDriverMeSession Revoke one session owned by the current driver account
+	// (DELETE /v1/driver/me/sessions/{id})
+	DeleteDriverMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteDriverMeSessionParams)
+	// PostMerchantAuthLogout Revoke the current merchant session
+	// (POST /v1/merchant/auth/logout)
+	PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, params PostMerchantAuthLogoutParams)
+	// GetMerchantMeSessions List the current merchant account sessions
+	// (GET /v1/merchant/me/sessions)
+	GetMerchantMeSessions(w http.ResponseWriter, r *http.Request)
+	// DeleteMerchantMeSession Revoke one session owned by the current merchant account
+	// (DELETE /v1/merchant/me/sessions/{id})
+	DeleteMerchantMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteMerchantMeSessionParams)
 	// ListMerchantProducts List the authenticated merchant products in any status
 	// (GET /v1/merchant/products)
 	ListMerchantProducts(w http.ResponseWriter, r *http.Request, params ListMerchantProductsParams)
@@ -984,6 +1189,9 @@ type ServerInterface interface {
 	// PublishMerchantProduct Publish a product; requires complete trilingual text and at least two price tiers
 	// (POST /v1/merchant/products/{public_id}/publish)
 	PublishMerchantProduct(w http.ResponseWriter, r *http.Request, publicId PublicID, params PublishMerchantProductParams)
+	// PostAuthRefresh Rotate a Mini App refresh token
+	// (POST /v1/public/auth/refresh)
+	PostAuthRefresh(w http.ResponseWriter, r *http.Request)
 	// PostTelegramAuth Sign in with Telegram Mini App initData
 	// (POST /v1/public/auth/telegram)
 	PostTelegramAuth(w http.ResponseWriter, r *http.Request)
@@ -1005,6 +1213,60 @@ type Unimplemented struct{}
 // ListAdminAudit Query immutable audit records
 // (GET /v1/admin/audit)
 func (_ Unimplemented) ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostBuyerAuthLogout Revoke the current buyer session
+// (POST /v1/buyer/auth/logout)
+func (_ Unimplemented) PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request, params PostBuyerAuthLogoutParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetBuyerMeSessions List the current buyer account sessions
+// (GET /v1/buyer/me/sessions)
+func (_ Unimplemented) GetBuyerMeSessions(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteBuyerMeSession Revoke one session owned by the current buyer account
+// (DELETE /v1/buyer/me/sessions/{id})
+func (_ Unimplemented) DeleteBuyerMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteBuyerMeSessionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostDriverAuthLogout Revoke the current driver session
+// (POST /v1/driver/auth/logout)
+func (_ Unimplemented) PostDriverAuthLogout(w http.ResponseWriter, r *http.Request, params PostDriverAuthLogoutParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetDriverMeSessions List the current driver account sessions
+// (GET /v1/driver/me/sessions)
+func (_ Unimplemented) GetDriverMeSessions(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteDriverMeSession Revoke one session owned by the current driver account
+// (DELETE /v1/driver/me/sessions/{id})
+func (_ Unimplemented) DeleteDriverMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteDriverMeSessionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostMerchantAuthLogout Revoke the current merchant session
+// (POST /v1/merchant/auth/logout)
+func (_ Unimplemented) PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, params PostMerchantAuthLogoutParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetMerchantMeSessions List the current merchant account sessions
+// (GET /v1/merchant/me/sessions)
+func (_ Unimplemented) GetMerchantMeSessions(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteMerchantMeSession Revoke one session owned by the current merchant account
+// (DELETE /v1/merchant/me/sessions/{id})
+func (_ Unimplemented) DeleteMerchantMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteMerchantMeSessionParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1035,6 +1297,12 @@ func (_ Unimplemented) UpdateMerchantProduct(w http.ResponseWriter, r *http.Requ
 // PublishMerchantProduct Publish a product; requires complete trilingual text and at least two price tiers
 // (POST /v1/merchant/products/{public_id}/publish)
 func (_ Unimplemented) PublishMerchantProduct(w http.ResponseWriter, r *http.Request, publicId PublicID, params PublishMerchantProductParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostAuthRefresh Rotate a Mini App refresh token
+// (POST /v1/public/auth/refresh)
+func (_ Unimplemented) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1173,6 +1441,345 @@ func (siw *ServerInterfaceWrapper) ListAdminAudit(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminAudit(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostBuyerAuthLogout operation middleware
+func (siw *ServerInterfaceWrapper) PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostBuyerAuthLogoutParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostBuyerAuthLogout(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBuyerMeSessions operation middleware
+func (siw *ServerInterfaceWrapper) GetBuyerMeSessions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBuyerMeSessions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteBuyerMeSession operation middleware
+func (siw *ServerInterfaceWrapper) DeleteBuyerMeSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SessionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteBuyerMeSessionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteBuyerMeSession(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostDriverAuthLogout operation middleware
+func (siw *ServerInterfaceWrapper) PostDriverAuthLogout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostDriverAuthLogoutParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostDriverAuthLogout(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDriverMeSessions operation middleware
+func (siw *ServerInterfaceWrapper) GetDriverMeSessions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDriverMeSessions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteDriverMeSession operation middleware
+func (siw *ServerInterfaceWrapper) DeleteDriverMeSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SessionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteDriverMeSessionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteDriverMeSession(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostMerchantAuthLogout operation middleware
+func (siw *ServerInterfaceWrapper) PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostMerchantAuthLogoutParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostMerchantAuthLogout(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMerchantMeSessions operation middleware
+func (siw *ServerInterfaceWrapper) GetMerchantMeSessions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMerchantMeSessions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMerchantMeSession operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMerchantMeSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id SessionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteMerchantMeSessionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMerchantMeSession(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1424,6 +2031,20 @@ func (siw *ServerInterfaceWrapper) PublishMerchantProduct(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PublishMerchantProduct(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAuthRefresh operation middleware
+func (siw *ServerInterfaceWrapper) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAuthRefresh(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1710,6 +2331,36 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/public/auth/telegram", wrapper.PostTelegramAuth)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/public/auth/refresh", wrapper.PostAuthRefresh)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/buyer/auth/logout", wrapper.PostBuyerAuthLogout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/merchant/auth/logout", wrapper.PostMerchantAuthLogout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/driver/auth/logout", wrapper.PostDriverAuthLogout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/me/sessions", wrapper.GetBuyerMeSessions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/me/sessions", wrapper.GetMerchantMeSessions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/driver/me/sessions", wrapper.GetDriverMeSessions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/buyer/me/sessions/{id}", wrapper.DeleteBuyerMeSession)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/merchant/me/sessions/{id}", wrapper.DeleteMerchantMeSession)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/driver/me/sessions/{id}", wrapper.DeleteDriverMeSession)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/public/ping", wrapper.GetPublicPing)

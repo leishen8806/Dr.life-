@@ -52,6 +52,7 @@ type GatewayOptions struct {
 	Logger            *slog.Logger
 	Login             api.TelegramLogin
 	Audit             *platformaudit.Store
+	Sessions          api.SessionManagement
 }
 
 func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
@@ -94,7 +95,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeMethodNotAllowed))
 	})
-	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, ClientIP: options.ClientIP, Audit: options.Audit}, router)
+	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, Sessions: options.Sessions, ClientIP: options.ClientIP, Audit: options.Audit}, router)
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

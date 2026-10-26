@@ -41,6 +41,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate a Mini App refresh token */
+        post: operations["postAuthRefresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/buyer/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke the current buyer session */
+        post: operations["postBuyerAuthLogout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke the current merchant session */
+        post: operations["postMerchantAuthLogout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/driver/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke the current driver session */
+        post: operations["postDriverAuthLogout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/buyer/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the current buyer account sessions */
+        get: operations["getBuyerMeSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the current merchant account sessions */
+        get: operations["getMerchantMeSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/driver/me/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the current driver account sessions */
+        get: operations["getDriverMeSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/buyer/me/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke one session owned by the current buyer account */
+        delete: operations["deleteBuyerMeSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/me/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke one session owned by the current merchant account */
+        delete: operations["deleteMerchantMeSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/driver/me/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke one session owned by the current driver account */
+        delete: operations["deleteDriverMeSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/ping": {
         parameters: {
             query?: never;
@@ -224,6 +394,52 @@ export interface components {
             data: components["schemas"]["TelegramAuthData"];
             request_id: string;
         };
+        RefreshRequest: {
+            refresh_token: string;
+        };
+        RefreshData: {
+            access_token: string;
+            /** Format: int64 */
+            access_expires_in: number;
+            refresh_token: string;
+            /** Format: int64 */
+            refresh_expires_in: number;
+        };
+        RefreshSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["RefreshData"];
+            request_id: string;
+        };
+        Session: {
+            public_id: string;
+            device_id?: string | null;
+            /** @description Masked IPv4 /24 or IPv6 /64 prefix. */
+            ip_prefix?: string | null;
+            /** Format: date-time */
+            last_used_at: string;
+            /** Format: date-time */
+            expires_at: string;
+        };
+        SessionListData: {
+            items: components["schemas"]["Session"][];
+        };
+        SessionListSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["SessionListData"];
+            request_id: string;
+        };
+        ActionData: {
+            /** @enum {boolean} */
+            revoked: true;
+        };
+        ActionSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["ActionData"];
+            request_id: string;
+        };
         /** @description Trilingual text; every language must be present before a product can be published. */
         LocalizedText: {
             zh: string;
@@ -359,6 +575,33 @@ export interface components {
         };
     };
     responses: {
+        /** @description Refresh token rotated successfully. */
+        RefreshSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["RefreshSuccessResponse"];
+            };
+        };
+        /** @description Active sessions owned by the authenticated account. */
+        SessionListSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["SessionListSuccessResponse"];
+            };
+        };
+        /** @description Session revocation succeeded. */
+        ActionSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ActionSuccessResponse"];
+            };
+        };
         /** @description Invalid request (error code 1002). */
         BadRequest: {
             headers: {
@@ -514,6 +757,8 @@ export interface components {
         XRequestID: string;
         /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
         PublicID: string;
+        /** @description Lowercase ULID of a session owned by the authenticated account. */
+        SessionID: string;
         /** @description Restrict the result to one category code. */
         CategoryCode: string;
         /** @description Restrict the result to one product status. */
@@ -597,6 +842,197 @@ export interface operations {
             429: components["responses"]["LoginTooManyAttempts"];
             500: components["responses"]["InternalServerError"];
             503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postAuthRefresh: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["RefreshSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["AccountBlocked"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postBuyerAuthLogout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postMerchantAuthLogout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postDriverAuthLogout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getBuyerMeSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["SessionListSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getMerchantMeSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["SessionListSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getDriverMeSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["SessionListSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    deleteBuyerMeSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Lowercase ULID of a session owned by the authenticated account. */
+                id: components["parameters"]["SessionID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    deleteMerchantMeSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Lowercase ULID of a session owned by the authenticated account. */
+                id: components["parameters"]["SessionID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    deleteDriverMeSession: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Lowercase ULID of a session owned by the authenticated account. */
+                id: components["parameters"]["SessionID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
         };
     };
     getPublicPing: {

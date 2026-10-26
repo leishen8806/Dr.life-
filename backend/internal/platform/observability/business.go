@@ -12,6 +12,7 @@ type Business struct {
 	ai                  *prometheus.CounterVec
 	bots                *prometheus.CounterVec
 	loginFailures       *prometheus.CounterVec
+	sessionRefresh      *prometheus.CounterVec
 	ledger              *prometheus.CounterVec
 	reconciliationRuns  *prometheus.CounterVec
 	reconciliation      *prometheus.CounterVec
@@ -27,6 +28,7 @@ func newBusiness(registry *prometheus.Registry) *Business {
 		ai:                  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ai_requests_total", Help: "AI requests and fallback events."}, []string{"event", "level"}),
 		bots:                prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_bot_sends_total", Help: "Bot send results."}, []string{"endpoint", "bot", "status", "reason"}),
 		loginFailures:       prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_login_validation_failures_total", Help: "Login validation failures."}, []string{"endpoint", "reason"}),
+		sessionRefresh:      prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_session_refresh_total", Help: "Refresh-token rotation results."}, []string{"endpoint", "result"}),
 		ledger:              prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_posts_total", Help: "Ledger posting results."}, []string{"status", "reason"}),
 		reconciliationRuns:  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_reconciliation_runs_total", Help: "Ledger reconciliation runs."}, []string{"status"}),
 		reconciliation:      prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_reconciliation_mismatches_total", Help: "Ledger reconciliation mismatches."}, []string{"check_code"}),
@@ -34,7 +36,7 @@ func newBusiness(registry *prometheus.Registry) *Business {
 		auditVerifyFailures: prometheus.NewCounter(prometheus.CounterOpts{Name: "drlife_audit_verify_failures_total", Help: "Audit chain verification failures."}),
 		auditAnchorMissing:  prometheus.NewGauge(prometheus.GaugeOpts{Name: "drlife_audit_anchor_missing", Help: "Whether the latest audit anchor is older than 24 hours."}),
 	}
-	registry.MustRegister(b.orders, b.withdrawals, b.ai, b.bots, b.loginFailures, b.ledger, b.reconciliationRuns, b.reconciliation, b.auditAppends, b.auditVerifyFailures, b.auditAnchorMissing)
+	registry.MustRegister(b.orders, b.withdrawals, b.ai, b.bots, b.loginFailures, b.sessionRefresh, b.ledger, b.reconciliationRuns, b.reconciliation, b.auditAppends, b.auditVerifyFailures, b.auditAnchorMissing)
 	return b
 }
 
@@ -56,6 +58,9 @@ func (b *Business) AIFallback(level string) {
 }
 func (b *Business) LoginValidationFailed(endpoint, reason string) {
 	b.loginFailures.WithLabelValues(bounded(endpoint, "buyer", "merchant", "driver"), bounded(reason, "expired", "invalid_signature", "malformed", "account_blocked", "rate_limited", "unknown_bot")).Inc()
+}
+func (b *Business) SessionRefresh(endpoint, result string) {
+	b.sessionRefresh.WithLabelValues(bounded(endpoint, "buyer", "merchant", "driver"), bounded(result, "success", "replayed", "invalid", "expired", "blocked", "reuse")).Inc()
 }
 func (b *Business) BotSent(endpoint string, bot int, success bool, reason string) {
 	status := "success"

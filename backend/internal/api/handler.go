@@ -32,6 +32,12 @@ type TelegramLogin interface {
 	Login(context.Context, iam.LoginInput) (iam.LoginResult, error)
 }
 
+type SessionManagement interface {
+	Refresh(context.Context, string, string) (iam.RefreshResult, error)
+	ListSessions(context.Context, string) ([]iam.SessionInfo, error)
+	RevokeSession(context.Context, string, string, string) error
+}
+
 // Handler 实现 gen.ServerInterface。
 // 零值 Handler 只提供 /v1/public/ping；商品接口在依赖未注入时返回 500，
 // 这样 server.NewHandler(nil) 与契约测试的既有行为保持不变。
@@ -40,6 +46,7 @@ type Handler struct {
 	Merchants MerchantResolver
 	Logger    *slog.Logger
 	Login     TelegramLogin
+	Sessions  SessionManagement
 	ClientIP  gateway.ClientIPResolver
 	Audit     *platformaudit.Store
 }
@@ -126,6 +133,94 @@ func (h Handler) PostTelegramAuth(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, result)
 }
 
+func (h Handler) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {
+	if h.Sessions == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	body, ok := decodeJSON[gen.RefreshRequest](w, r)
+	if !ok || body.RefreshToken == "" {
+		if ok {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	result, err := h.Sessions.Refresh(r.Context(), body.RefreshToken, h.ClientIP.Resolve(r))
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, result)
+}
+
+func (h Handler) PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request, _ gen.PostBuyerAuthLogoutParams) {
+	h.logout(w, r)
+}
+func (h Handler) PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, _ gen.PostMerchantAuthLogoutParams) {
+	h.logout(w, r)
+}
+func (h Handler) PostDriverAuthLogout(w http.ResponseWriter, r *http.Request, _ gen.PostDriverAuthLogoutParams) {
+	h.logout(w, r)
+}
+
+func (h Handler) GetBuyerMeSessions(w http.ResponseWriter, r *http.Request)    { h.listSessions(w, r) }
+func (h Handler) GetMerchantMeSessions(w http.ResponseWriter, r *http.Request) { h.listSessions(w, r) }
+func (h Handler) GetDriverMeSessions(w http.ResponseWriter, r *http.Request)   { h.listSessions(w, r) }
+
+func (h Handler) DeleteBuyerMeSession(w http.ResponseWriter, r *http.Request, id gen.SessionID, _ gen.DeleteBuyerMeSessionParams) {
+	h.deleteSession(w, r, string(id))
+}
+func (h Handler) DeleteMerchantMeSession(w http.ResponseWriter, r *http.Request, id gen.SessionID, _ gen.DeleteMerchantMeSessionParams) {
+	h.deleteSession(w, r, string(id))
+}
+func (h Handler) DeleteDriverMeSession(w http.ResponseWriter, r *http.Request, id gen.SessionID, _ gen.DeleteDriverMeSessionParams) {
+	h.deleteSession(w, r, string(id))
+}
+
+func (h Handler) logout(w http.ResponseWriter, r *http.Request) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if h.Sessions == nil || !ok || identity.SessionID == "" {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return
+	}
+	if err := h.Sessions.RevokeSession(r.Context(), identity.AccountID, identity.SessionID, "logout"); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, map[string]bool{"revoked": true})
+}
+
+func (h Handler) listSessions(w http.ResponseWriter, r *http.Request) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if h.Sessions == nil || !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return
+	}
+	items, err := h.Sessions.ListSessions(r.Context(), identity.AccountID)
+	if err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInternalError))
+		return
+	}
+	response := make([]gen.Session, 0, len(items))
+	for _, item := range items {
+		response = append(response, gen.Session{PublicId: item.PublicID, DeviceId: item.DeviceID, IpPrefix: item.IPPrefix, LastUsedAt: item.LastUsed, ExpiresAt: item.Expires})
+	}
+	httpx.WriteOK(w, r, gen.SessionListData{Items: response})
+}
+
+func (h Handler) deleteSession(w http.ResponseWriter, r *http.Request, sessionID string) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if h.Sessions == nil || !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return
+	}
+	if err := h.Sessions.RevokeSession(r.Context(), identity.AccountID, strings.ToUpper(sessionID), "user_revoked"); err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, map[string]bool{"revoked": true})
+}
+
 func (h Handler) ListPublicCategories(w http.ResponseWriter, r *http.Request, params gen.ListPublicCategoriesParams) {
 	service, ok := h.catalogService(w, r)
 	if !ok {
@@ -149,7 +244,7 @@ func (h Handler) ListPublicProducts(w http.ResponseWriter, r *http.Request, para
 		h.writeError(w, r, err)
 		return
 	}
-	httpx.WriteOK(w, r, productListData(page))
+	httpx.WriteOK(w, r, publicProductListData(page))
 }
 
 func (h Handler) ListMerchantProducts(w http.ResponseWriter, r *http.Request, params gen.ListMerchantProductsParams) {
@@ -387,6 +482,19 @@ func productListData(page catalog.ProductPage) gen.ProductListData {
 	items := make([]gen.Product, 0, len(page.Items))
 	for _, item := range page.Items {
 		items = append(items, toGenProduct(item))
+	}
+	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}
+}
+
+// publicProductListData 是匿名浏览的投影：供应商来源与内部标准分不属于买家可见信息。
+// 商家列表/详情继续使用 productListData，保留这些字段供商家核对。
+func publicProductListData(page catalog.ProductPage) gen.ProductListData {
+	items := make([]gen.Product, 0, len(page.Items))
+	for _, item := range page.Items {
+		product := toGenProduct(item)
+		product.SourceRef = nil
+		product.StdScore = nil
+		items = append(items, product)
 	}
 	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}
 }

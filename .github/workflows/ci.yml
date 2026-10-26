@@ -51,6 +51,7 @@ jobs:
           infra_changed=false
           while IFS= read -r -d '' file; do
             case "$file" in
+              docs/TESTMATRIX.md) docs_only=false; backend_changed=true ;;
               *.md|docs/*|LICENSE|LICENSE.*) ;;
               *) docs_only=false ;;
             esac
@@ -121,7 +122,7 @@ jobs:
           cache-dependency-path: backend/go.sum
       - name: Run PostgreSQL integration tests
         working-directory: backend
-        run: go test -count=1 -run '^TestDatabaseFramework$' -v ./internal/platform/db
+        run: go test -count=1 -v ./internal/platform/db ./internal/ledger
 
   docker-image:
     needs: changes

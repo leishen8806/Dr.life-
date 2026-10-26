@@ -26,6 +26,12 @@ describe("i18n", () => {
     );
   });
 
+  it("provides the shared brand slogan in every supported language", () => {
+    for (const language of ["zh", "en", "km"] as const) {
+      expect(t("brand.slogan", {}, language)).not.toBe("");
+    }
+  });
+
   it("selects explicit singular and plural keys", () => {
     expect(plural(1, "order.count.one", "order.count.other")).toBe(
       "order.count.one"

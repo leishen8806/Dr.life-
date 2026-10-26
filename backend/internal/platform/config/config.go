@@ -78,6 +78,11 @@ type Config struct {
 	TelegramInitDataMaxAge         time.Duration
 	AccessTokenTTL                 time.Duration
 	RefreshTokenTTL                time.Duration
+	RefreshTokenGrace              time.Duration
+	SessionIdleTTL                 time.Duration
+	SessionMaxPerAccount           int
+	TokenIssuer                    string
+	TokenLegacyAcceptUntil         time.Time
 	LoginFailureLimit              int
 	LoginFailureWindow             time.Duration
 	BotTokenCacheTTL               time.Duration
@@ -356,9 +361,32 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
-	refreshTTL, err := positiveDuration(getenv, "REFRESH_TOKEN_TTL", 30*24*time.Hour)
+	refreshTTL, err := positiveDuration(getenv, "REFRESH_TOKEN_TTL", 7*24*time.Hour)
 	if err != nil {
 		return Config{}, err
+	}
+	refreshGrace, err := positiveDuration(getenv, "REFRESH_TOKEN_GRACE", 10*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	sessionIdleTTL, err := positiveDuration(getenv, "SESSION_IDLE_TTL", 24*time.Hour)
+	if err != nil || sessionIdleTTL >= refreshTTL {
+		return Config{}, fmt.Errorf("SESSION_IDLE_TTL must be positive and below REFRESH_TOKEN_TTL")
+	}
+	sessionMax, err := positiveInt(getenv, "SESSION_MAX_PER_ACCOUNT", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	tokenIssuer := strings.TrimSpace(getenv("TOKEN_ISSUER"))
+	if tokenIssuer == "" {
+		tokenIssuer = "drlife"
+	}
+	legacyAcceptUntil := time.Time{}
+	if raw := strings.TrimSpace(getenv("TOKEN_LEGACY_ACCEPT_UNTIL")); raw != "" {
+		legacyAcceptUntil, err = time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("TOKEN_LEGACY_ACCEPT_UNTIL must be RFC3339")
+		}
 	}
 	loginFailureLimit, err := positiveInt(getenv, "LOGIN_FAILURE_LIMIT", 20)
 	if err != nil {
@@ -435,6 +463,11 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		TelegramInitDataMaxAge: telegramMaxAge,
 		AccessTokenTTL:         accessTTL,
 		RefreshTokenTTL:        refreshTTL,
+		RefreshTokenGrace:      refreshGrace,
+		SessionIdleTTL:         sessionIdleTTL,
+		SessionMaxPerAccount:   sessionMax,
+		TokenIssuer:            tokenIssuer,
+		TokenLegacyAcceptUntil: legacyAcceptUntil,
 		LoginFailureLimit:      loginFailureLimit,
 		LoginFailureWindow:     loginFailureWindow,
 		BotTokenCacheTTL:       botTokenCacheTTL,

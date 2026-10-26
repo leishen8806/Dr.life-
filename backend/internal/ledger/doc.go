@@ -23,6 +23,7 @@
 //     DecryptWithdrawalPayee is limited to the bank-disbursement adapter.
 //   - ClaimOutbox leases committed events; callers must finish each batch with
 //     MarkSent or Release so a failed delivery remains retryable.
+//   - OldestUnsentOutboxAge reports the current committed-event delivery lag.
 //
 // Invalid input returns ErrInvalidRequest or ErrInvalidAmount. State-machine,
 // ownership, insufficient-funds, separation-of-duty, and idempotency failures

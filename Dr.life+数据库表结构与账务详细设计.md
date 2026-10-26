@@ -52,11 +52,12 @@
 |---|---|---|
 | `person` | id, public_id, tg_user_id **bigint unique**, tg_first_name, tg_username, tg_lang_code, phone_enc, phone_verified_at, status | **一个 Telegram 号一个人**；`phone_enc bytea` 由应用层加密后存放 |
 | `account` | id, public_id, person_id→person, role (`buyer/merchant_owner/merchant_staff/driver`), merchant_id→merchant(可空), status (`active/frozen/disabled`), status_reason, lang, lang_registered_at, kyc_status | `UNIQUE NULLS NOT DISTINCT(person_id, role, merchant_id)`，确保 `merchant_id` 为空的账号也不能重复；冻结/停用必须填 `status_reason`（CHECK）；`lang` 为 `zh/en/km` |
-| `account_device` | account_id, device_id, first_seen_at, last_seen_at | 登录设备记录（语言登记设备） |
+| `account_device` | account_id, device_id, first_seen_at, last_seen_at | 登录与刷新时更新的设备记录 |
 | `bot` | id, public_id, end (`buyer/merchant/driver`), username unique, role_in_pool (`primary/standby`), status (`active/standby/limited/banned`), token_enc (bytea), token_last4, webhook_secret_enc, priority | **令牌信封加密**，AAD 为 `bot_token:<id>`；`token_last4` 仅用于显示；同一端 `priority` 唯一且最多一个 primary |
 | `account_bot` | account_id, bot_id, bound_at, write_access boolean, unreachable_at | 用户在哪些 Bot 点过开始/允许私信；发送时据此选 Bot（第二章） |
 | `login_event` | id, person_id, bot_id, valid_by_bot_id, tried_count, auth_date, ip, device_id, result, created_at | 登录审计；校验命中的 Bot、尝试次数 |
-| `session` | id, account_id, refresh_token_hash, device_id, ip, expires_at, revoked_at, revoked_reason | 停用员工/冻结账号时批量 `revoked_at` |
+| `session` | id, account_id, family_id, refresh_token_hash, previous_hash, rotated_at, rotation, refresh_kid, device_id, ip, expires_at, last_used_at, revoked_at, revoked_reason | 刷新令牌只存哈希；旋转使用前一哈希和时间实现宽限期重放，冻结/停用时按 family 批量作废 |
+| `security_event` | account_id, session_family_id, event, reason, created_at | 会话安全事件；不含令牌或哈希 |
 | `merchant` | id, public_id, name jsonb, type, area, svc jsonb, description jsonb, phone_enc, address_enc, contact_enc, kind (`self/verified/pending`), status, owner_account_id | 商户资料；电话、地址、联系人由应用层加密后存放；`kind=verified` 须核验 |
 | `merchant_staff` | id, public_id, merchant_id, account_id(可空,未接受前), name, phone_enc, phone_hash, tg_username, note, role (`manager/sales/warehouse/finance`), status (`invited/active/off`), invite_code unique, invited_by, last_login_at | 员工上限 10（应用层校验）；`phone_enc` 存密文，`phone_hash` 存规范化手机号的不可逆摘要并用于同一商户内唯一性 |
 | `merchant_role_perm` | merchant_id, role, module (`dash/prod/orders/store/fin/ads/prof/staff/ai`), level (`none/view/edit`) | `PRIMARY KEY(merchant_id,role,module)`；`staff` 模块 level 只允许 `none/view` |

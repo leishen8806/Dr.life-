@@ -119,6 +119,145 @@ paths:
           $ref: "#/components/responses/InternalServerError"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /v1/public/auth/refresh:
+    post:
+      tags: [public]
+      operationId: postAuthRefresh
+      summary: Rotate a Mini App refresh token
+      x-roles: ["none"]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200": { $ref: "#/components/responses/RefreshSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/AccountBlocked" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/buyer/auth/logout:
+    post:
+      tags: [buyer]
+      operationId: postBuyerAuthLogout
+      summary: Revoke the current buyer session
+      x-roles: [buyer]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/merchant/auth/logout:
+    post:
+      tags: [merchant]
+      operationId: postMerchantAuthLogout
+      summary: Revoke the current merchant session
+      x-roles: [merchant]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/driver/auth/logout:
+    post:
+      tags: [driver]
+      operationId: postDriverAuthLogout
+      summary: Revoke the current driver session
+      x-roles: [driver]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/buyer/me/sessions:
+    get:
+      tags: [buyer]
+      operationId: getBuyerMeSessions
+      summary: List the current buyer account sessions
+      x-roles: [buyer]
+      responses:
+        "200": { $ref: "#/components/responses/SessionListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/sessions:
+    get:
+      tags: [merchant]
+      operationId: getMerchantMeSessions
+      summary: List the current merchant account sessions
+      x-roles: [merchant]
+      responses:
+        "200": { $ref: "#/components/responses/SessionListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/me/sessions:
+    get:
+      tags: [driver]
+      operationId: getDriverMeSessions
+      summary: List the current driver account sessions
+      x-roles: [driver]
+      responses:
+        "200": { $ref: "#/components/responses/SessionListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/me/sessions/{id}:
+    delete:
+      tags: [buyer]
+      operationId: deleteBuyerMeSession
+      summary: Revoke one session owned by the current buyer account
+      x-roles: [buyer]
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/sessions/{id}:
+    delete:
+      tags: [merchant]
+      operationId: deleteMerchantMeSession
+      summary: Revoke one session owned by the current merchant account
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/me/sessions/{id}:
+    delete:
+      tags: [driver]
+      operationId: deleteDriverMeSession
+      summary: Revoke one session owned by the current driver account
+      x-roles: [driver]
+      parameters:
+        - $ref: "#/components/parameters/SessionID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /v1/public/ping:
     get:
       tags: [public]
@@ -362,7 +501,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT containing the account role; a role/path mismatch returns HTTP 403.
+      description: HS256 access JWT with typ=at+jwt, iss=drlife, and an audience bound to the path end (for example drlife:buyer).
   parameters:
     Page:
       name: page
@@ -422,6 +561,14 @@ components:
       in: path
       required: true
       description: ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive).
+      schema:
+        type: string
+        pattern: "^[0-9a-hjkmnp-tv-z]{26}$"
+    SessionID:
+      name: id
+      in: path
+      required: true
+      description: Lowercase ULID of a session owned by the authenticated account.
       schema:
         type: string
         pattern: "^[0-9a-hjkmnp-tv-z]{26}$"
@@ -622,6 +769,77 @@ components:
         request_id:
           type: string
           minLength: 1
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+          minLength: 32
+          maxLength: 512
+    RefreshData:
+      type: object
+      additionalProperties: false
+      required: [access_token, access_expires_in, refresh_token, refresh_expires_in]
+      properties:
+        access_token: { type: string }
+        access_expires_in: { type: integer, format: int64, minimum: 1 }
+        refresh_token: { type: string }
+        refresh_expires_in: { type: integer, format: int64, minimum: 1 }
+    RefreshSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/RefreshData" }
+        request_id: { type: string, minLength: 1 }
+    Session:
+      type: object
+      additionalProperties: false
+      required: [public_id, last_used_at, expires_at]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        device_id: { type: string, nullable: true }
+        ip_prefix:
+          type: string
+          nullable: true
+          description: Masked IPv4 /24 or IPv6 /64 prefix.
+        last_used_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+    SessionListData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Session" }
+    SessionListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/SessionListData" }
+        request_id: { type: string, minLength: 1 }
+    ActionData:
+      type: object
+      additionalProperties: false
+      required: [revoked]
+      properties:
+        revoked: { type: boolean, enum: [true] }
+    ActionSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ActionData" }
+        request_id: { type: string, minLength: 1 }
     LocalizedText:
       type: object
       additionalProperties: false
@@ -902,6 +1120,24 @@ components:
         data: {$ref: "#/components/schemas/AuditListData"}
         request_id: {type: string, minLength: 1}
   responses:
+    RefreshSucceeded:
+      description: Refresh token rotated successfully.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RefreshSuccessResponse"
+    SessionListSucceeded:
+      description: Active sessions owned by the authenticated account.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SessionListSuccessResponse"
+    ActionSucceeded:
+      description: Session revocation succeeded.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ActionSuccessResponse"
     BadRequest:
       description: Invalid request (error code 1002).
       content:
