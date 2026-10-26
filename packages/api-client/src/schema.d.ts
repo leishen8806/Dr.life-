@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/v1/public/auth/telegram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign in with Telegram Mini App initData */
+        post: operations["postTelegramAuth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/ping": {
         parameters: {
             query?: never;
@@ -21,6 +38,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List enabled product categories in display order */
+        get: operations["listPublicCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List products that are on sale for a merchant that is not disabled */
+        get: operations["listPublicProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the authenticated merchant products in any status */
+        get: operations["listMerchantProducts"];
+        put?: never;
+        /** Create a draft product owned by the authenticated merchant */
+        post: operations["createMerchantProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/products/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        /** Read one product owned by the authenticated merchant */
+        get: operations["getMerchantProduct"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch a product owned by the authenticated merchant */
+        patch: operations["updateMerchantProduct"];
+        trace?: never;
+    };
+    "/v1/merchant/products/{public_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish a product; requires complete trilingual text and at least two price tiers */
+        post: operations["publishMerchantProduct"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -30,7 +140,7 @@ export interface components {
          * @description Documented application error code; ranges are described in the API description.
          * @enum {integer}
          */
-        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 2001 | 2002;
+        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 7001;
         Messages: {
             zh: string;
             en: string;
@@ -62,6 +172,144 @@ export interface components {
             data: components["schemas"]["PingData"];
             request_id: string;
         };
+        TelegramAuthRequest: {
+            /** @enum {string} */
+            end: "buyer" | "merchant" | "driver";
+            init_data: string;
+            device_id?: string;
+        };
+        TelegramAccount: {
+            public_id: string;
+            /** @enum {string} */
+            role: "buyer" | "merchant" | "driver";
+            /** @enum {string|null} */
+            lang: "zh" | "en" | "km" | null;
+            /** @enum {string} */
+            status: "active" | "frozen" | "disabled";
+        };
+        TelegramAuthData: {
+            access_token: string;
+            /** Format: int64 */
+            access_expires_in: number;
+            refresh_token: string;
+            /** Format: int64 */
+            refresh_expires_in: number;
+            account: components["schemas"]["TelegramAccount"];
+            needs_language: boolean;
+            is_new_account: boolean;
+        };
+        TelegramAuthSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["TelegramAuthData"];
+            request_id: string;
+        };
+        /** @description Trilingual text; every language must be present before a product can be published. */
+        LocalizedText: {
+            zh: string;
+            en: string;
+            km: string;
+        };
+        ProductTier: {
+            /** @description Minimum order quantity as a decimal string; never a floating-point number. */
+            min_qty: string;
+            /**
+             * Format: int64
+             * @description Unit price in ten-thousandths of a US dollar.
+             */
+            unit_price_e4: number;
+        };
+        /** @description At least two tiers, each with a unique minimum order quantity. */
+        ProductTierList: components["schemas"]["ProductTier"][];
+        Category: {
+            public_id: string;
+            code: string;
+            name: components["schemas"]["LocalizedText"];
+            enabled: boolean;
+            default_zone?: string;
+            sort: number;
+        };
+        Product: {
+            public_id: string;
+            category_code: string;
+            name: components["schemas"]["LocalizedText"];
+            spec?: components["schemas"]["LocalizedText"];
+            unit: string;
+            /** @enum {string} */
+            origin: "cn" | "lc";
+            lead_days?: number | null;
+            vol_m3?: string | null;
+            /** @enum {string} */
+            status: "draft" | "review" | "on" | "off" | "rejected";
+            /** @enum {string} */
+            source: "manual" | "amazon" | "shopee" | "a1688" | "csv";
+            source_ref?: string | null;
+            std_score?: number | null;
+            tiers: components["schemas"]["ProductTierList"];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        ProductCreateRequest: {
+            category_code: string;
+            name: components["schemas"]["LocalizedText"];
+            spec?: components["schemas"]["LocalizedText"];
+            unit: string;
+            /** @enum {string} */
+            origin: "cn" | "lc";
+            lead_days?: number | null;
+            vol_m3?: string | null;
+            /** @enum {string} */
+            source?: "manual" | "amazon" | "shopee" | "a1688" | "csv";
+            source_ref?: string;
+            tiers: components["schemas"]["ProductTierList"];
+        };
+        ProductUpdateRequest: {
+            category_code?: string;
+            name?: components["schemas"]["LocalizedText"];
+            spec?: components["schemas"]["LocalizedText"];
+            unit?: string;
+            /** @enum {string} */
+            origin?: "cn" | "lc";
+            lead_days?: number | null;
+            vol_m3?: string | null;
+            source_ref?: string;
+            /**
+             * @description Merchants may only move a product between draft and off; on is reached through publish.
+             * @enum {string}
+             */
+            status?: "draft" | "off";
+            tiers?: components["schemas"]["ProductTierList"];
+        };
+        CategoryListData: {
+            items: components["schemas"]["Category"][];
+            page: number;
+            page_size: number;
+            total: number;
+        };
+        ProductListData: {
+            items: components["schemas"]["Product"][];
+            page: number;
+            page_size: number;
+            total: number;
+        };
+        CategoryListSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["CategoryListData"];
+            request_id: string;
+        };
+        ProductListSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["ProductListData"];
+            request_id: string;
+        };
+        ProductSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["Product"];
+            request_id: string;
+        };
     };
     responses: {
         /** @description Invalid request (error code 1002). */
@@ -85,6 +333,34 @@ export interface components {
         /** @description Permission denied (error code 2002). */
         Forbidden: {
             headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Telegram login validation failed (error code 2005). */
+        LoginFailed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Account is frozen or disabled (error code 2006). */
+        AccountBlocked: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Too many login validation failures (error code 2007). */
+        LoginTooManyAttempts: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
                 [name: string]: unknown;
             };
             content: {
@@ -136,6 +412,43 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
+        /** @description Request is already processing or its completed response cannot be replayed (error code 1010 or 1011). */
+        Conflict: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Request body exceeds the configured route limit (error code 1007). */
+        RequestTooLarge: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description JSON write request does not use application/json (error code 1008). */
+        UnsupportedMediaType: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Idempotency key was reused with different request content (error code 1009). */
+        UnprocessableEntity: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
     };
     parameters: {
         /** @description One-based page number. */
@@ -152,13 +465,58 @@ export interface components {
         IdempotencyKey: string;
         /** @description Optional caller request identifier. Invalid values are replaced by the server. */
         XRequestID: string;
+        /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+        PublicID: string;
+        /** @description Restrict the result to one category code. */
+        CategoryCode: string;
+        /** @description Restrict the result to one product status. */
+        StatusFilter: "draft" | "review" | "on" | "off" | "rejected";
+        /** @description Single-use token scoped to a declared high-risk action and account. */
+        XStepUpToken: string;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description True when the stored response for an identical request is replayed. */
+        IdempotentReplayed: "true";
+        /** @description Seconds before retrying an in-progress or rate-limited request. */
+        RetryAfter: number;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    postTelegramAuth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramAuthRequest"];
+            };
+        };
+        responses: {
+            /** @description Login succeeded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramAuthSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["LoginFailed"];
+            403: components["responses"]["AccountBlocked"];
+            405: components["responses"]["MethodNotAllowed"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["LoginTooManyAttempts"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     getPublicPing: {
         parameters: {
             query?: never;
@@ -179,6 +537,240 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             405: components["responses"]["MethodNotAllowed"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listPublicCategories: {
+        parameters: {
+            query?: {
+                /** @description One-based page number. */
+                page?: components["parameters"]["Page"];
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description Comma-separated field names; prefix a field with - for descending order. */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Enabled categories ordered by sort then code. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryListSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            405: components["responses"]["MethodNotAllowed"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listPublicProducts: {
+        parameters: {
+            query?: {
+                /** @description One-based page number. */
+                page?: components["parameters"]["Page"];
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description Comma-separated field names; prefix a field with - for descending order. */
+                sort?: components["parameters"]["Sort"];
+                /** @description Restrict the result to one category code. */
+                category?: components["parameters"]["CategoryCode"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description On-sale products; products of a disabled merchant are hidden. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductListSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            405: components["responses"]["MethodNotAllowed"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listMerchantProducts: {
+        parameters: {
+            query?: {
+                /** @description One-based page number. */
+                page?: components["parameters"]["Page"];
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description Comma-separated field names; prefix a field with - for descending order. */
+                sort?: components["parameters"]["Sort"];
+                /** @description Restrict the result to one product status. */
+                status?: components["parameters"]["StatusFilter"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Products owned by the authenticated merchant. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductListSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createMerchantProduct: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Product created in draft status. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getMerchantProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requested product. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    updateMerchantProduct: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated product. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    publishMerchantProduct: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The product is on sale. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             503: components["responses"]["ServiceUnavailable"];

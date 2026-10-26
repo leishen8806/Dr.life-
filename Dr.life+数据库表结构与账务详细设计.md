@@ -130,7 +130,7 @@
 | `BANK_DEDICATED` | 资产 | 平台（单例） | EXT | 合作银行专用账户在平台账里的镜像；与银行对账文件逐笔对 |
 | `WALLET_AVAIL` | 负债 | 每个账号一个 | o / m{id} / d{id} | 用户**可用资金**（可提现） |
 | `WALLET_FROZEN` | 负债 | 每个账号一个（买家） | FRZ | 装修分批计划已冻结资金；明细由 `ledger_hold` 记录 |
-| `PENDING_PAYOUT` | 负债 | 平台（单例）按账号分明细 | WD | 已申请提现、待银行出款 |
+| `PENDING_PAYOUT` | 负债 | 平台（单例），由 `ledger.withdrawal` 按申请人分明细 | WD | 已申请提现、待银行出款 |
 | `DELIVERY_ESCROW` | 负债 | 平台（单例）按订单分明细 | DH | 配送费托管 |
 | `AD_BUDGET` | 负债 | 每个商户一个 | ADB | 广告预算（已划扣未消耗） |
 | `PLATFORM_HELD` | 权益 | 平台（单例） | P | **平台自有收入**（仍在专用账户里，待划出）；每条分录带 `category` 区分来源 |
@@ -248,16 +248,19 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 ```
 > `SUSPENSE` 使用 CREDIT 正常方向并允许暂时为负，供对账差异双向暂存；`PAYABLE_CARRIER` 第一版保持不允许负数。`allow_negative` 在创建账户时由触发器复制到 `balance`，且余额写入触发器要求两处策略一致；**客户钱包类账户永远不允许为负。**
 
-### 入账流程（账务模块唯一入口 `Post(ctx, req)`）
+### 入账流程（对外仅限强类型业务方法，通用 `post` 为包内私有实现）
+其他模块只能调用账务模块经过评审的强类型业务方法。通用入账核心不导出，不能用任意交易类型、账户和金额绕过业务校验、状态机或职责分离；测试通过仅在测试构建中存在的包装验证底层不变量。
+
 1. 校验请求：金额 > 0；分录借贷平衡；账户存在且 `open`；金额与业务单据一致（例如分账之和 = 托管金额）。
 2. **开启事务**（`READ COMMITTED` + 显式行锁）。
 3. **按 `account_id` 升序**对涉及的 `ledger.balance` 行 `SELECT … FOR UPDATE`（**固定顺序加锁，避免死锁**）。
 4. 检查余额：借记负债账户后不得小于 0（客户资金）；不足返回 `ERR_INSUFFICIENT_FUNDS`，**不记账**。
 5. `INSERT ledger.txn`（带 `idem_key`）。**若唯一冲突，比较类型、金额、关联信息、发起人和规范化后的分录；内容相同才读取 outbox 中保存的原结果并返回，内容不同返回幂等冲突，不再入账。**
 6. `INSERT ledger.posting`（批量）；更新各 `balance`（`balance = balance ± amount`，`version+1`）。
-7. 同事务写入 outbox，再提交事务；提交时延迟触发器验证借贷平衡，任一步失败均整体回滚。
-8. outbox 工作者用 `FOR UPDATE SKIP LOCKED` 并发领取，发送成功后标记 `sent_at`；发送失败释放事务锁以便重试，**不回滚已经提交的账务**。
-9. `40001`（序列化失败）和 `40P01`（死锁）有限次数退避重试；其他数据库错误和业务错误不自动重试，上下文取消立即停止。
+7. 如业务动作注册了事务后置钩子，在分录与余额写入后、提交前执行；冻结业务用它写入或关闭 `ledger.hold`，因此记账与状态变化只能一起成功或一起回滚。幂等重放不重复执行后置钩子，并在原事务中校验业务状态与原交易一致。
+8. 同事务写入 outbox，再提交事务；提交时延迟触发器验证借贷平衡，任一步失败均整体回滚。
+9. outbox 工作者用 `FOR UPDATE SKIP LOCKED` 并发领取，发送成功后标记 `sent_at`；发送失败释放事务锁以便重试，**不回滚已经提交的账务**。
+10. `40001`（序列化失败）和 `40P01`（死锁）有限次数退避重试；其他数据库错误和业务错误不自动重试，上下文取消立即停止。
 
 **幂等键规则（`idem_key`）：** `业务类型:业务单据:动作[:序号]`，例如 `delivery_hold:order:12345`、`payout:withdrawal:777`、`settle:batch:99`；重试同一动作必须用同一个键。
 
@@ -273,9 +276,9 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 | 6.2 | **装修资金冻结**（计划某批） | `freeze` | DR `WALLET_AVAIL(buyer)` / CR `WALLET_FROZEN(buyer)` + 写 `ledger_hold(plan_batch)` | 余额不足不能冻结；`hold` 记录批次与金额 |
 | 6.3 | **节点确认后结算给收款方** | `settle` | DR `WALLET_FROZEN(buyer)` / CR `WALLET_AVAIL(payee)`；若结算服务费 > 0：再 CR `PLATFORM_HELD` (category=`settle_fee`)，收款方少收相应金额 | 第一版 fee=0；`hold` 置为已释放 |
 | 6.4 | **争议退回** | `refund` | DR `WALLET_FROZEN(buyer)` / CR `WALLET_AVAIL(buyer)` | 争议期间冻结不动；裁决后释放或退回；裁决人 ≠ 出款人（SoD） |
-| 6.5 | **提现申请** | `withdraw_req` | DR `WALLET_AVAIL(A)` / CR `PENDING_PAYOUT(A)` | 同时写 `ledger.withdrawal`（见下）；账号冻结/停用禁止；大额进入复核 |
-| 6.6 | **银行出款确认** | `payout` | DR `PENDING_PAYOUT(A)` / CR `BANK_DEDICATED` | 以银行出款回单为准；与 6.5 一一对应；**24 小时未出款 → 审计关注** |
-| 6.7 | **提现失败/撤销** | `payout_fail` | DR `PENDING_PAYOUT(A)` / CR `WALLET_AVAIL(A)` | 银行退回或人工撤销 |
+| 6.5 | **提现申请** | `withdraw_req` | DR `WALLET_AVAIL(A)` / CR `PENDING_PAYOUT`（单例） | 同事务写 `ledger.withdrawal` 作为申请人明细；账号冻结/停用禁止；大额进入复核 |
+| 6.6 | **银行出款确认** | `payout` | DR `PENDING_PAYOUT`（单例） / CR `BANK_DEDICATED` | 金额从提现单读取，以唯一银行回单号确认；与 6.5 一一对应；**24 小时未出款 → 审计关注** |
+| 6.7 | **提现失败/撤销** | `payout_fail` | DR `PENDING_PAYOUT`（单例） / CR `WALLET_AVAIL(A)` | 金额与退款钱包从提现单及账户归属读取，调用方不能传入 |
 | 6.8 | **仓储费月度出账** | `storage_fee` | DR `WALLET_AVAIL(M)` / CR `PLATFORM_HELD`(category=`storage`) | 日计提在 `wms.storage_fee_daily`（子账，不进总账）；**出账日按账单合计一次扣款**；余额不足则账单 `status=arrears`，**不扣成负数**，待充值后再催收扣款；欠费超阈值 → 审计 #18 |
 | 6.9 | **配送费托管**（发货） | `delivery_hold` | DR `WALLET_AVAIL(M)` / CR `DELIVERY_ESCROW`（明细=订单） | 商户资金不足不能发货；金额=规则当时版本计算出的 `fee_total`；写入 `shipment.fee_*` 快照 |
 | 6.10 | **签收后分账** | `delivery_release` | DR `DELIVERY_ESCROW`（订单）/ CR `WALLET_AVAIL(D)`（司机份，自建配送时）+ CR `PLATFORM_HELD`(category=`delivery_margin`) + CR `PAYABLE_CARRIER`（中通份） | **必须有签收凭证**；各份用"整数 + 最后一项倒挤"，**之和 = 托管金额**；平台留存默认 0 |
@@ -290,6 +293,13 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 | 6.19 | **对账差异调整** | `bank_diff` | 差异金额入 `SUSPENSE`（DR/CR `BANK_DEDICATED` 对 `SUSPENSE`） | **`SUSPENSE` 余额必须在 N 天内清零**，超期告警 |
 | — | **货款凭证**（买家线下付商家） | 不入账 | 写 `trade.payment_proof` | **不进分录**，流水页并列显示"凭证（仅留痕）" |
 
+#### 6.18 冲销补充规则
+
+- 第一版只允许冲销 `topup`、`storage_fee`、`member_fee`、`ad_charge`、`ad_spend`、`ad_refund`、`bank_diff`、`sweep`、`carrier_pay`、`adjust`。冻结与结算必须走 `hold` 状态机，提现必须走 `withdrawal` 状态机，配送托管需按订单状态处理，不能用通用冲销绕过业务状态。
+- 冲销交易必须逐条复制原分录的账户、金额、`role`、`category`，并只互换 `DEBIT` / `CREDIT`。延迟约束触发器在提交时比较两个分录多重集合，防止绕过服务直接写入不对称冲销。
+- 同一原交易最多一条冲销；冲销交易本身不能再次冲销。冲销仍执行账户余额非负检查，已花掉的充值不能用冲销强制形成客户负余额。
+- 服务调用必须携带非空原因、操作人及授权人；权限判断由 API 层执行。账务事务写 `ledger.txn.reversed` outbox 事件，审计模块消费事件并追加哈希链审计记录，账务模块不跨 schema 写审计表。
+
 ### 配套表
 ```sql
 create table ledger.hold (          -- 冻结明细
@@ -301,29 +311,50 @@ create table ledger.hold (          -- 冻结明细
   freeze_txn_id bigint not null references ledger.txn(id),
   close_txn_id bigint references ledger.txn(id),
   created_at timestamptz not null default now(), closed_at timestamptz,
+  dispute_reason text, disputed_by bigint, disputed_at timestamptz,
+  resolved_by bigint,
   unique (ref_type, ref_id)
 );
 
 create table ledger.withdrawal (
   id bigint generated always as identity primary key,
   public_id text unique not null,
+  request_key text unique not null,                       -- API Idempotency-Key；仅 A-Z/a-z/0-9/_/-，最长 100
   account_id bigint not null,                           -- 申请人账号
   amount bigint not null check (amount > 0),
   payee_account_text text not null,                     -- 收款账户（加密）
   payee_account_last4 text,
   status text not null check (status in ('requested','review','approved','paid','failed','cancelled')),
-  maker_actor bigint not null, checker_actor bigint,    -- 大额：两人复核
+  requester_actor bigint not null,                      -- 申请提现的用户 actor
+  maker_actor bigint, checker_actor bigint,             -- 管理员发起处理；大额由另一管理员复核
+  requires_review boolean not null,                     -- 申请时按阈值固定，后续调阈值不追溯
   req_txn_id bigint references ledger.txn(id), paid_txn_id bigint references ledger.txn(id),
-  bank_ref text, requested_at timestamptz not null default now(), paid_at timestamptz,
-  check (checker_actor is null or checker_actor <> maker_actor)    -- 发起人 ≠ 复核人（数据库兜底）
+  bank_ref text, requested_at timestamptz not null default now(), reviewed_at timestamptz, paid_at timestamptz,
+  failed_reason text,
+  check (checker_actor is null or (maker_actor is not null and checker_actor <> maker_actor and checker_actor <> requester_actor))
 );
 create index ix_wd_status on ledger.withdrawal(status, requested_at);
+create unique index uq_withdrawal_bank_ref on ledger.withdrawal(bank_ref) where bank_ref is not null;
 
 create table ledger.outbox (        -- 事务性发件箱：账已入则事件必发
   id bigint generated always as identity primary key,
   txn_id bigint, topic text, payload jsonb, created_at timestamptz default now(), sent_at timestamptz
 );
 ```
+
+`hold` 状态机为 `held → released | refunded | disputed`，以及 `disputed → released | refunded`；`released/refunded` 为终态。争议只改变状态与争议元数据，不动余额；必须通过 `ResolveDispute` 裁决后才可释放或退款，且裁决人与出款人不得相同。第一版一个 hold 只能整笔结算或整笔退回，部分结算待确认。
+
+冻结操作通过 `FreezeHold` 同事务写冻结分录与 hold；释放、退款通过 `SettleHold`、`RefundHold`，金额和冻结账户均取自 hold，调用方不能传入。第一版 `SettleHold.Fee` 必须为 0，参数仅为以后确定收费规则保留。L-03 的无状态冻结、结算、退款函数为包内私有，外部模块不能绕过状态机。锁顺序固定为：先由 `Post` 按 `account_id` 升序锁定余额行，再锁 hold 行。数据库触发器限制合法状态迁移，保护金额、账户、业务引用、冻结交易及创建时间不可变，并拒绝删除和截断。
+
+每日对账除总账恒等式外，还必须验证每个 `WALLET_FROZEN` 账户的余额等于该账户所有 `held/disputed` hold 金额之和；`VerifyHoldsMatchFrozen` 返回全部不一致账户。
+
+提现状态机为：大额 `requested → review → approved → paid`，小额在申请事务中直接进入 `approved`；`requested/review/approved → cancelled`，`approved → failed`，三个结束状态均不可再修改。默认大额阈值为 1,000 美元（`10_000_000` e4），申请时写入 `requires_review` 固定判定。申请、出款确认、失败和撤销均通过 `Post` 的事务钩子把分录与提现状态一次提交；金额和申请人钱包以提现行及 `owner_account` 关系为准。全局锁顺序与 hold 相同：先按账户编号升序锁余额，再锁 withdrawal 行。
+
+提现申请必须携带 API 层传入的 `Idempotency-Key`，保存为不可变的 `request_key`；格式限定为 `[A-Za-z0-9_-]` 且最长 100 个字符。事务幂等键为 `withdraw_req:request:<request_key>`。重放时必须核对申请人账号、钱包、金额及解密后的收款账户；任一内容不同均返回幂等冲突。复核开始、复核通过、出款确认、失败和撤销分别写事务性 outbox 事件，事件只包含提现 `public_id`、金额、相关操作人和时间，不包含收款账户全文。
+
+提现前由调用方完成真正的二次验证，并通过注入的 `AccountGuard` 检查账号可提现；任一检查缺失均默认拒绝。收款账户使用信封加密，AAD 为 `withdrawal_payee:<public_id>`，普通查询只返回末四位，全文仅由专用解密方法读取。银行回单号全表唯一。L-03 的无状态 `WithdrawReq/Payout/PayoutFail` 已收为包内方法，外部只能使用提现状态机。`VerifyPendingPayoutMatchesWithdrawals` 校验单例 `PENDING_PAYOUT` 余额等于所有 `requested/review/approved` 提现之和；24 小时未完成和所有大额未完成提现进入审计关注，列表不含收款账户全文。
+
+> **待确认：** `approved` 状态撤销与银行实际付款存在并发风险。当前约束要求流程保证：一旦已提交银行转账，不得再撤销；后续接入银行适配层时需确认可执行的状态凭证和互斥方案。
 
 ---
 
@@ -347,7 +378,35 @@ create table ledger.bank_statement_line (
 create table ledger.snapshot_daily (   -- 每日余额快照（用于对账、报表、审计留证）
   day date, account_id bigint, balance bigint, primary key (day, account_id)
 );
+
+-- 内部对账运行、异常明细与出款冻结（完整约束见迁移 00010）
+create table ledger.recon_run (
+  id bigint generated always as identity primary key,
+  day date not null, kind text not null check (kind in ('daily','spot')),
+  attempt integer not null, started_by bigint, force_reason text,
+  started_at timestamptz not null, finished_at timestamptz,
+  status text not null check (status in ('running','ok','failed')),
+  summary jsonb not null, unique (day, kind, attempt)
+);
+create table ledger.recon_issue (
+  id bigint generated always as identity primary key,
+  run_id bigint not null references ledger.recon_run(id), check_code text not null,
+  account_id bigint references ledger.account(id), txn_id bigint references ledger.txn(id),
+  expected bigint, actual bigint, detail text, created_at timestamptz not null
+);
+create table ledger.payout_freeze (
+  id bigint generated always as identity primary key,
+  scope text not null check (scope in ('global','account')), account_id bigint references ledger.account(id),
+  reason text not null, run_id bigint not null references ledger.recon_run(id), created_at timestamptz not null,
+  released_at timestamptz, released_by bigint, release_reason text
+);
 ```
+
+内部对账先按 `LEDGER_RECON_TIMEZONE`（默认 `Asia/Phnom_Penh`）的日界线写入只增不改的余额快照，再在**同一个只读 `REPEATABLE READ` 事务**中执行 `BALANCE_CACHE`、`TXN_BALANCED`、`IDENTITY`、`HOLD_FROZEN`、`PENDING_PAYOUT`、`REVERSAL`、`ORPHAN` 七项检查。快照重复写使用 `ON CONFLICT DO NOTHING`；已有快照与分录重算不一致时记录 `SNAPSHOT_DRIFT`。
+
+任何异常都写 `recon_issue` 与 `ledger.recon.failed` outbox 事件。单账户的 `BALANCE_CACHE` 异常建立账户级出款冻结；`TXN_BALANCED`、`IDENTITY`、`SNAPSHOT_DRIFT`、`REVERSAL`、`ORPHAN` 建立全局冻结。冻结阻止提现申请、出款确认、平台归集及承运商付款，不阻止提现失败或撤销时将款项退还用户。解除必须给出理由；人工发起的对账，其发起人不能解除自己触发的冻结。
+
+默认重复执行同一天的每日对账会返回已有完成结果。显式强制重跑必须填写原因，并以递增 `attempt` 留下新记录；因此唯一键采用 `(day, kind, attempt)`，保留每次强制重跑的审计证据。已完成运行、异常明细与每日快照不可更新、删除或截断；冻结记录仅允许一次性填写 `released_*` 字段。
 
 ### 2. 与审计中心 18 项检查的对应
 | 审计项 | 数据来源 |

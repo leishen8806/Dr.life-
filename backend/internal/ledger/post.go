@@ -8,6 +8,7 @@ import (
 	"math"
 	"regexp"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -25,6 +26,7 @@ var (
 )
 
 var idemKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+(?::[A-Za-z0-9_-]+)?$`)
+var adjustIdemKeyPattern = regexp.MustCompile(`^adjust:[A-Za-z0-9_-]+-[1-9][0-9]*$`)
 
 var validTxnTypes = map[string]struct{}{
 	"topup": {}, "freeze": {}, "settle": {}, "refund": {}, "withdraw_req": {},
@@ -40,17 +42,35 @@ var validCategories = map[string]struct{}{
 
 type beginner interface {
 	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
 type Service struct {
-	db         beginner
-	maxRetries int
-	singletons singletonCache
+	db                       beginner
+	maxRetries               int
+	singletons               singletonCache
+	accountGuard             AccountGuard
+	payeeCipher              PayeeCipher
+	withdrawalMetrics        WithdrawalMetrics
+	reconciliationMetrics    ReconciliationMetrics
+	largeWithdrawalThreshold int64
+	reconciliationLocation   *time.Location
+	spotCheckEvery           uint64
+	spotCheckCounter         atomic.Uint64
+	now                      func() time.Time
 }
 
 type Options struct {
-	MaxRetries int
+	MaxRetries               int
+	AccountGuard             AccountGuard
+	PayeeCipher              PayeeCipher
+	WithdrawalMetrics        WithdrawalMetrics
+	ReconciliationMetrics    ReconciliationMetrics
+	LargeWithdrawalThreshold int64
+	ReconciliationLocation   *time.Location
+	SpotCheckEvery           int
+	Now                      func() time.Time
 }
 
 func New(db beginner, options Options) *Service {
@@ -58,7 +78,28 @@ func New(db beginner, options Options) *Service {
 	if maxRetries <= 0 {
 		maxRetries = 3
 	}
-	return &Service{db: db, maxRetries: maxRetries}
+	threshold := options.LargeWithdrawalThreshold
+	if threshold <= 0 {
+		threshold = 10_000_000
+	}
+	now := options.Now
+	if now == nil {
+		now = time.Now
+	}
+	location := options.ReconciliationLocation
+	if location == nil {
+		location = time.FixedZone("Asia/Phnom_Penh", 7*60*60)
+	}
+	spotCheckEvery := options.SpotCheckEvery
+	if spotCheckEvery < 0 {
+		spotCheckEvery = 0
+	}
+	return &Service{
+		db: db, maxRetries: maxRetries, accountGuard: options.AccountGuard,
+		payeeCipher: options.PayeeCipher, withdrawalMetrics: options.WithdrawalMetrics,
+		reconciliationMetrics: options.ReconciliationMetrics, reconciliationLocation: location,
+		largeWithdrawalThreshold: threshold, spotCheckEvery: uint64(spotCheckEvery), now: now,
+	}
 }
 
 type Posting struct {
@@ -88,27 +129,49 @@ type Balance struct {
 }
 
 type PostResult struct {
-	TxnID    int64     `json:"txn_id"`
-	TxnNo    string    `json:"txn_no"`
-	Replayed bool      `json:"-"`
-	Balances []Balance `json:"balances"`
-}
-
-func (s *Service) Post(ctx context.Context, request PostRequest) (PostResult, error) {
-	return s.post(ctx, request, nil)
+	TxnID           int64     `json:"txn_id"`
+	TxnNo           string    `json:"txn_no"`
+	Replayed        bool      `json:"-"`
+	ReversedByTxnID *int64    `json:"reversed_by_txn_id,omitempty"`
+	Balances        []Balance `json:"balances"`
 }
 
 type transactionCheck func(context.Context, pgx.Tx) error
+type transactionAfter func(context.Context, pgx.Tx, PostResult) error
+type transactionReplayCheck func(context.Context, pgx.Tx, PostResult) error
 
-func (s *Service) post(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
+type transactionReplay struct{ result PostResult }
+
+func (*transactionReplay) Error() string { return "ledger transaction replay" }
+
+type transactionHooks struct {
+	check       transactionCheck
+	after       transactionAfter
+	replayCheck transactionReplayCheck
+	// skipInitialReplay lets a business-owned unique key resolve its record
+	// under the transaction check before comparing the ledger transaction.
+	skipInitialReplay bool
+}
+
+func (s *Service) postRaw(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
+	return s.postWithHooks(ctx, request, transactionHooks{check: check})
+}
+
+func (s *Service) postWithHooks(ctx context.Context, request PostRequest, hooks transactionHooks) (PostResult, error) {
 	if err := validateRequest(request); err != nil {
 		return PostResult{}, err
 	}
 	var result PostResult
 	var err error
 	for attempt := 0; attempt <= s.maxRetries; attempt++ {
-		result, err = s.postOnce(ctx, request, check)
-		if err == nil || !isRetryable(err) || attempt == s.maxRetries {
+		result, err = s.postOnce(ctx, request, hooks)
+		if err == nil {
+			if !result.Replayed {
+				s.maybeSpotCheck(request.Postings)
+			}
+			return result, nil
+		}
+		if !isRetryable(err) || attempt == s.maxRetries {
 			return result, err
 		}
 		delay := time.Duration(1<<attempt) * 10 * time.Millisecond
@@ -132,19 +195,26 @@ type accountState struct {
 	balance       int64
 }
 
-func (s *Service) postOnce(ctx context.Context, request PostRequest, check transactionCheck) (PostResult, error) {
+func (s *Service) postOnce(ctx context.Context, request PostRequest, hooks transactionHooks) (PostResult, error) {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return PostResult{}, err
 	}
 	defer tx.Rollback(ctx)
-	if result, replayErr := loadExisting(ctx, tx, request); replayErr == nil {
-		if err := tx.Commit(ctx); err != nil {
-			return PostResult{}, err
+	if !hooks.skipInitialReplay {
+		if result, replayErr := loadExisting(ctx, tx, request); replayErr == nil {
+			if hooks.replayCheck != nil {
+				if err := hooks.replayCheck(ctx, tx, result); err != nil {
+					return PostResult{}, err
+				}
+			}
+			if err := tx.Commit(ctx); err != nil {
+				return PostResult{}, err
+			}
+			return result, nil
+		} else if !errors.Is(replayErr, pgx.ErrNoRows) {
+			return PostResult{}, replayErr
 		}
-		return result, nil
-	} else if !errors.Is(replayErr, pgx.ErrNoRows) {
-		return PostResult{}, replayErr
 	}
 
 	ids := sortedAccountIDs(request.Postings)
@@ -167,8 +237,20 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest, check trans
 		}
 		accounts[id] = account
 	}
-	if check != nil {
-		if err := check(ctx, tx); err != nil {
+	if hooks.check != nil {
+		if err := hooks.check(ctx, tx); err != nil {
+			var replay *transactionReplay
+			if errors.As(err, &replay) {
+				if hooks.replayCheck != nil {
+					if err := hooks.replayCheck(ctx, tx, replay.result); err != nil {
+						return PostResult{}, err
+					}
+				}
+				if err := tx.Commit(ctx); err != nil {
+					return PostResult{}, err
+				}
+				return replay.result, nil
+			}
 			return PostResult{}, err
 		}
 	}
@@ -186,6 +268,11 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest, check trans
 		result, replayErr := loadExisting(ctx, tx, request)
 		if replayErr != nil {
 			return PostResult{}, replayErr
+		}
+		if hooks.replayCheck != nil {
+			if err := hooks.replayCheck(ctx, tx, result); err != nil {
+				return PostResult{}, err
+			}
 		}
 		if err := tx.Commit(ctx); err != nil {
 			return PostResult{}, err
@@ -233,6 +320,11 @@ func (s *Service) postOnce(ctx context.Context, request PostRequest, check trans
 		}
 		result.Balances = append(result.Balances, Balance{AccountID: id, Balance: account.balance})
 	}
+	if hooks.after != nil {
+		if err := hooks.after(ctx, tx, result); err != nil {
+			return PostResult{}, err
+		}
+	}
 	payload, err := json.Marshal(result)
 	if err != nil {
 		return PostResult{}, err
@@ -256,7 +348,8 @@ func validateRequest(request PostRequest) error {
 	if request.Amount <= 0 {
 		return ErrInvalidAmount
 	}
-	if len(request.IdemKey) > 200 || !idemKeyPattern.MatchString(request.IdemKey) {
+	if len(request.IdemKey) > 200 || !idemKeyPattern.MatchString(request.IdemKey) &&
+		(request.Type != "adjust" || !adjustIdemKeyPattern.MatchString(request.IdemKey)) {
 		return ErrInvalidRequest
 	}
 	seen := make(map[int64]struct{}, len(request.Postings))

@@ -109,7 +109,7 @@ func TestPostIntegration(t *testing.T) {
 	})
 
 	t.Run("migration down and up round trip", func(t *testing.T) {
-		if err := goose.Down(database, migrationDirectory(t)); err != nil {
+		if err := goose.DownTo(database, migrationDirectory(t), 4); err != nil {
 			t.Fatal(err)
 		}
 		var exists bool
@@ -128,14 +128,14 @@ func TestPostIntegration(t *testing.T) {
 		source := createWallet(t, ctx, admin, 101, 10, false)
 		destination := createWallet(t, ctx, admin, 102, 0, false)
 		request := transfer("settle:order:101", source, destination, 4)
-		first, err := adminService.Post(ctx, request)
+		first, err := ledger.PostForTest(ctx, adminService, request)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !regexp.MustCompile(`^L[0-9]{12}$`).MatchString(first.TxnNo) {
 			t.Fatalf("txn_no=%q", first.TxnNo)
 		}
-		replayed, err := adminService.Post(ctx, request)
+		replayed, err := ledger.PostForTest(ctx, adminService, request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +156,7 @@ func TestPostIntegration(t *testing.T) {
 		changed := request
 		changed.Amount = 3
 		changed.Postings = []ledger.Posting{{AccountID: source, Side: "DEBIT", Amount: 3}, {AccountID: destination, Side: "CREDIT", Amount: 3}}
-		if _, err := adminService.Post(ctx, changed); !errors.Is(err, ledger.ErrIdempotencyConflict) {
+		if _, err := ledger.PostForTest(ctx, adminService, changed); !errors.Is(err, ledger.ErrIdempotencyConflict) {
 			t.Fatalf("content conflict error=%v", err)
 		}
 		assertTxnCounts(t, ctx, admin, request.IdemKey, 1, 2, 1)
@@ -166,7 +166,7 @@ func TestPostIntegration(t *testing.T) {
 		source := createWallet(t, ctx, admin, 104, 10, false)
 		destination := createWallet(t, ctx, admin, 105, 0, false)
 		request := transfer("settle:outbox-cleanup:104", source, destination, 4)
-		first, err := adminService.Post(ctx, request)
+		first, err := ledger.PostForTest(ctx, adminService, request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -174,7 +174,7 @@ func TestPostIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 		for name, load := range map[string]func() (ledger.PostResult, error){
-			"Post":         func() (ledger.PostResult, error) { return adminService.Post(ctx, request) },
+			"Post":         func() (ledger.PostResult, error) { return ledger.PostForTest(ctx, adminService, request) },
 			"GetByID":      func() (ledger.PostResult, error) { return adminService.GetByID(ctx, first.TxnID) },
 			"GetByIdemKey": func() (ledger.PostResult, error) { return adminService.GetByIdemKey(ctx, request.IdemKey) },
 		} {
@@ -199,7 +199,7 @@ func TestPostIntegration(t *testing.T) {
 		wallet := createWallet(t, ctx, admin, 103, 0, false)
 		request := ledger.PostRequest{Type: "topup", Amount: 5, IdemKey: "topup:deposit:103", ActorID: 1,
 			Postings: []ledger.Posting{{AccountID: bank, Side: "DEBIT", Amount: 5}, {AccountID: wallet, Side: "CREDIT", Amount: 5}}}
-		if _, err := adminService.Post(ctx, request); err != nil {
+		if _, err := ledger.PostForTest(ctx, adminService, request); err != nil {
 			t.Fatal(err)
 		}
 		if getBalance(t, ctx, admin, bank) != 5 || getBalance(t, ctx, admin, wallet) != 5 {
@@ -219,7 +219,7 @@ func TestPostIntegration(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				result, err := adminService.Post(ctx, request)
+				result, err := ledger.PostForTest(ctx, adminService, request)
 				if err != nil {
 					errs <- err
 					return
@@ -264,7 +264,7 @@ func TestPostIntegration(t *testing.T) {
 			go func(i int) {
 				defer wg.Done()
 				begin := time.Now()
-				_, err := adminService.Post(ctx, transfer(fmt.Sprintf("settle:load:%d", i), source, destination, 1))
+				_, err := ledger.PostForTest(ctx, adminService, transfer(fmt.Sprintf("settle:load:%d", i), source, destination, 1))
 				latencies[i] = time.Since(begin)
 				switch {
 				case err == nil:
@@ -307,7 +307,7 @@ func TestPostIntegration(t *testing.T) {
 				}
 				request := ledger.PostRequest{Type: "settle", Amount: 2, IdemKey: fmt.Sprintf("settle:cross:%d", i), ActorID: 1,
 					Postings: []ledger.Posting{{AccountID: source, Side: "DEBIT", Amount: 2}, {AccountID: destination, Side: "CREDIT", Amount: 1}, {AccountID: c, Side: "CREDIT", Amount: 1}}}
-				if _, err := adminService.Post(ctx, request); err != nil {
+				if _, err := ledger.PostForTest(ctx, adminService, request); err != nil {
 					errs <- err
 				}
 			}(i)
@@ -331,7 +331,7 @@ func TestPostIntegration(t *testing.T) {
 		assertRawRejected(t, ctx, admin, "raw-unbalanced", 100, 99, a, b)
 		request := transfer("settle:mismatch:post", a, b, 2)
 		request.Amount = 1
-		if _, err := adminService.Post(ctx, request); !errors.Is(err, ledger.ErrUnbalanced) {
+		if _, err := ledger.PostForTest(ctx, adminService, request); !errors.Is(err, ledger.ErrUnbalanced) {
 			t.Fatalf("Post mismatch error=%v", err)
 		}
 	})
@@ -339,14 +339,14 @@ func TestPostIntegration(t *testing.T) {
 	t.Run("negative policy and invalid accounts", func(t *testing.T) {
 		suspense := singletonID(t, ctx, admin, "SUSPENSE")
 		destination := createWallet(t, ctx, admin, 601, 0, false)
-		if _, err := adminService.Post(ctx, transfer("bank_diff:item:601", suspense, destination, 5)); err != nil {
+		if _, err := ledger.PostForTest(ctx, adminService, transfer("bank_diff:item:601", suspense, destination, 5)); err != nil {
 			t.Fatal(err)
 		}
 		if getBalance(t, ctx, admin, suspense) != -5 {
 			t.Fatal("negative-enabled SUSPENSE did not go negative")
 		}
 		request := transfer("settle:missing:601", destination, 999999999, 1)
-		if _, err := adminService.Post(ctx, request); !errors.Is(err, ledger.ErrAccountNotFound) {
+		if _, err := ledger.PostForTest(ctx, adminService, request); !errors.Is(err, ledger.ErrAccountNotFound) {
 			t.Fatalf("missing account error=%v", err)
 		}
 	})
@@ -357,7 +357,7 @@ func TestPostIntegration(t *testing.T) {
 		if _, err := admin.Exec(ctx, `UPDATE ledger.account SET status='closed' WHERE id=$1`, source); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := adminService.Post(ctx, transfer("settle:closed:602", source, destination, 1)); !errors.Is(err, ledger.ErrAccountClosed) {
+		if _, err := ledger.PostForTest(ctx, adminService, transfer("settle:closed:602", source, destination, 1)); !errors.Is(err, ledger.ErrAccountClosed) {
 			t.Fatalf("closed account error=%v", err)
 		}
 		if _, err := admin.Exec(ctx, `UPDATE ledger.account SET status='open' WHERE id=$1`, source); err != nil {
@@ -365,13 +365,13 @@ func TestPostIntegration(t *testing.T) {
 		}
 		categoryRequest := transfer("settle:category:602", source, destination, 1)
 		categoryRequest.Postings[1].Category = "storage"
-		if _, err := adminService.Post(ctx, categoryRequest); !errors.Is(err, ledger.ErrInvalidRequest) {
+		if _, err := ledger.PostForTest(ctx, adminService, categoryRequest); !errors.Is(err, ledger.ErrInvalidRequest) {
 			t.Fatalf("category error=%v", err)
 		}
 		if _, err := admin.Exec(ctx, `UPDATE ledger.balance SET balance=$2 WHERE account_id=$1`, destination, int64(^uint64(0)>>1)); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := adminService.Post(ctx, transfer("settle:overflow:602", source, destination, 1)); !errors.Is(err, ledger.ErrInvalidAmount) {
+		if _, err := ledger.PostForTest(ctx, adminService, transfer("settle:overflow:602", source, destination, 1)); !errors.Is(err, ledger.ErrInvalidAmount) {
 			t.Fatalf("overflow error=%v", err)
 		}
 		assertTxnCounts(t, ctx, admin, "settle:overflow:602", 0, 0, 0)
@@ -383,7 +383,7 @@ func TestPostIntegration(t *testing.T) {
 		if _, err := admin.Exec(ctx, `REVOKE INSERT ON ledger.outbox FROM ledger_rw`); err != nil {
 			t.Fatal(err)
 		}
-		_, postErr := appService.Post(ctx, transfer("settle:rollback:701", source, destination, 1))
+		_, postErr := ledger.PostForTest(ctx, appService, transfer("settle:rollback:701", source, destination, 1))
 		if _, err := admin.Exec(ctx, `GRANT INSERT ON ledger.outbox TO ledger_rw`); err != nil {
 			t.Fatal(err)
 		}
@@ -403,7 +403,7 @@ func TestPostIntegration(t *testing.T) {
 		source := createWallet(t, ctx, admin, 801, 10, false)
 		destination := createWallet(t, ctx, admin, 802, 0, false)
 		for i := range 2 {
-			if _, err := appService.Post(ctx, transfer(fmt.Sprintf("settle:outbox:%d", i), source, destination, 1)); err != nil {
+			if _, err := ledger.PostForTest(ctx, appService, transfer(fmt.Sprintf("settle:outbox:%d", i), source, destination, 1)); err != nil {
 				t.Fatal(err)
 			}
 		}

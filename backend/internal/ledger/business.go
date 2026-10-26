@@ -54,7 +54,7 @@ type FreezeInput struct {
 	Amount, ActorID               int64
 }
 
-func (s *Service) Freeze(ctx context.Context, in FreezeInput) (PostResult, error) {
+func (s *Service) freeze(ctx context.Context, in FreezeInput) (PostResult, error) {
 	if !keySegmentPattern.MatchString(in.RefType) || in.RefID <= 0 {
 		return PostResult{}, ErrInvalidRequest
 	}
@@ -70,7 +70,7 @@ type SettleInput struct {
 	Amount, Fee, ActorID        int64
 }
 
-func (s *Service) Settle(ctx context.Context, in SettleInput) (PostResult, error) {
+func (s *Service) settle(ctx context.Context, in SettleInput) (PostResult, error) {
 	if in.HoldID <= 0 || in.Fee < 0 || in.Fee > in.Amount {
 		return PostResult{}, ErrInvalidRequest
 	}
@@ -99,7 +99,7 @@ type RefundFrozenInput struct {
 	Amount, ActorID, PayerActorID         int64
 }
 
-func (s *Service) RefundFrozen(ctx context.Context, in RefundFrozenInput) (PostResult, error) {
+func (s *Service) refundFrozen(ctx context.Context, in RefundFrozenInput) (PostResult, error) {
 	if in.HoldID <= 0 || in.ActorID <= 0 || in.PayerActorID <= 0 {
 		return PostResult{}, ErrInvalidRequest
 	}
@@ -115,7 +115,7 @@ func (s *Service) RefundFrozen(ctx context.Context, in RefundFrozenInput) (PostR
 
 type WithdrawReqInput struct{ WithdrawalID, WalletAvailable, Amount, ActorID int64 }
 
-func (s *Service) WithdrawReq(ctx context.Context, in WithdrawReqInput) (PostResult, error) {
+func (s *Service) withdrawReq(ctx context.Context, in WithdrawReqInput) (PostResult, error) {
 	ids, err := s.singletonAccounts(ctx)
 	if err != nil {
 		return PostResult{}, err
@@ -127,7 +127,7 @@ func (s *Service) WithdrawReq(ctx context.Context, in WithdrawReqInput) (PostRes
 
 type PayoutInput struct{ WithdrawalID, Amount, RequestedAmount, ActorID int64 }
 
-func (s *Service) Payout(ctx context.Context, in PayoutInput) (PostResult, error) {
+func (s *Service) payoutLegacy(ctx context.Context, in PayoutInput) (PostResult, error) {
 	if in.Amount != in.RequestedAmount {
 		return PostResult{}, ErrInvalidAmount
 	}
@@ -136,7 +136,7 @@ func (s *Service) Payout(ctx context.Context, in PayoutInput) (PostResult, error
 
 type PayoutFailInput struct{ WithdrawalID, WalletAvailable, Amount, ActorID int64 }
 
-func (s *Service) PayoutFail(ctx context.Context, in PayoutFailInput) (PostResult, error) {
+func (s *Service) payoutFailLegacy(ctx context.Context, in PayoutFailInput) (PostResult, error) {
 	return s.payout(ctx, "payout_fail", in.WithdrawalID, in.Amount, in.ActorID, in.WalletAvailable)
 }
 
@@ -341,7 +341,9 @@ func (s *Service) reviewedPayment(ctx context.Context, typ, refType string, in R
 	req := businessRequest(typ, in.Amount, fmt.Sprintf("%s:%s:%d", typ, refType, in.ID), refType, &in.ID, in.ActorID,
 		Posting{AccountID: source, Side: "DEBIT", Amount: in.Amount}, Posting{AccountID: ids["BANK_DEDICATED"], Side: "CREDIT", Amount: in.Amount})
 	req.Note = fmt.Sprintf("reviewer_actor:%d", in.ReviewerActorID)
-	return s.postBusiness(ctx, req, map[int64]string{source: kind, ids["BANK_DEDICATED"]: "BANK_DEDICATED"}, nil)
+	return s.postBusiness(ctx, req, map[int64]string{source: kind, ids["BANK_DEDICATED"]: "BANK_DEDICATED"}, func(ctx context.Context, tx pgx.Tx) error {
+		return checkPayoutFreeze(ctx, tx, 0)
+	})
 }
 
 type BankDiffInput struct {
@@ -375,5 +377,5 @@ func (s *Service) postBusiness(ctx context.Context, request PostRequest, kinds m
 	if request.RefID != nil && *request.RefID <= 0 {
 		return PostResult{}, ErrInvalidRequest
 	}
-	return s.post(ctx, request, requireKinds(kinds, extra, sameOwner...))
+	return s.postRaw(ctx, request, requireKinds(kinds, extra, sameOwner...))
 }

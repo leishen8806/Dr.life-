@@ -74,6 +74,32 @@ func TestMetricsAreNotExposedOnPublicHandler(t *testing.T) {
 	}
 }
 
+func TestHTTPServerSecurityLimits(t *testing.T) {
+	srv := NewHTTPServer(":0", NewHandler(nil), time.Second, 2*time.Second, 3*time.Second)
+	if srv.MaxHeaderBytes != 16<<10 || srv.ReadHeaderTimeout != time.Second || srv.ReadTimeout != 2*time.Second || srv.IdleTimeout != 3*time.Second || srv.WriteTimeout != 0 {
+		t.Fatalf("unexpected server limits: %+v", srv)
+	}
+}
+
+func TestSecurityHeadersCoverRouterErrors(t *testing.T) {
+	handler := NewHandler(nil, func(context.Context) error { return context.DeadlineExceeded })
+	for _, test := range []struct {
+		method, path string
+	}{
+		{http.MethodGet, "/missing"},
+		{http.MethodPost, "/v1/public/ping"},
+		{http.MethodGet, "/readyz"},
+	} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(test.method, test.path, nil))
+		for _, name := range []string{"X-Content-Type-Options", "Referrer-Policy", "Content-Security-Policy", "Cross-Origin-Resource-Policy", "Cache-Control"} {
+			if response.Header().Get(name) == "" {
+				t.Errorf("%s %s missing %s", test.method, test.path, name)
+			}
+		}
+	}
+}
+
 func TestServeWaitsForInflightRequestDuringShutdown(t *testing.T) {
 	started, release := make(chan struct{}), make(chan struct{})
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
