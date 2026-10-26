@@ -28,12 +28,15 @@
 6. 提供内部接口 `RevokeAllSessions(ctx, accountID, reason)` 与 `RevokeSession`：账号冻结/停用、员工停用、改权限、复用检测时调用；作废要同时写数据库并更新 Redis；**冻结账号后旧访问令牌立即失效**（不是等 15 分钟）。
 7. 设备记录：account_device 随登录/刷新更新 last_seen_at；会话列表返回设备标识、IP 前缀（打码）、最近使用时间，**不返回刷新令牌或其哈希**。
 8. 指标与日志：刷新成功/失败/复用检测次数（标签只用端与结果），日志不含令牌。
+9. **补齐 A-02 令牌与规范的偏差（访问令牌 aud 与 typ）**：A-02 已合并的令牌（backend/internal/iam/token.go）缺少 `aud` 声明与 `typ` 头，按《API 安全协议》3.1 补齐：①JWT 头增加 `typ: at+jwt`，验证时必须检查（缺失或不等于 at+jwt 拒绝）；②声明增加 `iss`（配置项，默认 drlife）与 `aud`（**按端区分**：buyer→`drlife:buyer`、merchant→`drlife:merchant`、driver→`drlife:driver`；后台留给 A-06：`drlife:admin`、`drlife:wms`），签发时由 end 决定，验证时**必须与请求路径所属的端一致**（/v1/buyer/* 只接受 aud=drlife:buyer；不一致返回与『签名错』相同的 401，不暴露原因），用 `jwt.WithAudience`/`WithIssuer` 之外再加路径级校验放在认证器里；③`role` 声明与 `aud` 必须相互一致（buyer↔drlife:buyer 等），不一致拒绝；④**向后兼容过渡**：已签发的旧令牌（无 aud/typ）最长 15 分钟，过渡期内（配置开关 `TOKEN_LEGACY_ACCEPT_UNTIL`，默认关闭、上线时按需开 15 分钟）可接受旧格式，之后拒绝；开关到期后相应代码路径要有测试证明已拒绝；⑤刷新接口签发的新访问令牌同样带 aud/typ/iss；会话列表接口不暴露 aud 以外的令牌内容；⑥测试：缺 typ、错 typ（如 JWT）、缺 aud、错 aud（买家令牌访问 /v1/merchant/*、/v1/driver/*）、role 与 aud 不一致、alg=none/HS384/RS256 混淆、错误 kid、过期、旧令牌过渡开关开/关两种状态；⑦不得修改 A-02 已合并的登录行为与错误码，只扩展令牌格式；README 与 openapi 的安全方案描述同步更新（bearerFormat 说明 typ/aud）。
 【验收标准】
 ① 冻结账号后其旧访问令牌立即失效（集成测试：先通过一次受保护接口，冻结，再次访问立即 401/403）
 ② 刷新令牌每次轮换；复用检测触发整链作废；宽限窗口内重试不误判
 ③ 50 并发刷新同一会话安全（无分叉、无 500）
 ④ Redis 不可用时资金/后台类路由拒绝、普通读放行；Redis 重建后与数据库一致
-⑤ 令牌、哈希不出现在日志、错误、响应（子串断言）；go vet、-race、ci-gate 全绿
+⑤ 令牌、哈希不出现在日志、错误、响应（子串断言）
+⑥ 访问令牌带 typ=at+jwt 与按端区分的 aud/iss，错端/错 typ/缺 aud/role-aud 不一致的令牌一律 401；旧格式令牌仅在过渡开关打开期间被接受
+⑦ go vet、-race、ci-gate 全绿
 【待确认（不要自己拍板，PR 里列出）】
 - 宽限窗口长度；同一账号最大并发会话数（默认 5，超出踢最旧）
 【红线】刷新令牌只存哈希；不得在客户端响应之外返回刷新令牌；不改 A-02 已合并行为（只扩展）；不为通过测试放宽 fail-closed。
