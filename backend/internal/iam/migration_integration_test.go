@@ -173,7 +173,7 @@ func TestIAMMigration(t *testing.T) {
 
 	t.Run("concurrent removals cannot leave zero active super administrators", func(t *testing.T) {
 		// Start from exactly two active supers (the earlier subtest left one).
-		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAU','Super Two','super2@example.test','hash','super','active')`); err != nil {
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAZ','Super Two','super2@example.test','hash','super','active')`); err != nil {
 			t.Fatal(err)
 		}
 		for round := 0; round < 25; round++ {
@@ -182,7 +182,7 @@ func TestIAMMigration(t *testing.T) {
 			}
 			start := make(chan struct{})
 			results := make(chan error, 2)
-			for _, id := range []string{"01ARZ3NDEKTSV4RRFFQ69G5FAT", "01ARZ3NDEKTSV4RRFFQ69G5FAU"} {
+			for _, id := range []string{"01ARZ3NDEKTSV4RRFFQ69G5FAT", "01ARZ3NDEKTSV4RRFFQ69G5FAZ"} {
 				go func(publicID string) {
 					conn, err := pgx.Connect(ctx, dsn)
 					if err != nil {
