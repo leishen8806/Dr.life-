@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/iam"
+	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 )
@@ -24,6 +27,10 @@ type MerchantResolver interface {
 	MerchantID(ctx context.Context, accountID string) (merchantID int64, found bool, err error)
 }
 
+type TelegramLogin interface {
+	Login(context.Context, iam.LoginInput) (iam.LoginResult, error)
+}
+
 // Handler 实现 gen.ServerInterface。
 // 零值 Handler 只提供 /v1/public/ping；商品接口在依赖未注入时返回 500，
 // 这样 server.NewHandler(nil) 与契约测试的既有行为保持不变。
@@ -31,10 +38,39 @@ type Handler struct {
 	Catalog   *catalog.Service
 	Merchants MerchantResolver
 	Logger    *slog.Logger
+	Login     TelegramLogin
+	ClientIP  gateway.ClientIPResolver
 }
 
 func (Handler) GetPublicPing(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, map[string]bool{"pong": true})
+}
+
+func (h Handler) PostTelegramAuth(w http.ResponseWriter, r *http.Request) {
+	if h.Login == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	var request gen.TelegramAuthRequest
+	decoder := json.NewDecoder(io.LimitReader(r.Body, telegram.MaxInitDataBytes+1024))
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&request)
+	var trailing any
+	trailingErr := decoder.Decode(&trailing)
+	if err != nil || trailingErr != io.EOF || request.InitData == "" || len(request.InitData) > telegram.MaxInitDataBytes || !telegram.End(request.End).Valid() {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return
+	}
+	device := ""
+	if request.DeviceId != nil {
+		device = *request.DeviceId
+	}
+	result, err := h.Login.Login(r.Context(), iam.LoginInput{End: telegram.End(request.End), InitData: request.InitData, DeviceID: device, IP: h.ClientIP.Resolve(r)})
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, result)
 }
 
 func (h Handler) ListPublicCategories(w http.ResponseWriter, r *http.Request, params gen.ListPublicCategoriesParams) {

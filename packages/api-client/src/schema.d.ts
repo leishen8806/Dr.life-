@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/v1/public/auth/telegram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign in with Telegram Mini App initData */
+        post: operations["postTelegramAuth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/ping": {
         parameters: {
             query?: never;
@@ -123,7 +140,7 @@ export interface components {
          * @description Documented application error code; ranges are described in the API description.
          * @enum {integer}
          */
-        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 7001;
+        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 7001;
         Messages: {
             zh: string;
             en: string;
@@ -153,6 +170,38 @@ export interface components {
             /** @enum {boolean} */
             ok: true;
             data: components["schemas"]["PingData"];
+            request_id: string;
+        };
+        TelegramAuthRequest: {
+            /** @enum {string} */
+            end: "buyer" | "merchant" | "driver";
+            init_data: string;
+            device_id?: string;
+        };
+        TelegramAccount: {
+            public_id: string;
+            /** @enum {string} */
+            role: "buyer" | "merchant" | "driver";
+            /** @enum {string|null} */
+            lang: "zh" | "en" | "km" | null;
+            /** @enum {string} */
+            status: "active" | "frozen" | "disabled";
+        };
+        TelegramAuthData: {
+            access_token: string;
+            /** Format: int64 */
+            access_expires_in: number;
+            refresh_token: string;
+            /** Format: int64 */
+            refresh_expires_in: number;
+            account: components["schemas"]["TelegramAccount"];
+            needs_language: boolean;
+            is_new_account: boolean;
+        };
+        TelegramAuthSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["TelegramAuthData"];
             request_id: string;
         };
         /** @description Trilingual text; every language must be present before a product can be published. */
@@ -290,6 +339,34 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
+        /** @description Telegram login validation failed (error code 2005). */
+        LoginFailed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Account is frozen or disabled (error code 2006). */
+        AccountBlocked: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Too many login validation failures (error code 2007). */
+        LoginTooManyAttempts: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
         /** @description Resource not found (error code 1003). */
         NotFound: {
             headers: {
@@ -408,6 +485,38 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    postTelegramAuth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramAuthRequest"];
+            };
+        };
+        responses: {
+            /** @description Login succeeded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramAuthSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["LoginFailed"];
+            403: components["responses"]["AccountBlocked"];
+            405: components["responses"]["MethodNotAllowed"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["LoginTooManyAttempts"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     getPublicPing: {
         parameters: {
             query?: never;
