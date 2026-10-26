@@ -436,7 +436,7 @@ create table audit.log (
 -- 插入触发器以事务级咨询锁串行化，覆盖调用方给出的 ts/prev_hash/hash。
 -- hash 的规范负载：原始 prev_hash 字节 || UTF-8(UTC 微秒 ts、actor_id、action、target、canonical jsonb detail，
 -- 字段间以 ASCII Unit Separator 分隔)，使用 sha256；hash 与非空 prev_hash 均为 32 字节。
--- 只给 audit_writer 的 audit.log INSERT、SELECT 权限；触发器拒绝任何角色的 UPDATE/DELETE。
+-- 只给 audit_writer 的 audit.log INSERT、SELECT 权限；触发器拒绝任何角色的 UPDATE/DELETE/TRUNCATE；`action`/`target` 不得含分隔符 chr(31)（CHECK），保证哈希负载编码无歧义。
 -- 每日把当天最后一个 hash 写入异地（防止整表被替换）；异地存储目标、留存期与凭据注入方式待董事会指定。
 ```
 
