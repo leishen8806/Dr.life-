@@ -17,9 +17,11 @@ import (
 )
 
 var (
-	bearerTokenPattern = regexp.MustCompile(`(?i)\bbearer[ \t]+[^\s,;]+`)
-	colonTokenPattern  = regexp.MustCompile(`\b[0-9]+:[[:alnum:]_-]+\b`)
-	phonePattern       = regexp.MustCompile(`\+?[0-9](?:[ ()-]*[0-9]){7,14}`)
+	bearerTokenPattern   = regexp.MustCompile(`(?i)\bbearer[ \t]+[^\s,;]+`)
+	colonTokenPattern    = regexp.MustCompile(`\b[0-9]+:[[:alnum:]_-]+\b`)
+	phonePattern         = regexp.MustCompile(`\+?[0-9](?:[ ()-]*[0-9]){7,14}`)
+	authorizationPattern = regexp.MustCompile(`(?i)\bauthorization["']?[ \t]*[:=][ \t]*(?:basic|bearer)?[ \t]*[^\s,;]+`)
+	namedTokenPattern    = regexp.MustCompile(`(?i)\b(?:init_?data|token)["']?[ \t]*[:=][ \t]*[^\s,;]+`)
 )
 
 type ErrorReporter struct {
@@ -85,33 +87,142 @@ func scrubEvent(event *sentry.Event, _ *sentry.EventHint) *sentry.Event {
 	if event == nil {
 		return nil
 	}
-	event.Extra = nil
 	event.User = sentry.User{ID: event.User.ID}
-	event.Message = scrubText(event.Message)
+	scrubStrings(&event.Message, &event.Dist, &event.Environment, &event.Platform, &event.Release, &event.ServerName, &event.Transaction, &event.Logger, &event.Type)
+	for i := range event.Fingerprint {
+		event.Fingerprint[i] = scrubText(event.Fingerprint[i])
+	}
+	scrubStringMap(event.Tags)
+	scrubStringMap(event.Modules)
+	for _, context := range event.Contexts {
+		scrubMap(context)
+	}
+	for _, breadcrumb := range event.Breadcrumbs {
+		if breadcrumb == nil {
+			continue
+		}
+		scrubStrings(&breadcrumb.Type, &breadcrumb.Category, &breadcrumb.Message)
+		scrubMap(breadcrumb.Data)
+	}
 	for i := range event.Exception {
 		event.Exception[i].Type = scrubText(event.Exception[i].Type)
 		event.Exception[i].Value = scrubText(event.Exception[i].Value)
 		event.Exception[i].Module = scrubText(event.Exception[i].Module)
+		scrubStacktrace(event.Exception[i].Stacktrace)
+		if mechanism := event.Exception[i].Mechanism; mechanism != nil {
+			scrubStrings(&mechanism.Type, &mechanism.Description, &mechanism.HelpLink, &mechanism.Source)
+			scrubMap(mechanism.Data)
+		}
+	}
+	for i := range event.Threads {
+		event.Threads[i].Name = scrubText(event.Threads[i].Name)
+		scrubStacktrace(event.Threads[i].Stacktrace)
+	}
+	for _, span := range event.Spans {
+		if span == nil {
+			continue
+		}
+		scrubStrings(&span.Name, &span.Op, &span.Description)
+		scrubStringMap(span.Tags)
+		scrubMap(span.Data)
 	}
 	if event.Request != nil {
 		event.Request.Data = ""
 		event.Request.Cookies = ""
-		for key := range event.Request.Headers {
+		for key, value := range event.Request.Headers {
 			if sensitiveName(key) {
 				delete(event.Request.Headers, key)
+				continue
 			}
+			event.Request.Headers[key] = scrubText(value)
 		}
+		scrubStringMap(event.Request.Env)
 		event.Request.QueryString = scrubQuery(event.Request.QueryString)
 		if parsed, err := url.Parse(event.Request.URL); err == nil {
 			parsed.RawQuery = scrubQuery(parsed.RawQuery)
 			parsed.Fragment = ""
+			parsed.Path = scrubText(parsed.Path)
+			parsed.RawPath = ""
+			parsed.User = nil
 			event.Request.URL = parsed.String()
+		} else {
+			event.Request.URL = ""
 		}
 	}
 	return event
 }
 
+func scrubStrings(values ...*string) {
+	for _, value := range values {
+		*value = scrubText(*value)
+	}
+}
+
+func scrubStringMap(values map[string]string) {
+	for key, value := range values {
+		if sensitiveName(key) {
+			values[key] = "[REDACTED]"
+			continue
+		}
+		values[key] = scrubText(value)
+	}
+}
+
+func scrubMap(values map[string]any) {
+	for key, value := range values {
+		if sensitiveName(key) {
+			values[key] = "[REDACTED]"
+			continue
+		}
+		values[key] = scrubValue(value)
+	}
+}
+
+func scrubValue(value any) any {
+	switch value := value.(type) {
+	case string:
+		return scrubText(value)
+	case map[string]any:
+		scrubMap(value)
+		return value
+	case map[string]string:
+		scrubStringMap(value)
+		return value
+	case []any:
+		for i := range value {
+			value[i] = scrubValue(value[i])
+		}
+		return value
+	case []string:
+		for i := range value {
+			value[i] = scrubText(value[i])
+		}
+		return value
+	default:
+		return value
+	}
+}
+
+func scrubStacktrace(stacktrace *sentry.Stacktrace) {
+	if stacktrace == nil {
+		return
+	}
+	for i := range stacktrace.Frames {
+		frame := &stacktrace.Frames[i]
+		scrubStrings(&frame.Function, &frame.Symbol, &frame.Module, &frame.Filename, &frame.AbsPath, &frame.ContextLine, &frame.Package, &frame.InstructionAddr, &frame.AddrMode, &frame.SymbolAddr, &frame.ImageAddr, &frame.Platform)
+		for j := range frame.PreContext {
+			frame.PreContext[j] = scrubText(frame.PreContext[j])
+		}
+		for j := range frame.PostContext {
+			frame.PostContext[j] = scrubText(frame.PostContext[j])
+		}
+		scrubMap(frame.Vars)
+	}
+}
+
 func scrubText(value string) string {
+	value = authorizationPattern.ReplaceAllString(value, "[REDACTED]")
+	value = namedTokenPattern.ReplaceAllString(value, "[REDACTED]")
 	value = bearerTokenPattern.ReplaceAllString(value, "[REDACTED]")
 	value = colonTokenPattern.ReplaceAllString(value, "[REDACTED]")
 	return phonePattern.ReplaceAllString(value, "[REDACTED]")
@@ -125,6 +236,10 @@ func scrubQuery(raw string) string {
 	for key := range values {
 		if sensitiveName(key) {
 			values.Del(key)
+			continue
+		}
+		for i, value := range values[key] {
+			values[key][i] = scrubText(value)
 		}
 	}
 	return values.Encode()

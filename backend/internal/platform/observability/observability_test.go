@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -212,8 +214,7 @@ func TestSentryDisabledWithoutDSNAndScrubsEvent(t *testing.T) {
 		Exception: []sentry.Exception{{
 			Type: "Bearer type-secret", Value: "phone 0123456789 token 999:AlphaNum_1", Module: "Bearer module-secret",
 		}},
-		User:  sentry.User{ID: "public-1", Email: "person@example.test", IPAddress: "203.0.113.10", Name: "Person", Data: map[string]string{"phone": "0123456789"}},
-		Extra: map[string]any{"phone": "0123456789"},
+		User: sentry.User{ID: "public-1", Email: "person@example.test", IPAddress: "203.0.113.10", Name: "Person", Data: map[string]string{"phone": "0123456789"}},
 		Request: &sentry.Request{
 			URL: "https://api.example.test/path?init_data=secret&safe=yes", QueryString: "token=secret&phone=0123456789&safe=yes", Data: "request-secret", Cookies: "session=secret",
 			Headers: map[string]string{"Authorization": "Bearer secret", "Cookie": "session=secret", "Idempotency-Key": "idem-secret", "X-Safe": "visible"},
@@ -226,8 +227,50 @@ func TestSentryDisabledWithoutDSNAndScrubsEvent(t *testing.T) {
 			t.Fatalf("event leaked %q: %#v", value, event)
 		}
 	}
-	if event.User.ID != "public-1" || event.Request.Headers["X-Safe"] != "visible" || event.Request.QueryString != "safe=yes" || event.Extra != nil || !strings.Contains(event.Message, "[REDACTED]") || !strings.Contains(event.Exception[0].Value, "[REDACTED]") {
+	if event.User.ID != "public-1" || event.Request.Headers["X-Safe"] != "visible" || event.Request.QueryString != "safe=yes" || !strings.Contains(event.Message, "[REDACTED]") || !strings.Contains(event.Exception[0].Value, "[REDACTED]") {
 		t.Fatalf("unexpected scrubbed event: %#v", event)
+	}
+}
+
+func TestSentryScrubsAllFreeTextContainers(t *testing.T) {
+	transport := &fakeTransport{}
+	reporter, err := NewErrorReporter("https://public@example.invalid/1", "test", "release", transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets := []string{"+855 12 345 678", "Bearer bearer-secret", "123456:BotSecret", "telegram-init-secret", "opaque-auth-secret"}
+	reporter.hub.CaptureEvent(&sentry.Event{
+		Message:     strings.Join(secrets[:3], " ") + " init_data=" + secrets[3] + " Authorization: Basic " + secrets[4],
+		Fingerprint: []string{secrets[0]},
+		Tags:        map[string]string{"authorization": secrets[1], "safe": secrets[2]},
+		Contexts: map[string]sentry.Context{
+			"request": {"init_data": secrets[3], "nested": []any{secrets[0], map[string]any{"token": secrets[2]}}},
+		},
+		Breadcrumbs: []*sentry.Breadcrumb{{
+			Type: secrets[0], Category: secrets[1], Message: secrets[2],
+			Data: map[string]any{"init_data": secrets[3], "phone": secrets[0]},
+		}},
+		Exception: []sentry.Exception{{
+			Type: secrets[1], Value: secrets[0], Module: secrets[2],
+			Stacktrace: &sentry.Stacktrace{Frames: []sentry.Frame{{ContextLine: secrets[1], Vars: map[string]any{"init_data": secrets[3]}}}},
+			Mechanism:  &sentry.Mechanism{Type: "test", Description: secrets[0], Data: map[string]any{"authorization": secrets[1]}},
+		}},
+		Request: &sentry.Request{
+			URL:         "https://api.example.test/" + secrets[2] + "?init_data=" + secrets[3] + "&safe=" + url.QueryEscape(secrets[0]),
+			QueryString: "init_data=" + secrets[3] + "&safe=" + url.QueryEscape(secrets[1]),
+			Headers:     map[string]string{"Authorization": secrets[1], "X-Debug": secrets[2]},
+			Env:         map[string]string{"init_data": secrets[3], "SAFE": secrets[0]},
+		},
+	})
+	event := transport.last(t)
+	serialized := fmt.Sprintf("%#v", event)
+	for _, secret := range secrets {
+		if strings.Contains(serialized, secret) {
+			t.Fatalf("event leaked %q: %s", secret, serialized)
+		}
+	}
+	if event.Contexts["request"]["init_data"] != "[REDACTED]" || event.Tags["authorization"] != "[REDACTED]" || event.Breadcrumbs[0].Data["init_data"] != "[REDACTED]" {
+		t.Fatalf("sensitive containers were not redacted: %#v", event)
 	}
 }
 
