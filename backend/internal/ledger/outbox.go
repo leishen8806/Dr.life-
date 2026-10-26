@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -19,6 +20,21 @@ type OutboxBatch struct {
 	tx     pgx.Tx
 	events []OutboxEvent
 	done   bool
+}
+
+// OldestUnsentOutboxAge returns zero when every committed event was sent.
+func (s *Service) OldestUnsentOutboxAge(ctx context.Context) (time.Duration, error) {
+	var ageNanoseconds int64
+	if err := s.db.QueryRow(ctx, `
+		SELECT COALESCE(GREATEST(
+			EXTRACT(EPOCH FROM now() - MIN(created_at)) * 1000000000,
+			0
+		), 0)::bigint
+		FROM ledger.outbox
+		WHERE sent_at IS NULL`).Scan(&ageNanoseconds); err != nil {
+		return 0, err
+	}
+	return time.Duration(ageNanoseconds), nil
 }
 
 func (s *Service) ClaimOutbox(ctx context.Context, limit int) (*OutboxBatch, error) {
