@@ -32,6 +32,8 @@ type Config struct {
 	DBSlowQuery                    time.Duration
 	SentryDSN                      string
 	RedisURL                       string
+	QueueRedisURL                  string
+	QueueAllowEviction             bool
 	CORSBuyerOrigins               []string
 	CORSMerchantOrigins            []string
 	CORSDriverOrigins              []string
@@ -409,6 +411,15 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		}
 	}
 
+	queueAllowEviction := false
+	if raw := strings.TrimSpace(getenv("QUEUE_ALLOW_EVICTION")); raw != "" {
+		var err error
+		queueAllowEviction, err = strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("QUEUE_ALLOW_EVICTION must be true or false")
+		}
+	}
+
 	return Config{
 		HTTPAddr:               httpAddr,
 		MetricsAddr:            metricsAddr,
@@ -429,6 +440,8 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		DBSlowQuery:            time.Duration(dbSlowQueryMS) * time.Millisecond,
 		SentryDSN:              strings.TrimSpace(getenv("SENTRY_DSN")),
 		RedisURL:               strings.TrimSpace(getenv("REDIS_URL")),
+		QueueRedisURL:          strings.TrimSpace(getenv("QUEUE_REDIS_URL")),
+		QueueAllowEviction:     queueAllowEviction,
 		CORSBuyerOrigins:       cors["CORS_BUYER_ORIGINS"],
 		CORSMerchantOrigins:    cors["CORS_MERCHANT_ORIGINS"],
 		CORSDriverOrigins:      cors["CORS_DRIVER_ORIGINS"],
