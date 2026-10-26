@@ -47,6 +47,12 @@ func NewAccountLinkService(repo AccountLinkRepository, newID func() (string, err
 	return &AccountLinkService{repo: repo, newID: newID}
 }
 
+// CandidateBuyers returns only the IAM-filtered buyer account identifiers for a merchant account.
+// It intentionally delegates matching to the repository so no other module reads iam tables directly.
+func (s *AccountLinkService) CandidateBuyers(ctx context.Context, merchantAccountID string) ([]AccountLinkCandidate, error) {
+	return s.repo.CandidateBuyers(ctx, merchantAccountID)
+}
+
 func (s *AccountLinkService) Link(ctx context.Context, actorAccountID, buyerAccountID string) (AccountLink, error) {
 	owner, err := s.repo.IsActiveMerchantOwner(ctx, actorAccountID)
 	if err != nil {

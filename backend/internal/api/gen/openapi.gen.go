@@ -13,6 +13,66 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for AccountLinkCandidateListSuccessResponseOk.
+const (
+	AccountLinkCandidateListSuccessResponseOkTrue AccountLinkCandidateListSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the AccountLinkCandidateListSuccessResponseOk enum.
+func (e AccountLinkCandidateListSuccessResponseOk) Valid() bool {
+	switch e {
+	case AccountLinkCandidateListSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountLinkDeletedDataUnlinked.
+const (
+	AccountLinkDeletedDataUnlinkedTrue AccountLinkDeletedDataUnlinked = true
+)
+
+// Valid indicates whether the value is a known member of the AccountLinkDeletedDataUnlinked enum.
+func (e AccountLinkDeletedDataUnlinked) Valid() bool {
+	switch e {
+	case AccountLinkDeletedDataUnlinkedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountLinkDeletedSuccessResponseOk.
+const (
+	AccountLinkDeletedSuccessResponseOkTrue AccountLinkDeletedSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the AccountLinkDeletedSuccessResponseOk enum.
+func (e AccountLinkDeletedSuccessResponseOk) Valid() bool {
+	switch e {
+	case AccountLinkDeletedSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AccountLinkSuccessResponseOk.
+const (
+	AccountLinkSuccessResponseOkTrue AccountLinkSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the AccountLinkSuccessResponseOk enum.
+func (e AccountLinkSuccessResponseOk) Valid() bool {
+	switch e {
+	case AccountLinkSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ActionDataRevoked.
 const (
 	ActionDataRevokedTrue ActionDataRevoked = true
@@ -568,6 +628,67 @@ func (e ListMerchantProductsParamsStatus) Valid() bool {
 	}
 }
 
+// AccountLink defines model for AccountLink.
+type AccountLink struct {
+	BuyerAccountId string `json:"buyer_account_id"`
+	PublicId       string `json:"public_id"`
+}
+
+// AccountLinkCandidate defines model for AccountLinkCandidate.
+type AccountLinkCandidate struct {
+	// PublicId Canonical public identifier of the eligible buyer account.
+	PublicId string `json:"public_id"`
+}
+
+// AccountLinkCandidateListData defines model for AccountLinkCandidateListData.
+type AccountLinkCandidateListData struct {
+	Items []AccountLinkCandidate `json:"items"`
+}
+
+// AccountLinkCandidateListSuccessResponse defines model for AccountLinkCandidateListSuccessResponse.
+type AccountLinkCandidateListSuccessResponse struct {
+	Data      AccountLinkCandidateListData              `json:"data"`
+	Ok        AccountLinkCandidateListSuccessResponseOk `json:"ok"`
+	RequestId string                                    `json:"request_id"`
+}
+
+// AccountLinkCandidateListSuccessResponseOk defines model for AccountLinkCandidateListSuccessResponse.Ok.
+type AccountLinkCandidateListSuccessResponseOk bool
+
+// AccountLinkCreateRequest defines model for AccountLinkCreateRequest.
+type AccountLinkCreateRequest struct {
+	// BuyerAccountId Canonical public identifier returned by the candidate endpoint.
+	BuyerAccountId string `json:"buyer_account_id"`
+}
+
+// AccountLinkDeletedData defines model for AccountLinkDeletedData.
+type AccountLinkDeletedData struct {
+	Unlinked AccountLinkDeletedDataUnlinked `json:"unlinked"`
+}
+
+// AccountLinkDeletedDataUnlinked defines model for AccountLinkDeletedData.Unlinked.
+type AccountLinkDeletedDataUnlinked bool
+
+// AccountLinkDeletedSuccessResponse defines model for AccountLinkDeletedSuccessResponse.
+type AccountLinkDeletedSuccessResponse struct {
+	Data      AccountLinkDeletedData              `json:"data"`
+	Ok        AccountLinkDeletedSuccessResponseOk `json:"ok"`
+	RequestId string                              `json:"request_id"`
+}
+
+// AccountLinkDeletedSuccessResponseOk defines model for AccountLinkDeletedSuccessResponse.Ok.
+type AccountLinkDeletedSuccessResponseOk bool
+
+// AccountLinkSuccessResponse defines model for AccountLinkSuccessResponse.
+type AccountLinkSuccessResponse struct {
+	Data      AccountLink                  `json:"data"`
+	Ok        AccountLinkSuccessResponseOk `json:"ok"`
+	RequestId string                       `json:"request_id"`
+}
+
+// AccountLinkSuccessResponseOk defines model for AccountLinkSuccessResponse.Ok.
+type AccountLinkSuccessResponseOk bool
+
 // ActionData defines model for ActionData.
 type ActionData struct {
 	Revoked ActionDataRevoked `json:"revoked"`
@@ -931,6 +1052,9 @@ type TelegramAuthSuccessResponse struct {
 // TelegramAuthSuccessResponseOk defines model for TelegramAuthSuccessResponse.Ok.
 type TelegramAuthSuccessResponseOk bool
 
+// AccountLinkID defines model for AccountLinkID.
+type AccountLinkID = string
+
 // CategoryCode defines model for CategoryCode.
 type CategoryCode = string
 
@@ -1061,6 +1185,18 @@ type PostMerchantAuthLogoutParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// CreateMerchantMeLinkParams defines parameters for CreateMerchantMeLink.
+type CreateMerchantMeLinkParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// DeleteMerchantMeLinkParams defines parameters for DeleteMerchantMeLink.
+type DeleteMerchantMeLinkParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // DeleteMerchantMeSessionParams defines parameters for DeleteMerchantMeSession.
 type DeleteMerchantMeSessionParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
@@ -1130,6 +1266,9 @@ type ListPublicProductsParams struct {
 	Category *CategoryCode `form:"category,omitempty" json:"category,omitempty"`
 }
 
+// CreateMerchantMeLinkJSONRequestBody defines body for CreateMerchantMeLink for application/json ContentType.
+type CreateMerchantMeLinkJSONRequestBody = AccountLinkCreateRequest
+
 // CreateMerchantProductJSONRequestBody defines body for CreateMerchantProduct for application/json ContentType.
 type CreateMerchantProductJSONRequestBody = ProductCreateRequest
 
@@ -1168,6 +1307,15 @@ type ServerInterface interface {
 	// PostMerchantAuthLogout Revoke the current merchant session
 	// (POST /v1/merchant/auth/logout)
 	PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, params PostMerchantAuthLogoutParams)
+	// GetMerchantMeLinkCandidates List buyer accounts that may be linked to the authenticated merchant account
+	// (GET /v1/merchant/me/link-candidates)
+	GetMerchantMeLinkCandidates(w http.ResponseWriter, r *http.Request)
+	// CreateMerchantMeLink Link the authenticated merchant owner to one eligible buyer account
+	// (POST /v1/merchant/me/links)
+	CreateMerchantMeLink(w http.ResponseWriter, r *http.Request, params CreateMerchantMeLinkParams)
+	// DeleteMerchantMeLink Unlink one account link owned by the authenticated merchant owner
+	// (DELETE /v1/merchant/me/links/{id})
+	DeleteMerchantMeLink(w http.ResponseWriter, r *http.Request, id AccountLinkID, params DeleteMerchantMeLinkParams)
 	// GetMerchantMeSessions List the current merchant account sessions
 	// (GET /v1/merchant/me/sessions)
 	GetMerchantMeSessions(w http.ResponseWriter, r *http.Request)
@@ -1255,6 +1403,24 @@ func (_ Unimplemented) DeleteDriverMeSession(w http.ResponseWriter, r *http.Requ
 // PostMerchantAuthLogout Revoke the current merchant session
 // (POST /v1/merchant/auth/logout)
 func (_ Unimplemented) PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, params PostMerchantAuthLogoutParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetMerchantMeLinkCandidates List buyer accounts that may be linked to the authenticated merchant account
+// (GET /v1/merchant/me/link-candidates)
+func (_ Unimplemented) GetMerchantMeLinkCandidates(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateMerchantMeLink Link the authenticated merchant owner to one eligible buyer account
+// (POST /v1/merchant/me/links)
+func (_ Unimplemented) CreateMerchantMeLink(w http.ResponseWriter, r *http.Request, params CreateMerchantMeLinkParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteMerchantMeLink Unlink one account link owned by the authenticated merchant owner
+// (DELETE /v1/merchant/me/links/{id})
+func (_ Unimplemented) DeleteMerchantMeLink(w http.ResponseWriter, r *http.Request, id AccountLinkID, params DeleteMerchantMeLinkParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1712,6 +1878,119 @@ func (siw *ServerInterfaceWrapper) PostMerchantAuthLogout(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostMerchantAuthLogout(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMerchantMeLinkCandidates operation middleware
+func (siw *ServerInterfaceWrapper) GetMerchantMeLinkCandidates(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMerchantMeLinkCandidates(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMerchantMeLink operation middleware
+func (siw *ServerInterfaceWrapper) CreateMerchantMeLink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateMerchantMeLinkParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMerchantMeLink(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMerchantMeLink operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMerchantMeLink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id AccountLinkID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteMerchantMeLinkParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMerchantMeLink(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2370,6 +2649,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/public/products", wrapper.ListPublicProducts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/me/link-candidates", wrapper.GetMerchantMeLinkCandidates)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/merchant/me/links", wrapper.CreateMerchantMeLink)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/merchant/me/links/{id}", wrapper.DeleteMerchantMeLink)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/merchant/products", wrapper.ListMerchantProducts)

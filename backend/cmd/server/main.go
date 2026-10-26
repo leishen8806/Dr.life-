@@ -18,6 +18,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/overload"
@@ -145,6 +146,7 @@ func main() {
 	}
 	var loginService *iam.Service
 	var sessionService *iam.SessionService
+	var accountLinkService *iam.AccountLinkService
 	var authenticator gateway.Authenticator
 	checks := []server.ReadinessCheck{database.Ping}
 	if auditReadiness != nil {
@@ -192,6 +194,7 @@ func main() {
 		checker := iam.DBSessionChecker{DB: iamDatabase, Cache: sessionCache, IdleTTL: cfg.SessionIdleTTL}
 		tokens := iam.TokenManager{Keys: jwtKeys, AccessTTL: cfg.AccessTokenTTL, Issuer: cfg.TokenIssuer, LegacyAcceptUntil: cfg.TokenLegacyAcceptUntil, Checker: checker}
 		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}}
+		accountLinkService = iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: iamDatabase}, ids.NewULID)
 		loginService = &iam.Service{
 			DB:       iamDatabase,
 			Verifier: telegram.PoolVerifier{Validator: telegram.NewValidator(cfg.TelegramInitDataMaxAge), Source: &telegram.DBPoolSource{DB: iamDatabase, Envelope: envelope, TTL: cfg.BotTokenCacheTTL}},
@@ -239,6 +242,7 @@ func main() {
 		Login:         loginService,
 		Audit:         auditStore,
 		Sessions:      sessionService,
+		AccountLinks:  accountLinkService,
 		Bulkhead:      bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)

@@ -35,6 +35,19 @@ func TestAccountLinkServiceOwnerOnlyAndImmutableBusinessData(t *testing.T) {
 	}
 }
 
+func TestAccountLinkServiceCandidateBuyersUsesIAMRepository(t *testing.T) {
+	repo := &fakeAccountLinkRepository{candidates: map[string][]AccountLinkCandidate{"merchant": {{AccountID: "buyer"}}}}
+	service := NewAccountLinkService(repo, func() (string, error) { return "unused", nil })
+
+	candidates, err := service.CandidateBuyers(context.Background(), "merchant")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(candidates) != 1 || candidates[0].AccountID != "buyer" {
+		t.Fatalf("candidates=%+v", candidates)
+	}
+}
+
 type fakeAccountLinkRepository struct {
 	owners     map[string]bool
 	candidates map[string][]AccountLinkCandidate
