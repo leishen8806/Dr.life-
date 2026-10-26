@@ -38,17 +38,26 @@ type SessionManagement interface {
 	RevokeSession(context.Context, string, string, string) error
 }
 
+// AccountLinkManagement is the HTTP-facing IAM port for the merchant account-link flow.
+// It deliberately exposes candidate public IDs only; matching people and owner authorization stay in IAM.
+type AccountLinkManagement interface {
+	CandidateBuyers(context.Context, string) ([]iam.AccountLinkCandidate, error)
+	Link(context.Context, string, string) (iam.AccountLink, error)
+	Unlink(context.Context, string, string) error
+}
+
 // Handler 实现 gen.ServerInterface。
 // 零值 Handler 只提供 /v1/public/ping；商品接口在依赖未注入时返回 500，
 // 这样 server.NewHandler(nil) 与契约测试的既有行为保持不变。
 type Handler struct {
-	Catalog   *catalog.Service
-	Merchants MerchantResolver
-	Logger    *slog.Logger
-	Login     TelegramLogin
-	Sessions  SessionManagement
-	ClientIP  gateway.ClientIPResolver
-	Audit     *platformaudit.Store
+	Catalog      *catalog.Service
+	Merchants    MerchantResolver
+	Logger       *slog.Logger
+	Login        TelegramLogin
+	Sessions     SessionManagement
+	AccountLinks AccountLinkManagement
+	ClientIP     gateway.ClientIPResolver
+	Audit        *platformaudit.Store
 }
 
 func (Handler) GetPublicPing(w http.ResponseWriter, r *http.Request) {
@@ -175,6 +184,55 @@ func (h Handler) DeleteMerchantMeSession(w http.ResponseWriter, r *http.Request,
 }
 func (h Handler) DeleteDriverMeSession(w http.ResponseWriter, r *http.Request, id gen.SessionID, _ gen.DeleteDriverMeSessionParams) {
 	h.deleteSession(w, r, string(id))
+}
+
+func (h Handler) GetMerchantMeLinkCandidates(w http.ResponseWriter, r *http.Request) {
+	links, accountID, ok := h.accountLinks(w, r)
+	if !ok {
+		return
+	}
+	candidates, err := links.CandidateBuyers(r.Context(), accountID)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	items := make([]gen.AccountLinkCandidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		items = append(items, gen.AccountLinkCandidate{PublicId: candidate.AccountID})
+	}
+	httpx.WriteOK(w, r, gen.AccountLinkCandidateListData{Items: items})
+}
+
+func (h Handler) CreateMerchantMeLink(w http.ResponseWriter, r *http.Request, _ gen.CreateMerchantMeLinkParams) {
+	links, accountID, ok := h.accountLinks(w, r)
+	if !ok {
+		return
+	}
+	body, ok := decodeJSON[gen.CreateMerchantMeLinkJSONRequestBody](w, r)
+	if !ok || body.BuyerAccountId == "" {
+		if ok {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	link, err := links.Link(r.Context(), accountID, body.BuyerAccountId)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, gen.AccountLink{PublicId: link.PublicID, BuyerAccountId: link.BuyerAccountID})
+}
+
+func (h Handler) DeleteMerchantMeLink(w http.ResponseWriter, r *http.Request, id gen.AccountLinkID, _ gen.DeleteMerchantMeLinkParams) {
+	links, accountID, ok := h.accountLinks(w, r)
+	if !ok {
+		return
+	}
+	if err := links.Unlink(r.Context(), accountID, publicIDFromPath(id)); err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, gen.AccountLinkDeletedData{Unlinked: gen.AccountLinkDeletedDataUnlinkedTrue})
 }
 
 func (h Handler) logout(w http.ResponseWriter, r *http.Request) {
@@ -362,6 +420,19 @@ func (h Handler) catalogService(w http.ResponseWriter, r *http.Request) (*catalo
 	return h.Catalog, true
 }
 
+func (h Handler) accountLinks(w http.ResponseWriter, r *http.Request) (AccountLinkManagement, string, bool) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok || identity.AccountID == "" {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return nil, "", false
+	}
+	if h.AccountLinks == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return nil, "", false
+	}
+	return h.AccountLinks, identity.AccountID, true
+}
+
 // merchantID 解析当前登录商户；身份由网关注入，未登录或角色不符在网关层已拦截。
 func (h Handler) merchantID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 	identity, ok := gateway.IdentityFromContext(r.Context())
@@ -386,11 +457,17 @@ func (h Handler) merchantID(w http.ResponseWriter, r *http.Request) (int64, bool
 	return merchantID, true
 }
 
-// writeError 把领域错误映射为 1002/1003/2001/2002/5001；未识别错误按内部错误处理并记录日志。
+// writeError maps domain errors to public error codes without exposing internal details.
 func (h Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	code := httpx.CodeInternalError
 	var invalid *catalog.ValidationError
 	switch {
+	case errors.Is(err, iam.ErrAccountLinkNotFound):
+		code = httpx.CodeResourceNotFound
+	case errors.Is(err, iam.ErrAccountLinkForbidden):
+		code = httpx.CodePermissionDenied
+	case errors.Is(err, iam.ErrAccountLinkExists):
+		code = httpx.CodeAlreadyProcessed
 	case errors.Is(err, catalog.ErrNotFound):
 		code = httpx.CodeResourceNotFound
 	case errors.Is(err, catalog.ErrForbidden), errors.Is(err, catalog.ErrMerchantUnknown):
@@ -399,7 +476,7 @@ func (h Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 		code = httpx.CodeInvalidArgument
 	}
 	if code == httpx.CodeInternalError && h.Logger != nil {
-		h.Logger.ErrorContext(r.Context(), "catalog request failed", "error", err, "request_id", httpx.RequestIDFromContext(r.Context()))
+		h.Logger.ErrorContext(r.Context(), "api request failed", "error", err, "request_id", httpx.RequestIDFromContext(r.Context()))
 	}
 	httpx.WriteError(w, r, httpx.NewAppError(code))
 }

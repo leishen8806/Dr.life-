@@ -24,6 +24,30 @@ type fakeLogin struct {
 	err    error
 }
 
+type fakeAccountLinks struct {
+	candidates []iam.AccountLinkCandidate
+	link       iam.AccountLink
+	err        error
+	actor      string
+	buyer      string
+	linkID     string
+}
+
+func (f *fakeAccountLinks) CandidateBuyers(_ context.Context, actor string) ([]iam.AccountLinkCandidate, error) {
+	f.actor = actor
+	return f.candidates, f.err
+}
+
+func (f *fakeAccountLinks) Link(_ context.Context, actor, buyer string) (iam.AccountLink, error) {
+	f.actor, f.buyer = actor, buyer
+	return f.link, f.err
+}
+
+func (f *fakeAccountLinks) Unlink(_ context.Context, actor, linkID string) error {
+	f.actor, f.linkID = actor, linkID
+	return f.err
+}
+
 func (f *fakeLogin) Login(_ context.Context, input iam.LoginInput) (iam.LoginResult, error) {
 	f.input = input
 	return f.result, f.err
@@ -176,6 +200,16 @@ func catalogHandler(store catalog.Store, directory stubDirectory, auth gateway.A
 	})
 }
 
+func accountLinkHandler(links api.AccountLinkManagement, auth gateway.Authenticator) http.Handler {
+	return server.NewHandlerWithGateway(nil, server.GatewayOptions{
+		Limiter:       gateway.NewMemoryLimiter(),
+		IPRules:       permissiveRules(),
+		AccountRules:  permissiveRules(),
+		Authenticator: auth,
+		AccountLinks:  links,
+	})
+}
+
 func activeDirectory() stubDirectory {
 	return stubDirectory{
 		sellable: []int64{merchantID},
@@ -317,6 +351,102 @@ func TestMerchantProductReportsNotFound(t *testing.T) {
 	}
 	if code := decodeErrorCode(t, recorder); code != 1003 {
 		t.Fatalf("code = %d, want 1003", code)
+	}
+}
+
+// 验收：候选账号只从 IAM 服务取回 public_id，HTTP 层绝不返回 Telegram 编号或其他个人资料。
+func TestMerchantAccountLinkCandidatesExposeOnlyBuyerPublicID(t *testing.T) {
+	links := &fakeAccountLinks{candidates: []iam.AccountLinkCandidate{{AccountID: otherULID}}}
+	handler := accountLinkHandler(links, merchantAuth())
+
+	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/merchant/me/link-candidates", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if links.actor != accountID {
+		t.Fatalf("candidate actor = %q, want current account %q", links.actor, accountID)
+	}
+	var body struct {
+		Data struct {
+			Items []struct {
+				PublicID string `json:"public_id"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.Data.Items) != 1 || body.Data.Items[0].PublicID != otherULID {
+		t.Fatalf("candidates = %+v", body.Data.Items)
+	}
+	if strings.Contains(recorder.Body.String(), "telegram") || strings.Contains(recorder.Body.String(), "phone") {
+		t.Fatalf("candidate response leaked personal data: %s", recorder.Body.String())
+	}
+}
+
+// 验收：关联和解除永远以网关注入的当前商家账号为主体，不能由请求体冒充其他账号。
+func TestMerchantAccountLinksUseCurrentIdentity(t *testing.T) {
+	links := &fakeAccountLinks{link: iam.AccountLink{PublicID: merchantULID, BuyerAccountID: otherULID, MerchantAccountID: accountID}}
+	handler := accountLinkHandler(links, merchantAuth())
+
+	create := httptest.NewRequest(http.MethodPost, "/v1/merchant/me/links", strings.NewReader(`{"buyer_account_id":"`+otherULID+`"}`))
+	create.Header.Set("Content-Type", "application/json")
+	create.Header.Set("Idempotency-Key", "account-link-create-1")
+	recorder := serve(t, handler, create)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("create status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if links.actor != accountID || links.buyer != otherULID {
+		t.Fatalf("link input = actor=%q buyer=%q", links.actor, links.buyer)
+	}
+
+	remove := httptest.NewRequest(http.MethodDelete, "/v1/merchant/me/links/"+strings.ToLower(merchantULID), nil)
+	remove.Header.Set("Content-Type", "application/json")
+	remove.Header.Set("Idempotency-Key", "account-link-delete-1")
+	recorder = serve(t, handler, remove)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("delete status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if links.actor != accountID || links.linkID != merchantULID {
+		t.Fatalf("unlink input = actor=%q link_id=%q", links.actor, links.linkID)
+	}
+}
+
+// 验收：买家不能使用商家账号关联路径；该规则必须由网关而不是客户端按钮保证。
+func TestMerchantAccountLinksRejectBuyerRole(t *testing.T) {
+	links := &fakeAccountLinks{}
+	auth := stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}
+	handler := accountLinkHandler(links, auth)
+
+	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/merchant/me/link-candidates", nil))
+	if recorder.Code != http.StatusForbidden || decodeErrorCode(t, recorder) != 2002 {
+		t.Fatalf("candidate status/body = %d/%s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestMerchantAccountLinkDomainErrorsAreSafeHTTPResponses(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		err    error
+		method string
+		path   string
+		body   string
+		want   int
+	}{
+		{name: "link forbidden", err: iam.ErrAccountLinkForbidden, method: http.MethodPost, path: "/v1/merchant/me/links", body: `{"buyer_account_id":"` + otherULID + `"}`, want: http.StatusForbidden},
+		{name: "link exists", err: iam.ErrAccountLinkExists, method: http.MethodPost, path: "/v1/merchant/me/links", body: `{"buyer_account_id":"` + otherULID + `"}`, want: http.StatusConflict},
+		{name: "link absent", err: iam.ErrAccountLinkNotFound, method: http.MethodDelete, path: "/v1/merchant/me/links/" + strings.ToLower(merchantULID), want: http.StatusNotFound},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			handler := accountLinkHandler(&fakeAccountLinks{err: test.err}, merchantAuth())
+			request := httptest.NewRequest(test.method, test.path, strings.NewReader(test.body))
+			request.Header.Set("Idempotency-Key", "account-link-error-1")
+			request.Header.Set("Content-Type", "application/json")
+			recorder := serve(t, handler, request)
+			if recorder.Code != test.want {
+				t.Fatalf("status = %d, want %d; body=%s", recorder.Code, test.want, recorder.Body.String())
+			}
+		})
 	}
 }
 

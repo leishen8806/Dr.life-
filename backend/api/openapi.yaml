@@ -339,6 +339,76 @@ paths:
           $ref: "#/components/responses/InternalServerError"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /v1/merchant/me/link-candidates:
+    get:
+      tags: [merchant]
+      operationId: getMerchantMeLinkCandidates
+      summary: List buyer accounts that may be linked to the authenticated merchant account
+      description: Returns public account identifiers only. The server matches candidates by the same Telegram person and does not disclose personal data.
+      x-roles: [merchant]
+      responses:
+        "200":
+          description: Buyer account candidates for the current merchant account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountLinkCandidateListSuccessResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/merchant/me/links:
+    post:
+      tags: [merchant]
+      operationId: createMerchantMeLink
+      summary: Link the authenticated merchant owner to one eligible buyer account
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountLinkCreateRequest"
+      responses:
+        "200":
+          description: The accounts were linked. This does not merge funds, orders, or permissions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountLinkSuccessResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/merchant/me/links/{id}:
+    parameters:
+      - $ref: "#/components/parameters/AccountLinkID"
+    delete:
+      tags: [merchant]
+      operationId: deleteMerchantMeLink
+      summary: Unlink one account link owned by the authenticated merchant owner
+      x-roles: [merchant]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: The link was marked unlinked; no business data is deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountLinkDeletedSuccessResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /v1/merchant/products:
     get:
       tags: [merchant]
@@ -569,6 +639,14 @@ components:
       in: path
       required: true
       description: Lowercase ULID of a session owned by the authenticated account.
+      schema:
+        type: string
+        pattern: "^[0-9a-hjkmnp-tv-z]{26}$"
+    AccountLinkID:
+      name: id
+      in: path
+      required: true
+      description: Lowercase ULID of an account link owned by the authenticated merchant owner.
       schema:
         type: string
         pattern: "^[0-9a-hjkmnp-tv-z]{26}$"
@@ -839,6 +917,73 @@ components:
       properties:
         ok: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/ActionData" }
+        request_id: { type: string, minLength: 1 }
+    AccountLinkCandidate:
+      type: object
+      additionalProperties: false
+      required: [public_id]
+      properties:
+        public_id:
+          type: string
+          description: Canonical public identifier of the eligible buyer account.
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+    AccountLinkCandidateListData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AccountLinkCandidate" }
+    AccountLinkCandidateListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AccountLinkCandidateListData" }
+        request_id: { type: string, minLength: 1 }
+    AccountLinkCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [buyer_account_id]
+      properties:
+        buyer_account_id:
+          type: string
+          description: Canonical public identifier returned by the candidate endpoint.
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+    AccountLink:
+      type: object
+      additionalProperties: false
+      required: [public_id, buyer_account_id]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        buyer_account_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+    AccountLinkSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AccountLink" }
+        request_id: { type: string, minLength: 1 }
+    AccountLinkDeletedData:
+      type: object
+      additionalProperties: false
+      required: [unlinked]
+      properties:
+        unlinked: { type: boolean, enum: [true] }
+    AccountLinkDeletedSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AccountLinkDeletedData" }
         request_id: { type: string, minLength: 1 }
     LocalizedText:
       type: object
