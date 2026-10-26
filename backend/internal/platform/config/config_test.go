@@ -39,6 +39,68 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if cfg.RequestBodyMaxBytes != 64<<10 || cfg.WebhookMaxBodyBytes != 64<<10 || cfg.IdempotencyTTL != 24*time.Hour || cfg.IdempotencyMaxBytes != 64<<10 || len(cfg.FinancialPrefixes) != 4 {
 		t.Fatalf("unexpected security defaults: %+v", cfg)
 	}
+	if cfg.BulkheadTotal != 512 || cfg.BulkheadWait != 100*time.Millisecond || cfg.BulkheadDrain != 5*time.Second || cfg.BulkheadLimits["critical"] != 512 || cfg.BulkheadLimits["heavy"] != 32 {
+		t.Fatalf("unexpected bulkhead defaults: %+v", cfg)
+	}
+	if cfg.BrownoutEscalateAfter != 5*time.Second || cfg.BrownoutRecoverAfter != 60*time.Second ||
+		cfg.BrownoutP95Threshold != 2*time.Second || cfg.BrownoutP95Recovery != time.Second ||
+		cfg.BrownoutDBWaitThreshold != 100*time.Millisecond || cfg.BrownoutDBWaitRecovery != 50*time.Millisecond ||
+		cfg.BrownoutInFlightRatioThreshold != .8 || cfg.BrownoutInFlightRatioRecovery != .6 || cfg.BrownoutSampleInterval != time.Second {
+		t.Fatalf("unexpected brownout defaults: %+v", cfg)
+	}
+}
+
+func TestLoadBrownoutConfiguration(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{
+		"APP_ENV": "test", "BROWNOUT_ESCALATE_AFTER_SECONDS": "3", "BROWNOUT_RECOVER_AFTER_SECONDS": "90",
+		"BROWNOUT_P95_THRESHOLD_MS": "3000", "BROWNOUT_P95_RECOVERY_MS": "1500",
+		"BROWNOUT_DB_WAIT_THRESHOLD_MS": "200", "BROWNOUT_DB_WAIT_RECOVERY_MS": "80",
+		"BROWNOUT_INFLIGHT_RATIO_PERCENT": "75", "BROWNOUT_INFLIGHT_RECOVERY_PERCENT": "40",
+		"BROWNOUT_SAMPLE_INTERVAL_MS": "500",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BrownoutEscalateAfter != 3*time.Second || cfg.BrownoutRecoverAfter != 90*time.Second ||
+		cfg.BrownoutP95Threshold != 3*time.Second || cfg.BrownoutP95Recovery != 1500*time.Millisecond ||
+		cfg.BrownoutDBWaitThreshold != 200*time.Millisecond || cfg.BrownoutDBWaitRecovery != 80*time.Millisecond ||
+		cfg.BrownoutInFlightRatioThreshold != .75 || cfg.BrownoutInFlightRatioRecovery != .4 || cfg.BrownoutSampleInterval != 500*time.Millisecond {
+		t.Fatalf("unexpected brownout config: %+v", cfg)
+	}
+	for _, env := range []map[string]string{
+		{"BROWNOUT_P95_RECOVERY_MS": "2000"},
+		{"BROWNOUT_DB_WAIT_RECOVERY_MS": "100"},
+		{"BROWNOUT_INFLIGHT_RECOVERY_PERCENT": "80"},
+		{"BROWNOUT_INFLIGHT_RATIO_PERCENT": "101"},
+		{"BROWNOUT_ESCALATE_AFTER_SECONDS": "0"},
+		{"BROWNOUT_SAMPLE_INTERVAL_MS": "bad"},
+	} {
+		env["APP_ENV"] = "test"
+		if _, err := load(lookup(env)); err == nil {
+			t.Fatalf("invalid brownout configuration accepted: %+v", env)
+		}
+	}
+}
+
+func TestLoadBulkheadConfiguration(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_TOTAL": "20", "BULKHEAD_WAIT_MS": "50", "BULKHEAD_DRAIN_SECONDS": "3", "BULKHEAD_READ_LIMIT": "7", "BULKHEAD_ROUTE_CLASSES": "/v1/x=heavy,/v1/y=critical"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.BulkheadTotal != 20 || cfg.BulkheadWait != 50*time.Millisecond || cfg.BulkheadDrain != 3*time.Second || cfg.BulkheadLimits["read"] != 7 || cfg.BulkheadRules["/v1/x"] != "heavy" {
+		t.Fatalf("unexpected bulkhead config: %+v", cfg)
+	}
+	for _, value := range []string{"0", "101", "bad"} {
+		if _, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_WAIT_MS": value})); err == nil {
+			t.Fatalf("wait=%q accepted", value)
+		}
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_TOTAL": "3"})); err == nil {
+		t.Fatal("BULKHEAD_TOTAL below the critical reserve minimum was accepted")
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "BULKHEAD_TOTAL": "20", "BULKHEAD_CRITICAL_LIMIT": "19"})); err == nil {
+		t.Fatal("critical capacity below total was accepted")
+	}
 }
 
 func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
