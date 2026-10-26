@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/v1/admin/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Query immutable audit records
+         * @description Requires the aud view permission. Detail is returned only with aud edit permission.
+         */
+        get: operations["listAdminAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/auth/telegram": {
         parameters: {
             query?: never;
@@ -526,6 +546,33 @@ export interface components {
             data: components["schemas"]["Product"];
             request_id: string;
         };
+        AuditRecord: {
+            /** Format: int64 */
+            id: number;
+            /** Format: date-time */
+            ts: string;
+            /** Format: int64 */
+            actor_id: number;
+            actor_role: string;
+            action: string;
+            target: string;
+            detail: {
+                [key: string]: unknown;
+            };
+            ip?: string;
+            request_id: string;
+        };
+        AuditListData: {
+            items: components["schemas"]["AuditRecord"][];
+            /** Format: int64 */
+            next_before_id?: number | null;
+        };
+        AuditListSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["AuditListData"];
+            request_id: string;
+        };
     };
     responses: {
         /** @description Refresh token rotated successfully. */
@@ -730,6 +777,41 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    listAdminAudit: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                actor_id?: number;
+                action?: string;
+                target?: string;
+                /** @description Return records with ids lower than this cursor. */
+                before_id?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audit page ordered by descending id. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditListSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     postTelegramAuth: {
         parameters: {
             query?: never;

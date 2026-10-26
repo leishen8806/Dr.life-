@@ -6,6 +6,10 @@ Go 模块化单体后端，采用 chi、pgx、sqlc 与 goose。
 
 Prometheus、Grafana、Sentry 与指标暴露约束见 `../deploy/observability/README.md`。
 
+## 审计哈希链
+
+审计模块使用独立的 `AUDIT_DATABASE_URL`（`audit_writer` 登录角色）。配置后，服务把审计数据库加入就绪检查，并启用 `/v1/admin/audit` 查询；查询除 admin 角色外还要求令牌具有 `aud` 的 `view` 或 `edit` 权限。链校验和 UTC 每日锚定命令见 `internal/platform/audit/README.md`。
+
 ## 账务对账命令
 
 服务和 `ledgerctl` 都从环境变量读取数据库配置。每日快照日界线由
