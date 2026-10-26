@@ -63,12 +63,13 @@ func (t Timeouts) forClass(c Class) time.Duration {
 }
 
 type Config struct {
-	Total    int
-	Wait     time.Duration
-	Limits   Limits
-	Timeouts Timeouts
-	Rules    map[string]Class
-	Metrics  *observability.Metrics
+	Total              int
+	Wait               time.Duration
+	Limits             Limits
+	Timeouts           Timeouts
+	Rules              map[string]Class
+	DeadlineExemptions map[string]bool
+	Metrics            *observability.Metrics
 }
 
 func DefaultConfig() Config {
@@ -82,6 +83,7 @@ type Bulkhead struct {
 	heavyInFlight      int
 	heavyMax           int
 	heavyLimit         atomic.Int64
+	heavyWake          chan struct{}
 	config             Config
 	draining           atomic.Bool
 	brownout           atomic.Pointer[Brownout]
@@ -110,7 +112,7 @@ func New(config Config) *Bulkhead {
 	if config.Timeouts.Heavy <= 0 {
 		config.Timeouts.Heavy = defaults.Heavy
 	}
-	b := &Bulkhead{total: make(chan struct{}, config.Total), nonCritical: make(chan struct{}, config.Total*3/4), classes: make(map[Class]chan struct{}), config: config}
+	b := &Bulkhead{total: make(chan struct{}, config.Total), nonCritical: make(chan struct{}, config.Total*3/4), classes: make(map[Class]chan struct{}), heavyWake: make(chan struct{}, 1), config: config}
 	for _, c := range allClasses {
 		if c == Heavy {
 			continue
@@ -156,6 +158,7 @@ func (b *Bulkhead) SetHeavyLimit(limit int) {
 		limit = b.heavyMax
 	}
 	b.heavyLimit.Store(int64(limit))
+	b.signalHeavy()
 }
 
 // InFlight reports the number of admitted requests.
@@ -177,10 +180,6 @@ func (b *Bulkhead) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		started := time.Now()
-		brownout := b.brownout.Load()
-		if brownout != nil {
-			defer func() { brownout.Record(time.Since(started)) }()
-		}
 		if b.Draining() {
 			b.observe(class, started, false)
 			reject(w, r)
@@ -191,7 +190,14 @@ func (b *Bulkhead) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		defer b.release(class)
-		ctx, cancel := context.WithTimeout(r.Context(), b.config.Timeouts.forClass(class))
+		brownout := b.brownout.Load()
+		if brownout != nil {
+			defer func() { brownout.Record(time.Since(started)) }()
+		}
+		ctx, cancel := r.Context(), func() {}
+		if !b.deadlineExempt(r.URL.Path) {
+			ctx, cancel = context.WithTimeout(ctx, b.config.Timeouts.forClass(class))
+		}
 		defer cancel()
 		if brownout != nil {
 			ctx = WithLevel(ctx, brownout.Level())
@@ -219,7 +225,7 @@ func (b *Bulkhead) Classify(path string) Class {
 	switch {
 	case path == "/healthz" || path == "/readyz":
 		return Health
-	case strings.HasPrefix(path, "/v1/public/auth/"):
+	case isAuthPath(path):
 		return Auth
 	case strings.Contains(path, "withdraw") || strings.HasPrefix(path, "/v1/ledger") || strings.HasPrefix(path, "/v1/admin/finance"):
 		return Critical
@@ -229,6 +235,33 @@ func (b *Bulkhead) Classify(path string) Class {
 		return Read
 	default:
 		return Write
+	}
+}
+
+func isAuthPath(path string) bool {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	return len(parts) >= 3 && parts[0] == "v1" && parts[2] == "auth"
+}
+
+func (b *Bulkhead) deadlineExempt(path string) bool {
+	for prefix, exempt := range b.config.DeadlineExemptions {
+		if exempt && isSSEPrefix(prefix) && (path == prefix || strings.HasPrefix(path, strings.TrimSuffix(prefix, "/")+"/")) {
+			return true
+		}
+	}
+	return false
+}
+
+func isSSEPrefix(path string) bool {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) != 3 || parts[0] != "v1" || parts[2] != "events" {
+		return false
+	}
+	switch parts[1] {
+	case "buyer", "merchant", "driver", "wms", "admin":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -298,9 +331,14 @@ func (b *Bulkhead) acquire(ctx context.Context, class Class) bool {
 func (b *Bulkhead) acquireHeavy(ctx context.Context, timer *time.Timer) bool {
 	for {
 		b.heavyMu.Lock()
-		if b.heavyInFlight < int(b.heavyLimit.Load()) {
+		limit := int(b.heavyLimit.Load())
+		if b.heavyInFlight < limit {
 			b.heavyInFlight++
+			moreAvailable := b.heavyInFlight < limit
 			b.heavyMu.Unlock()
+			if moreAvailable {
+				b.signalHeavy()
+			}
 			return true
 		}
 		b.heavyMu.Unlock()
@@ -309,7 +347,7 @@ func (b *Bulkhead) acquireHeavy(ctx context.Context, timer *time.Timer) bool {
 			return false
 		case <-timer.C:
 			return false
-		case <-time.After(time.Millisecond):
+		case <-b.heavyWake:
 		}
 	}
 }
@@ -319,7 +357,18 @@ func (b *Bulkhead) releaseHeavy() {
 	if b.heavyInFlight > 0 {
 		b.heavyInFlight--
 	}
+	available := b.heavyInFlight < int(b.heavyLimit.Load())
 	b.heavyMu.Unlock()
+	if available {
+		b.signalHeavy()
+	}
+}
+
+func (b *Bulkhead) signalHeavy() {
+	select {
+	case b.heavyWake <- struct{}{}:
+	default:
+	}
 }
 
 func (b *Bulkhead) release(class Class) {
@@ -370,4 +419,13 @@ func (w *captureWriter) Write(body []byte) (int, error) {
 		w.WriteHeader(http.StatusOK)
 	}
 	return w.ResponseWriter.Write(body)
+}
+
+func (w *captureWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+
+func (w *captureWriter) Flush() {
+	if !w.wrote {
+		w.WriteHeader(http.StatusOK)
+	}
+	_ = http.NewResponseController(w.ResponseWriter).Flush()
 }
