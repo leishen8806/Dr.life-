@@ -40,6 +40,7 @@ type loginFixture struct {
 	source   *telegram.DBPoolSource
 	service  *Service
 	tokens   map[telegram.End][]string
+	cache    *testSessionCache
 }
 
 func TestTelegramLoginIntegration(t *testing.T) {
@@ -105,7 +106,8 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	f.seedBots(t, ctx)
 	f.source = &telegram.DBPoolSource{DB: pool, Envelope: envelope, TTL: 5 * time.Minute, Now: func() time.Time { return now }}
 	manager := TokenManager{Keys: jwtRing, AccessTTL: 15 * time.Minute, Now: func() time.Time { return now }}
-	f.service = &Service{DB: pool, Verifier: telegram.PoolVerifier{Validator: validatorAt(now), Source: f.source}, Tokens: manager, RefreshTTL: 30 * 24 * time.Hour, Now: func() time.Time { return now }}
+	f.cache = newTestSessionCache()
+	f.service = &Service{DB: pool, Verifier: telegram.PoolVerifier{Validator: validatorAt(now), Source: f.source}, Tokens: manager, RefreshTTL: 7 * 24 * time.Hour, IdleTTL: 24 * time.Hour, MaxSessions: 5, SessionCache: f.cache, Now: func() time.Time { return now }}
 
 	t.Run("pool isolation status and fallback", f.testPool)
 	t.Run("one hundred concurrent first logins", f.testConcurrentLogin)
@@ -113,6 +115,8 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	t.Run("validation failures are classified", f.testFailureEvents)
 	t.Run("failure ban expires", f.testFailureBan)
 	t.Run("refresh plaintext is absent", f.testRefreshNotStored)
+	t.Run("refresh rotation concurrency reuse and revocation", f.testSessionLifecycle)
+	t.Run("session ownership cache rebuild and fail policy", f.testSessionAccess)
 }
 
 func validatorAt(now time.Time) telegram.Validator {
@@ -242,6 +246,10 @@ func (f *loginFixture) testConcurrentLogin(t *testing.T) {
 	again, err := f.service.Login(context.Background(), LoginInput{End: telegram.Buyer, InitData: raw, IP: "198.51.100.10"})
 	if err != nil || again.Account.Lang == nil || *again.Account.Lang != "km" {
 		t.Fatalf("registered language overwritten: %+v %v", again.Account, err)
+	}
+	var activeSessions int
+	if err := f.pool.QueryRow(context.Background(), `SELECT count(*) FROM iam.session s JOIN iam.account a ON a.id=s.account_id WHERE a.public_id=$1 AND s.revoked_at IS NULL`, account).Scan(&activeSessions); err != nil || activeSessions != 5 {
+		t.Fatalf("active sessions=%d err=%v, want 5", activeSessions, err)
 	}
 	var kyc *string
 	driverRaw := signInit(f.now, 8002, "driver-primary-token", "")

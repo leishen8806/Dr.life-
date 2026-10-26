@@ -27,7 +27,7 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 || cfg.RateLimitAdmin != 60 || cfg.LedgerReconTimezone != "Asia/Phnom_Penh" || cfg.TelegramInitDataMaxAge != 24*time.Hour || cfg.AccessTokenTTL != 15*time.Minute || cfg.RefreshTokenTTL != 30*24*time.Hour || cfg.LoginFailureLimit != 20 || cfg.LoginFailureWindow != 10*time.Minute || cfg.BotTokenCacheTTL != 5*time.Minute {
+	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 || cfg.RateLimitAdmin != 60 || cfg.LedgerReconTimezone != "Asia/Phnom_Penh" || cfg.TelegramInitDataMaxAge != 24*time.Hour || cfg.AccessTokenTTL != 15*time.Minute || cfg.RefreshTokenTTL != 7*24*time.Hour || cfg.RefreshTokenGrace != 10*time.Second || cfg.SessionIdleTTL != 24*time.Hour || cfg.SessionMaxPerAccount != 5 || cfg.TokenIssuer != "drlife" || !cfg.TokenLegacyAcceptUntil.IsZero() || cfg.LoginFailureLimit != 20 || cfg.LoginFailureWindow != 10*time.Minute || cfg.BotTokenCacheTTL != 5*time.Minute {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 	if cfg.DatabaseURL != "" || cfg.IAMDatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" {
@@ -159,6 +159,11 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"TELEGRAM_INITDATA_MAX_AGE":      "12h",
 		"ACCESS_TOKEN_TTL":               "10m",
 		"REFRESH_TOKEN_TTL":              "240h",
+		"REFRESH_TOKEN_GRACE":            "12s",
+		"SESSION_IDLE_TTL":               "12h",
+		"SESSION_MAX_PER_ACCOUNT":        "3",
+		"TOKEN_ISSUER":                   "drlife-staging",
+		"TOKEN_LEGACY_ACCEPT_UNTIL":      "2027-01-02T03:04:05Z",
 		"LOGIN_FAILURE_LIMIT":            "8",
 		"LOGIN_FAILURE_WINDOW":           "3m",
 		"BOT_TOKEN_CACHE_TTL":            "2m",
@@ -166,7 +171,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.IAMDatabaseURL != "postgres://iam-placeholder" || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" || cfg.TelegramInitDataMaxAge != 12*time.Hour || cfg.AccessTokenTTL != 10*time.Minute || cfg.RefreshTokenTTL != 240*time.Hour || cfg.LoginFailureLimit != 8 || cfg.LoginFailureWindow != 3*time.Minute || cfg.BotTokenCacheTTL != 2*time.Minute {
+	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.IAMDatabaseURL != "postgres://iam-placeholder" || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" || cfg.TelegramInitDataMaxAge != 12*time.Hour || cfg.AccessTokenTTL != 10*time.Minute || cfg.RefreshTokenTTL != 240*time.Hour || cfg.RefreshTokenGrace != 12*time.Second || cfg.SessionIdleTTL != 12*time.Hour || cfg.SessionMaxPerAccount != 3 || cfg.TokenIssuer != "drlife-staging" || !cfg.TokenLegacyAcceptUntil.Equal(time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC)) || cfg.LoginFailureLimit != 8 || cfg.LoginFailureWindow != 3*time.Minute || cfg.BotTokenCacheTTL != 2*time.Minute {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	for _, raw := range []string{"0", "-1", "abc"} {
@@ -190,7 +195,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 			}
 		})
 	}
-	for _, key := range []string{"TELEGRAM_INITDATA_MAX_AGE", "ACCESS_TOKEN_TTL", "REFRESH_TOKEN_TTL", "LOGIN_FAILURE_WINDOW", "BOT_TOKEN_CACHE_TTL"} {
+	for _, key := range []string{"TELEGRAM_INITDATA_MAX_AGE", "ACCESS_TOKEN_TTL", "REFRESH_TOKEN_TTL", "REFRESH_TOKEN_GRACE", "SESSION_IDLE_TTL", "LOGIN_FAILURE_WINDOW", "BOT_TOKEN_CACHE_TTL"} {
 		t.Run("invalid "+key, func(t *testing.T) {
 			if _, err := load(lookup(map[string]string{"APP_ENV": "test", key: "0s"})); err == nil {
 				t.Fatalf("expected invalid %s", key)
