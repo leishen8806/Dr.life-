@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0f172a" />
+    <title>Dr.life+ Driver Location PoC</title>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="hero-top">
+          <div class="brand">
+            <span class="brand-mark" aria-hidden="true">D+</span>
+            <div>
+              <h1 data-i18n="appTitle"></h1>
+              <p data-i18n="appSubtitle"></p>
+            </div>
+          </div>
+          <div
+            id="language"
+            class="language"
+            role="group"
+            aria-label="Language"
+          ></div>
+        </div>
+        <div class="badges">
+          <span id="network" class="badge"></span>
+          <span id="mode" class="badge muted"></span>
+        </div>
+      </header>
+
+      <main>
+        <section class="panel stats" aria-live="polite">
+          <div class="stat">
+            <span class="label" data-i18n="pendingLabel"></span>
+            <strong id="pending">0</strong>
+          </div>
+          <div class="stat">
+            <span class="label" data-i18n="uploadedLabel"></span>
+            <strong id="uploaded">0</strong>
+          </div>
+          <div class="stat">
+            <span class="label" data-i18n="lastCapturedLabel"></span>
+            <strong id="last-captured" class="small-value"></strong>
+          </div>
+          <div class="stat">
+            <span class="label" data-i18n="lastErrorLabel"></span>
+            <strong id="last-error" class="small-value"></strong>
+          </div>
+          <div class="stat wide">
+            <span class="label" data-i18n="intervalLabel"></span>
+            <strong id="interval" class="small-value"></strong>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="queueTitle"></h2>
+            <span id="queue-count" class="count">0</span>
+          </div>
+          <ul id="queue" class="queue"></ul>
+        </section>
+
+        <button id="retry" class="primary" type="button"></button>
+        <p class="notice" data-i18n="testNotice"></p>
+
+        <footer class="footer">
+          <span data-i18n="versionLabel"></span>
+          <code id="version"></code>
+        </footer>
+      </main>
+      <div id="live" class="sr-only" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,76 @@
+P0-9 driver location PoC - browser evidence (AC-1, AC-2, recovery)
+==================================================================
+Source commit: c8e6fe9
+Build id:      c8e6fe9-2026-10-23T02-06-47-056Z
+Build output:  dist/index.html, dist/assets/index-B8esBLTF.js, dist/assets/index-DzapKYyL.css
+Browser:       Chromium via Playwright MCP
+Viewport:      390 x 844
+Time zone:     timestamps below are UTC (Bangkok = UTC+7)
+Backend:       local mock only, http://127.0.0.1:8787, reset before AC-1
+Page URL:      http://localhost:5180/?fakeLocation=1&intervalMs=1000&run=final-ac1
+Storage key:   drlife.driver.location.queue.v1
+
+Ctrl+F5 note
+------------
+AC-2 did NOT use Ctrl+F5. A CDP Page.reload({ignoreCache:true}) (equivalent to a
+hard reload) was attempted earlier at 2026-10-23T02:04:01.457Z with the server
+stopped; it landed on chrome-error://chromewebdata/ instead of the cached shell,
+i.e. the hard-reload path is not served by the Service Worker. AC-2 therefore
+uses the method required by the contract: DevTools-equivalent offline
+(context.setOffline(true)) + normal reload. The page was loaded fresh at
+2026-10-23T02:07:01Z before the test.
+
+AC-1 fixed-interval capture and submit
+--------------------------------------
+Aligned snapshot (page counters + mock stats in one evaluate):
+  at: 2026-10-23T02:07:18.046Z
+  build: c8e6fe9-2026-10-23T02-06-47-056Z
+  uploadedDom=17  pendingDom=0
+  mock.received=17  mock.uniqueKeys=17  mock.duplicateAttempts=0
+  viewport: 390 x 844
+  interval: 1000 ms (page copy "每 1 秒采集一次")
+=> page counter, mock received count and unique-key count all equal 17;
+   no duplicate delivery while online.
+
+AC-2 offline queue persistence across reload
+--------------------------------------------
+Mock stopped at ~2026-10-23T02:07:33Z (preview kept running, so uploads fail and
+points accumulate locally). First queued point capturedAt=2026-10-23T02:07:34.404Z.
+
+Snapshot at 2026-10-23T02:08:00.941Z:
+  queued=27  pendingDom=27  uploadedDom=33
+  navigator.onLine=true (mock down, browser still reports online)
+
+Immediately before the offline reload, at ~2026-10-23T02:08:11Z:
+  queuedBefore=38  (ids saved to localStorage __ac2_before_snapshot)
+  lastError text: "上报失败，定位点已保留在本地队列"
+
+Offline reload:
+  context.setOffline(true), then page.reload({waitUntil:'domcontentloaded'})
+Snapshot at 2026-10-23T02:08:15.469Z:
+  build=c8e6fe9-2026-10-23T02-06-47-056Z
+  navigator.onLine=true (Chromium offline emulation did not flip it)
+  navigator.serviceWorker.controller=true
+  queuedBefore=38  queuedAfterReload=43  allBeforePresent=true  missingCount=0
+  navigation entry: transferSize=0
+  /assets/index-B8esBLTF.js:  transferSize=0
+  /assets/index-DzapKYyL.css: transferSize=0
+=> all 38 pre-reload ids survived; document/JS/CSS came from the SW cache.
+   (43 > 38 because sampling continued for 4 s while offline.)
+
+Recovery (mock restarted, context.setOffline(false))
+----------------------------------------------------
+Snapshot at 2026-10-23T02:08:38.208Z:
+  pendingDom=0  queuedNow=0
+  mock.received=65  mock.uniqueKeys=65  mock.duplicateAttempts=0
+  uploadedDom=98  (33 persisted before reload + 65 received after restart)
+  beforeCount=38  beforeAllReceived=true
+=> the queue drained completely; every pre-reload id reached the mock;
+   unique keys == received (no duplicates).
+
+Console during the outage (saved in evidence/console-errors-ac2.txt)
+--------------------------------------------------------------------
+Total messages: 38 (Errors: 38, Warnings: 0)
+  [ERROR] Failed to load resource: net::ERR_INTERNET_DISCONNECTED @ http://localhost:5180/v1/driver/locations
+  [ERROR] [location-upload] TypeError: Failed to fetch
+Failures are handled as expected: the point stays in the local queue.

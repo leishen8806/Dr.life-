@@ -1,0 +1,28 @@
+P0-9 driver location PoC - AC-4 idempotency over real HTTP
+==========================================================
+Source commit: c8e6fe9
+Build id:      n/a (HTTP-level test; UI build not involved)
+Mock:          local only, http://127.0.0.1:8787
+Time zone:     UTC (Bangkok = UTC+7)
+Fixed key:     ac4-http-fixed-002 (also used as body.id)
+
+Request 1 at 2026-10-23T02:06:21.160Z
+  POST /v1/driver/locations
+  Idempotency-Key: ac4-http-fixed-002
+  status=201
+  body={"status":"accepted","id":"ac4-http-fixed-002","total":168}
+
+Request 2 at 2026-10-23T02:06:21.196Z (same key, same body)
+  POST /v1/driver/locations
+  Idempotency-Key: ac4-http-fixed-002
+  status=200
+  body={"status":"duplicate","id":"ac4-http-fixed-002","total":168}
+
+Final stats at 2026-10-23T02:06:21.208Z
+  received=168
+  uniqueKeys=168
+  duplicateAttempts=2
+  containsKey=True
+
+=> 201 accepted then 200 duplicate; total did not increase on the second
+   delivery; the key is stored exactly once.Note: duplicateAttempts=2 includes an earlier manual duplicate check (ac4-http-fixed-001); this run contributed 1 duplicate attempt.

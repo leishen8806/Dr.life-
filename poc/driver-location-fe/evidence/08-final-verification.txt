@@ -1,0 +1,46 @@
+time_utc=2026-10-23T02:06:44Z
+head=c8e6fe9
+node=v25.9.0
+pnpm=10.28.2
+
+== TESTS ==
+EXIT_CODE: 0
+
+ RUN  v4.0.16 E:/VirtualAIOffice/pc-worktrees/CMP-24-p0-9-poc/poc/driver-location-fe
+
+stdout | tests/location-queue.test.ts > driver location queue > persists queued points across a page reload
+[AC-2] queuedBeforeReload=1 queuedAfterReload=1
+
+stdout | tests/location-queue.test.ts > driver location queue > replays every point captured during a five minute offline window
+[AC-3] N=60 received=60 uniqueKeys=60 duplicateAttempts=0 uploaded=60 pendingAfter=0
+
+stdout | tests/location-queue.test.ts > driver location queue > records a repeated idempotency key only once
+[AC-4] first=accepted firstTotal=1 second=duplicate secondTotal=1 finalReceived=1 duplicateAttempts=1
+
+ ✓ tests/location-queue.test.ts > driver location queue > persists queued points across a page reload 2ms
+ ✓ tests/location-queue.test.ts > driver location queue > replays every point captured during a five minute offline window 5ms
+ ✓ tests/location-queue.test.ts > driver location queue > records a repeated idempotency key only once 0ms
+ ✓ tests/location-queue.test.ts > driver location queue > does not upload twice when flush is called concurrently 0ms
+ ✓ tests/location-queue.test.ts > driver location queue > keeps points queued when upload fails 0ms
+ ✓ tests/location-queue.test.ts > driver location queue > sends the point id as the Idempotency-Key header 16ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  09:06:45
+   Duration  197ms (transform 40ms, setup 0ms, import 54ms, tests 25ms, environment 0ms)
+
+
+== TYPECHECK ==
+EXIT_CODE: 0
+
+== BUILD ==
+EXIT_CODE: 0
+vite v7.3.0 building client environment for production...
+transforming...
+✓ 8 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                  2.67 kB │ gzip: 0.81 kB
+dist/assets/index-DzapKYyL.css   4.10 kB │ gzip: 1.62 kB
+dist/assets/index-B8esBLTF.js   12.88 kB │ gzip: 5.19 kB
+✓ built in 91ms

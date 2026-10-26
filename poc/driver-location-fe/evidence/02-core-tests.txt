@@ -1,0 +1,32 @@
+time_utc=2026-10-23T02:06:44Z
+head=c8e6fe9
+node=v25.9.0
+pnpm=10.28.2
+
+COMMAND: pnpm exec vitest run --config poc/driver-location-fe/vitest.config.ts
+EXIT_CODE: 0
+
+
+ RUN  v4.0.16 E:/VirtualAIOffice/pc-worktrees/CMP-24-p0-9-poc/poc/driver-location-fe
+
+stdout | tests/location-queue.test.ts > driver location queue > persists queued points across a page reload
+[AC-2] queuedBeforeReload=1 queuedAfterReload=1
+
+stdout | tests/location-queue.test.ts > driver location queue > replays every point captured during a five minute offline window
+[AC-3] N=60 received=60 uniqueKeys=60 duplicateAttempts=0 uploaded=60 pendingAfter=0
+
+stdout | tests/location-queue.test.ts > driver location queue > records a repeated idempotency key only once
+[AC-4] first=accepted firstTotal=1 second=duplicate secondTotal=1 finalReceived=1 duplicateAttempts=1
+
+ ✓ tests/location-queue.test.ts > driver location queue > persists queued points across a page reload 2ms
+ ✓ tests/location-queue.test.ts > driver location queue > replays every point captured during a five minute offline window 5ms
+ ✓ tests/location-queue.test.ts > driver location queue > records a repeated idempotency key only once 0ms
+ ✓ tests/location-queue.test.ts > driver location queue > does not upload twice when flush is called concurrently 0ms
+ ✓ tests/location-queue.test.ts > driver location queue > keeps points queued when upload fails 0ms
+ ✓ tests/location-queue.test.ts > driver location queue > sends the point id as the Idempotency-Key header 16ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  09:06:45
+   Duration  197ms (transform 40ms, setup 0ms, import 54ms, tests 25ms, environment 0ms)
+
