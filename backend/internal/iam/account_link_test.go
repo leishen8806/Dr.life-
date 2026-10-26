@@ -8,7 +8,11 @@ import (
 
 func TestAccountLinkServiceOwnerOnlyAndImmutableBusinessData(t *testing.T) {
 	repo := &fakeAccountLinkRepository{owners: map[string]bool{"owner": true}, candidates: map[string][]AccountLinkCandidate{"owner": {{AccountID: "buyer"}}}}
-	service := NewAccountLinkService(repo, func() (string, error) { return "01ARZ3NDEKTSV4RRFFQ69G5FAV", nil })
+	counter := 0
+	service := NewAccountLinkService(repo, func() (string, error) {
+		counter++
+		return "01ARZ3NDEKTSV4RRFFQ69G5F" + string(rune('A'+counter)), nil
+	})
 	if _, err := service.Link(context.Background(), "staff", "buyer"); !errors.Is(err, ErrAccountLinkForbidden) {
 		t.Fatalf("staff Link error=%v, want forbidden", err)
 	}
@@ -25,6 +29,10 @@ func TestAccountLinkServiceOwnerOnlyAndImmutableBusinessData(t *testing.T) {
 	if len(repo.audits) != 2 || repo.audits[1].Action != "account_unlinked" {
 		t.Fatalf("unlink audit=%+v", repo.audits)
 	}
+	// The two audit rows must not share an identifier: the unlink entry used to reuse the link's id.
+	if repo.audits[0].LogPublicID == "" || repo.audits[0].LogPublicID == repo.audits[1].LogPublicID {
+		t.Fatalf("audit log ids must be distinct and non-empty: %+v", repo.audits)
+	}
 }
 
 type fakeAccountLinkRepository struct {
@@ -40,14 +48,15 @@ func (r *fakeAccountLinkRepository) IsActiveMerchantOwner(_ context.Context, acc
 func (r *fakeAccountLinkRepository) CandidateBuyers(_ context.Context, merchantAccountID string) ([]AccountLinkCandidate, error) {
 	return r.candidates[merchantAccountID], nil
 }
-func (r *fakeAccountLinkRepository) Link(_ context.Context, link AccountLink) (AccountLink, error) {
+func (r *fakeAccountLinkRepository) Link(_ context.Context, link AccountLink, audit AccountLinkAudit) (AccountLink, error) {
 	if r.links == nil {
 		r.links = map[string]AccountLink{}
 	}
 	r.links[link.PublicID] = link
+	r.audits = append(r.audits, audit)
 	return link, nil
 }
-func (r *fakeAccountLinkRepository) Unlink(_ context.Context, id, actor string) error {
+func (r *fakeAccountLinkRepository) Unlink(_ context.Context, id, actor string, audit AccountLinkAudit) error {
 	l, ok := r.links[id]
 	if !ok {
 		return ErrAccountLinkNotFound
@@ -57,9 +66,6 @@ func (r *fakeAccountLinkRepository) Unlink(_ context.Context, id, actor string) 
 	}
 	l.Unlinked = true
 	r.links[id] = l
-	return nil
-}
-func (r *fakeAccountLinkRepository) Audit(_ context.Context, audit AccountLinkAudit) error {
 	r.audits = append(r.audits, audit)
 	return nil
 }

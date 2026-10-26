@@ -15,10 +15,14 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
+
+	"github.com/leishen8806/Dr.life-/backend/internal/iam"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 )
 
 const (
@@ -171,6 +175,49 @@ func TestIAMMigration(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.account_link (public_id,buyer_account_id,merchant_account_id) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FAW',b.id,m.id FROM iam.account b,iam.account m WHERE b.public_id='01ARZ3NDEKTSV4RRFFQ69G5FAV' AND m.public_id='`+ownerPublicID+`'`)
+	})
+
+	t.Run("account link service links and unlinks with one distinct audit row per action", func(t *testing.T) {
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pool.Close()
+		service := iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: pool}, ids.NewULID)
+
+		link, err := service.Link(ctx, ownerPublicID, buyerPublicID)
+		if err != nil {
+			t.Fatalf("first link: %v", err)
+		}
+		if _, err := service.Link(ctx, ownerPublicID, buyerPublicID); !errors.Is(err, iam.ErrAccountLinkExists) {
+			t.Fatalf("duplicate active link error = %v, want ErrAccountLinkExists", err)
+		}
+		// A buyer belonging to a different Telegram person is not a candidate.
+		if _, err := service.Link(ctx, ownerPublicID, "01ARZ3NDEKTSV4RRFFQ69G5FAV"); !errors.Is(err, iam.ErrAccountLinkForbidden) {
+			t.Fatalf("other person's buyer error = %v, want ErrAccountLinkForbidden", err)
+		}
+		if err := service.Unlink(ctx, ownerPublicID, link.PublicID); err != nil {
+			t.Fatalf("unlink: %v", err)
+		}
+		if err := service.Unlink(ctx, ownerPublicID, link.PublicID); !errors.Is(err, iam.ErrAccountLinkNotFound) {
+			t.Fatalf("second unlink error = %v, want ErrAccountLinkNotFound", err)
+		}
+		// Link and unlink again: the unlink entry used to reuse the link's identifier as the log row's
+		// public_id, which violates the unique constraint on the second cycle.
+		again, err := service.Link(ctx, ownerPublicID, buyerPublicID)
+		if err != nil {
+			t.Fatalf("relink: %v", err)
+		}
+		if err := service.Unlink(ctx, ownerPublicID, again.PublicID); err != nil {
+			t.Fatalf("second unlink cycle: %v", err)
+		}
+		var rows, distinct int
+		if err := admin.QueryRow(ctx, `SELECT count(*), count(DISTINCT public_id) FROM iam.merchant_op_log WHERE action IN ('account_linked','account_unlinked')`).Scan(&rows, &distinct); err != nil {
+			t.Fatal(err)
+		}
+		if rows != 4 || distinct != 4 {
+			t.Fatalf("audit rows=%d distinct ids=%d, want 4 and 4", rows, distinct)
+		}
 	})
 
 	t.Run("permission seeds match approved matrices", func(t *testing.T) {
