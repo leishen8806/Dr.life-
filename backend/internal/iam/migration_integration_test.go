@@ -114,6 +114,58 @@ func TestIAMMigration(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.account (public_id, person_id, role, lang) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FA5', id, 'driver', 'fr' FROM iam.person WHERE public_id = '`+personPublicID+`'`)
 	})
 
+	t.Run("login events remain append only for iam rw", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.login_event(public_id,person_id,result,tried_count) SELECT '01BX5ZZKBKACTAV9WEVGEMMVS2',id,'ambiguous_account',1 FROM iam.person WHERE public_id=$1`, personPublicID); err != nil {
+			t.Fatal(err)
+		}
+		if err := goose.DownTo(database, migrationsDir, 19); err != nil {
+			t.Fatal(err)
+		}
+		var result string
+		if err := admin.QueryRow(ctx, `SELECT result FROM iam.login_event WHERE public_id='01BX5ZZKBKACTAV9WEVGEMMVS2'`).Scan(&result); err != nil || result != "internal_error" {
+			t.Fatalf("Down migration result=%q, want internal_error; err=%v", result, err)
+		}
+		if err := goose.Up(database, migrationsDir); err != nil {
+			t.Fatal(err)
+		}
+		for _, privilege := range []string{"UPDATE", "DELETE", "TRUNCATE", "TRIGGER", "REFERENCES"} {
+			var allowed bool
+			if err := admin.QueryRow(ctx, `SELECT has_table_privilege('iam_rw', 'iam.login_event', $1)`, privilege).Scan(&allowed); err != nil || allowed {
+				t.Fatalf("iam_rw %s allowed=%v err=%v", privilege, allowed, err)
+			}
+		}
+		for _, privilege := range []string{"SELECT", "INSERT"} {
+			var allowed bool
+			if err := admin.QueryRow(ctx, `SELECT has_table_privilege('iam_rw', 'iam.login_event', $1)`, privilege).Scan(&allowed); err != nil || !allowed {
+				t.Fatalf("iam_rw %s allowed=%v err=%v", privilege, allowed, err)
+			}
+		}
+		if _, err := admin.Exec(ctx, `SET ROLE iam_rw`); err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _, _ = admin.Exec(ctx, `RESET ROLE`) }()
+		for _, statement := range []string{
+			`UPDATE iam.login_event SET result='ok'`,
+			`DELETE FROM iam.login_event`,
+			`TRUNCATE iam.login_event`,
+			`CREATE TRIGGER swallow_login_event BEFORE INSERT ON iam.login_event FOR EACH ROW EXECUTE FUNCTION pg_temp.swallow_login_event()`,
+		} {
+			if strings.HasPrefix(statement, "CREATE TRIGGER") {
+				if _, err := admin.Exec(ctx, `CREATE FUNCTION pg_temp.swallow_login_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NULL; END $$`); err != nil {
+					t.Fatal(err)
+				}
+			}
+			assertSQLState(t, ctx, admin, "42501", statement)
+		}
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.login_event(public_id,result,tried_count) VALUES($1,'ok',0)`, "01BX5ZZKBKACTAV9WEVGEMMVS1"); err != nil {
+			t.Fatalf("iam_rw insert login event: %v", err)
+		}
+		var count int
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM iam.login_event`).Scan(&count); err != nil || count == 0 {
+			t.Fatalf("iam_rw select login event count=%d err=%v", count, err)
+		}
+	})
+
 	t.Run("bot and binding constraints", func(t *testing.T) {
 		insertBot(t, ctx, admin, "01ARZ3NDEKTSV4RRFFQ69G5FA6", "buyer", "buyer_primary", "primary", "active", 1)
 		assertSQLState(t, ctx, admin, "23505", `INSERT INTO iam.bot (public_id,"end",username,role_in_pool,status,token_enc,webhook_secret_enc,priority) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FA7','buyer','buyer_second_primary','primary','active','\x01','\x02',2)`)

@@ -255,6 +255,7 @@ func main() {
 			Tokens:   tokens, RefreshTTL: cfg.RefreshTokenTTL, IdleTTL: cfg.SessionIdleTTL, MaxSessions: cfg.SessionMaxPerAccount, SessionCache: sessionCache,
 			Failures: &iam.FailureGuard{Limiter: limiter, Rule: gateway.Rule{Limit: cfg.LoginFailureLimit, Window: cfg.LoginFailureWindow}},
 			Metrics:  metrics.Business(),
+			Logger:   logger,
 		}
 		authenticator = iam.Authenticator{Tokens: tokens}
 	}
