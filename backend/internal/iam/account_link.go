@@ -50,6 +50,13 @@ func NewAccountLinkService(repo AccountLinkRepository, newID func() (string, err
 // CandidateBuyers returns only the IAM-filtered buyer account identifiers for a merchant account.
 // It intentionally delegates matching to the repository so no other module reads iam tables directly.
 func (s *AccountLinkService) CandidateBuyers(ctx context.Context, merchantAccountID string) ([]AccountLinkCandidate, error) {
+	owner, err := s.repo.IsActiveMerchantOwner(ctx, merchantAccountID)
+	if err != nil {
+		return nil, err
+	}
+	if !owner {
+		return nil, ErrAccountLinkForbidden
+	}
 	return s.repo.CandidateBuyers(ctx, merchantAccountID)
 }
 
