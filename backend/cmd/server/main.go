@@ -53,6 +53,20 @@ func main() {
 		os.Exit(1)
 	}
 	defer database.Close()
+	if cfg.ReportDatabaseURL != "" {
+		report, reportErr := observability.NewReportPool(ctx, cfg, metrics, logger)
+		if reportErr != nil {
+			logger.Error("report database pool failed", "error", reportErr)
+			os.Exit(1)
+		}
+		defer report.Close()
+	}
+	worker, err := observability.NewWorkerPool(ctx, cfg, metrics, logger)
+	if err != nil {
+		logger.Error("worker database pool failed", "error", err)
+		os.Exit(1)
+	}
+	defer worker.Close()
 
 	var waitMu sync.Mutex
 	var lastAcquireCount int64

@@ -172,14 +172,14 @@ func statusClass(status int) string {
 	}
 }
 
-func (m *Metrics) RegisterPool(pool *pgxpool.Pool) {
+func (m *Metrics) RegisterPool(name string, pool *pgxpool.Pool) {
 	if m == nil || pool == nil {
 		return
 	}
 	m.registry.MustRegister(
-		prometheus.NewGaugeFunc(prometheus.GaugeOpts{Name: "drlife_db_pool_acquired_connections", Help: "Connections currently acquired."}, func() float64 { return float64(pool.Stat().AcquiredConns()) }),
-		prometheus.NewGaugeFunc(prometheus.GaugeOpts{Name: "drlife_db_pool_idle_connections", Help: "Connections currently idle."}, func() float64 { return float64(pool.Stat().IdleConns()) }),
-		prometheus.NewCounterFunc(prometheus.CounterOpts{Name: "drlife_db_pool_acquire_wait_seconds_total", Help: "Cumulative time waiting to acquire a connection."}, func() float64 { return pool.Stat().AcquireDuration().Seconds() }),
+		prometheus.NewGaugeFunc(prometheus.GaugeOpts{Name: "drlife_db_pool_acquired_connections", Help: "Connections currently acquired.", ConstLabels: prometheus.Labels{"pool": name}}, func() float64 { return float64(pool.Stat().AcquiredConns()) }),
+		prometheus.NewGaugeFunc(prometheus.GaugeOpts{Name: "drlife_db_pool_idle_connections", Help: "Connections currently idle.", ConstLabels: prometheus.Labels{"pool": name}}, func() float64 { return float64(pool.Stat().IdleConns()) }),
+		prometheus.NewCounterFunc(prometheus.CounterOpts{Name: "drlife_db_pool_acquire_wait_seconds_total", Help: "Cumulative time waiting to acquire a connection.", ConstLabels: prometheus.Labels{"pool": name}}, func() float64 { return pool.Stat().AcquireDuration().Seconds() }),
 	)
 }
 

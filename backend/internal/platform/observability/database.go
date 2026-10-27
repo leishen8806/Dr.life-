@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
+	platformdb "github.com/leishen8806/Dr.life-/backend/internal/platform/db"
 )
 
 type queryStartedKey struct{}
@@ -102,22 +102,29 @@ func (c *slowQueryCatalog) observe(fingerprint string) (label string, first bool
 }
 
 func NewDatabasePool(ctx context.Context, cfg config.Config, metrics *Metrics, logger *slog.Logger) (*pgxpool.Pool, error) {
-	if cfg.DatabaseURL == "" {
-		return nil, fmt.Errorf("database URL is required")
-	}
-	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	pool, err := platformdb.NewPool(ctx, cfg, NewQueryTracer(cfg.DBSlowQuery, metrics, logger))
 	if err != nil {
-		return nil, fmt.Errorf("parse database URL: %w", err)
+		return nil, err
 	}
-	poolConfig.MaxConns = cfg.DBMaxConns
-	poolConfig.MinConns = cfg.DBMinConns
-	poolConfig.ConnConfig.ConnectTimeout = cfg.DBConnectTimeout
-	poolConfig.ConnConfig.Tracer = NewQueryTracer(cfg.DBSlowQuery, metrics, logger)
-	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	metrics.RegisterPool("oltp", pool)
+	return pool, nil
+}
+
+func NewReportPool(ctx context.Context, cfg config.Config, metrics *Metrics, logger *slog.Logger) (*pgxpool.Pool, error) {
+	pool, err := platformdb.NewReadOnlyPool(ctx, cfg, NewQueryTracer(cfg.DBSlowQuery, metrics, logger))
 	if err != nil {
-		return nil, fmt.Errorf("create database pool: %w", err)
+		return nil, err
 	}
-	metrics.RegisterPool(pool)
+	metrics.RegisterPool("report", pool)
+	return pool, nil
+}
+
+func NewWorkerPool(ctx context.Context, cfg config.Config, metrics *Metrics, logger *slog.Logger) (*pgxpool.Pool, error) {
+	pool, err := platformdb.NewWorkerPool(ctx, cfg, NewQueryTracer(cfg.DBSlowQuery, metrics, logger))
+	if err != nil {
+		return nil, err
+	}
+	metrics.RegisterPool("worker", pool)
 	return pool, nil
 }
 
