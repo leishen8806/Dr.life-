@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/v1/admin/financial-center": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get ledger-derived financial-center reporting */
+        get: operations["getAdminFinancialCenter"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/audit": {
         parameters: {
             query?: never;
@@ -840,6 +857,65 @@ export interface components {
             data: components["schemas"]["AuditListData"];
             request_id: string;
         };
+        RevenueByCategory: {
+            /** @enum {string} */
+            category: "storage" | "delivery_margin" | "ads" | "settle_fee" | "member";
+            /** Format: int64 */
+            amount_e4: number;
+        };
+        FundsPosition: {
+            /** Format: int64 */
+            user_available_e4: number;
+            /** Format: int64 */
+            frozen_e4: number;
+            /** Format: int64 */
+            pending_payout_e4: number;
+            /** Format: int64 */
+            delivery_escrow_e4: number;
+            /** Format: int64 */
+            ad_budget_e4: number;
+            /** Format: int64 */
+            platform_held_e4: number;
+            /** Format: int64 */
+            payable_carrier_e4: number;
+            /** Format: int64 */
+            suspense_e4: number;
+            /** Format: int64 */
+            internal_total_e4: number;
+            /** Format: int64 */
+            bank_dedicated_e4: number;
+            matches_bank: boolean;
+        };
+        WithdrawalSummary: {
+            /** Format: int64 */
+            pending_count: number;
+            /** Format: int64 */
+            pending_amount_e4: number;
+            /** Format: int64 */
+            paid_count: number;
+            /** Format: int64 */
+            paid_amount_e4: number;
+        };
+        MerchantBalance: {
+            /** Format: int64 */
+            merchant_id: number;
+            /** Format: int64 */
+            available_e4: number;
+        };
+        FinancialCenterData: {
+            revenue: components["schemas"]["RevenueByCategory"][];
+            /** Format: int64 */
+            revenue_total_e4: number;
+            position: components["schemas"]["FundsPosition"];
+            withdrawals: components["schemas"]["WithdrawalSummary"];
+            merchant_balances: components["schemas"]["MerchantBalance"][];
+        };
+        FinancialCenterSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["FinancialCenterData"];
+            request_id: string;
+        };
         /** @description Read-only ledger data. Amounts are signed or unsigned integer e4 values; clients format them only for display. */
         LedgerReadData: {
             [key: string]: unknown;
@@ -1065,6 +1141,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getAdminFinancialCenter: {
+        parameters: {
+            query?: {
+                /** @description Inclusive UTC period start. Must be supplied with to. */
+                from?: string;
+                /** @description Exclusive UTC period end. Must be supplied with from. */
+                to?: string;
+                /** @description Maximum merchant rows, from 1 through 100. */
+                merchant_limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Financial-center report derived from the ledger. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancialCenterSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     listAdminAudit: {
         parameters: {
             query?: {

@@ -243,7 +243,10 @@ func decodeErrorCode(t *testing.T, recorder *httptest.ResponseRecorder) int {
 	return body.Error.Code
 }
 
-type fakeLedgerReader struct{ walletOwner int64 }
+type fakeLedgerReader struct {
+	walletOwner int64
+	financial   ledger.FinancialCenterFilter
+}
 
 func (f *fakeLedgerReader) ListAdminTransactions(context.Context, int) ([]ledger.AdminTransaction, error) {
 	return []ledger.AdminTransaction{{TxnNo: "TXN-1", AmountE4: 100}}, nil
@@ -264,6 +267,10 @@ func (f *fakeLedgerReader) ListWalletTransactions(_ context.Context, q ledger.Wa
 func (f *fakeLedgerReader) GetWalletTransaction(context.Context, int64, string) (ledger.WalletTransaction, bool, error) {
 	return ledger.WalletTransaction{TxnNo: "TXN-OWN", AmountE4: 1200, Kind: "txn"}, true, nil
 }
+func (f *fakeLedgerReader) FinancialCenter(_ context.Context, filter ledger.FinancialCenterFilter) (ledger.FinancialCenterReport, error) {
+	f.financial = filter
+	return ledger.FinancialCenterReport{}, nil
+}
 
 type fakeAccountDirectory struct{ account iam.AccountResolution }
 
@@ -281,7 +288,7 @@ func (f fakeAdminPermissions) HasDataScope(context.Context, string) (bool, error
 }
 
 func ledgerHandler(auth gateway.Authenticator, reader api.LedgerReader, directory api.AccountDirectory, permissions api.AdminPermissionChecker) http.Handler {
-	return server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: auth, Ledger: reader, Directory: directory, AdminPermissions: permissions})
+	return server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: auth, Ledger: reader, Directory: directory, AdminPermissions: permissions})
 }
 
 func TestLedgerReadFailsClosedAndWalletNeverLeaksInternalFields(t *testing.T) {
@@ -303,6 +310,18 @@ func TestLedgerReadFailsClosedAndWalletNeverLeaksInternalFields(t *testing.T) {
 	staff := ledgerHandler(stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleMerchant}}, &fakeLedgerReader{}, fakeAccountDirectory{account: iam.AccountResolution{ID: 41, Role: "merchant_staff", Status: "active"}}, nil)
 	if got := serve(t, staff, httptest.NewRequest(http.MethodGet, "/v1/merchant/wallet/transactions", nil)); got.Code != http.StatusForbidden {
 		t.Fatalf("merchant staff without fin view status=%d", got.Code)
+	}
+}
+
+func TestFinancialCenterUsesAuthorizedLedgerReader(t *testing.T) {
+	reader := &fakeLedgerReader{}
+	handler := ledgerHandler(stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, reader, nil, fakeAdminPermissions{allowed: true})
+	response := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/admin/financial-center?from=2026-10-01T00:00:00Z&to=2026-10-02T00:00:00Z&merchant_limit=25", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if reader.financial.From != time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC) || reader.financial.To != time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC) || reader.financial.MerchantLimit != 25 {
+		t.Fatalf("filter=%+v", reader.financial)
 	}
 }
 
