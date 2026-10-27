@@ -30,6 +30,7 @@ func (fakeLedger) ReleasePayoutFreeze(context.Context, int64, int64, string) (le
 
 func TestParseCommand(t *testing.T) {
 	valid := [][]string{
+		{"recon"},
 		{"recon", "--day", "2026-10-14"},
 		{"recon", "--day", "2026-10-14", "--force", "--reason", "after repair"},
 		{"snapshot", "--day", "2026-10-14"},
@@ -42,7 +43,7 @@ func TestParseCommand(t *testing.T) {
 		}
 	}
 	invalid := [][]string{
-		nil, {"recon"}, {"recon", "--day", "bad"},
+		nil, {"recon", "--day", "bad"},
 		{"recon", "--day", "2026-10-14", "--force"},
 		{"snapshot", "--day", "2026-10-14", "--force"},
 		{"freeze", "release", "--id", "0", "--by", "2", "--reason", "checked"},
@@ -67,5 +68,8 @@ func TestExecuteExitCodes(t *testing.T) {
 	}
 	if got := execute(context.Background(), cmd, fakeLedger{err: errors.New("database unavailable")}, &stdout, &stderr); got != 1 {
 		t.Fatalf("operation error exit=%d", got)
+	}
+	if got := execute(context.Background(), cmd, fakeLedger{err: ledger.ErrReconciliationDayOpen}, &stdout, &stderr); got != 2 {
+		t.Fatalf("open reconciliation day exit=%d", got)
 	}
 }

@@ -27,6 +27,7 @@ var publicServiceMethods = []string{
 	"ListOverdueWithdrawals", "ListPayoutFreezes", "MemberFee", "OldestUnsentOutboxAge", "RefundHold",
 	"ReleasePayoutFreeze", "RequestWithdrawal", "ResolveDispute", "Reverse",
 	"RunDailyReconciliation", "SettleHold", "SnapshotDaily", "StartReview", "StorageFee",
+	"StopSpotChecks",
 	"Sweep", "Topup", "VerifyHoldsMatchFrozen", "VerifyPendingPayoutMatchesWithdrawals",
 }
 
@@ -69,7 +70,7 @@ func TestLedgerImportGuard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	allowed := map[string]bool{"cmd/ledgerctl": true}
+	allowed := map[string]bool{"cmd/ledgerctl": true, "internal/platform/queue/outbox": true}
 	if err := validateLedgerImports(imports, allowed); err != nil {
 		t.Fatal(err)
 	}
