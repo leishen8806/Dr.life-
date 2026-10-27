@@ -20,9 +20,8 @@ func TestMinIOPresignedURLs(t *testing.T) {
 	ctx := context.Background()
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
-			Image:        "quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z",
+			Image:        "bitnamilegacy/minio:2024.10.29-debian-12-r0",
 			Env:          map[string]string{"MINIO_ROOT_USER": "testaccess", "MINIO_ROOT_PASSWORD": "testsecret"},
-			Cmd:          []string{"server", "/data"},
 			ExposedPorts: []string{"9000/tcp"},
 			WaitingFor:   wait.ForListeningPort("9000/tcp").WithStartupTimeout(60 * time.Second),
 		},
