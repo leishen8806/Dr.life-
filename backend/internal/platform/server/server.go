@@ -54,6 +54,9 @@ type GatewayOptions struct {
 	Audit             *platformaudit.Store
 	Sessions          api.SessionManagement
 	AccountLinks      api.AccountLinkManagement
+	Ledger            api.LedgerReader
+	Directory         api.AccountDirectory
+	AdminPermissions  api.AdminPermissionChecker
 }
 
 func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
@@ -96,7 +99,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeMethodNotAllowed))
 	})
-	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, Sessions: options.Sessions, AccountLinks: options.AccountLinks, ClientIP: options.ClientIP, Audit: options.Audit}, router)
+	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, Sessions: options.Sessions, AccountLinks: options.AccountLinks, ClientIP: options.ClientIP, Audit: options.Audit, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions}, router)
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

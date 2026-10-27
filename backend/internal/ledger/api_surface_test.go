@@ -70,7 +70,10 @@ func TestLedgerImportGuard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	allowed := map[string]bool{"cmd/ledgerctl": true, "internal/platform/queue/outbox": true}
+	// L-09a reviewed read-only consumers. api only accepts LedgerReader and
+	// cmd/server constructs ReadService with the report pool; neither receives
+	// the balance-mutating Service surface.
+	allowed := map[string]bool{"cmd/ledgerctl": true, "cmd/server": true, "internal/api": true, "internal/platform/queue/outbox": true}
 	if err := validateLedgerImports(imports, allowed); err != nil {
 		t.Fatal(err)
 	}

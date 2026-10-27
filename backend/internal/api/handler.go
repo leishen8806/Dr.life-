@@ -7,12 +7,14 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
+	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
@@ -46,22 +48,234 @@ type AccountLinkManagement interface {
 	Unlink(context.Context, string, string) error
 }
 
+// AccountDirectory is the only L-09a bridge from ledger to IAM. The ledger
+// schema stores owner_account as an opaque IAM id and must not query iam.account
+// directly.
+type AccountDirectory interface {
+	Resolve(context.Context, string) (iam.AccountResolution, bool, error)
+}
+
+// AdminPermissionChecker remains fail-closed until A-06b supplies the
+// production adapter. Test handlers inject an explicit fake.
+type AdminPermissionChecker interface {
+	Can(context.Context, string, string, string) (bool, error)
+	HasDataScope(context.Context, string) (bool, error)
+}
+
+type LedgerReader interface {
+	ListAdminTransactions(context.Context, int) ([]ledger.AdminTransaction, error)
+	GetAdminTransaction(context.Context, string) (ledger.AdminTransaction, bool, error)
+	ListAccountReconciliations(context.Context) ([]ledger.AdminAccountReconciliation, error)
+	ListAccountPostings(context.Context, int64, int) ([]ledger.AdminPosting, error)
+	ListWalletTransactions(context.Context, ledger.WalletTransactionQuery) (ledger.WalletTransactionPage, error)
+	GetWalletTransaction(context.Context, int64, string) (ledger.WalletTransaction, bool, error)
+}
+
 // Handler 实现 gen.ServerInterface。
 // 零值 Handler 只提供 /v1/public/ping；商品接口在依赖未注入时返回 500，
 // 这样 server.NewHandler(nil) 与契约测试的既有行为保持不变。
 type Handler struct {
-	Catalog      *catalog.Service
-	Merchants    MerchantResolver
-	Logger       *slog.Logger
-	Login        TelegramLogin
-	Sessions     SessionManagement
-	AccountLinks AccountLinkManagement
-	ClientIP     gateway.ClientIPResolver
-	Audit        *platformaudit.Store
+	Catalog          *catalog.Service
+	Merchants        MerchantResolver
+	Logger           *slog.Logger
+	Login            TelegramLogin
+	Sessions         SessionManagement
+	AccountLinks     AccountLinkManagement
+	ClientIP         gateway.ClientIPResolver
+	Audit            *platformaudit.Store
+	Ledger           LedgerReader
+	Directory        AccountDirectory
+	AdminPermissions AdminPermissionChecker
 }
 
 func (Handler) GetPublicPing(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, map[string]bool{"pong": true})
+}
+
+func (h Handler) GetAdminLedgerTxns(w http.ResponseWriter, r *http.Request) {
+	if !h.adminLedgerAccess(w, r) {
+		return
+	}
+	if h.Ledger == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	items, err := h.Ledger.ListAdminTransactions(r.Context(), 30)
+	if err != nil {
+		h.ledgerError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, map[string]any{"items": items})
+}
+
+func (h Handler) GetAdminLedgerTxn(w http.ResponseWriter, r *http.Request, txnNo string) {
+	if !h.adminLedgerAccess(w, r) {
+		return
+	}
+	if h.Ledger == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	item, found, err := h.Ledger.GetAdminTransaction(r.Context(), txnNo)
+	if err != nil {
+		h.ledgerError(w, r, err)
+		return
+	}
+	if found {
+		httpx.WriteOK(w, r, item)
+		return
+	}
+	httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
+}
+
+func (h Handler) GetAdminLedgerAccounts(w http.ResponseWriter, r *http.Request) {
+	if !h.adminLedgerAccess(w, r) {
+		return
+	}
+	if h.Ledger == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	items, err := h.Ledger.ListAccountReconciliations(r.Context())
+	if err != nil {
+		h.ledgerError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, map[string]any{"items": items})
+}
+
+func (h Handler) GetAdminLedgerAccountPostings(w http.ResponseWriter, r *http.Request, accountRef string) {
+	if !h.adminLedgerAccess(w, r) {
+		return
+	}
+	if h.Ledger == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	accountID, err := strconv.ParseInt(accountRef, 10, 64)
+	if err != nil || accountID <= 0 {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return
+	}
+	items, err := h.Ledger.ListAccountPostings(r.Context(), accountID, 30)
+	if err != nil {
+		h.ledgerError(w, r, err)
+		return
+	}
+	if len(items) == 0 {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
+		return
+	}
+	httpx.WriteOK(w, r, map[string]any{"items": items})
+}
+
+func (h Handler) GetBuyerWalletTransactions(w http.ResponseWriter, r *http.Request) {
+	h.walletTransactions(w, r, "buyer")
+}
+func (h Handler) GetMerchantWalletTransactions(w http.ResponseWriter, r *http.Request) {
+	h.walletTransactions(w, r, "merchant")
+}
+func (h Handler) GetDriverWalletTransactions(w http.ResponseWriter, r *http.Request) {
+	h.walletTransactions(w, r, "driver")
+}
+func (h Handler) GetBuyerWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string) {
+	h.walletTransaction(w, r, "buyer", txnNo)
+}
+func (h Handler) GetMerchantWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string) {
+	h.walletTransaction(w, r, "merchant", txnNo)
+}
+func (h Handler) GetDriverWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string) {
+	h.walletTransaction(w, r, "driver", txnNo)
+}
+
+func (h Handler) adminLedgerAccess(w http.ResponseWriter, r *http.Request) bool {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return false
+	}
+	if identity.Role != gateway.RoleAdmin || h.AdminPermissions == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	allowed, err := h.AdminPermissions.Can(r.Context(), identity.AccountID, "fund", "view")
+	if err != nil || !allowed {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	scoped, err := h.AdminPermissions.HasDataScope(r.Context(), identity.AccountID)
+	if err != nil || scoped {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	return true
+}
+
+func (h Handler) walletTransactions(w http.ResponseWriter, r *http.Request, end string) {
+	owner, ok := h.walletOwner(w, r, end)
+	if !ok {
+		return
+	}
+	items, err := h.Ledger.ListWalletTransactions(r.Context(), ledger.WalletTransactionQuery{OwnerAccountID: owner.ID, PageSize: 30})
+	if err != nil {
+		h.ledgerError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, items)
+}
+
+func (h Handler) walletTransaction(w http.ResponseWriter, r *http.Request, end, txnNo string) {
+	owner, ok := h.walletOwner(w, r, end)
+	if !ok {
+		return
+	}
+	item, found, err := h.Ledger.GetWalletTransaction(r.Context(), owner.ID, txnNo)
+	if err != nil {
+		h.ledgerError(w, r, err)
+		return
+	}
+	if !found {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
+		return
+	}
+	httpx.WriteOK(w, r, item)
+}
+
+func (h Handler) walletOwner(w http.ResponseWriter, r *http.Request, end string) (iam.AccountResolution, bool) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return iam.AccountResolution{}, false
+	}
+	if string(identity.Role) != end || h.Directory == nil || h.Ledger == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return iam.AccountResolution{}, false
+	}
+	account, found, err := h.Directory.Resolve(r.Context(), identity.AccountID)
+	if err != nil {
+		h.ledgerError(w, r, err)
+		return iam.AccountResolution{}, false
+	}
+	if !found || account.Status != "active" {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
+		return iam.AccountResolution{}, false
+	}
+	if end == "merchant" && account.Role == "merchant_staff" && !identity.HasPermission("fin", "view") {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return iam.AccountResolution{}, false
+	}
+	return account, true
+}
+
+func (h Handler) ledgerError(w http.ResponseWriter, r *http.Request, err error) {
+	if errors.Is(err, ledger.ErrInvalidRequest) {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return
+	}
+	if h.Logger != nil {
+		h.Logger.ErrorContext(r.Context(), "ledger read failed", "request_id", httpx.RequestIDFromContext(r.Context()))
+	}
+	httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInternalError))
 }
 
 func (h Handler) ListAdminAudit(w http.ResponseWriter, r *http.Request, params gen.ListAdminAuditParams) {

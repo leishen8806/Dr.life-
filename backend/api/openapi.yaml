@@ -258,6 +258,135 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/ledger/txns:
+    get:
+      tags: [admin]
+      operationId: getAdminLedgerTxns
+      summary: List ledger transactions for authorized finance users
+      description: Requires fund view. Administrators with a non-empty data scope are denied because ledger accounts have no region field.
+      x-roles: [admin]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/ledger/txns/{txn_no}:
+    get:
+      tags: [admin]
+      operationId: getAdminLedgerTxn
+      summary: Read a transaction and its postings
+      x-roles: [admin]
+      parameters:
+        - name: txn_no
+          in: path
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 128}
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/ledger/accounts:
+    get:
+      tags: [admin]
+      operationId: getAdminLedgerAccounts
+      summary: List cached versus reconciled account balances
+      x-roles: [admin]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/ledger/accounts/{account_ref}/postings:
+    get:
+      tags: [admin]
+      operationId: getAdminLedgerAccountPostings
+      summary: List postings belonging to one account
+      x-roles: [admin]
+      parameters:
+        - name: account_ref
+          in: path
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 64}
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/wallet/transactions:
+    get:
+      tags: [buyer]
+      operationId: getBuyerWalletTransactions
+      summary: List the authenticated buyer wallet transactions
+      x-roles: [buyer]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/wallet/transactions:
+    get:
+      tags: [merchant]
+      operationId: getMerchantWalletTransactions
+      summary: List the authenticated merchant wallet transactions
+      x-roles: [merchant]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/wallet/transactions:
+    get:
+      tags: [driver]
+      operationId: getDriverWalletTransactions
+      summary: List the authenticated driver wallet transactions
+      x-roles: [driver]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/wallet/transactions/{txn_no}:
+    get:
+      tags: [buyer]
+      operationId: getBuyerWalletTransaction
+      summary: Read one buyer transaction visible to the authenticated account
+      x-roles: [buyer]
+      parameters: [{name: txn_no, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/wallet/transactions/{txn_no}:
+    get:
+      tags: [merchant]
+      operationId: getMerchantWalletTransaction
+      summary: Read one merchant transaction visible to the authenticated account
+      x-roles: [merchant]
+      parameters: [{name: txn_no, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/wallet/transactions/{txn_no}:
+    get:
+      tags: [driver]
+      operationId: getDriverWalletTransaction
+      summary: Read one driver transaction visible to the authenticated account
+      x-roles: [driver]
+      parameters: [{name: txn_no, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /v1/public/ping:
     get:
       tags: [public]
@@ -1264,7 +1393,24 @@ components:
         ok: {type: boolean, enum: [true]}
         data: {$ref: "#/components/schemas/AuditListData"}
         request_id: {type: string, minLength: 1}
+    LedgerReadData:
+      type: object
+      additionalProperties: true
+      description: Read-only ledger data. Amounts are signed or unsigned integer e4 values; clients format them only for display.
+    LedgerReadSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/LedgerReadData"}
+        request_id: {type: string, minLength: 1}
   responses:
+    LedgerReadSucceeded:
+      description: Read-only ledger response.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/LedgerReadSuccessResponse"}
     RefreshSucceeded:
       description: Refresh token rotated successfully.
       content:
