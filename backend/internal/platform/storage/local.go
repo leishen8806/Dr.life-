@@ -25,12 +25,15 @@ type localStorage struct {
 	policy  Policy
 }
 
-func NewLocal(config LocalConfig, policy Policy) Storage {
+func NewLocal(config LocalConfig, policy Policy) (Storage, error) {
+	if len(config.Secret) == 0 {
+		return nil, ErrSecretRequired
+	}
 	now := config.Now
 	if now == nil {
 		now = time.Now
 	}
-	return &localStorage{baseURL: strings.TrimRight(config.BaseURL, "/"), secret: config.Secret, now: now, policy: policy}
+	return &localStorage{baseURL: strings.TrimRight(config.BaseURL, "/"), secret: config.Secret, now: now, policy: policy}, nil
 }
 
 func (s *localStorage) PresignPut(_ context.Context, in PutRequest) (SignedURL, error) {
@@ -41,6 +44,9 @@ func (s *localStorage) PresignPut(_ context.Context, in PutRequest) (SignedURL, 
 }
 
 func (s *localStorage) PresignGet(_ context.Context, key string) (SignedURL, error) {
+	if !validRandomKey(key) {
+		return SignedURL{}, ErrInvalidObjectKey
+	}
 	return s.signed("GET", key, "", 0, getTTL), nil
 }
 

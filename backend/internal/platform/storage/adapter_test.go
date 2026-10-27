@@ -2,14 +2,19 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"strings"
 	"testing"
 )
 
 func TestAdaptersSharePresignContract(t *testing.T) {
+	local, err := NewLocal(LocalConfig{BaseURL: "https://files.example.test", Secret: []byte("test-secret")}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
 	adapters := map[string]Storage{
-		"local": NewLocal(LocalConfig{BaseURL: "https://files.example.test", Secret: []byte("test-secret")}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100}),
+		"local": local,
 		"s3":    NewS3(S3Config{Bucket: "bucket", Region: "us-east-1", Endpoint: "https://s3.example.test", AccessKey: "test", SecretKey: "test"}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100}),
 		"minio": NewMinIO(MinIOConfig{Bucket: "bucket", Endpoint: "https://minio.example.test", AccessKey: "test", SecretKey: "test"}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100}),
 	}
@@ -34,6 +39,24 @@ func TestAdaptersSharePresignContract(t *testing.T) {
 			}
 			if _, err := adapter.PresignGet(context.Background(), signed.Key); err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestAdaptersRejectInvalidObjectKeys(t *testing.T) {
+	local, err := NewLocal(LocalConfig{BaseURL: "https://files.example.test", Secret: []byte("test-secret")}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, adapter := range map[string]Storage{
+		"local": local,
+		"s3":    NewS3(S3Config{Bucket: "bucket", Region: "us-east-1", Endpoint: "https://s3.example.test", AccessKey: "test", SecretKey: "test"}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100}),
+		"minio": NewMinIO(MinIOConfig{Bucket: "bucket", Endpoint: "https://minio.example.test", AccessKey: "test", SecretKey: "test"}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := adapter.PresignGet(context.Background(), "objects/.."); !errors.Is(err, ErrInvalidObjectKey) {
+				t.Fatalf("PresignGet() error = %v, want %v", err, ErrInvalidObjectKey)
 			}
 		})
 	}

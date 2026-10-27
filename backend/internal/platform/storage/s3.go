@@ -57,6 +57,9 @@ func (s *s3Storage) PresignPut(ctx context.Context, in PutRequest) (SignedURL, e
 }
 
 func (s *s3Storage) PresignGet(ctx context.Context, key string) (SignedURL, error) {
+	if !validRandomKey(key) {
+		return SignedURL{}, ErrInvalidObjectKey
+	}
 	request, err := s.client.PresignGetObject(ctx, &awss3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)}, func(o *awss3.PresignOptions) { o.Expires = s.getExpires })
 	if err != nil {
 		return SignedURL{}, err

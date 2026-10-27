@@ -18,6 +18,9 @@ var (
 	ErrContentLengthInvalid  = errors.New("storage content length must be positive")
 	ErrURLExpired            = errors.New("storage signed URL has expired")
 	ErrInvalidSignature      = errors.New("storage signed URL signature is invalid")
+	ErrPolicyNotConfigured   = errors.New("storage upload policy must be explicitly configured")
+	ErrSecretRequired        = errors.New("storage local signing secret is required")
+	ErrInvalidObjectKey      = errors.New("storage object key is invalid")
 )
 
 type Policy struct {
@@ -42,14 +45,14 @@ type Storage interface {
 }
 
 func (p Policy) validate(in PutRequest) error {
+	if len(p.AllowedContentTypes) == 0 || p.MaxContentLength <= 0 {
+		return ErrPolicyNotConfigured
+	}
 	if in.ContentLength <= 0 {
 		return ErrContentLengthInvalid
 	}
 	if p.MaxContentLength > 0 && in.ContentLength > p.MaxContentLength {
 		return ErrContentLengthTooLarge
-	}
-	if len(p.AllowedContentTypes) == 0 {
-		return nil
 	}
 	for _, contentType := range p.AllowedContentTypes {
 		if in.ContentType == contentType {

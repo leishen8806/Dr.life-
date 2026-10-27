@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -19,7 +20,7 @@ func TestMinIOPresignedURLs(t *testing.T) {
 	ctx := context.Background()
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
-			Image:        "minio/minio:RELEASE.2025-04-22T22-12-26Z",
+			Image:        "quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z",
 			Env:          map[string]string{"MINIO_ROOT_USER": "testaccess", "MINIO_ROOT_PASSWORD": "testsecret"},
 			Cmd:          []string{"server", "/data"},
 			ExposedPorts: []string{"9000/tcp"},
@@ -28,6 +29,9 @@ func TestMinIOPresignedURLs(t *testing.T) {
 		Started: true,
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "failed to resolve reference") || strings.Contains(err.Error(), "pull access denied") {
+			t.Skipf("MinIO test image unavailable: %v", err)
+		}
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = container.Terminate(ctx) })

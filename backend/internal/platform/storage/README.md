@@ -12,8 +12,8 @@ This package uses `github.com/aws/aws-sdk-go-v2/service/s3`. The AWS SDK's SigV4
 
 - PUT expiry is fixed at 10 minutes; signed PUTs include `Content-Type` and `Content-Length`.
 - GET expiry is fixed at 5 minutes.
-- `Policy.AllowedContentTypes` rejects any unlisted type; an empty list permits all types.
-- `Policy.MaxContentLength` rejects larger objects; zero means no configured upper bound.
+- `Policy.AllowedContentTypes` must be non-empty and rejects any unlisted type.
+- `Policy.MaxContentLength` must be positive and rejects larger objects.
 - Invalid content types, oversized content, and non-positive length return distinct sentinel errors.
 
 ## Configuration
@@ -32,3 +32,5 @@ This package uses `github.com/aws/aws-sdk-go-v2/service/s3`. The AWS SDK's SigV4
 | `STORAGE_SCAN_HOOK_ENABLED` | `false` | Reserved malware-scan hook; disabled by default. |
 
 No presigned URL, access key, or secret key may be written to logs. ScanHook is intentionally only documented here: wiring and a provider decision are outside this package's scope.
+
+`VerifyLocalURL` validates the signature and expiry only. Its caller must separately verify that the actual HTTP request method matches the signed URL's `method` query parameter.
