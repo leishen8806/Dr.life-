@@ -3,8 +3,10 @@ package storage
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -16,19 +18,36 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
+func TestSkipUnavailableImageOutsideCI(t *testing.T) {
+	err := fmt.Errorf("pull access denied")
+	if !skipUnavailableImage("", err) {
+		t.Fatal("local unavailable image should be skipped")
+	}
+	if skipUnavailableImage("true", err) {
+		t.Fatal("CI unavailable image must fail")
+	}
+	if skipUnavailableImage("", fmt.Errorf("container did not start")) {
+		t.Fatal("non-image failure must not be skipped")
+	}
+}
+
+func skipUnavailableImage(ci string, err error) bool {
+	return ci == "" && (strings.Contains(err.Error(), "failed to resolve reference") || strings.Contains(err.Error(), "pull access denied"))
+}
+
 func TestMinIOPresignedURLs(t *testing.T) {
 	ctx := context.Background()
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: testcontainers.ContainerRequest{
-			Image:        "bitnamilegacy/minio:2024.10.29-debian-12-r0",
-			Env:          map[string]string{"MINIO_ROOT_USER": "testaccess", "MINIO_ROOT_PASSWORD": "testsecret"},
+			Image:        "rustfs/rustfs:1.0.0-alpha.50",
+			Env:          map[string]string{"RUSTFS_ACCESS_KEY": "testaccess", "RUSTFS_SECRET_KEY": "testsecret"},
 			ExposedPorts: []string{"9000/tcp"},
 			WaitingFor:   wait.ForListeningPort("9000/tcp").WithStartupTimeout(60 * time.Second),
 		},
 		Started: true,
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "failed to resolve reference") || strings.Contains(err.Error(), "pull access denied") {
+		if skipUnavailableImage(os.Getenv("CI"), err) {
 			t.Skipf("MinIO test image unavailable: %v", err)
 		}
 		t.Fatal(err)
