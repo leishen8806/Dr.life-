@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -81,12 +83,12 @@ func (s *HTTPSender) SendMessage(ctx context.Context, botID string, chatID int64
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/bot"+token+"/sendMessage", bytes.NewReader(body))
 	if err != nil {
-		return Result{Kind: ResultPermanentError, Err: err}
+		return Result{Kind: ResultPermanentError, Err: scrubURLError(err)}
 	}
 	req.Header.Set("Content-Type", "application/json")
 	response, err := s.client.Do(req)
 	if err != nil {
-		return Result{Kind: ResultTemporaryError, Err: err}
+		return Result{Kind: ResultTemporaryError, Err: scrubURLError(err)}
 	}
 	defer response.Body.Close()
 	var payload struct {
@@ -113,4 +115,14 @@ func (s *HTTPSender) SendMessage(ctx context.Context, botID string, chatID int64
 		return Result{Kind: ResultTemporaryError}
 	}
 	return Result{Kind: ResultPermanentError}
+}
+
+// scrubURLError drops the request URL from transport and request-building errors: the URL embeds the
+// bot token, so a *url.Error must never reach logs or callers.
+func scrubURLError(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return fmt.Errorf("telegram request failed: %s: %w", urlErr.Op, urlErr.Err)
+	}
+	return errors.New("telegram request failed")
 }

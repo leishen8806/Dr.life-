@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -36,5 +37,27 @@ func TestHTTPSenderClassifiesTelegramResponses(t *testing.T) {
 				t.Fatalf("result = %#v, want kind %v retry %v", result, tc.wantKind, tc.wantRetry)
 			}
 		})
+	}
+}
+
+func TestHTTPSenderErrorsNeverContainTheBotToken(t *testing.T) {
+	const token = "123456:SECRET-TOKEN"
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	url := server.URL
+	server.Close() // connection refused: the transport error would normally embed the full request URL
+
+	sender := NewHTTPSender(url, StaticTokenProvider{"primary": token}, SenderOptions{Timeout: time.Second})
+	result := sender.SendMessage(context.Background(), "primary", 123, "hello", SendOptions{})
+	if result.Kind != ResultTemporaryError || result.Err == nil {
+		t.Fatalf("result = %#v, want temporary error", result)
+	}
+	if strings.Contains(result.Err.Error(), token) || strings.Contains(result.Err.Error(), "SECRET") {
+		t.Fatalf("error leaks the bot token: %v", result.Err)
+	}
+
+	bad := NewHTTPSender("http://bad host", StaticTokenProvider{"primary": token}, SenderOptions{Timeout: time.Second})
+	result = bad.SendMessage(context.Background(), "primary", 123, "hello", SendOptions{})
+	if result.Err == nil || strings.Contains(result.Err.Error(), token) {
+		t.Fatalf("request-building error leaks the bot token: %v", result.Err)
 	}
 }
