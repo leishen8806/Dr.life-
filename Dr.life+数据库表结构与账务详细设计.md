@@ -405,9 +405,9 @@ create table ledger.payout_freeze (
 
 内部对账先按 `LEDGER_RECON_TIMEZONE`（默认 `Asia/Phnom_Penh`）的日界线写入只增不改的余额快照，再在**同一个只读 `REPEATABLE READ` 事务**中执行 `BALANCE_CACHE`、`TXN_BALANCED`、`IDENTITY`、`HOLD_FROZEN`、`PENDING_PAYOUT`、`REVERSAL`、`ORPHAN` 七项检查。快照重复写使用 `ON CONFLICT DO NOTHING`；已有快照与分录重算不一致时记录 `SNAPSHOT_DRIFT`。
 
-任何异常都写 `recon_issue` 与 `ledger.recon.failed` outbox 事件。单账户的 `BALANCE_CACHE` 异常建立账户级出款冻结；`TXN_BALANCED`、`IDENTITY`、`SNAPSHOT_DRIFT`、`REVERSAL`、`ORPHAN` 建立全局冻结。冻结阻止提现申请、出款确认、平台归集及承运商付款，不阻止提现失败或撤销时将款项退还用户。解除必须给出理由；人工发起的对账，其发起人不能解除自己触发的冻结。
+任何异常都写 `recon_issue` 与 `ledger.recon.failed` outbox 事件。`BALANCE_CACHE` 与 `HOLD_FROZEN` 异常建立该冻结账户同一 `owner_account` 的 `WALLET_AVAIL` 账户级出款冻结；`PENDING_PAYOUT`、`TXN_BALANCED`、`IDENTITY`、`SNAPSHOT_DRIFT`、`REVERSAL`、`ORPHAN` 建立全局冻结。冻结阻止提现申请、出款确认、平台归集及承运商付款，不阻止提现失败或撤销时将款项退还用户。解除必须给出理由；人工发起的对账，其发起人不能解除自己触发的冻结。
 
-默认重复执行同一天的每日对账会返回已有完成结果。显式强制重跑必须填写原因，并以递增 `attempt` 留下新记录；因此唯一键采用 `(day, kind, attempt)`，保留每次强制重跑的审计证据。已完成运行、异常明细与每日快照不可更新、删除或截断；冻结记录仅允许一次性填写 `released_*` 字段。
+每日快照和每日对账只允许处理已经结束的业务日；当日和未来日期不产生快照、运行记录或冻结。默认重复执行同一天的每日对账会返回已有完成结果。若最新运行仍为 `running`，未超过 30 分钟默认超时阈值则返回运行中错误；超过阈值则标记为 `failed`（`STALE_RUN`）、写 `ledger.recon.stale_run`，再以递增 `attempt` 继续。显式强制重跑必须填写原因，并以递增 `attempt` 留下新记录；因此唯一键采用 `(day, kind, attempt)`，保留每次强制重跑的审计证据。抽检仅比较相关账户余额缓存；正常抽检不创建 `recon_run`，仅发现不一致时创建 `kind='spot'` 运行并冻结账户。已完成运行、异常明细与每日快照不可更新、删除或截断；冻结记录仅允许一次性填写 `released_*` 字段。
 
 ### 2. 与审计中心 18 项检查的对应
 | 审计项 | 数据来源 |

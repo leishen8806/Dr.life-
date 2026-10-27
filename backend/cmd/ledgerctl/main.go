@@ -79,6 +79,9 @@ func execute(ctx context.Context, cmd command, service ledgerService, stdout, st
 	}
 	if err != nil {
 		fmt.Fprintln(stderr, err)
+		if errors.Is(err, ledger.ErrReconciliationDayOpen) {
+			return 2
+		}
 		return 1
 	}
 	if run, ok := value.(ledger.ReconciliationRun); ok && run.Status != "ok" {
@@ -100,7 +103,7 @@ func parseCommand(args []string) (command, error) {
 	case "recon", "snapshot":
 		set := flag.NewFlagSet(args[0], flag.ContinueOnError)
 		set.SetOutput(io.Discard)
-		dayText := set.String("day", "", "day in YYYY-MM-DD")
+		dayText := set.String("day", time.Now().AddDate(0, 0, -1).Format("2006-01-02"), "day in YYYY-MM-DD")
 		force := set.Bool("force", false, "force a new reconciliation attempt")
 		reason := set.String("reason", "", "force reason")
 		if err := set.Parse(args[1:]); err != nil || set.NArg() != 0 {

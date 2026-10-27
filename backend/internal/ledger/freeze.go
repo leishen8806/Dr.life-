@@ -2,6 +2,8 @@ package ledger
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -19,22 +21,34 @@ func (s *Service) maybeSpotCheck(postings []Posting) {
 	for id := range accountSet {
 		accountIDs = append(accountIDs, id)
 	}
+	s.spotCheckMu.Lock()
+	if s.spotCheckClosed {
+		s.spotCheckMu.Unlock()
+		return
+	}
+	select {
+	case s.spotCheckSem <- struct{}{}:
+		s.spotCheckWG.Add(1)
+		s.spotCheckMu.Unlock()
+	default:
+		s.spotCheckMu.Unlock()
+		if s.reconciliationMetrics != nil {
+			s.reconciliationMetrics.ReconSpotCheckDropped()
+		}
+		return
+	}
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer func() { <-s.spotCheckSem; s.spotCheckWG.Done() }()
+		ctx, cancel := context.WithTimeout(s.spotCheckCtx, 30*time.Second)
 		defer cancel()
 		_ = s.runSpotCheck(ctx, accountIDs)
 	}()
 }
 
 func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
-	day, _ := s.reconciliationDay(s.now())
-	run, _, err := s.startReconciliationRun(ctx, day, "spot", ReconciliationOptions{Force: true, Reason: "automatic posting spot check"})
-	if err != nil {
-		return err
-	}
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
-		s.failReconciliationRun(ctx, run.ID, err)
+		s.recordSpotCheckFailure(err)
 		return err
 	}
 	issues, err := checkBalanceCache(ctx, tx, accountIDs)
@@ -44,7 +58,16 @@ func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 		_ = tx.Rollback(ctx)
 	}
 	if err != nil {
-		s.failReconciliationRun(ctx, run.ID, err)
+		s.recordSpotCheckFailure(err)
+		return err
+	}
+	if len(issues) == 0 {
+		return nil
+	}
+	day, _ := s.reconciliationDay(s.now())
+	run, _, err := s.startReconciliationRun(ctx, day, "spot", ReconciliationOptions{Force: true, Reason: "automatic posting spot check"})
+	if err != nil {
+		s.recordSpotCheckFailure(err)
 		return err
 	}
 	_, err = s.finishReconciliationRun(ctx, run, issues)
@@ -52,4 +75,38 @@ func (s *Service) runSpotCheck(ctx context.Context, accountIDs []int64) error {
 		s.failReconciliationRun(ctx, run.ID, err)
 	}
 	return err
+}
+
+func (s *Service) recordSpotCheckFailure(err error) {
+	if s.reconciliationMetrics != nil {
+		s.reconciliationMetrics.ReconRun(false)
+	}
+	slog.Error("ledger spot check failed", "error_type", spotCheckErrorType(err))
+}
+
+func spotCheckErrorType(err error) string {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "deadline_exceeded"
+	default:
+		return "reconciliation"
+	}
+}
+
+func (s *Service) StopSpotChecks(ctx context.Context) error {
+	s.spotCheckMu.Lock()
+	s.spotCheckClosed = true
+	s.spotCheckMu.Unlock()
+	done := make(chan struct{})
+	go func() { s.spotCheckWG.Wait(); close(done) }()
+	select {
+	case <-done:
+		s.spotCheckCancel()
+		return nil
+	case <-ctx.Done():
+		s.spotCheckCancel()
+		return ctx.Err()
+	}
 }
