@@ -1,6 +1,7 @@
 package iam
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -9,6 +10,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"path/filepath"
 	"runtime"
@@ -34,6 +36,7 @@ import (
 
 type loginFixture struct {
 	pool     *pgxpool.Pool
+	dsn      string
 	envelope *secrets.Envelope
 	keys     *secrets.Keyring
 	now      time.Time
@@ -100,7 +103,7 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	jwtRing, _ := secrets.NewKeyring(map[string][]byte{"test": signing}, "test")
 	envelope, _ := secrets.NewEnvelope(masterRing)
 	now := time.Unix(1_800_000_000, 0)
-	f := &loginFixture{pool: pool, envelope: envelope, keys: jwtRing, now: now, tokens: map[telegram.End][]string{
+	f := &loginFixture{pool: pool, dsn: iamURL.String(), envelope: envelope, keys: jwtRing, now: now, tokens: map[telegram.End][]string{
 		telegram.Buyer: {"buyer-primary-token", "buyer-standby-token"}, telegram.Merchant: {"merchant-primary-token"}, telegram.Driver: {"driver-primary-token"},
 	}}
 	f.seedBots(t, ctx)
@@ -111,12 +114,154 @@ func TestTelegramLoginIntegration(t *testing.T) {
 
 	t.Run("pool isolation status and fallback", f.testPool)
 	t.Run("one hundred concurrent first logins", f.testConcurrentLogin)
+	t.Run("merchant owner account reuse and ambiguity", f.testMerchantOwnerReuseAndAmbiguity)
+	t.Run("ambiguous login audits with small pools", f.testAmbiguousLoginSmallPools)
 	t.Run("blocked account and safe events", f.testBlockedAndEvents)
 	t.Run("validation failures are classified", f.testFailureEvents)
+	t.Run("audit write failure is observable", f.testAuditWriteFailure)
 	t.Run("failure ban expires", f.testFailureBan)
 	t.Run("refresh plaintext is absent", f.testRefreshNotStored)
 	t.Run("refresh rotation concurrency reuse and revocation", f.testSessionLifecycle)
 	t.Run("session ownership cache rebuild and fail policy", f.testSessionAccess)
+}
+
+func (f *loginFixture) testMerchantOwnerReuseAndAmbiguity(t *testing.T) {
+	ctx := context.Background()
+	raw := signInit(f.now, 8003, "merchant-primary-token", "")
+	first, err := f.service.Login(ctx, LoginInput{End: telegram.Merchant, InitData: raw, IP: "198.51.100.13"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindTestMerchant(t, ctx, f.pool, first.Account.PublicID)
+	again, err := f.service.Login(ctx, LoginInput{End: telegram.Merchant, InitData: raw, IP: "198.51.100.13"})
+	if err != nil || again.Account.PublicID != first.Account.PublicID {
+		t.Fatalf("bound owner login=%+v err=%v", again, err)
+	}
+	var count int
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.account a JOIN iam.person p ON p.id=a.person_id WHERE p.tg_user_id=8003 AND a.role='merchant_owner'`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("merchant owner accounts=%d err=%v", count, err)
+	}
+	secondMerchantID := insertTestMerchant(t, ctx, f.pool)
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.account(public_id,person_id,role,merchant_id) SELECT $1,p.id,'merchant_owner',$2 FROM iam.person p WHERE p.tg_user_id=8003`, mustULID(t), secondMerchantID); err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.service.Login(ctx, LoginInput{End: telegram.Merchant, InitData: raw, IP: "198.51.100.13"})
+	var appErr *httpx.AppError
+	if !errorsAs(err, &appErr) || appErr.Code != httpx.CodeInternalError {
+		t.Fatalf("ambiguous login error=%v", err)
+	}
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.login_event e JOIN iam.person p ON p.id=e.person_id WHERE p.tg_user_id=8003 AND e.result='ambiguous_account'`).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("ambiguous audit events=%d err=%v", count, err)
+	}
+}
+
+func (f *loginFixture) testAmbiguousLoginSmallPools(t *testing.T) {
+	ctx := context.Background()
+	raw := signInit(f.now, 8003, "merchant-primary-token", "")
+	var wantCount int
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.login_event e JOIN iam.person p ON p.id=e.person_id WHERE p.tg_user_id=8003 AND e.result='ambiguous_account'`).Scan(&wantCount); err != nil {
+		t.Fatal(err)
+	}
+	for _, maxConns := range []int32{1, 4} {
+		t.Run(fmt.Sprintf("max conns %d", maxConns), func(t *testing.T) {
+			config, err := pgxpool.ParseConfig(f.dsn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			config.MaxConns = maxConns
+			pool, err := pgxpool.NewWithConfig(ctx, config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer pool.Close()
+			service := *f.service
+			service.DB = pool
+			service.Verifier.Source = &telegram.DBPoolSource{DB: pool, Envelope: f.envelope, TTL: 5 * time.Minute, Now: func() time.Time { return f.now }}
+			const requests = 4
+			errs := make(chan error, requests)
+			var wg sync.WaitGroup
+			for range requests {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					requestCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+					defer cancel()
+					_, err := service.Login(requestCtx, LoginInput{End: telegram.Merchant, InitData: raw, IP: "198.51.100.13"})
+					errs <- err
+				}()
+			}
+			wg.Wait()
+			close(errs)
+			for err := range errs {
+				var appErr *httpx.AppError
+				if !errorsAs(err, &appErr) || appErr.Code != httpx.CodeInternalError {
+					t.Fatalf("ambiguous login max conns %d error=%v", maxConns, err)
+				}
+			}
+			wantCount += requests
+			var count int
+			if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.login_event e JOIN iam.person p ON p.id=e.person_id WHERE p.tg_user_id=8003 AND e.result='ambiguous_account'`).Scan(&count); err != nil || count != wantCount {
+				t.Fatalf("max conns %d ambiguous audit events=%d, want %d, err=%v", maxConns, count, wantCount, err)
+			}
+		})
+	}
+}
+
+type auditFailureMetrics struct{ count int }
+
+func (*auditFailureMetrics) LoginValidationFailed(string, string) {}
+func (m *auditFailureMetrics) LoginAuditWriteFailed(string)       { m.count++ }
+
+func (f *loginFixture) testAuditWriteFailure(t *testing.T) {
+	closed, err := pgxpool.New(context.Background(), f.dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closed.Close()
+	metrics := &auditFailureMetrics{}
+	var logs bytes.Buffer
+	service := *f.service
+	service.DB = closed
+	service.Metrics = metrics
+	service.Logger = slog.New(slog.NewTextHandler(&logs, nil))
+	_, err = service.Login(context.Background(), LoginInput{End: telegram.Driver, InitData: "%zz", IP: "198.51.100.14"})
+	var appErr *httpx.AppError
+	if !errorsAs(err, &appErr) || appErr.Code != httpx.CodeTelegramLoginFailed {
+		t.Fatalf("response changed after audit write failure: %v", err)
+	}
+	if metrics.count != 1 {
+		t.Fatalf("audit write failure metric=%d, want 1", metrics.count)
+	}
+	if !strings.Contains(logs.String(), "login audit write failed") {
+		t.Fatalf("audit write failure was not logged: %q", logs.String())
+	}
+}
+
+func bindTestMerchant(t *testing.T, ctx context.Context, pool *pgxpool.Pool, accountPublicID string) int64 {
+	t.Helper()
+	merchantID := insertTestMerchant(t, ctx, pool)
+	if _, err := pool.Exec(ctx, `UPDATE iam.account SET merchant_id=$1 WHERE public_id=$2`, merchantID, accountPublicID); err != nil {
+		t.Fatal(err)
+	}
+	return merchantID
+}
+
+func insertTestMerchant(t *testing.T, ctx context.Context, pool *pgxpool.Pool) int64 {
+	t.Helper()
+	var merchantID int64
+	if err := pool.QueryRow(ctx, `INSERT INTO iam.merchant(public_id,name) VALUES($1,'{}') RETURNING id`, mustULID(t)).Scan(&merchantID); err != nil {
+		t.Fatal(err)
+	}
+	return merchantID
+}
+
+func mustULID(t *testing.T) string {
+	t.Helper()
+	value, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value
 }
 
 func validatorAt(now time.Time) telegram.Validator {
