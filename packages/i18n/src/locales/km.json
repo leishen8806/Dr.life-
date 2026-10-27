@@ -65,4 +65,13 @@
   "app.driver": "[TODO-KM-REVIEW] Driver",
   "app.admin": "[TODO-KM-REVIEW] Platform Admin",
   "app.wms": "[TODO-KM-REVIEW] Warehouse Admin"
+,"error.1007": "[TODO-KM-REVIEW] Request is too large."
+,"error.1008": "[TODO-KM-REVIEW] Request format is not supported."
+,"error.1009": "[TODO-KM-REVIEW] This action conflicts with an earlier request."
+,"error.1010": "[TODO-KM-REVIEW] This action is still being processed. Try again later."
+,"error.1011": "[TODO-KM-REVIEW] This action was already processed."
+,"error.2003": "[TODO-KM-REVIEW] Additional verification is required."
+,"error.2004": "[TODO-KM-REVIEW] Verification could not be completed."
+,"error.7001": "[TODO-KM-REVIEW] The external service could not complete the request."
+,"error.circuitOpen": "[TODO-KM-REVIEW] The service is temporarily unavailable. Try again later."
 }
