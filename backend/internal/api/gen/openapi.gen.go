@@ -217,6 +217,21 @@ func (e ErrorEnvelopeOk) Valid() bool {
 	}
 }
 
+// Defines values for FinancialCenterSuccessResponseOk.
+const (
+	FinancialCenterSuccessResponseOkTrue FinancialCenterSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the FinancialCenterSuccessResponseOk enum.
+func (e FinancialCenterSuccessResponseOk) Valid() bool {
+	switch e {
+	case FinancialCenterSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LedgerReadSuccessResponseOk.
 const (
 	LedgerReadSuccessResponseOkTrue LedgerReadSuccessResponseOk = true
@@ -454,6 +469,33 @@ const (
 func (e RefreshSuccessResponseOk) Valid() bool {
 	switch e {
 	case RefreshSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RevenueByCategoryCategory.
+const (
+	Ads            RevenueByCategoryCategory = "ads"
+	DeliveryMargin RevenueByCategoryCategory = "delivery_margin"
+	Member         RevenueByCategoryCategory = "member"
+	SettleFee      RevenueByCategoryCategory = "settle_fee"
+	Storage        RevenueByCategoryCategory = "storage"
+)
+
+// Valid indicates whether the value is a known member of the RevenueByCategoryCategory enum.
+func (e RevenueByCategoryCategory) Valid() bool {
+	switch e {
+	case Ads:
+		return true
+	case DeliveryMargin:
+		return true
+	case Member:
+		return true
+	case SettleFee:
+		return true
+	case Storage:
 		return true
 	default:
 		return false
@@ -801,6 +843,40 @@ type ErrorEnvelope struct {
 // ErrorEnvelopeOk defines model for ErrorEnvelope.Ok.
 type ErrorEnvelopeOk bool
 
+// FinancialCenterData defines model for FinancialCenterData.
+type FinancialCenterData struct {
+	MerchantBalances []MerchantBalance   `json:"merchant_balances"`
+	Position         FundsPosition       `json:"position"`
+	Revenue          []RevenueByCategory `json:"revenue"`
+	RevenueTotalE4   int64               `json:"revenue_total_e4"`
+	Withdrawals      WithdrawalSummary   `json:"withdrawals"`
+}
+
+// FinancialCenterSuccessResponse defines model for FinancialCenterSuccessResponse.
+type FinancialCenterSuccessResponse struct {
+	Data      FinancialCenterData              `json:"data"`
+	Ok        FinancialCenterSuccessResponseOk `json:"ok"`
+	RequestId string                           `json:"request_id"`
+}
+
+// FinancialCenterSuccessResponseOk defines model for FinancialCenterSuccessResponse.Ok.
+type FinancialCenterSuccessResponseOk bool
+
+// FundsPosition defines model for FundsPosition.
+type FundsPosition struct {
+	AdBudgetE4       int64 `json:"ad_budget_e4"`
+	BankDedicatedE4  int64 `json:"bank_dedicated_e4"`
+	DeliveryEscrowE4 int64 `json:"delivery_escrow_e4"`
+	FrozenE4         int64 `json:"frozen_e4"`
+	InternalTotalE4  int64 `json:"internal_total_e4"`
+	MatchesBank      bool  `json:"matches_bank"`
+	PayableCarrierE4 int64 `json:"payable_carrier_e4"`
+	PendingPayoutE4  int64 `json:"pending_payout_e4"`
+	PlatformHeldE4   int64 `json:"platform_held_e4"`
+	SuspenseE4       int64 `json:"suspense_e4"`
+	UserAvailableE4  int64 `json:"user_available_e4"`
+}
+
 // LedgerReadData Read-only ledger data. Amounts are signed or unsigned integer e4 values; clients format them only for display.
 type LedgerReadData map[string]interface{}
 
@@ -820,6 +896,12 @@ type LocalizedText struct {
 	En string `json:"en"`
 	Km string `json:"km"`
 	Zh string `json:"zh"`
+}
+
+// MerchantBalance defines model for MerchantBalance.
+type MerchantBalance struct {
+	AvailableE4 int64 `json:"available_e4"`
+	MerchantId  int64 `json:"merchant_id"`
 }
 
 // Messages defines model for Messages.
@@ -997,6 +1079,15 @@ type RefreshSuccessResponse struct {
 // RefreshSuccessResponseOk defines model for RefreshSuccessResponse.Ok.
 type RefreshSuccessResponseOk bool
 
+// RevenueByCategory defines model for RevenueByCategory.
+type RevenueByCategory struct {
+	AmountE4 int64                     `json:"amount_e4"`
+	Category RevenueByCategoryCategory `json:"category"`
+}
+
+// RevenueByCategoryCategory defines model for RevenueByCategory.Category.
+type RevenueByCategoryCategory string
+
 // Session defines model for Session.
 type Session struct {
 	DeviceId  *string   `json:"device_id,omitempty"`
@@ -1080,6 +1171,14 @@ type TelegramAuthSuccessResponse struct {
 
 // TelegramAuthSuccessResponseOk defines model for TelegramAuthSuccessResponse.Ok.
 type TelegramAuthSuccessResponseOk bool
+
+// WithdrawalSummary defines model for WithdrawalSummary.
+type WithdrawalSummary struct {
+	PaidAmountE4    int64 `json:"paid_amount_e4"`
+	PaidCount       int64 `json:"paid_count"`
+	PendingAmountE4 int64 `json:"pending_amount_e4"`
+	PendingCount    int64 `json:"pending_count"`
+}
 
 // AccountLinkID defines model for AccountLinkID.
 type AccountLinkID = string
@@ -1185,6 +1284,18 @@ type ListAdminAuditParams struct {
 	// BeforeId Return records with ids lower than this cursor.
 	BeforeId *int64 `form:"before_id,omitempty" json:"before_id,omitempty"`
 	PageSize *int   `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// GetAdminFinancialCenterParams defines parameters for GetAdminFinancialCenter.
+type GetAdminFinancialCenterParams struct {
+	// From Inclusive UTC period start. Must be supplied with to.
+	From *time.Time `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Exclusive UTC period end. Must be supplied with from.
+	To *time.Time `form:"to,omitempty" json:"to,omitempty"`
+
+	// MerchantLimit Maximum merchant rows, from 1 through 100.
+	MerchantLimit *int `form:"merchant_limit,omitempty" json:"merchant_limit,omitempty"`
 }
 
 // PostBuyerAuthLogoutParams defines parameters for PostBuyerAuthLogout.
@@ -1318,6 +1429,9 @@ type ServerInterface interface {
 	// ListAdminAudit Query immutable audit records
 	// (GET /v1/admin/audit)
 	ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams)
+	// GetAdminFinancialCenter Get ledger-derived financial-center reporting
+	// (GET /v1/admin/financial-center)
+	GetAdminFinancialCenter(w http.ResponseWriter, r *http.Request, params GetAdminFinancialCenterParams)
 	// GetAdminLedgerAccounts List cached versus reconciled account balances
 	// (GET /v1/admin/ledger/accounts)
 	GetAdminLedgerAccounts(w http.ResponseWriter, r *http.Request)
@@ -1423,6 +1537,12 @@ type Unimplemented struct{}
 // ListAdminAudit Query immutable audit records
 // (GET /v1/admin/audit)
 func (_ Unimplemented) ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAdminFinancialCenter Get ledger-derived financial-center reporting
+// (GET /v1/admin/financial-center)
+func (_ Unimplemented) GetAdminFinancialCenter(w http.ResponseWriter, r *http.Request, params GetAdminFinancialCenterParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1729,6 +1849,65 @@ func (siw *ServerInterfaceWrapper) ListAdminAudit(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminAudit(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminFinancialCenter operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminFinancialCenter(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminFinancialCenterParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "merchant_limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "merchant_limit", r.URL.Query(), &params.MerchantLimit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "merchant_limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "merchant_limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminFinancialCenter(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2927,6 +3106,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/financial-center", wrapper.GetAdminFinancialCenter)
+	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/admin/audit", wrapper.ListAdminAudit)
 	})

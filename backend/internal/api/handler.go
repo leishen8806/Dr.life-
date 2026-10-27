@@ -69,6 +69,7 @@ type LedgerReader interface {
 	ListAccountPostings(context.Context, int64, int) ([]ledger.AdminPosting, error)
 	ListWalletTransactions(context.Context, ledger.WalletTransactionQuery) (ledger.WalletTransactionPage, error)
 	GetWalletTransaction(context.Context, int64, string) (ledger.WalletTransaction, bool, error)
+	FinancialCenter(context.Context, ledger.FinancialCenterFilter) (ledger.FinancialCenterReport, error)
 }
 
 // Handler 实现 gen.ServerInterface。
@@ -106,6 +107,32 @@ func (h Handler) GetAdminLedgerTxns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteOK(w, r, map[string]any{"items": items})
+}
+
+func (h Handler) GetAdminFinancialCenter(w http.ResponseWriter, r *http.Request, params gen.GetAdminFinancialCenterParams) {
+	if !h.adminLedgerAccess(w, r) {
+		return
+	}
+	if h.Ledger == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	filter := ledger.FinancialCenterFilter{}
+	if params.From != nil {
+		filter.From = *params.From
+	}
+	if params.To != nil {
+		filter.To = *params.To
+	}
+	if params.MerchantLimit != nil {
+		filter.MerchantLimit = *params.MerchantLimit
+	}
+	report, err := h.Ledger.FinancialCenter(r.Context(), filter)
+	if err != nil {
+		h.ledgerError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, report)
 }
 
 func (h Handler) GetAdminLedgerTxn(w http.ResponseWriter, r *http.Request, txnNo string) {

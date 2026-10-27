@@ -15,6 +15,7 @@ import (
 // rows even accidentally.
 type queryPool interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
 // ReadService is the ledger report-reader.  Construct it only with the report
