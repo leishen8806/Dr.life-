@@ -27,6 +27,7 @@ type AdminStepUpService struct {
 	Cipher      TOTPSecretCipher
 	Permissions AdminPermissionStore
 	Audit       platformaudit.Writer
+	Failures    *AdminFailureGuard
 	Now         func() time.Time
 
 	mu   sync.Mutex
@@ -57,7 +58,8 @@ func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, code, sco
 	var id int64
 	var secretEnc []byte
 	var status AdminStatus
-	err = s.DB.QueryRow(ctx, `SELECT id,totp_secret_enc,status FROM iam.admin_user WHERE public_id=$1`, adminPublicID).Scan(&id, &secretEnc, &status)
+	var email string
+	err = s.DB.QueryRow(ctx, `SELECT id,email,totp_secret_enc,status FROM iam.admin_user WHERE public_id=$1`, adminPublicID).Scan(&id, &email, &secretEnc, &status)
 	if err != nil || status != AdminStatusActive {
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
@@ -70,9 +72,19 @@ func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, code, sco
 	if s.Now != nil {
 		now = s.Now()
 	}
+	key := email + "\x00" + ip
+	if s.Failures != nil && s.Failures.locked(key, now) {
+		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
+	}
 	if !ValidateTOTP(string(secret), code, now) || !s.consume(adminPublicID, code, now) {
+		if s.Failures != nil {
+			s.Failures.recordFailure(key, now)
+		}
 		s.appendAudit(ctx, id, adminPublicID, scope, "failed", ip, requestID)
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
+	}
+	if s.Failures != nil {
+		s.Failures.clear(key)
 	}
 	token, expiresAt, err := s.Tokens.IssueStepUp(ctx, adminPublicID, scope)
 	if err != nil {

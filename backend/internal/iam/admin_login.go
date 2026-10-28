@@ -45,6 +45,41 @@ type adminFailure struct {
 	first    time.Time
 }
 
+// AdminFailureGuard is shared by administrator login and step-up verification.
+type AdminFailureGuard struct {
+	mu       sync.Mutex
+	failures map[string]adminFailure
+}
+
+func (g *AdminFailureGuard) locked(key string, now time.Time) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	f, ok := g.failures[key]
+	if !ok || now.Sub(f.first) >= adminLoginFailureWindow {
+		delete(g.failures, key)
+		return false
+	}
+	return f.attempts >= adminLoginFailureLimit
+}
+func (g *AdminFailureGuard) recordFailure(key string, now time.Time) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.failures == nil {
+		g.failures = make(map[string]adminFailure)
+	}
+	f := g.failures[key]
+	if f.first.IsZero() || now.Sub(f.first) >= adminLoginFailureWindow {
+		f = adminFailure{first: now}
+	}
+	f.attempts++
+	g.failures[key] = f
+}
+func (g *AdminFailureGuard) clear(key string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	delete(g.failures, key)
+}
+
 // AdminLoginService authenticates a web administrator and uses the shared iam.session chain.
 // Failed-attempt state is intentionally keyed by the normalized account identifier and source IP.
 type AdminLoginService struct {
@@ -56,6 +91,7 @@ type AdminLoginService struct {
 	IdleTTL      time.Duration
 	SessionCache SessionCache
 	Now          func() time.Time
+	Failures     *AdminFailureGuard
 
 	mu       sync.Mutex
 	failures map[string]adminFailure
@@ -133,6 +169,9 @@ func (s *AdminLoginService) now() time.Time {
 	return time.Now()
 }
 func (s *AdminLoginService) locked(key string, now time.Time) bool {
+	if s.Failures != nil {
+		return s.Failures.locked(key, now)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	f, ok := s.failures[key]
@@ -143,6 +182,10 @@ func (s *AdminLoginService) locked(key string, now time.Time) bool {
 	return f.attempts >= adminLoginFailureLimit
 }
 func (s *AdminLoginService) recordFailure(key string, now time.Time) {
+	if s.Failures != nil {
+		s.Failures.recordFailure(key, now)
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.failures == nil {
@@ -156,6 +199,10 @@ func (s *AdminLoginService) recordFailure(key string, now time.Time) {
 	s.failures[key] = f
 }
 func (s *AdminLoginService) clearFailure(key string) {
+	if s.Failures != nil {
+		s.Failures.clear(key)
+		return
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.failures, key)

@@ -332,8 +332,9 @@ func main() {
 		}
 		adminTokens := tokens
 		adminTokens.AccessTTL = 10 * time.Minute
-		adminLoginService = &iam.AdminLoginService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Audit: auditStore, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: sessionCache}
-		adminStepUpService = &iam.AdminStepUpService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Permissions: *adminPermissions, Audit: auditStore}
+		adminFailures := &iam.AdminFailureGuard{}
+		adminLoginService = &iam.AdminLoginService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Audit: auditStore, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: sessionCache, Failures: adminFailures}
+		adminStepUpService = &iam.AdminStepUpService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Permissions: *adminPermissions, Audit: auditStore, Failures: adminFailures}
 		authenticator = iam.Authenticator{Tokens: tokens}
 	}
 
