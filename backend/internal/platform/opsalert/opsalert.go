@@ -33,7 +33,8 @@ type Scheduler interface {
 
 type Merger interface {
 	Add(context.Context, string, payload) (leader bool, error error)
-	Peek(context.Context, string) (mergedPayload, bool, error)
+	Take(context.Context, string) (mergedPayload, bool, error)
+	Restore(context.Context, string, mergedPayload) error
 	Discard(context.Context, string) error
 }
 
@@ -92,11 +93,27 @@ func (m *memoryMerger) Add(_ context.Context, topic string, p payload) (bool, er
 	return false, nil
 }
 
-func (m *memoryMerger) Peek(_ context.Context, topic string) (mergedPayload, bool, error) {
+func (m *memoryMerger) Take(_ context.Context, topic string) (mergedPayload, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	group, ok := m.groups[topic]
+	delete(m.groups, topic)
 	return group, ok, nil
+}
+
+func (m *memoryMerger) Restore(_ context.Context, topic string, restored mergedPayload) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	current, ok := m.groups[topic]
+	if !ok {
+		m.groups[topic] = restored
+		return nil
+	}
+	for id := range restored.IDs {
+		current.IDs[id] = struct{}{}
+	}
+	m.groups[topic] = current
+	return nil
 }
 
 func (m *memoryMerger) Discard(_ context.Context, topic string) error {
@@ -161,17 +178,25 @@ return created
 	return created == 1, err
 }
 
-func (m redisMerger) Peek(ctx context.Context, topic string) (mergedPayload, bool, error) {
-	values, err := m.client.HGetAll(ctx, mergeKey(topic)).Result()
+func (m redisMerger) Take(ctx context.Context, topic string) (mergedPayload, bool, error) {
+	values, err := m.client.Eval(ctx, `
+local values = redis.call('HGETALL', KEYS[1])
+if #values > 0 then redis.call('DEL', KEYS[1]) end
+return values
+`, []string{mergeKey(topic)}).StringSlice()
 	if err != nil || len(values) == 0 {
 		return mergedPayload{}, len(values) != 0, err
 	}
+	fields := make(map[string]string, len(values)/2)
+	for i := 0; i < len(values); i += 2 {
+		fields[values[i]] = values[i+1]
+	}
 	var result mergedPayload
-	if err := json.Unmarshal([]byte(values["payload"]), &result.Payload); err != nil {
+	if err := json.Unmarshal([]byte(fields["payload"]), &result.Payload); err != nil {
 		return mergedPayload{}, false, err
 	}
 	result.IDs = make(map[int64]struct{})
-	for field := range values {
+	for field := range fields {
 		if !strings.HasPrefix(field, "id:") {
 			continue
 		}
@@ -182,6 +207,32 @@ func (m redisMerger) Peek(ctx context.Context, topic string) (mergedPayload, boo
 		result.IDs[id] = struct{}{}
 	}
 	return result, len(result.IDs) > 0, nil
+}
+
+func (m redisMerger) Restore(ctx context.Context, topic string, restored mergedPayload) error {
+	encoded, err := json.Marshal(restored.Payload)
+	if err != nil {
+		return err
+	}
+	ids := make([]int64, 0, len(restored.IDs))
+	for id := range restored.IDs {
+		ids = append(ids, id)
+	}
+	_, err = m.client.Eval(ctx, `
+redis.call('HSETNX', KEYS[1], 'payload', ARGV[1])
+for i = 2, #ARGV do redis.call('HSET', KEYS[1], 'id:' .. ARGV[i], '1') end
+redis.call('PEXPIRE', KEYS[1], ARGV[#ARGV])
+return 1
+`, []string{mergeKey(topic)}, append([]interface{}{encoded}, append(int64SliceToInterfaces(ids), int64((24*time.Hour).Milliseconds()))...)...).Result()
+	return err
+}
+
+func int64SliceToInterfaces(ids []int64) []interface{} {
+	values := make([]interface{}, len(ids))
+	for i, id := range ids {
+		values[i] = id
+	}
+	return values
 }
 
 func (m redisMerger) Discard(ctx context.Context, topic string) error {
@@ -266,7 +317,7 @@ func (h *handler) flush(ctx context.Context, task *asynq.Task) error {
 }
 
 func (h *handler) deliver(ctx context.Context, topic string) error {
-	merged, ok, err := h.merger.Peek(ctx, topic)
+	merged, ok, err := h.merger.Take(ctx, topic)
 	if err != nil {
 		return errors.New("operations alert merge unavailable")
 	}
@@ -291,6 +342,9 @@ func (h *handler) deliver(ctx context.Context, topic string) error {
 		}
 		return nil
 	case telegram.ResultRateLimited, telegram.ResultTemporaryError:
+		if err := h.merger.Restore(ctx, topic, merged); err != nil {
+			return errors.New("operations alert merge unavailable")
+		}
 		return errors.New("operations alert delivery retryable")
 	default:
 		_ = h.merger.Discard(ctx, topic)
