@@ -22,6 +22,7 @@ type Business struct {
 	auditAnchorMissing    prometheus.Gauge
 	spotChecksDropped     prometheus.Counter
 	opsAlertUndeliverable *prometheus.CounterVec
+	outboxRelayRetries    prometheus.Counter
 }
 
 func newBusiness(registry *prometheus.Registry) *Business {
@@ -41,8 +42,9 @@ func newBusiness(registry *prometheus.Registry) *Business {
 		auditAnchorMissing:    prometheus.NewGauge(prometheus.GaugeOpts{Name: "drlife_audit_anchor_missing", Help: "Whether the latest audit anchor is older than 24 hours."}),
 		spotChecksDropped:     prometheus.NewCounter(prometheus.CounterOpts{Name: "drlife_ledger_spot_checks_dropped_total", Help: "Ledger spot checks dropped at the concurrency limit."}),
 		opsAlertUndeliverable: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "ops_alert_undeliverable_total", Help: "Operations reconciliation alerts that could not be delivered."}, []string{"reason"}),
+		outboxRelayRetries:    prometheus.NewCounter(prometheus.CounterOpts{Name: "drlife_outbox_relay_retries_total", Help: "Transient database failures retried by the outbox relay."}),
 	}
-	registry.MustRegister(b.orders, b.withdrawals, b.ai, b.bots, b.loginFailures, b.loginAuditFailures, b.sessionRefresh, b.ledger, b.reconciliationRuns, b.reconciliation, b.spotChecksDropped, b.opsAlertUndeliverable, b.auditAppends, b.auditVerifyFailures, b.auditAnchorMissing)
+	registry.MustRegister(b.orders, b.withdrawals, b.ai, b.bots, b.loginFailures, b.loginAuditFailures, b.sessionRefresh, b.ledger, b.reconciliationRuns, b.reconciliation, b.spotChecksDropped, b.opsAlertUndeliverable, b.outboxRelayRetries, b.auditAppends, b.auditVerifyFailures, b.auditAnchorMissing)
 	return b
 }
 
@@ -124,6 +126,7 @@ func (b *Business) ReconSpotCheckDropped() { b.spotChecksDropped.Inc() }
 func (b *Business) OpsAlertUndeliverable(reason string) {
 	b.opsAlertUndeliverable.WithLabelValues(bounded(reason, "unconfigured", "telegram_permanent", "retry_exhausted")).Inc()
 }
+func (b *Business) OutboxRelayRetry() { b.outboxRelayRetries.Inc() }
 
 func bounded(value string, allowed ...string) string {
 	for _, candidate := range allowed {

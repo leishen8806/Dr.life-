@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/leishen8806/Dr.life-/backend/internal/comms/telegram"
@@ -133,6 +135,111 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	} else if strings.Contains(strings.Join(got, " "), "9988") || strings.Contains(strings.Join(got, " "), "12345") {
 		t.Fatalf("Telegram alert leaked queue-sensitive payload: %v", got)
 	}
+}
+
+func TestRelayRecoversDeliveryAfterPostgresRestart(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	database, postgresContainer := newRestartableRelayPostgres(t, ctx)
+	defer func() { database.Close() }()
+	pools := &restartablePool{pool: database}
+	redisURL := newRelayRedis(t, ctx)
+	options, err := asynq.ParseRedisURI(redisURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := asynq.NewClient(options)
+	defer client.Close()
+	retries := make(chan error, 1)
+	relay, err := outbox.New(ledger.New(pools, ledger.Options{}), client, outbox.Options{
+		Routes:            outbox.LedgerRoutes(),
+		RetryInitialDelay: 10 * time.Millisecond,
+		RetryMaxDelay:     50 * time.Millisecond,
+		OnRetry: func(err error) {
+			select {
+			case retries <- err:
+			default:
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- relay.Run(ctx) }()
+	if err := postgresContainer.Stop(ctx, nil); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-retries:
+	case err := <-done:
+		t.Fatalf("relay stopped instead of retrying PostgreSQL restart: %v", err)
+	case <-ctx.Done():
+		t.Fatal("relay did not report a retry while PostgreSQL was stopped")
+	}
+	if err := postgresContainer.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	dsn, err := postgresContainer.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	updatedPool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	database.Close()
+	database = updatedPool
+	pools.Set(database)
+	var outboxID int64
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		err = database.QueryRow(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES('ledger.txn.posted','{}') RETURNING id`).Scan(&outboxID)
+		if err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if err != nil {
+		t.Fatalf("insert after PostgreSQL restart: %v", err)
+	}
+	eventuallyRelay(t, 20*time.Second, func() bool {
+		var sentAt *time.Time
+		return database.QueryRow(ctx, `SELECT sent_at FROM ledger.outbox WHERE id=$1`, outboxID).Scan(&sentAt) == nil && sentAt != nil
+	})
+	cancel()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("relay shutdown error=%v, want context cancellation", err)
+	}
+}
+
+type restartablePool struct {
+	mu   sync.RWMutex
+	pool *pgxpool.Pool
+}
+
+func (p *restartablePool) Set(pool *pgxpool.Pool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.pool = pool
+}
+
+func (p *restartablePool) BeginTx(ctx context.Context, options pgx.TxOptions) (pgx.Tx, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.pool.BeginTx(ctx, options)
+}
+
+func (p *restartablePool) Query(ctx context.Context, query string, args ...any) (pgx.Rows, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.pool.Query(ctx, query, args...)
+}
+
+func (p *restartablePool) QueryRow(ctx context.Context, query string, args ...any) pgx.Row {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.pool.QueryRow(ctx, query, args...)
 }
 
 func TestReconAlertsRelayWithoutConfigurationDegradesEndToEnd(t *testing.T) {
@@ -268,6 +375,11 @@ func waitForRelayDeliveries(t *testing.T, ctx context.Context, observer *relayOb
 }
 
 func newRelayPostgres(t *testing.T, ctx context.Context) *pgxpool.Pool {
+	database, _ := newRestartableRelayPostgres(t, ctx)
+	return database
+}
+
+func newRestartableRelayPostgres(t *testing.T, ctx context.Context) (*pgxpool.Pool, *postgres.PostgresContainer) {
 	t.Helper()
 	container, err := postgres.Run(ctx, "postgres:16-alpine", postgres.WithDatabase("relay_test"), postgres.WithUsername("test_admin"), postgres.WithPassword("test-only"), postgres.BasicWaitStrategies())
 	if err != nil {
@@ -293,7 +405,7 @@ func newRelayPostgres(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return pool
+	return pool, container
 }
 
 func newRelayRedis(t *testing.T, ctx context.Context) string {

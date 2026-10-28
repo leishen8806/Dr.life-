@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -84,7 +85,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, "queue handler error:", err)
 		os.Exit(1)
 	}
-	relay, err := outbox.New(ledger.New(database, ledger.Options{}), client, outbox.Options{Routes: outbox.LedgerRoutes()})
+	relay, err := outbox.New(ledger.New(database, ledger.Options{}), client, outbox.Options{
+		Routes: outbox.LedgerRoutes(),
+		OnRetry: func(err error) {
+			metrics.Business().OutboxRelayRetry()
+			logger.Error("outbox relay retrying after transient database failure", "error", err)
+		},
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "outbox relay configuration error:", err)
 		os.Exit(1)
@@ -93,13 +100,25 @@ func main() {
 		fmt.Fprintln(os.Stderr, "worker start error:", err)
 		os.Exit(1)
 	}
-	go func() {
-		if err := relay.Run(ctx); err != nil && ctx.Err() == nil {
-			logger.Error("outbox relay stopped", "error", err)
-			stop()
+	relayDone := make(chan error, 1)
+	go func() { relayDone <- relay.Run(ctx) }()
+	select {
+	case <-ctx.Done():
+		return
+	case relayErr := <-relayDone:
+		if errors.Is(relayErr, context.Canceled) {
+			return
 		}
-	}()
-	<-ctx.Done()
+		logger.Error("outbox relay stopped", "error", relayErr)
+		os.Exit(relayExitCode(relayErr))
+	}
+}
+
+func relayExitCode(err error) int {
+	if err == nil || errors.Is(err, context.Canceled) {
+		return 0
+	}
+	return 1
 }
 
 func reconciliationAlerts(cfg config.Config, logger *slog.Logger, metrics opsalert.Metrics, deduper opsalert.Deduper, merger opsalert.Merger, scheduler opsalert.Scheduler) opsalert.Handlers {

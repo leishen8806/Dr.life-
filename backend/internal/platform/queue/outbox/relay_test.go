@@ -2,6 +2,7 @@ package outbox_test
 
 import (
 	"context"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -11,11 +12,73 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue/outbox"
 )
+
+type failingLedgerOutbox struct {
+	errs  []error
+	calls int
+}
+
+func (f *failingLedgerOutbox) ClaimOutbox(context.Context, int) (*ledger.OutboxBatch, error) {
+	f.calls++
+	if len(f.errs) == 0 {
+		return nil, context.Canceled
+	}
+	err := f.errs[0]
+	f.errs = f.errs[1:]
+	return nil, err
+}
+
+func TestRelayRunRetriesTransientDatabaseFailureBeforeRetryingClaim(t *testing.T) {
+	ledgerOutbox := &failingLedgerOutbox{errs: []error{
+		&pgconn.PgError{Code: "40001"},
+		context.Canceled,
+	}}
+	retries := 0
+	relay, err := outbox.New(ledgerOutbox, discardQueueClient{}, outbox.Options{
+		RetryInitialDelay: time.Nanosecond,
+		RetryMaxDelay:     time.Nanosecond,
+		OnRetry: func(error) {
+			retries++
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := relay.Run(context.Background()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run error=%v, want context cancellation after recovered claim", err)
+	}
+	if ledgerOutbox.calls != 2 || retries != 1 {
+		t.Fatalf("calls=%d retries=%d, want 2/1", ledgerOutbox.calls, retries)
+	}
+}
+
+func TestRelayRunReturnsFatalDatabaseConfigurationError(t *testing.T) {
+	ledgerOutbox := &failingLedgerOutbox{errs: []error{&pgconn.PgError{Code: "42P01"}}}
+	relay, err := outbox.New(ledgerOutbox, discardQueueClient{}, outbox.Options{RetryInitialDelay: time.Nanosecond, RetryMaxDelay: time.Nanosecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := relay.Run(context.Background()); err == nil {
+		t.Fatal("Run accepted missing ledger.outbox relation as retryable")
+	}
+	if ledgerOutbox.calls != 1 {
+		t.Fatalf("calls=%d, want 1 for fatal error", ledgerOutbox.calls)
+	}
+}
+
+type discardQueueClient struct{}
+
+func (discardQueueClient) EnqueueContext(context.Context, *asynq.Task, ...asynq.Option) (*asynq.TaskInfo, error) {
+	return nil, nil
+}
 
 func TestRelayRequiresDependencies(t *testing.T) {
 	if _, err := outbox.New(nil, nil, outbox.Options{}); err == nil {
