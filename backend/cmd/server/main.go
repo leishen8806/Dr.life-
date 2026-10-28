@@ -260,6 +260,7 @@ func main() {
 	}
 	var loginService *iam.Service
 	var adminLoginService *iam.AdminLoginService
+	var adminStepUpService *iam.AdminStepUpService
 	var sessionService *iam.SessionService
 	var accountProfileService *iam.AccountProfileService
 	var accountLinkService *iam.AccountLinkService
@@ -332,6 +333,7 @@ func main() {
 		adminTokens := tokens
 		adminTokens.AccessTTL = 10 * time.Minute
 		adminLoginService = &iam.AdminLoginService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Audit: auditStore, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: sessionCache}
+		adminStepUpService = &iam.AdminStepUpService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Permissions: *adminPermissions, Audit: auditStore}
 		authenticator = iam.Authenticator{Tokens: tokens}
 	}
 
@@ -375,6 +377,7 @@ func main() {
 		Logger:          logger,
 		Login:           loginService,
 		AdminLogin:      adminLoginService,
+		AdminStepUp:     adminStepUpService,
 		Audit:           auditStore,
 		Sessions:        sessionService,
 		AccountProfiles: accountProfileService,

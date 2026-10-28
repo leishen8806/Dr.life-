@@ -54,6 +54,7 @@ type GatewayOptions struct {
 	Logger            *slog.Logger
 	Login             api.TelegramLogin
 	AdminLogin        api.AdminLogin
+	AdminStepUp       api.AdminStepUp
 	Audit             *platformaudit.Store
 	AuditWriter       platformaudit.Writer
 	Sessions          api.SessionManagement
@@ -126,7 +127,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	if auditWriter == nil {
 		auditWriter = options.Audit
 	}
-	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, AdminLogin: options.AdminLogin, Sessions: options.Sessions, AccountProfiles: options.AccountProfiles, AccountLinks: options.AccountLinks, Consents: options.Consents, ClientIP: options.ClientIP, Audit: options.Audit, AuditWriter: auditWriter, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions, Files: options.Files}, router)
+	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, AdminLogin: options.AdminLogin, AdminStepUp: options.AdminStepUp, Sessions: options.Sessions, AccountProfiles: options.AccountProfiles, AccountLinks: options.AccountLinks, Consents: options.Consents, ClientIP: options.ClientIP, Audit: options.Audit, AuditWriter: auditWriter, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions, Files: options.Files}, router)
 	if options.RouteFit != nil {
 		router.Post(routeFitEventsPath, options.RouteFit.ServeHTTP)
 	}
