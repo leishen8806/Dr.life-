@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log/slog"
 	"strconv"
 	"time"
 
@@ -16,18 +18,78 @@ import (
 const (
 	DefaultBatchSize = 100
 	unknownTaskType  = "ops:outbox_unknown:v1"
+	TaskLedgerInfo   = "ledger:outbox_info:v1"
+	TaskReconFailed  = "ledger:recon_failed:v1"
+	TaskReconStale   = "ledger:recon_stale:v1"
 )
 
 type ledgerOutbox interface {
 	ClaimOutbox(context.Context, int) (*ledger.OutboxBatch, error)
 }
 
-// Route maps a ledger outbox topic to its registered asynq task type.
-type Route struct{ TaskType string }
+// Route maps a ledger outbox topic to its registered asynq task type and queue.
+type Route struct {
+	TaskType string
+	Queue    string
+}
 
 type Options struct {
 	BatchSize int
 	Routes    map[string]Route
+}
+
+// LedgerRoutes maps every ledger-published topic to its minimal landing task.
+func LedgerRoutes() map[string]Route {
+	return map[string]Route{
+		"ledger.txn.posted": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault}, "ledger.txn.reversed": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault},
+		"ledger.txn.adjusted": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault}, "ledger.withdrawal.review_started": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault},
+		"ledger.withdrawal.approved": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault}, "ledger.withdrawal.paid": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault},
+		"ledger.withdrawal.failed": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault}, "ledger.withdrawal.cancelled": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault},
+		"ledger.withdrawal.payee_accessed": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault},
+		"ledger.payout_freeze.released":    {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault}, "ledger.recon.failed": {TaskType: TaskReconFailed, Queue: queue.QueueCritical},
+		"ledger.recon.stale_run": {TaskType: TaskReconStale, Queue: queue.QueueCritical},
+	}
+}
+
+func RegisterLedgerTasks(registry *queue.Registry) error {
+	for _, spec := range []queue.TypeSpec{
+		{Name: TaskLedgerInfo, Queue: queue.QueueDefault, Timeout: time.Second * 30, MaxRetry: 3},
+		{Name: TaskReconFailed, Queue: queue.QueueCritical, Timeout: time.Second * 30, MaxRetry: 3},
+		{Name: TaskReconStale, Queue: queue.QueueCritical, Timeout: time.Second * 30, MaxRetry: 3},
+	} {
+		if err := registry.Register(spec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type workerRegistrar interface {
+	Register(string, queue.Handler) error
+}
+
+func RegisterLedgerHandlers(worker workerRegistrar, logger *slog.Logger) error {
+	for taskType, topic := range map[string]string{TaskLedgerInfo: "ledger.info", TaskReconFailed: "ledger.recon.failed", TaskReconStale: "ledger.recon.stale_run"} {
+		if err := worker.Register(taskType, landingHandler(logger, topic)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func landingHandler(logger *slog.Logger, topic string) queue.Handler {
+	return func(_ context.Context, task *asynq.Task) error {
+		var payload struct {
+			OutboxID int64 `json:"outbox_id"`
+		}
+		if err := json.Unmarshal(task.Payload(), &payload); err != nil || payload.OutboxID <= 0 {
+			return fmt.Errorf("invalid outbox landing payload")
+		}
+		if logger != nil {
+			logger.Info("ledger outbox event landed", "topic", topic, "outbox_id", payload.OutboxID)
+		}
+		return nil
+	}
 }
 
 // Relay performs at-least-once delivery. The queue task ID is stable so a
@@ -78,8 +140,8 @@ func (r *Relay) RunOnce(ctx context.Context) (int, error) {
 }
 
 func (r *Relay) route(topic string) (string, []asynq.Option) {
-	if route, ok := r.options.Routes[topic]; ok && route.TaskType != "" {
-		return route.TaskType, nil
+	if route, ok := r.options.Routes[topic]; ok && route.TaskType != "" && route.Queue != "" {
+		return route.TaskType, []asynq.Option{asynq.Queue(route.Queue)}
 	}
 	// Unknown topics are isolated by Worker as an unregistered task and archived
 	// immediately because MaxRetry is zero; they cannot loop indefinitely.
