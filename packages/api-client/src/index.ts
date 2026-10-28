@@ -6,6 +6,7 @@ import { createAuthFetch, type AuthFetchOptions } from "./auth";
 
 export type { components, operations, paths } from "./schema";
 export { ApiError } from "./errors";
+export type { ApiErrorCode, ApiErrorContext, ApiErrorKind } from "./errors";
 export { CircuitOpenError, createIdempotentAction, createResilientFetch, loginStormDelay, redactSensitive, retryDelay } from "./http";
 export { createAuthFetch, createTokenStore } from "./auth";
 export type { AuthFetchOptions, AuthProvider, StepUpHandler, StepUpRequest, TokenPair, TokenStore } from "./auth";
@@ -67,7 +68,7 @@ export function createApiClient(options: ApiClientOptions = {}) {
         .json()
         .catch(() => undefined);
       if (isErrorEnvelope(body)) {
-        throw new ApiError(body.error.code, body.request_id, response.status);
+        throw new ApiError(body.error.code, body.request_id, response.status, { retryAfter: response.headers.get("Retry-After") });
       }
       return response;
     }

@@ -57,6 +57,21 @@ describe("i18n", () => {
     expect(readLanguagePreference(storage)).toBeUndefined();
   });
 
+  it("has login hardening error copy in every supported language", () => {
+    for (const language of ["zh", "en", "km"] as const) {
+      for (const key of ["error.2005", "error.2006", "error.2007"] as const) {
+        expect(t(key, {}, language)).toMatch(/\S/);
+      }
+      expect(t("error.2007.countdown", { seconds: 45 }, language)).toContain("45");
+    }
+  });
+
+  it("never suggests retrying when the account is blocked", () => {
+    expect(t("error.2006", {}, "zh")).not.toMatch(/重试|再试/);
+    expect(t("error.2006", {}, "en").toLowerCase()).not.toMatch(/retry|try again/);
+    expect(t("error.2006", {}, "km").toLowerCase()).not.toMatch(/retry|try again/);
+  });
+
   it("updates the root language", () => {
     const root = { lang: "en" };
     applyDocumentLanguage("zh", root);

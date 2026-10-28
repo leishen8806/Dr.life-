@@ -35,4 +35,19 @@ describe("api client", () => {
     });
     await expect(client.GET("/v1/public/ping")).rejects.not.toThrow("internal detail");
   });
+
+  it("carries the login lockout window from Retry-After into the ApiError", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ ok: false, error: { code: 2007, message: { zh: "internal detail", en: "internal detail", km: "internal detail" } }, request_id: "server_3" }), { status: 429, headers: { "Content-Type": "application/json", "Retry-After": "30" } })
+    );
+    const client = createApiClient({ baseUrl: "http://example.test", fetch: fetchMock, resilience: { retry: { maxAttempts: 1 } } });
+
+    await expect(client.GET("/v1/public/ping")).rejects.toMatchObject({
+      code: 2007,
+      status: 429,
+      kind: "loginThrottled",
+      messageKey: "error.2007",
+      retryAfterSeconds: 30
+    });
+  });
 });
