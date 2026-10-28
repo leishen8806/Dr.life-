@@ -27,8 +27,11 @@ type ledgerOutbox interface {
 	ClaimOutbox(context.Context, int) (*ledger.OutboxBatch, error)
 }
 
-// Route maps a ledger outbox topic to its registered asynq task type.
-type Route struct{ TaskType string }
+// Route maps a ledger outbox topic to its registered asynq task type and queue.
+type Route struct {
+	TaskType string
+	Queue    string
+}
 
 type Options struct {
 	BatchSize int
@@ -38,12 +41,13 @@ type Options struct {
 // LedgerRoutes maps every ledger-published topic to its minimal landing task.
 func LedgerRoutes() map[string]Route {
 	return map[string]Route{
-		"ledger.txn.posted": {TaskType: TaskLedgerInfo}, "ledger.txn.reversed": {TaskType: TaskLedgerInfo},
-		"ledger.txn.adjusted": {TaskType: TaskLedgerInfo}, "ledger.withdrawal.review_started": {TaskType: TaskLedgerInfo},
-		"ledger.withdrawal.approved": {TaskType: TaskLedgerInfo}, "ledger.withdrawal.paid": {TaskType: TaskLedgerInfo},
-		"ledger.withdrawal.failed": {TaskType: TaskLedgerInfo}, "ledger.withdrawal.cancelled": {TaskType: TaskLedgerInfo},
-		"ledger.payout_freeze.released": {TaskType: TaskLedgerInfo}, "ledger.recon.failed": {TaskType: TaskReconFailed},
-		"ledger.recon.stale_run": {TaskType: TaskReconStale},
+		"ledger.txn.posted": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault}, "ledger.txn.reversed": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault},
+		"ledger.txn.adjusted": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault}, "ledger.withdrawal.review_started": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault},
+		"ledger.withdrawal.approved": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault}, "ledger.withdrawal.paid": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault},
+		"ledger.withdrawal.failed": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault}, "ledger.withdrawal.cancelled": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault},
+		"ledger.withdrawal.payee_accessed": {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault},
+		"ledger.payout_freeze.released":    {TaskType: TaskLedgerInfo, Queue: queue.QueueDefault}, "ledger.recon.failed": {TaskType: TaskReconFailed, Queue: queue.QueueCritical},
+		"ledger.recon.stale_run": {TaskType: TaskReconStale, Queue: queue.QueueCritical},
 	}
 }
 
@@ -136,8 +140,8 @@ func (r *Relay) RunOnce(ctx context.Context) (int, error) {
 }
 
 func (r *Relay) route(topic string) (string, []asynq.Option) {
-	if route, ok := r.options.Routes[topic]; ok && route.TaskType != "" {
-		return route.TaskType, nil
+	if route, ok := r.options.Routes[topic]; ok && route.TaskType != "" && route.Queue != "" {
+		return route.TaskType, []asynq.Option{asynq.Queue(route.Queue)}
 	}
 	// Unknown topics are isolated by Worker as an unregistered task and archived
 	// immediately because MaxRetry is zero; they cannot loop indefinitely.

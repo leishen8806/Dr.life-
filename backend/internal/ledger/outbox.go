@@ -11,7 +11,7 @@ import (
 
 type OutboxEvent struct {
 	ID      int64
-	TxnID   int64
+	TxnID   *int64
 	Topic   string
 	Payload json.RawMessage
 }

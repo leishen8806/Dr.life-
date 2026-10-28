@@ -2,6 +2,14 @@ package outbox_test
 
 import (
 	"context"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"io/fs"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/hibiken/asynq"
@@ -20,16 +28,54 @@ func TestRelayRequiresDependencies(t *testing.T) {
 }
 
 func TestLedgerRoutesCoverPublishedTopics(t *testing.T) {
-	for _, topic := range []string{
-		"ledger.txn.posted", "ledger.txn.reversed", "ledger.txn.adjusted",
-		"ledger.withdrawal.review_started", "ledger.withdrawal.approved", "ledger.withdrawal.paid",
-		"ledger.withdrawal.failed", "ledger.withdrawal.cancelled", "ledger.recon.failed",
-		"ledger.recon.stale_run", "ledger.payout_freeze.released",
-	} {
+	for _, topic := range ledgerPublishedTopics(t) {
 		if _, ok := outbox.LedgerRoutes()[topic]; !ok {
 			t.Errorf("published topic %q has no route", topic)
 		}
 	}
+}
+
+func ledgerPublishedTopics(t *testing.T) []string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("locate relay test")
+	}
+	ledgerDir := filepath.Join(filepath.Dir(file), "..", "..", "..", "ledger")
+	packages, err := parser.ParseDir(token.NewFileSet(), ledgerDir, func(info fs.FileInfo) bool {
+		return !strings.HasSuffix(info.Name(), "_test.go")
+	}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := make(map[string]struct{})
+	for _, pkg := range packages {
+		for _, source := range pkg.Files {
+			ast.Inspect(source, func(node ast.Node) bool {
+				literal, ok := node.(*ast.BasicLit)
+				if !ok || literal.Kind != token.STRING {
+					return true
+				}
+				value, err := strconv.Unquote(literal.Value)
+				if err != nil {
+					t.Fatalf("unquote %s: %v", literal.Value, err)
+				}
+				for _, field := range strings.FieldsFunc(value, func(r rune) bool {
+					return !(r == '.' || r == '_' || r >= 'a' && r <= 'z')
+				}) {
+					if strings.HasPrefix(field, "ledger.") && strings.Count(field, ".") >= 2 && !strings.HasSuffix(field, ".") {
+						seen[field] = struct{}{}
+					}
+				}
+				return true
+			})
+		}
+	}
+	topics := make([]string, 0, len(seen))
+	for topic := range seen {
+		topics = append(topics, topic)
+	}
+	return topics
 }
 
 type registeringWorker struct{ handlers map[string]queue.Handler }
