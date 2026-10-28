@@ -92,6 +92,14 @@ test("compose pins every image and includes the required local services", () => 
   assert.doesNotMatch(compose, /image:\s*[^\s]+:latest\b/, "compose must not use latest tags");
 });
 
+test("worker overrides the HTTP image health check with a process probe", () => {
+  const compose = read("loadtest/docker-compose.yml");
+  const worker = compose.match(/^  worker:\n([\s\S]*?)(?=^  \w|\z)/m)?.[1] ?? "";
+
+  assert.match(worker, /healthcheck:\n\s+test: \["CMD-SHELL", "kill -0 1"\]/);
+  assert.doesNotMatch(worker, /healthz/);
+});
+
 test("the five fault drills are present and guarded", () => {
   const drills = read("loadtest/drills/run-drill.mjs");
   for (const name of ["redis-cache-down", "redis-queue-down", "replica-lag", "kill-worker", "kill-app"]) {
