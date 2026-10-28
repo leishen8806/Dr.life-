@@ -41,13 +41,14 @@ jobs:
 
       - name: Smoke
         env:
-          TARGET_ENV: local
+          TARGET_ENV: test
           BASE_URL: http://app-a:8080
+          LOADTEST_TEST_HOSTS: app-a
         run: |
           docker run --rm -i \
             --network drlife-loadtest_default \
             -v "$PWD:/work" -w /work \
-            -e TARGET_ENV -e BASE_URL \
+            -e TARGET_ENV -e BASE_URL -e LOADTEST_TEST_HOSTS \
             grafana/k6:2.3.0 run loadtest/scenarios/smoke.js
 
       - name: Stop rig
