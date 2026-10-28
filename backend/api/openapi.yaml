@@ -34,6 +34,37 @@ tags:
 security:
   - bearerAuth: []
 paths:
+  /v1/admin/financial-center:
+    get:
+      tags: [admin]
+      operationId: getAdminFinancialCenter
+      summary: Get ledger-derived financial-center reporting
+      x-roles: [admin]
+      parameters:
+        - name: from
+          in: query
+          description: Inclusive UTC period start. Must be supplied with to.
+          schema: {type: string, format: date-time}
+        - name: to
+          in: query
+          description: Exclusive UTC period end. Must be supplied with from.
+          schema: {type: string, format: date-time}
+        - name: merchant_limit
+          in: query
+          description: Maximum merchant rows, from 1 through 100.
+          schema: {type: integer, minimum: 1, maximum: 100, default: 10}
+      responses:
+        "200":
+          description: Financial-center report derived from the ledger.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FinancialCenterSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
   /v1/admin/audit:
     get:
       tags: [admin]
@@ -254,6 +285,135 @@ paths:
         - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/ledger/txns:
+    get:
+      tags: [admin]
+      operationId: getAdminLedgerTxns
+      summary: List ledger transactions for authorized finance users
+      description: Requires fund view. Administrators with a non-empty data scope are denied because ledger accounts have no region field.
+      x-roles: [admin]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/ledger/txns/{txn_no}:
+    get:
+      tags: [admin]
+      operationId: getAdminLedgerTxn
+      summary: Read a transaction and its postings
+      x-roles: [admin]
+      parameters:
+        - name: txn_no
+          in: path
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 128}
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/ledger/accounts:
+    get:
+      tags: [admin]
+      operationId: getAdminLedgerAccounts
+      summary: List cached versus reconciled account balances
+      x-roles: [admin]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/ledger/accounts/{account_ref}/postings:
+    get:
+      tags: [admin]
+      operationId: getAdminLedgerAccountPostings
+      summary: List postings belonging to one account
+      x-roles: [admin]
+      parameters:
+        - name: account_ref
+          in: path
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 64}
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/wallet/transactions:
+    get:
+      tags: [buyer]
+      operationId: getBuyerWalletTransactions
+      summary: List the authenticated buyer wallet transactions
+      x-roles: [buyer]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/wallet/transactions:
+    get:
+      tags: [merchant]
+      operationId: getMerchantWalletTransactions
+      summary: List the authenticated merchant wallet transactions
+      x-roles: [merchant]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/wallet/transactions:
+    get:
+      tags: [driver]
+      operationId: getDriverWalletTransactions
+      summary: List the authenticated driver wallet transactions
+      x-roles: [driver]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/wallet/transactions/{txn_no}:
+    get:
+      tags: [buyer]
+      operationId: getBuyerWalletTransaction
+      summary: Read one buyer transaction visible to the authenticated account
+      x-roles: [buyer]
+      parameters: [{name: txn_no, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/wallet/transactions/{txn_no}:
+    get:
+      tags: [merchant]
+      operationId: getMerchantWalletTransaction
+      summary: Read one merchant transaction visible to the authenticated account
+      x-roles: [merchant]
+      parameters: [{name: txn_no, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/wallet/transactions/{txn_no}:
+    get:
+      tags: [driver]
+      operationId: getDriverWalletTransaction
+      summary: Read one driver transaction visible to the authenticated account
+      x-roles: [driver]
+      parameters: [{name: txn_no, in: path, required: true, schema: {type: string, minLength: 1, maxLength: 128}}]
+      responses:
+        "200": { $ref: "#/components/responses/LedgerReadSucceeded" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1264,7 +1424,81 @@ components:
         ok: {type: boolean, enum: [true]}
         data: {$ref: "#/components/schemas/AuditListData"}
         request_id: {type: string, minLength: 1}
+    RevenueByCategory:
+      type: object
+      additionalProperties: false
+      required: [category, amount_e4]
+      properties:
+        category: {type: string, enum: [storage, delivery_margin, ads, settle_fee, member]}
+        amount_e4: {type: integer, format: int64}
+    FundsPosition:
+      type: object
+      additionalProperties: false
+      required: [user_available_e4, frozen_e4, pending_payout_e4, delivery_escrow_e4, ad_budget_e4, platform_held_e4, payable_carrier_e4, suspense_e4, internal_total_e4, bank_dedicated_e4, matches_bank]
+      properties:
+        user_available_e4: {type: integer, format: int64}
+        frozen_e4: {type: integer, format: int64}
+        pending_payout_e4: {type: integer, format: int64}
+        delivery_escrow_e4: {type: integer, format: int64}
+        ad_budget_e4: {type: integer, format: int64}
+        platform_held_e4: {type: integer, format: int64}
+        payable_carrier_e4: {type: integer, format: int64}
+        suspense_e4: {type: integer, format: int64}
+        internal_total_e4: {type: integer, format: int64}
+        bank_dedicated_e4: {type: integer, format: int64}
+        matches_bank: {type: boolean}
+    WithdrawalSummary:
+      type: object
+      additionalProperties: false
+      required: [pending_count, pending_amount_e4, paid_count, paid_amount_e4]
+      properties:
+        pending_count: {type: integer, format: int64}
+        pending_amount_e4: {type: integer, format: int64}
+        paid_count: {type: integer, format: int64}
+        paid_amount_e4: {type: integer, format: int64}
+    MerchantBalance:
+      type: object
+      additionalProperties: false
+      required: [merchant_id, available_e4]
+      properties:
+        merchant_id: {type: integer, format: int64}
+        available_e4: {type: integer, format: int64}
+    FinancialCenterData:
+      type: object
+      additionalProperties: false
+      required: [revenue, revenue_total_e4, position, withdrawals, merchant_balances]
+      properties:
+        revenue: {type: array, items: {$ref: "#/components/schemas/RevenueByCategory"}}
+        revenue_total_e4: {type: integer, format: int64}
+        position: {$ref: "#/components/schemas/FundsPosition"}
+        withdrawals: {$ref: "#/components/schemas/WithdrawalSummary"}
+        merchant_balances: {type: array, items: {$ref: "#/components/schemas/MerchantBalance"}}
+    FinancialCenterSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/FinancialCenterData"}
+        request_id: {type: string, minLength: 1}
+    LedgerReadData:
+      type: object
+      additionalProperties: true
+      description: Read-only ledger data. Amounts are signed or unsigned integer e4 values; clients format them only for display.
+    LedgerReadSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/LedgerReadData"}
+        request_id: {type: string, minLength: 1}
   responses:
+    LedgerReadSucceeded:
+      description: Read-only ledger response.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/LedgerReadSuccessResponse"}
     RefreshSucceeded:
       description: Refresh token rotated successfully.
       content:

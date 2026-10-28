@@ -217,6 +217,36 @@ func (e ErrorEnvelopeOk) Valid() bool {
 	}
 }
 
+// Defines values for FinancialCenterSuccessResponseOk.
+const (
+	FinancialCenterSuccessResponseOkTrue FinancialCenterSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the FinancialCenterSuccessResponseOk enum.
+func (e FinancialCenterSuccessResponseOk) Valid() bool {
+	switch e {
+	case FinancialCenterSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LedgerReadSuccessResponseOk.
+const (
+	LedgerReadSuccessResponseOkTrue LedgerReadSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the LedgerReadSuccessResponseOk enum.
+func (e LedgerReadSuccessResponseOk) Valid() bool {
+	switch e {
+	case LedgerReadSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PingDataPong.
 const (
 	PingDataPongTrue PingDataPong = true
@@ -439,6 +469,33 @@ const (
 func (e RefreshSuccessResponseOk) Valid() bool {
 	switch e {
 	case RefreshSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RevenueByCategoryCategory.
+const (
+	Ads            RevenueByCategoryCategory = "ads"
+	DeliveryMargin RevenueByCategoryCategory = "delivery_margin"
+	Member         RevenueByCategoryCategory = "member"
+	SettleFee      RevenueByCategoryCategory = "settle_fee"
+	Storage        RevenueByCategoryCategory = "storage"
+)
+
+// Valid indicates whether the value is a known member of the RevenueByCategoryCategory enum.
+func (e RevenueByCategoryCategory) Valid() bool {
+	switch e {
+	case Ads:
+		return true
+	case DeliveryMargin:
+		return true
+	case Member:
+		return true
+	case SettleFee:
+		return true
+	case Storage:
 		return true
 	default:
 		return false
@@ -786,11 +843,65 @@ type ErrorEnvelope struct {
 // ErrorEnvelopeOk defines model for ErrorEnvelope.Ok.
 type ErrorEnvelopeOk bool
 
+// FinancialCenterData defines model for FinancialCenterData.
+type FinancialCenterData struct {
+	MerchantBalances []MerchantBalance   `json:"merchant_balances"`
+	Position         FundsPosition       `json:"position"`
+	Revenue          []RevenueByCategory `json:"revenue"`
+	RevenueTotalE4   int64               `json:"revenue_total_e4"`
+	Withdrawals      WithdrawalSummary   `json:"withdrawals"`
+}
+
+// FinancialCenterSuccessResponse defines model for FinancialCenterSuccessResponse.
+type FinancialCenterSuccessResponse struct {
+	Data      FinancialCenterData              `json:"data"`
+	Ok        FinancialCenterSuccessResponseOk `json:"ok"`
+	RequestId string                           `json:"request_id"`
+}
+
+// FinancialCenterSuccessResponseOk defines model for FinancialCenterSuccessResponse.Ok.
+type FinancialCenterSuccessResponseOk bool
+
+// FundsPosition defines model for FundsPosition.
+type FundsPosition struct {
+	AdBudgetE4       int64 `json:"ad_budget_e4"`
+	BankDedicatedE4  int64 `json:"bank_dedicated_e4"`
+	DeliveryEscrowE4 int64 `json:"delivery_escrow_e4"`
+	FrozenE4         int64 `json:"frozen_e4"`
+	InternalTotalE4  int64 `json:"internal_total_e4"`
+	MatchesBank      bool  `json:"matches_bank"`
+	PayableCarrierE4 int64 `json:"payable_carrier_e4"`
+	PendingPayoutE4  int64 `json:"pending_payout_e4"`
+	PlatformHeldE4   int64 `json:"platform_held_e4"`
+	SuspenseE4       int64 `json:"suspense_e4"`
+	UserAvailableE4  int64 `json:"user_available_e4"`
+}
+
+// LedgerReadData Read-only ledger data. Amounts are signed or unsigned integer e4 values; clients format them only for display.
+type LedgerReadData map[string]interface{}
+
+// LedgerReadSuccessResponse defines model for LedgerReadSuccessResponse.
+type LedgerReadSuccessResponse struct {
+	// Data Read-only ledger data. Amounts are signed or unsigned integer e4 values; clients format them only for display.
+	Data      LedgerReadData              `json:"data"`
+	Ok        LedgerReadSuccessResponseOk `json:"ok"`
+	RequestId string                      `json:"request_id"`
+}
+
+// LedgerReadSuccessResponseOk defines model for LedgerReadSuccessResponse.Ok.
+type LedgerReadSuccessResponseOk bool
+
 // LocalizedText Trilingual text; every language must be present before a product can be published.
 type LocalizedText struct {
 	En string `json:"en"`
 	Km string `json:"km"`
 	Zh string `json:"zh"`
+}
+
+// MerchantBalance defines model for MerchantBalance.
+type MerchantBalance struct {
+	AvailableE4 int64 `json:"available_e4"`
+	MerchantId  int64 `json:"merchant_id"`
 }
 
 // Messages defines model for Messages.
@@ -968,6 +1079,15 @@ type RefreshSuccessResponse struct {
 // RefreshSuccessResponseOk defines model for RefreshSuccessResponse.Ok.
 type RefreshSuccessResponseOk bool
 
+// RevenueByCategory defines model for RevenueByCategory.
+type RevenueByCategory struct {
+	AmountE4 int64                     `json:"amount_e4"`
+	Category RevenueByCategoryCategory `json:"category"`
+}
+
+// RevenueByCategoryCategory defines model for RevenueByCategory.Category.
+type RevenueByCategoryCategory string
+
 // Session defines model for Session.
 type Session struct {
 	DeviceId  *string   `json:"device_id,omitempty"`
@@ -1052,6 +1172,14 @@ type TelegramAuthSuccessResponse struct {
 // TelegramAuthSuccessResponseOk defines model for TelegramAuthSuccessResponse.Ok.
 type TelegramAuthSuccessResponseOk bool
 
+// WithdrawalSummary defines model for WithdrawalSummary.
+type WithdrawalSummary struct {
+	PaidAmountE4    int64 `json:"paid_amount_e4"`
+	PaidCount       int64 `json:"paid_count"`
+	PendingAmountE4 int64 `json:"pending_amount_e4"`
+	PendingCount    int64 `json:"pending_count"`
+}
+
 // AccountLinkID defines model for AccountLinkID.
 type AccountLinkID = string
 
@@ -1106,6 +1234,9 @@ type Forbidden = ErrorEnvelope
 // InternalServerError defines model for InternalServerError.
 type InternalServerError = ErrorEnvelope
 
+// LedgerReadSucceeded defines model for LedgerReadSucceeded.
+type LedgerReadSucceeded = LedgerReadSuccessResponse
+
 // LoginFailed defines model for LoginFailed.
 type LoginFailed = ErrorEnvelope
 
@@ -1153,6 +1284,18 @@ type ListAdminAuditParams struct {
 	// BeforeId Return records with ids lower than this cursor.
 	BeforeId *int64 `form:"before_id,omitempty" json:"before_id,omitempty"`
 	PageSize *int   `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// GetAdminFinancialCenterParams defines parameters for GetAdminFinancialCenter.
+type GetAdminFinancialCenterParams struct {
+	// From Inclusive UTC period start. Must be supplied with to.
+	From *time.Time `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Exclusive UTC period end. Must be supplied with from.
+	To *time.Time `form:"to,omitempty" json:"to,omitempty"`
+
+	// MerchantLimit Maximum merchant rows, from 1 through 100.
+	MerchantLimit *int `form:"merchant_limit,omitempty" json:"merchant_limit,omitempty"`
 }
 
 // PostBuyerAuthLogoutParams defines parameters for PostBuyerAuthLogout.
@@ -1286,6 +1429,21 @@ type ServerInterface interface {
 	// ListAdminAudit Query immutable audit records
 	// (GET /v1/admin/audit)
 	ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams)
+	// GetAdminFinancialCenter Get ledger-derived financial-center reporting
+	// (GET /v1/admin/financial-center)
+	GetAdminFinancialCenter(w http.ResponseWriter, r *http.Request, params GetAdminFinancialCenterParams)
+	// GetAdminLedgerAccounts List cached versus reconciled account balances
+	// (GET /v1/admin/ledger/accounts)
+	GetAdminLedgerAccounts(w http.ResponseWriter, r *http.Request)
+	// GetAdminLedgerAccountPostings List postings belonging to one account
+	// (GET /v1/admin/ledger/accounts/{account_ref}/postings)
+	GetAdminLedgerAccountPostings(w http.ResponseWriter, r *http.Request, accountRef string)
+	// GetAdminLedgerTxns List ledger transactions for authorized finance users
+	// (GET /v1/admin/ledger/txns)
+	GetAdminLedgerTxns(w http.ResponseWriter, r *http.Request)
+	// GetAdminLedgerTxn Read a transaction and its postings
+	// (GET /v1/admin/ledger/txns/{txn_no})
+	GetAdminLedgerTxn(w http.ResponseWriter, r *http.Request, txnNo string)
 	// PostBuyerAuthLogout Revoke the current buyer session
 	// (POST /v1/buyer/auth/logout)
 	PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request, params PostBuyerAuthLogoutParams)
@@ -1295,6 +1453,12 @@ type ServerInterface interface {
 	// DeleteBuyerMeSession Revoke one session owned by the current buyer account
 	// (DELETE /v1/buyer/me/sessions/{id})
 	DeleteBuyerMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteBuyerMeSessionParams)
+	// GetBuyerWalletTransactions List the authenticated buyer wallet transactions
+	// (GET /v1/buyer/wallet/transactions)
+	GetBuyerWalletTransactions(w http.ResponseWriter, r *http.Request)
+	// GetBuyerWalletTransaction Read one buyer transaction visible to the authenticated account
+	// (GET /v1/buyer/wallet/transactions/{txn_no})
+	GetBuyerWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string)
 	// PostDriverAuthLogout Revoke the current driver session
 	// (POST /v1/driver/auth/logout)
 	PostDriverAuthLogout(w http.ResponseWriter, r *http.Request, params PostDriverAuthLogoutParams)
@@ -1304,6 +1468,12 @@ type ServerInterface interface {
 	// DeleteDriverMeSession Revoke one session owned by the current driver account
 	// (DELETE /v1/driver/me/sessions/{id})
 	DeleteDriverMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteDriverMeSessionParams)
+	// GetDriverWalletTransactions List the authenticated driver wallet transactions
+	// (GET /v1/driver/wallet/transactions)
+	GetDriverWalletTransactions(w http.ResponseWriter, r *http.Request)
+	// GetDriverWalletTransaction Read one driver transaction visible to the authenticated account
+	// (GET /v1/driver/wallet/transactions/{txn_no})
+	GetDriverWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string)
 	// PostMerchantAuthLogout Revoke the current merchant session
 	// (POST /v1/merchant/auth/logout)
 	PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, params PostMerchantAuthLogoutParams)
@@ -1337,6 +1507,12 @@ type ServerInterface interface {
 	// PublishMerchantProduct Publish a product; requires complete trilingual text and at least two price tiers
 	// (POST /v1/merchant/products/{public_id}/publish)
 	PublishMerchantProduct(w http.ResponseWriter, r *http.Request, publicId PublicID, params PublishMerchantProductParams)
+	// GetMerchantWalletTransactions List the authenticated merchant wallet transactions
+	// (GET /v1/merchant/wallet/transactions)
+	GetMerchantWalletTransactions(w http.ResponseWriter, r *http.Request)
+	// GetMerchantWalletTransaction Read one merchant transaction visible to the authenticated account
+	// (GET /v1/merchant/wallet/transactions/{txn_no})
+	GetMerchantWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string)
 	// PostAuthRefresh Rotate a Mini App refresh token
 	// (POST /v1/public/auth/refresh)
 	PostAuthRefresh(w http.ResponseWriter, r *http.Request)
@@ -1364,6 +1540,36 @@ func (_ Unimplemented) ListAdminAudit(w http.ResponseWriter, r *http.Request, pa
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// GetAdminFinancialCenter Get ledger-derived financial-center reporting
+// (GET /v1/admin/financial-center)
+func (_ Unimplemented) GetAdminFinancialCenter(w http.ResponseWriter, r *http.Request, params GetAdminFinancialCenterParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAdminLedgerAccounts List cached versus reconciled account balances
+// (GET /v1/admin/ledger/accounts)
+func (_ Unimplemented) GetAdminLedgerAccounts(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAdminLedgerAccountPostings List postings belonging to one account
+// (GET /v1/admin/ledger/accounts/{account_ref}/postings)
+func (_ Unimplemented) GetAdminLedgerAccountPostings(w http.ResponseWriter, r *http.Request, accountRef string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAdminLedgerTxns List ledger transactions for authorized finance users
+// (GET /v1/admin/ledger/txns)
+func (_ Unimplemented) GetAdminLedgerTxns(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAdminLedgerTxn Read a transaction and its postings
+// (GET /v1/admin/ledger/txns/{txn_no})
+func (_ Unimplemented) GetAdminLedgerTxn(w http.ResponseWriter, r *http.Request, txnNo string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // PostBuyerAuthLogout Revoke the current buyer session
 // (POST /v1/buyer/auth/logout)
 func (_ Unimplemented) PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request, params PostBuyerAuthLogoutParams) {
@@ -1382,6 +1588,18 @@ func (_ Unimplemented) DeleteBuyerMeSession(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// GetBuyerWalletTransactions List the authenticated buyer wallet transactions
+// (GET /v1/buyer/wallet/transactions)
+func (_ Unimplemented) GetBuyerWalletTransactions(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetBuyerWalletTransaction Read one buyer transaction visible to the authenticated account
+// (GET /v1/buyer/wallet/transactions/{txn_no})
+func (_ Unimplemented) GetBuyerWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // PostDriverAuthLogout Revoke the current driver session
 // (POST /v1/driver/auth/logout)
 func (_ Unimplemented) PostDriverAuthLogout(w http.ResponseWriter, r *http.Request, params PostDriverAuthLogoutParams) {
@@ -1397,6 +1615,18 @@ func (_ Unimplemented) GetDriverMeSessions(w http.ResponseWriter, r *http.Reques
 // DeleteDriverMeSession Revoke one session owned by the current driver account
 // (DELETE /v1/driver/me/sessions/{id})
 func (_ Unimplemented) DeleteDriverMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteDriverMeSessionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetDriverWalletTransactions List the authenticated driver wallet transactions
+// (GET /v1/driver/wallet/transactions)
+func (_ Unimplemented) GetDriverWalletTransactions(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetDriverWalletTransaction Read one driver transaction visible to the authenticated account
+// (GET /v1/driver/wallet/transactions/{txn_no})
+func (_ Unimplemented) GetDriverWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1463,6 +1693,18 @@ func (_ Unimplemented) UpdateMerchantProduct(w http.ResponseWriter, r *http.Requ
 // PublishMerchantProduct Publish a product; requires complete trilingual text and at least two price tiers
 // (POST /v1/merchant/products/{public_id}/publish)
 func (_ Unimplemented) PublishMerchantProduct(w http.ResponseWriter, r *http.Request, publicId PublicID, params PublishMerchantProductParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetMerchantWalletTransactions List the authenticated merchant wallet transactions
+// (GET /v1/merchant/wallet/transactions)
+func (_ Unimplemented) GetMerchantWalletTransactions(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetMerchantWalletTransaction Read one merchant transaction visible to the authenticated account
+// (GET /v1/merchant/wallet/transactions/{txn_no})
+func (_ Unimplemented) GetMerchantWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1616,6 +1858,145 @@ func (siw *ServerInterfaceWrapper) ListAdminAudit(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetAdminFinancialCenter operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminFinancialCenter(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAdminFinancialCenterParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "merchant_limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "merchant_limit", r.URL.Query(), &params.MerchantLimit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "merchant_limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "merchant_limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminFinancialCenter(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminLedgerAccounts operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminLedgerAccounts(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminLedgerAccounts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminLedgerAccountPostings operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminLedgerAccountPostings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "account_ref" -------------
+	var accountRef string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "account_ref", chi.URLParam(r, "account_ref"), &accountRef, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "account_ref", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminLedgerAccountPostings(w, r, accountRef)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminLedgerTxns operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminLedgerTxns(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminLedgerTxns(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminLedgerTxn operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminLedgerTxn(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "txn_no" -------------
+	var txnNo string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "txn_no", chi.URLParam(r, "txn_no"), &txnNo, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "txn_no", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminLedgerTxn(w, r, txnNo)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PostBuyerAuthLogout operation middleware
 func (siw *ServerInterfaceWrapper) PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request) {
 
@@ -1729,6 +2110,46 @@ func (siw *ServerInterfaceWrapper) DeleteBuyerMeSession(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// GetBuyerWalletTransactions operation middleware
+func (siw *ServerInterfaceWrapper) GetBuyerWalletTransactions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBuyerWalletTransactions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBuyerWalletTransaction operation middleware
+func (siw *ServerInterfaceWrapper) GetBuyerWalletTransaction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "txn_no" -------------
+	var txnNo string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "txn_no", chi.URLParam(r, "txn_no"), &txnNo, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "txn_no", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBuyerWalletTransaction(w, r, txnNo)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PostDriverAuthLogout operation middleware
 func (siw *ServerInterfaceWrapper) PostDriverAuthLogout(w http.ResponseWriter, r *http.Request) {
 
@@ -1833,6 +2254,46 @@ func (siw *ServerInterfaceWrapper) DeleteDriverMeSession(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteDriverMeSession(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDriverWalletTransactions operation middleware
+func (siw *ServerInterfaceWrapper) GetDriverWalletTransactions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDriverWalletTransactions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDriverWalletTransaction operation middleware
+func (siw *ServerInterfaceWrapper) GetDriverWalletTransaction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "txn_no" -------------
+	var txnNo string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "txn_no", chi.URLParam(r, "txn_no"), &txnNo, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "txn_no", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDriverWalletTransaction(w, r, txnNo)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2319,6 +2780,46 @@ func (siw *ServerInterfaceWrapper) PublishMerchantProduct(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// GetMerchantWalletTransactions operation middleware
+func (siw *ServerInterfaceWrapper) GetMerchantWalletTransactions(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMerchantWalletTransactions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMerchantWalletTransaction operation middleware
+func (siw *ServerInterfaceWrapper) GetMerchantWalletTransaction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "txn_no" -------------
+	var txnNo string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "txn_no", chi.URLParam(r, "txn_no"), &txnNo, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "txn_no", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMerchantWalletTransaction(w, r, txnNo)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PostAuthRefresh operation middleware
 func (siw *ServerInterfaceWrapper) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {
 
@@ -2606,6 +3107,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/financial-center", wrapper.GetAdminFinancialCenter)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/admin/audit", wrapper.ListAdminAudit)
 	})
 	r.Group(func(r chi.Router) {
@@ -2640,6 +3144,36 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/v1/driver/me/sessions/{id}", wrapper.DeleteDriverMeSession)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/ledger/txns", wrapper.GetAdminLedgerTxns)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/ledger/txns/{txn_no}", wrapper.GetAdminLedgerTxn)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/ledger/accounts", wrapper.GetAdminLedgerAccounts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/ledger/accounts/{account_ref}/postings", wrapper.GetAdminLedgerAccountPostings)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/wallet/transactions", wrapper.GetBuyerWalletTransactions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/wallet/transactions", wrapper.GetMerchantWalletTransactions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/driver/wallet/transactions", wrapper.GetDriverWalletTransactions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/wallet/transactions/{txn_no}", wrapper.GetBuyerWalletTransaction)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/wallet/transactions/{txn_no}", wrapper.GetMerchantWalletTransaction)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/driver/wallet/transactions/{txn_no}", wrapper.GetDriverWalletTransaction)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/public/ping", wrapper.GetPublicPing)

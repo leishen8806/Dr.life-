@@ -114,9 +114,17 @@ func TestWithdrawalWorkflowIntegration(t *testing.T) {
 			t.Fatal("service result contains payee plaintext")
 		}
 		assertSQLState(t, execErr(e.ctx, e.admin, `UPDATE ledger.withdrawal SET request_key='changed-key' WHERE id=$1`, result.Withdrawal.ID), "55000")
-		decrypted, err := service.DecryptWithdrawalPayee(e.ctx, result.Withdrawal.ID)
+		decrypted, err := service.DecryptWithdrawalPayee(e.ctx, result.Withdrawal.ID, 99, "bank_payout")
 		if err != nil || string(decrypted) != plaintext {
 			t.Fatalf("decrypt=%q err=%v", decrypted, err)
+		}
+		var accesses int
+		var payload string
+		if err := e.admin.QueryRow(e.ctx, `SELECT count(*),COALESCE(max(payload::text),'') FROM ledger.outbox WHERE topic='ledger.withdrawal.payee_accessed'`).Scan(&accesses, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if accesses != 1 || strings.Contains(payload, plaintext) || !strings.Contains(payload, "bank_payout") {
+			t.Fatalf("payee access event count=%d payload=%s", accesses, payload)
 		}
 		assertNoSensitiveOutbox(t, e, plaintext)
 		if got := accountBalance(t, e, wallet.Available); got != beforeWallet-25 {

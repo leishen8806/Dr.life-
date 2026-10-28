@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/v1/admin/financial-center": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get ledger-derived financial-center reporting */
+        get: operations["getAdminFinancialCenter"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/audit": {
         parameters: {
             query?: never;
@@ -211,6 +228,179 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/ledger/txns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List ledger transactions for authorized finance users
+         * @description Requires fund view. Administrators with a non-empty data scope are denied because ledger accounts have no region field.
+         */
+        get: operations["getAdminLedgerTxns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/ledger/txns/{txn_no}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a transaction and its postings */
+        get: operations["getAdminLedgerTxn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/ledger/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List cached versus reconciled account balances */
+        get: operations["getAdminLedgerAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/ledger/accounts/{account_ref}/postings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List postings belonging to one account */
+        get: operations["getAdminLedgerAccountPostings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/buyer/wallet/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the authenticated buyer wallet transactions */
+        get: operations["getBuyerWalletTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/wallet/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the authenticated merchant wallet transactions */
+        get: operations["getMerchantWalletTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/driver/wallet/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the authenticated driver wallet transactions */
+        get: operations["getDriverWalletTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/buyer/wallet/transactions/{txn_no}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one buyer transaction visible to the authenticated account */
+        get: operations["getBuyerWalletTransaction"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/wallet/transactions/{txn_no}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one merchant transaction visible to the authenticated account */
+        get: operations["getMerchantWalletTransaction"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/driver/wallet/transactions/{txn_no}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one driver transaction visible to the authenticated account */
+        get: operations["getDriverWalletTransaction"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/ping": {
         parameters: {
             query?: never;
@@ -257,6 +447,63 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/me/link-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List buyer accounts that may be linked to the authenticated merchant account
+         * @description Returns public account identifiers only. The server matches candidates by the same Telegram person and does not disclose personal data.
+         */
+        get: operations["getMerchantMeLinkCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/me/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link the authenticated merchant owner to one eligible buyer account */
+        post: operations["createMerchantMeLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/me/links/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Lowercase ULID of an account link owned by the authenticated merchant owner. */
+                id: components["parameters"]["AccountLinkID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unlink one account link owned by the authenticated merchant owner */
+        delete: operations["deleteMerchantMeLink"];
         options?: never;
         head?: never;
         patch?: never;
@@ -440,6 +687,43 @@ export interface components {
             data: components["schemas"]["ActionData"];
             request_id: string;
         };
+        AccountLinkCandidate: {
+            /** @description Canonical public identifier of the eligible buyer account. */
+            public_id: string;
+        };
+        AccountLinkCandidateListData: {
+            items: components["schemas"]["AccountLinkCandidate"][];
+        };
+        AccountLinkCandidateListSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["AccountLinkCandidateListData"];
+            request_id: string;
+        };
+        AccountLinkCreateRequest: {
+            /** @description Canonical public identifier returned by the candidate endpoint. */
+            buyer_account_id: string;
+        };
+        AccountLink: {
+            public_id: string;
+            buyer_account_id: string;
+        };
+        AccountLinkSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["AccountLink"];
+            request_id: string;
+        };
+        AccountLinkDeletedData: {
+            /** @enum {boolean} */
+            unlinked: true;
+        };
+        AccountLinkDeletedSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["AccountLinkDeletedData"];
+            request_id: string;
+        };
         /** @description Trilingual text; every language must be present before a product can be published. */
         LocalizedText: {
             zh: string;
@@ -573,8 +857,86 @@ export interface components {
             data: components["schemas"]["AuditListData"];
             request_id: string;
         };
+        RevenueByCategory: {
+            /** @enum {string} */
+            category: "storage" | "delivery_margin" | "ads" | "settle_fee" | "member";
+            /** Format: int64 */
+            amount_e4: number;
+        };
+        FundsPosition: {
+            /** Format: int64 */
+            user_available_e4: number;
+            /** Format: int64 */
+            frozen_e4: number;
+            /** Format: int64 */
+            pending_payout_e4: number;
+            /** Format: int64 */
+            delivery_escrow_e4: number;
+            /** Format: int64 */
+            ad_budget_e4: number;
+            /** Format: int64 */
+            platform_held_e4: number;
+            /** Format: int64 */
+            payable_carrier_e4: number;
+            /** Format: int64 */
+            suspense_e4: number;
+            /** Format: int64 */
+            internal_total_e4: number;
+            /** Format: int64 */
+            bank_dedicated_e4: number;
+            matches_bank: boolean;
+        };
+        WithdrawalSummary: {
+            /** Format: int64 */
+            pending_count: number;
+            /** Format: int64 */
+            pending_amount_e4: number;
+            /** Format: int64 */
+            paid_count: number;
+            /** Format: int64 */
+            paid_amount_e4: number;
+        };
+        MerchantBalance: {
+            /** Format: int64 */
+            merchant_id: number;
+            /** Format: int64 */
+            available_e4: number;
+        };
+        FinancialCenterData: {
+            revenue: components["schemas"]["RevenueByCategory"][];
+            /** Format: int64 */
+            revenue_total_e4: number;
+            position: components["schemas"]["FundsPosition"];
+            withdrawals: components["schemas"]["WithdrawalSummary"];
+            merchant_balances: components["schemas"]["MerchantBalance"][];
+        };
+        FinancialCenterSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["FinancialCenterData"];
+            request_id: string;
+        };
+        /** @description Read-only ledger data. Amounts are signed or unsigned integer e4 values; clients format them only for display. */
+        LedgerReadData: {
+            [key: string]: unknown;
+        };
+        LedgerReadSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["LedgerReadData"];
+            request_id: string;
+        };
     };
     responses: {
+        /** @description Read-only ledger response. */
+        LedgerReadSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["LedgerReadSuccessResponse"];
+            };
+        };
         /** @description Refresh token rotated successfully. */
         RefreshSucceeded: {
             headers: {
@@ -759,6 +1121,8 @@ export interface components {
         PublicID: string;
         /** @description Lowercase ULID of a session owned by the authenticated account. */
         SessionID: string;
+        /** @description Lowercase ULID of an account link owned by the authenticated merchant owner. */
+        AccountLinkID: string;
         /** @description Restrict the result to one category code. */
         CategoryCode: string;
         /** @description Restrict the result to one product status. */
@@ -777,6 +1141,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    getAdminFinancialCenter: {
+        parameters: {
+            query?: {
+                /** @description Inclusive UTC period start. Must be supplied with to. */
+                from?: string;
+                /** @description Exclusive UTC period end. Must be supplied with from. */
+                to?: string;
+                /** @description Maximum merchant rows, from 1 through 100. */
+                merchant_limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Financial-center report derived from the ledger. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FinancialCenterSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     listAdminAudit: {
         parameters: {
             query?: {
@@ -1035,6 +1432,171 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    getAdminLedgerTxns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getAdminLedgerTxn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txn_no: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getAdminLedgerAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getAdminLedgerAccountPostings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getBuyerWalletTransactions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getMerchantWalletTransactions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getDriverWalletTransactions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getBuyerWalletTransaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txn_no: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getMerchantWalletTransaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txn_no: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getDriverWalletTransaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txn_no: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     getPublicPing: {
         parameters: {
             query?: never;
@@ -1121,6 +1683,97 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             405: components["responses"]["MethodNotAllowed"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getMerchantMeLinkCandidates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Buyer account candidates for the current merchant account. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountLinkCandidateListSuccessResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createMerchantMeLink: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountLinkCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The accounts were linked. This does not merge funds, orders, or permissions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountLinkSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    deleteMerchantMeLink: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description Lowercase ULID of an account link owned by the authenticated merchant owner. */
+                id: components["parameters"]["AccountLinkID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The link was marked unlinked; no business data is deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountLinkDeletedSuccessResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             503: components["responses"]["ServiceUnavailable"];

@@ -1,34 +1,19 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import type { components, paths } from "./schema";
+import { ApiError } from "./errors";
+import { createIdentifier, createResilientFetch } from "./http";
+import { createAuthFetch, type AuthFetchOptions } from "./auth";
 
 export type { components, operations, paths } from "./schema";
+export { ApiError } from "./errors";
+export { CircuitOpenError, createIdempotentAction, createResilientFetch, loginStormDelay, redactSensitive, retryDelay } from "./http";
+export { createAuthFetch, createTokenStore } from "./auth";
+export type { AuthFetchOptions, AuthProvider, StepUpHandler, StepUpRequest, TokenPair, TokenStore } from "./auth";
 export type Language = "zh" | "en" | "km";
 type ErrorEnvelope = components["schemas"]["ErrorEnvelope"];
-type Messages = components["schemas"]["Messages"];
-
-const identifierPattern = /^[A-Za-z0-9_-]{1,64}$/;
-
-function createIdentifier(): string {
-  const value = globalThis.crypto?.randomUUID().replaceAll("-", "_");
-  if (!value || !identifierPattern.test(value))
-    throw new Error("Unable to create request identifier");
-  return value;
-}
 
 export function withIdempotencyKey(): { "Idempotency-Key": string } {
   return { "Idempotency-Key": createIdentifier() };
-}
-
-export class ApiError extends Error {
-  constructor(
-    public readonly code: ErrorEnvelope["error"]["code"],
-    public readonly messages: Messages,
-    public readonly requestId: string,
-    public readonly status: number
-  ) {
-    super(messages.en);
-    this.name = "ApiError";
-  }
 }
 
 export interface ApiClientOptions {
@@ -36,6 +21,9 @@ export interface ApiClientOptions {
   getToken?: () => string | null | undefined;
   getLanguage?: () => Language;
   fetch?: typeof globalThis.fetch;
+  resilience?: Parameters<typeof createResilientFetch>[1];
+  /** Memory-only token management: single-flight refresh on 2001 and step-up replay on 2003. */
+  auth?: AuthFetchOptions;
 }
 
 function defaultBaseUrl(): string {
@@ -57,13 +45,16 @@ function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
 }
 
 export function createApiClient(options: ApiClientOptions = {}) {
+  if (options.auth && options.getToken)
+    throw new Error("Use either options.auth or options.getToken, not both");
+  const transport = options.fetch ?? globalThis.fetch;
   const client = createClient<paths>({
     baseUrl: options.baseUrl ?? defaultBaseUrl(),
-    fetch: options.fetch
+    fetch: createResilientFetch(options.auth ? createAuthFetch(transport, options.auth) : transport, options.resilience)
   });
   const middleware: Middleware = {
     async onRequest({ request }) {
-      const token = options.getToken?.();
+      const token = options.auth ? undefined : options.getToken?.();
       if (token) request.headers.set("Authorization", `Bearer ${token}`);
       request.headers.set("X-Request-ID", createIdentifier());
       request.headers.set("Accept-Language", options.getLanguage?.() ?? "en");
@@ -76,12 +67,7 @@ export function createApiClient(options: ApiClientOptions = {}) {
         .json()
         .catch(() => undefined);
       if (isErrorEnvelope(body)) {
-        throw new ApiError(
-          body.error.code,
-          body.error.message,
-          body.request_id,
-          response.status
-        );
+        throw new ApiError(body.error.code, body.request_id, response.status);
       }
       return response;
     }

@@ -123,6 +123,7 @@ func TestBusinessMetricMethods(t *testing.T) {
 	b.BotSent("buyer", 0, true, "")
 	b.BotSent("merchant", 1, false, "network")
 	b.LoginValidationFailed("driver", "expired")
+	b.LoginAuditWriteFailed("driver")
 	b.SessionRefresh("buyer", "success")
 	b.LedgerPosted()
 	b.LedgerFailed("unbalanced")
@@ -134,9 +135,10 @@ func TestBusinessMetricMethods(t *testing.T) {
 	b.ReconRun(true)
 	b.ReconRun(false)
 	b.ReconMismatch("BALANCE_CACHE", 2)
+	b.ReconSpotCheckDropped()
 	for _, name := range []string{
 		"drlife_orders_total", "drlife_withdrawals_total", "drlife_ai_requests_total", "drlife_bot_sends_total",
-		"drlife_login_validation_failures_total", "drlife_session_refresh_total", "drlife_ledger_posts_total", "drlife_ledger_reconciliation_runs_total", "drlife_ledger_reconciliation_mismatches_total",
+		"drlife_login_validation_failures_total", "drlife_login_audit_write_failures_total", "drlife_session_refresh_total", "drlife_ledger_posts_total", "drlife_ledger_reconciliation_runs_total", "drlife_ledger_reconciliation_mismatches_total", "drlife_ledger_spot_checks_dropped_total",
 		"drlife_audit_appends_total", "drlife_audit_verify_failures_total", "drlife_audit_anchor_missing",
 	} {
 		if len(metricFamily(t, metrics, name).Metric) == 0 {

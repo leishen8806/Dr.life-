@@ -1,0 +1,49 @@
+name: loadtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: "Scenario file under loadtest/scenarios"
+        required: true
+        default: "smoke.js"
+        type: choice
+        options:
+          - smoke.js
+          - login-storm.js
+          - mixed.js
+          - financial-write.js
+          - overload3x.js
+          - retry-storm.js
+          - cache-stampede.js
+          - queue-flood.js
+          - soak.js
+          - security-under-load.js
+      base_url:
+        description: "Local or explicitly allow-listed test origin"
+        required: true
+        default: "http://app-a:8080"
+
+permissions:
+  contents: read
+
+jobs:
+  loadtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start isolated load-test rig
+        run: docker compose -f loadtest/docker-compose.yml up -d --build
+      - name: Run manual k6 scenario
+        env:
+          TARGET_ENV: local
+          BASE_URL: ${{ inputs.base_url }}
+        run: |
+          docker run --rm -i \
+            --network drlife-loadtest_default \
+            -v "$PWD:/work" -w /work \
+            -e TARGET_ENV -e BASE_URL \
+            grafana/k6:2.3.0 run "loadtest/scenarios/${{ inputs.scenario }}"
+      - name: Stop rig
+        if: always()
+        run: docker compose -f loadtest/docker-compose.yml down -v

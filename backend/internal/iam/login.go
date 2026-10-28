@@ -3,6 +3,7 @@ package iam
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net"
 	"regexp"
 	"sync"
@@ -20,6 +21,11 @@ var devicePattern = regexp.MustCompile(`^[A-Za-z0-9_:-]{1,128}$`)
 var startPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 type LoginMetrics interface{ LoginValidationFailed(endpoint, reason string) }
+type LoginAuditMetrics interface{ LoginAuditWriteFailed(endpoint string) }
+
+type ambiguousAccountError struct{ personID int64 }
+
+func (ambiguousAccountError) Error() string { return "ambiguous account" }
 
 type LoginInput struct {
 	End      telegram.End
@@ -55,6 +61,7 @@ type Service struct {
 	SessionCache SessionCache
 	Failures     *FailureGuard
 	Metrics      LoginMetrics
+	Logger       *slog.Logger
 	Now          func() time.Time
 }
 
@@ -89,7 +96,13 @@ func (s *Service) Login(ctx context.Context, input LoginInput) (LoginResult, err
 		}
 		return LoginResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
-	return s.loginValidated(ctx, input, verified)
+	result, err := s.loginValidated(ctx, input, verified)
+	var ambiguousErr ambiguousAccountError
+	if errors.As(err, &ambiguousErr) {
+		s.recordFailureForPerson(ctx, input, verified, ambiguousErr.personID, "ambiguous_account", verified.Data.AuthDate)
+		return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
+	}
+	return result, err
 }
 
 func (s *Service) loginBlocked(ctx context.Context, ip string) (bool, error) {
@@ -118,6 +131,10 @@ func (s *Service) loginValidated(ctx context.Context, input LoginInput, verified
 	role := roleForEnd(input.End)
 	account, isNew, err := upsertAccount(ctx, tx, personID, role)
 	if err != nil {
+		var ambiguousErr ambiguousAccountError
+		if errors.As(err, &ambiguousErr) {
+			return LoginResult{}, ambiguousAccountError{personID: personID}
+		}
 		return LoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
 	if account.Status != "active" {
@@ -226,6 +243,16 @@ func upsertPerson(ctx context.Context, tx pgx.Tx, user telegram.User) (int64, er
 }
 
 func upsertAccount(ctx context.Context, tx pgx.Tx, personID int64, role string) (accountRow, bool, error) {
+	accounts, err := findAccounts(ctx, tx, personID, role)
+	if err != nil {
+		return accountRow{}, false, err
+	}
+	if len(accounts) == 1 {
+		return accounts[0], false, nil
+	}
+	if len(accounts) > 1 {
+		return accountRow{}, false, ambiguousAccountError{}
+	}
 	publicID, err := ids.NewULID()
 	if err != nil {
 		return accountRow{}, false, err
@@ -242,8 +269,31 @@ func upsertAccount(ctx context.Context, tx pgx.Tx, personID int64, role string) 
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return accountRow{}, false, err
 	}
-	err = tx.QueryRow(ctx, `SELECT id,public_id,lang,status FROM iam.account WHERE person_id=$1 AND role=$2 AND merchant_id IS NULL`, personID, role).Scan(&row.ID, &row.PublicID, &row.Lang, &row.Status)
-	return row, false, err
+	accounts, err = findAccounts(ctx, tx, personID, role)
+	if err != nil || len(accounts) != 1 {
+		if err == nil && len(accounts) > 1 {
+			err = ambiguousAccountError{}
+		}
+		return accountRow{}, false, err
+	}
+	return accounts[0], false, nil
+}
+
+func findAccounts(ctx context.Context, tx pgx.Tx, personID int64, role string) ([]accountRow, error) {
+	rows, err := tx.Query(ctx, `SELECT id,public_id,lang,status FROM iam.account WHERE person_id=$1 AND role=$2 ORDER BY id LIMIT 2`, personID, role)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	accounts := make([]accountRow, 0, 2)
+	for rows.Next() {
+		var account accountRow
+		if err := rows.Scan(&account.ID, &account.PublicID, &account.Lang, &account.Status); err != nil {
+			return nil, err
+		}
+		accounts = append(accounts, account)
+	}
+	return accounts, rows.Err()
 }
 
 func bindBot(ctx context.Context, tx pgx.Tx, accountID, botID int64, write bool) error {
@@ -282,13 +332,33 @@ func insertLoginEvent(ctx context.Context, tx pgx.Tx, personID int64, verified t
 }
 
 func (s *Service) recordFailure(ctx context.Context, input LoginInput, verified telegram.PoolResult, result string, authDate time.Time) {
+	s.recordFailureForPerson(ctx, input, verified, 0, result, authDate)
+}
+
+func (s *Service) recordFailureForPerson(ctx context.Context, input LoginInput, verified telegram.PoolResult, personID int64, result string, authDate time.Time) {
 	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
+		s.auditWriteFailed(input.End, "begin")
 		return
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if insertLoginEvent(ctx, tx, 0, verified, input, result, authDate) == nil {
-		_ = tx.Commit(ctx)
+	if err := insertLoginEvent(ctx, tx, personID, verified, input, result, authDate); err != nil {
+		s.auditWriteFailed(input.End, "insert")
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		s.auditWriteFailed(input.End, "commit")
+	}
+}
+
+func (s *Service) auditWriteFailed(end telegram.End, stage string) {
+	logger := s.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Error("login audit write failed", "endpoint", string(end), "stage", stage)
+	if metrics, ok := s.Metrics.(LoginAuditMetrics); ok {
+		metrics.LoginAuditWriteFailed(string(end))
 	}
 }
 

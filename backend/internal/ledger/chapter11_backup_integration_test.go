@@ -56,7 +56,7 @@ func TestChapter11BackupRestoreIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	run, err := ledger.New(pool, ledger.Options{}).RunDailyReconciliation(e.ctx, time.Now(), ledger.ReconciliationOptions{})
+	run, err := ledger.New(pool, ledger.Options{}).RunDailyReconciliation(e.ctx, time.Now().AddDate(0, 0, -1), ledger.ReconciliationOptions{})
 	if err != nil || run.Status != "ok" || len(run.Issues) != 0 {
 		t.Fatalf("reconciliation after restore: run=%+v err=%v", run, err)
 	}

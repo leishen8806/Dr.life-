@@ -27,8 +27,11 @@ type Config struct {
 	DatabaseURL                    string
 	ReportDatabaseURL              string
 	DBMaxConns                     int32
+	DBReportMaxConns               int32
+	DBWorkerMaxConns               int32
 	DBMinConns                     int32
 	DBConnectTimeout               time.Duration
+	DBAcquireTimeout               time.Duration
 	DBSlowQuery                    time.Duration
 	SentryDSN                      string
 	RedisURL                       string
@@ -170,7 +173,22 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if dbMinConns > dbMaxConns {
 		return Config{}, fmt.Errorf("DB_MIN_CONNS must not exceed DB_MAX_CONNS")
 	}
+	dbReportMaxConns, err := positiveInt(getenv, "REPORT_DB_MAX_CONNS", 4)
+	if err != nil {
+		return Config{}, err
+	}
+	dbWorkerMaxConns, err := positiveInt(getenv, "WORKER_DB_MAX_CONNS", 4)
+	if err != nil {
+		return Config{}, err
+	}
+	if dbMinConns > dbReportMaxConns || dbMinConns > dbWorkerMaxConns {
+		return Config{}, fmt.Errorf("DB_MIN_CONNS must not exceed any database pool maximum")
+	}
 	dbConnectSeconds, err := durationSeconds(getenv, "DB_CONNECT_TIMEOUT_SECONDS", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	dbAcquireMilliseconds, err := positiveInt(getenv, "DB_ACQUIRE_TIMEOUT_MILLISECONDS", 100)
 	if err != nil {
 		return Config{}, err
 	}
@@ -435,8 +453,11 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		AuditDatabaseURL:       strings.TrimSpace(getenv("AUDIT_DATABASE_URL")),
 		ReportDatabaseURL:      strings.TrimSpace(getenv("REPORT_DATABASE_URL")),
 		DBMaxConns:             int32(dbMaxConns),
+		DBReportMaxConns:       int32(dbReportMaxConns),
+		DBWorkerMaxConns:       int32(dbWorkerMaxConns),
 		DBMinConns:             int32(dbMinConns),
 		DBConnectTimeout:       time.Duration(dbConnectSeconds) * time.Second,
+		DBAcquireTimeout:       time.Duration(dbAcquireMilliseconds) * time.Millisecond,
 		DBSlowQuery:            time.Duration(dbSlowQueryMS) * time.Millisecond,
 		SentryDSN:              strings.TrimSpace(getenv("SENTRY_DSN")),
 		RedisURL:               strings.TrimSpace(getenv("REDIS_URL")),

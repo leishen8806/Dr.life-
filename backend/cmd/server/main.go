@@ -15,6 +15,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
+	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
@@ -53,6 +54,24 @@ func main() {
 		os.Exit(1)
 	}
 	defer database.Close()
+	var reportReadiness server.ReadinessCheck
+	var ledgerReader *ledger.ReadService
+	if cfg.ReportDatabaseURL != "" {
+		report, reportErr := observability.NewReportPool(ctx, cfg, metrics, logger)
+		if reportErr != nil {
+			logger.Error("report database pool failed", "error", reportErr)
+			os.Exit(1)
+		}
+		defer report.Close()
+		ledgerReader = ledger.NewReadService(report)
+		reportReadiness = report.Ping
+	}
+	worker, err := observability.NewWorkerPool(ctx, cfg, metrics, logger)
+	if err != nil {
+		logger.Error("worker database pool failed", "error", err)
+		os.Exit(1)
+	}
+	defer worker.Close()
 
 	var waitMu sync.Mutex
 	var lastAcquireCount int64
@@ -177,8 +196,12 @@ func main() {
 	var loginService *iam.Service
 	var sessionService *iam.SessionService
 	var accountLinkService *iam.AccountLinkService
+	var accountDirectory *iam.AccountDirectory
 	var authenticator gateway.Authenticator
 	checks := []server.ReadinessCheck{database.Ping}
+	if reportReadiness != nil {
+		checks = append(checks, reportReadiness)
+	}
 	if auditReadiness != nil {
 		checks = append(checks, auditReadiness)
 	}
@@ -195,6 +218,7 @@ func main() {
 			os.Exit(1)
 		}
 		defer iamDatabase.Close()
+		accountDirectory = &iam.AccountDirectory{DB: iamDatabase}
 		checks = append(checks, iamDatabase.Ping)
 		jwtKeys, keyErr := iam.LoadJWTKeyringFromEnvironment()
 		if keyErr != nil {
@@ -231,6 +255,7 @@ func main() {
 			Tokens:   tokens, RefreshTTL: cfg.RefreshTokenTTL, IdleTTL: cfg.SessionIdleTTL, MaxSessions: cfg.SessionMaxPerAccount, SessionCache: sessionCache,
 			Failures: &iam.FailureGuard{Limiter: limiter, Rule: gateway.Rule{Limit: cfg.LoginFailureLimit, Window: cfg.LoginFailureWindow}},
 			Metrics:  metrics.Business(),
+			Logger:   logger,
 		}
 		authenticator = iam.Authenticator{Tokens: tokens}
 	}
@@ -273,6 +298,8 @@ func main() {
 		Audit:         auditStore,
 		Sessions:      sessionService,
 		AccountLinks:  accountLinkService,
+		Ledger:        ledgerReader,
+		Directory:     accountDirectory,
 		Bulkhead:      bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)

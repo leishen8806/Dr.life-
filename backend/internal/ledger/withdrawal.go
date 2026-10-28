@@ -481,19 +481,46 @@ func (s *Service) getWithdrawalByRequestKey(ctx context.Context, requestKey stri
 	return withdrawal, mapWithdrawalNotFound(err)
 }
 
-func (s *Service) DecryptWithdrawalPayee(ctx context.Context, id int64) ([]byte, error) {
-	if id <= 0 || s.payeeCipher == nil {
+func (s *Service) DecryptWithdrawalPayee(ctx context.Context, id, actorID int64, purpose string) ([]byte, error) {
+	if id <= 0 || actorID <= 0 || strings.TrimSpace(purpose) == "" {
+		return nil, ErrInvalidRequest
+	}
+	if s.payeeCipher == nil {
 		return nil, ErrPayeeCipherRequired
 	}
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
 	var publicID, encoded string
-	if err := s.db.QueryRow(ctx, `SELECT public_id,payee_account_text FROM ledger.withdrawal WHERE id=$1`, id).Scan(&publicID, &encoded); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT public_id,payee_account_text FROM ledger.withdrawal WHERE id=$1 FOR SHARE`, id).Scan(&publicID, &encoded); err != nil {
 		return nil, mapWithdrawalNotFound(err)
 	}
 	blob, err := base64.RawStdEncoding.DecodeString(encoded)
 	if err != nil {
 		return nil, ErrInvalidRequest
 	}
-	return s.payeeCipher.Decrypt(ctx, blob, withdrawalPayeeAAD(publicID))
+	plaintext, err := s.payeeCipher.Decrypt(ctx, blob, withdrawalPayeeAAD(publicID))
+	if err != nil {
+		return nil, err
+	}
+	payload, err := json.Marshal(struct {
+		PublicID   string    `json:"public_id"`
+		ActorID    int64     `json:"actor"`
+		Purpose    string    `json:"purpose"`
+		OccurredAt time.Time `json:"occurred_at"`
+	}{PublicID: publicID, ActorID: actorID, Purpose: strings.TrimSpace(purpose), OccurredAt: s.now()})
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES('ledger.withdrawal.payee_accessed',$1)`, payload); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return plaintext, nil
 }
 
 func (s *Service) ListOverdueWithdrawals(ctx context.Context, now time.Time, olderThan time.Duration) ([]PendingWithdrawal, error) {

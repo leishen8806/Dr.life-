@@ -27,7 +27,7 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 || cfg.RateLimitAdmin != 60 || cfg.LedgerReconTimezone != "Asia/Phnom_Penh" || cfg.TelegramInitDataMaxAge != 24*time.Hour || cfg.AccessTokenTTL != 15*time.Minute || cfg.RefreshTokenTTL != 7*24*time.Hour || cfg.RefreshTokenGrace != 10*time.Second || cfg.SessionIdleTTL != 24*time.Hour || cfg.SessionMaxPerAccount != 5 || cfg.TokenIssuer != "drlife" || !cfg.TokenLegacyAcceptUntil.IsZero() || cfg.LoginFailureLimit != 20 || cfg.LoginFailureWindow != 10*time.Minute || cfg.BotTokenCacheTTL != 5*time.Minute {
+	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBReportMaxConns != 4 || cfg.DBWorkerMaxConns != 4 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBAcquireTimeout != 100*time.Millisecond || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 || cfg.RateLimitAdmin != 60 || cfg.LedgerReconTimezone != "Asia/Phnom_Penh" || cfg.TelegramInitDataMaxAge != 24*time.Hour || cfg.AccessTokenTTL != 15*time.Minute || cfg.RefreshTokenTTL != 7*24*time.Hour || cfg.RefreshTokenGrace != 10*time.Second || cfg.SessionIdleTTL != 24*time.Hour || cfg.SessionMaxPerAccount != 5 || cfg.TokenIssuer != "drlife" || !cfg.TokenLegacyAcceptUntil.IsZero() || cfg.LoginFailureLimit != 20 || cfg.LoginFailureWindow != 10*time.Minute || cfg.BotTokenCacheTTL != 5*time.Minute {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
 	if cfg.DatabaseURL != "" || cfg.IAMDatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" || cfg.QueueRedisURL != "" {
@@ -118,63 +118,66 @@ func TestLoadBulkheadConfiguration(t *testing.T) {
 
 func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 	cfg, err := load(lookup(map[string]string{
-		"APP_ENV":                        "staging",
-		"HTTP_ADDR":                      "127.0.0.1:9090",
-		"METRICS_ADDR":                   "127.0.0.1:9200",
-		"APP_RELEASE":                    "test-release",
-		"LOG_LEVEL":                      "debug",
-		"SHUTDOWN_TIMEOUT_SECONDS":       "8",
-		"READ_HEADER_TIMEOUT_SECONDS":    "12",
-		"READ_TIMEOUT_SECONDS":           "35",
-		"IDLE_TIMEOUT_SECONDS":           "75",
-		"DATABASE_URL":                   "postgres://placeholder",
-		"IAM_DATABASE_URL":               "postgres://iam-placeholder",
-		"AUDIT_DATABASE_URL":             "postgres://audit-placeholder",
-		"REPORT_DATABASE_URL":            "postgres://report-placeholder",
-		"DB_MAX_CONNS":                   "20",
-		"DB_MIN_CONNS":                   "4",
-		"DB_CONNECT_TIMEOUT_SECONDS":     "6",
-		"DB_SLOW_QUERY_MS":               "250",
-		"SENTRY_DSN":                     "https://public@example.invalid/1",
-		"REDIS_URL":                      "redis://placeholder",
-		"QUEUE_REDIS_URL":                "redis://queue-placeholder",
-		"QUEUE_ALLOW_EVICTION":           "true",
-		"CORS_BUYER_ORIGINS":             "https://buyer.example",
-		"CORS_CREDENTIAL_PATHS":          "/v1/admin/auth/refresh",
-		"PUBLIC_WEBHOOK_PREFIX":          "/webhooks/telegram",
-		"TRUSTED_PROXY_HEADER":           "CF-Connecting-IP",
-		"TRUSTED_PROXY_CIDRS":            "192.0.2.0/24,2001:db8::/32",
-		"ADMIN_ALLOWED_CIDRS":            "198.51.100.0/24",
-		"REQUEST_BODY_MAX_BYTES":         "4096",
-		"REQUEST_BODY_OVERRIDES":         "/v1/admin/import=8192",
-		"CONTENT_TYPE_EXEMPT_PATHS":      "/v1/admin/upload",
-		"WEBHOOK_MAX_BODY_BYTES":         "2048",
-		"IDEMPOTENCY_TTL_HOURS":          "12",
-		"IDEMPOTENCY_MAX_RESPONSE_BYTES": "8192",
-		"IDEMPOTENCY_FINANCIAL_PREFIXES": "/v1/admin/finance",
-		"RATE_LIMIT_IP_PER_MINUTE":       "100",
-		"RATE_LIMIT_ACCOUNT_PER_MINUTE":  "200",
-		"RATE_LIMIT_LOGIN_PER_MINUTE":    "9",
-		"RATE_LIMIT_WITHDRAW_PER_MINUTE": "4",
-		"RATE_LIMIT_AI_PER_MINUTE":       "20",
-		"RATE_LIMIT_ADMIN_PER_MINUTE":    "40",
-		"LEDGER_RECON_TIMEZONE":          "UTC",
-		"TELEGRAM_INITDATA_MAX_AGE":      "12h",
-		"ACCESS_TOKEN_TTL":               "10m",
-		"REFRESH_TOKEN_TTL":              "240h",
-		"REFRESH_TOKEN_GRACE":            "12s",
-		"SESSION_IDLE_TTL":               "12h",
-		"SESSION_MAX_PER_ACCOUNT":        "3",
-		"TOKEN_ISSUER":                   "drlife-staging",
-		"TOKEN_LEGACY_ACCEPT_UNTIL":      "2027-01-02T03:04:05Z",
-		"LOGIN_FAILURE_LIMIT":            "8",
-		"LOGIN_FAILURE_WINDOW":           "3m",
-		"BOT_TOKEN_CACHE_TTL":            "2m",
+		"APP_ENV":                         "staging",
+		"HTTP_ADDR":                       "127.0.0.1:9090",
+		"METRICS_ADDR":                    "127.0.0.1:9200",
+		"APP_RELEASE":                     "test-release",
+		"LOG_LEVEL":                       "debug",
+		"SHUTDOWN_TIMEOUT_SECONDS":        "8",
+		"READ_HEADER_TIMEOUT_SECONDS":     "12",
+		"READ_TIMEOUT_SECONDS":            "35",
+		"IDLE_TIMEOUT_SECONDS":            "75",
+		"DATABASE_URL":                    "postgres://placeholder",
+		"IAM_DATABASE_URL":                "postgres://iam-placeholder",
+		"AUDIT_DATABASE_URL":              "postgres://audit-placeholder",
+		"REPORT_DATABASE_URL":             "postgres://report-placeholder",
+		"DB_MAX_CONNS":                    "20",
+		"DB_MIN_CONNS":                    "4",
+		"REPORT_DB_MAX_CONNS":             "6",
+		"WORKER_DB_MAX_CONNS":             "5",
+		"DB_ACQUIRE_TIMEOUT_MILLISECONDS": "150",
+		"DB_CONNECT_TIMEOUT_SECONDS":      "6",
+		"DB_SLOW_QUERY_MS":                "250",
+		"SENTRY_DSN":                      "https://public@example.invalid/1",
+		"REDIS_URL":                       "redis://placeholder",
+		"QUEUE_REDIS_URL":                 "redis://queue-placeholder",
+		"QUEUE_ALLOW_EVICTION":            "true",
+		"CORS_BUYER_ORIGINS":              "https://buyer.example",
+		"CORS_CREDENTIAL_PATHS":           "/v1/admin/auth/refresh",
+		"PUBLIC_WEBHOOK_PREFIX":           "/webhooks/telegram",
+		"TRUSTED_PROXY_HEADER":            "CF-Connecting-IP",
+		"TRUSTED_PROXY_CIDRS":             "192.0.2.0/24,2001:db8::/32",
+		"ADMIN_ALLOWED_CIDRS":             "198.51.100.0/24",
+		"REQUEST_BODY_MAX_BYTES":          "4096",
+		"REQUEST_BODY_OVERRIDES":          "/v1/admin/import=8192",
+		"CONTENT_TYPE_EXEMPT_PATHS":       "/v1/admin/upload",
+		"WEBHOOK_MAX_BODY_BYTES":          "2048",
+		"IDEMPOTENCY_TTL_HOURS":           "12",
+		"IDEMPOTENCY_MAX_RESPONSE_BYTES":  "8192",
+		"IDEMPOTENCY_FINANCIAL_PREFIXES":  "/v1/admin/finance",
+		"RATE_LIMIT_IP_PER_MINUTE":        "100",
+		"RATE_LIMIT_ACCOUNT_PER_MINUTE":   "200",
+		"RATE_LIMIT_LOGIN_PER_MINUTE":     "9",
+		"RATE_LIMIT_WITHDRAW_PER_MINUTE":  "4",
+		"RATE_LIMIT_AI_PER_MINUTE":        "20",
+		"RATE_LIMIT_ADMIN_PER_MINUTE":     "40",
+		"LEDGER_RECON_TIMEZONE":           "UTC",
+		"TELEGRAM_INITDATA_MAX_AGE":       "12h",
+		"ACCESS_TOKEN_TTL":                "10m",
+		"REFRESH_TOKEN_TTL":               "240h",
+		"REFRESH_TOKEN_GRACE":             "12s",
+		"SESSION_IDLE_TTL":                "12h",
+		"SESSION_MAX_PER_ACCOUNT":         "3",
+		"TOKEN_ISSUER":                    "drlife-staging",
+		"TOKEN_LEGACY_ACCEPT_UNTIL":       "2027-01-02T03:04:05Z",
+		"LOGIN_FAILURE_LIMIT":             "8",
+		"LOGIN_FAILURE_WINDOW":            "3m",
+		"BOT_TOKEN_CACHE_TTL":             "2m",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.IAMDatabaseURL != "postgres://iam-placeholder" || cfg.AuditDatabaseURL != "postgres://audit-placeholder" || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.QueueRedisURL != "redis://queue-placeholder" || !cfg.QueueAllowEviction || cfg.DBMaxConns != 20 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" || cfg.TelegramInitDataMaxAge != 12*time.Hour || cfg.AccessTokenTTL != 10*time.Minute || cfg.RefreshTokenTTL != 240*time.Hour || cfg.RefreshTokenGrace != 12*time.Second || cfg.SessionIdleTTL != 12*time.Hour || cfg.SessionMaxPerAccount != 3 || cfg.TokenIssuer != "drlife-staging" || !cfg.TokenLegacyAcceptUntil.Equal(time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC)) || cfg.LoginFailureLimit != 8 || cfg.LoginFailureWindow != 3*time.Minute || cfg.BotTokenCacheTTL != 2*time.Minute {
+	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.IAMDatabaseURL != "postgres://iam-placeholder" || cfg.AuditDatabaseURL != "postgres://audit-placeholder" || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.QueueRedisURL != "redis://queue-placeholder" || !cfg.QueueAllowEviction || cfg.DBMaxConns != 20 || cfg.DBReportMaxConns != 6 || cfg.DBWorkerMaxConns != 5 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBAcquireTimeout != 150*time.Millisecond || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" || cfg.TelegramInitDataMaxAge != 12*time.Hour || cfg.AccessTokenTTL != 10*time.Minute || cfg.RefreshTokenTTL != 240*time.Hour || cfg.RefreshTokenGrace != 12*time.Second || cfg.SessionIdleTTL != 12*time.Hour || cfg.SessionMaxPerAccount != 3 || cfg.TokenIssuer != "drlife-staging" || !cfg.TokenLegacyAcceptUntil.Equal(time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC)) || cfg.LoginFailureLimit != 8 || cfg.LoginFailureWindow != 3*time.Minute || cfg.BotTokenCacheTTL != 2*time.Minute {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	for _, raw := range []string{"0", "-1", "abc"} {
@@ -191,7 +194,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 			}
 		})
 	}
-	for _, key := range []string{"DB_MAX_CONNS", "DB_MIN_CONNS", "DB_CONNECT_TIMEOUT_SECONDS", "DB_SLOW_QUERY_MS"} {
+	for _, key := range []string{"DB_MAX_CONNS", "REPORT_DB_MAX_CONNS", "WORKER_DB_MAX_CONNS", "DB_MIN_CONNS", "DB_CONNECT_TIMEOUT_SECONDS", "DB_ACQUIRE_TIMEOUT_MILLISECONDS", "DB_SLOW_QUERY_MS"} {
 		t.Run("invalid "+key, func(t *testing.T) {
 			if _, err := load(lookup(map[string]string{"APP_ENV": "test", key: "0"})); err == nil {
 				t.Fatalf("expected invalid %s error", key)

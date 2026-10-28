@@ -13,6 +13,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
+	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
@@ -240,6 +241,88 @@ func decodeErrorCode(t *testing.T, recorder *httptest.ResponseRecorder) int {
 		t.Fatalf("decode error envelope: %v body=%s", err, recorder.Body.String())
 	}
 	return body.Error.Code
+}
+
+type fakeLedgerReader struct {
+	walletOwner int64
+	financial   ledger.FinancialCenterFilter
+}
+
+func (f *fakeLedgerReader) ListAdminTransactions(context.Context, int) ([]ledger.AdminTransaction, error) {
+	return []ledger.AdminTransaction{{TxnNo: "TXN-1", AmountE4: 100}}, nil
+}
+func (f *fakeLedgerReader) GetAdminTransaction(context.Context, string) (ledger.AdminTransaction, bool, error) {
+	return ledger.AdminTransaction{TxnNo: "TXN-1", AmountE4: 100}, true, nil
+}
+func (f *fakeLedgerReader) ListAccountReconciliations(context.Context) ([]ledger.AdminAccountReconciliation, error) {
+	return nil, nil
+}
+func (f *fakeLedgerReader) ListAccountPostings(context.Context, int64, int) ([]ledger.AdminPosting, error) {
+	return nil, nil
+}
+func (f *fakeLedgerReader) ListWalletTransactions(_ context.Context, q ledger.WalletTransactionQuery) (ledger.WalletTransactionPage, error) {
+	f.walletOwner = q.OwnerAccountID
+	return ledger.WalletTransactionPage{Items: []ledger.WalletTransaction{{TxnNo: "TXN-OWN", AmountE4: 1200, Kind: "txn"}}}, nil
+}
+func (f *fakeLedgerReader) GetWalletTransaction(context.Context, int64, string) (ledger.WalletTransaction, bool, error) {
+	return ledger.WalletTransaction{TxnNo: "TXN-OWN", AmountE4: 1200, Kind: "txn"}, true, nil
+}
+func (f *fakeLedgerReader) FinancialCenter(_ context.Context, filter ledger.FinancialCenterFilter) (ledger.FinancialCenterReport, error) {
+	f.financial = filter
+	return ledger.FinancialCenterReport{}, nil
+}
+
+type fakeAccountDirectory struct{ account iam.AccountResolution }
+
+func (f fakeAccountDirectory) Resolve(context.Context, string) (iam.AccountResolution, bool, error) {
+	return f.account, true, nil
+}
+
+type fakeAdminPermissions struct{ allowed, scoped bool }
+
+func (f fakeAdminPermissions) Can(context.Context, string, string, string) (bool, error) {
+	return f.allowed, nil
+}
+func (f fakeAdminPermissions) HasDataScope(context.Context, string) (bool, error) {
+	return f.scoped, nil
+}
+
+func ledgerHandler(auth gateway.Authenticator, reader api.LedgerReader, directory api.AccountDirectory, permissions api.AdminPermissionChecker) http.Handler {
+	return server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: auth, Ledger: reader, Directory: directory, AdminPermissions: permissions})
+}
+
+func TestLedgerReadFailsClosedAndWalletNeverLeaksInternalFields(t *testing.T) {
+	admin := ledgerHandler(stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, &fakeLedgerReader{}, nil, nil)
+	if got := serve(t, admin, httptest.NewRequest(http.MethodGet, "/v1/admin/ledger/txns", nil)); got.Code != http.StatusForbidden {
+		t.Fatalf("unwired admin permission status=%d body=%s", got.Code, got.Body.String())
+	}
+
+	reader := &fakeLedgerReader{}
+	buyer := ledgerHandler(stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, reader, fakeAccountDirectory{account: iam.AccountResolution{ID: 41, Role: "buyer", Status: "active"}}, nil)
+	response := serve(t, buyer, httptest.NewRequest(http.MethodGet, "/v1/buyer/wallet/transactions", nil))
+	if response.Code != http.StatusOK || reader.walletOwner != 41 {
+		t.Fatalf("wallet status=%d owner=%d body=%s", response.Code, reader.walletOwner, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "idem_key") || strings.Contains(response.Body.String(), "actor_id") {
+		t.Fatalf("wallet response leaked internal fields: %s", response.Body.String())
+	}
+
+	staff := ledgerHandler(stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleMerchant}}, &fakeLedgerReader{}, fakeAccountDirectory{account: iam.AccountResolution{ID: 41, Role: "merchant_staff", Status: "active"}}, nil)
+	if got := serve(t, staff, httptest.NewRequest(http.MethodGet, "/v1/merchant/wallet/transactions", nil)); got.Code != http.StatusForbidden {
+		t.Fatalf("merchant staff without fin view status=%d", got.Code)
+	}
+}
+
+func TestFinancialCenterUsesAuthorizedLedgerReader(t *testing.T) {
+	reader := &fakeLedgerReader{}
+	handler := ledgerHandler(stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, reader, nil, fakeAdminPermissions{allowed: true})
+	response := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/admin/financial-center?from=2026-10-01T00:00:00Z&to=2026-10-02T00:00:00Z&merchant_limit=25", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if reader.financial.From != time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC) || reader.financial.To != time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC) || reader.financial.MerchantLimit != 25 {
+		t.Fatalf("filter=%+v", reader.financial)
+	}
 }
 
 // 验收：列表接口分页与排序透传，并且只返回当前商户的商品。
