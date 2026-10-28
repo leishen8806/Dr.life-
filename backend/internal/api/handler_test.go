@@ -66,8 +66,14 @@ type fakeAdminRefresh struct {
 
 type fakeAdminStepUp struct {
 	adminID, code, scope, ip, requestID string
-	result                             iam.AdminStepUpResult
-	err                                error
+	result                              iam.AdminStepUpResult
+	err                                 error
+}
+
+type adminStepUpAuthenticator struct{}
+
+func (adminStepUpAuthenticator) Authenticate(*http.Request) (gateway.Identity, bool, error) {
+	return gateway.Identity{AccountID: "admin-account", Role: gateway.RoleAdmin}, true, nil
 }
 
 func (f *fakeAdminStepUp) Issue(_ context.Context, adminID, code, scope, ip, requestID string) (iam.AdminStepUpResult, error) {
@@ -139,15 +145,17 @@ func TestAdminStepUpHandlerRequiresAdminIdentityAndNeverLeaksTokenOnFailure(t *t
 	handler := api.Handler{AdminStepUp: fake}
 	request := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/step-up", strings.NewReader(`{"totp_code":"123456","scope":"withdrawal_review"}`))
 	request.RemoteAddr = "198.51.100.7:42"
-	request = gateway.WithIdentity(request, gateway.Identity{AccountID: "admin-account", Role: gateway.RoleAdmin})
 	w := httptest.NewRecorder()
-	httpx.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.PostAdminAuthStepUp(w, r) })).ServeHTTP(w, request)
+	endpoint := httpx.RequestID(gateway.Authenticate(adminStepUpAuthenticator{}, "")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.PostAdminAuthStepUp(w, r) })))
+	endpoint.ServeHTTP(w, request)
 	if w.Code != http.StatusOK || fake.adminID != "admin-account" || fake.code != "123456" || fake.scope != "withdrawal_review" || !strings.Contains(w.Body.String(), "step-up-token") {
 		t.Fatalf("status=%d input=%+v body=%s", w.Code, fake, w.Body.String())
 	}
 	fake.err = httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	w = httptest.NewRecorder()
-	httpx.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.PostAdminAuthStepUp(w, r) })).ServeHTTP(w, request)
+	request = httptest.NewRequest(http.MethodPost, "/v1/admin/auth/step-up", strings.NewReader(`{"totp_code":"123456","scope":"withdrawal_review"}`))
+	request.RemoteAddr = "198.51.100.7:42"
+	endpoint.ServeHTTP(w, request)
 	if w.Code != http.StatusUnauthorized || strings.Contains(w.Body.String(), "step-up-token") {
 		t.Fatalf("failure body=%s", w.Body.String())
 	}

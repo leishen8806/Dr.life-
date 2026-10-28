@@ -34,6 +34,12 @@ type AdminLoginResult struct {
 	RefreshToken    string `json:"-"`
 }
 
+type AdminStepUpResult struct {
+	Token     string    `json:"step_up_token"`
+	Scope     string    `json:"scope"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
 type adminFailure struct {
 	attempts int
 	first    time.Time

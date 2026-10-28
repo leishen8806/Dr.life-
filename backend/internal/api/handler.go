@@ -41,6 +41,10 @@ type AdminLogin interface {
 	Login(context.Context, iam.AdminLoginInput) (iam.AdminLoginResult, error)
 }
 
+type AdminStepUp interface {
+	Issue(context.Context, string, string, string, string, string) (iam.AdminStepUpResult, error)
+}
+
 type SessionManagement interface {
 	Refresh(context.Context, string, string) (iam.RefreshResult, error)
 	ListSessions(context.Context, string) ([]iam.SessionInfo, error)
@@ -108,6 +112,7 @@ type Handler struct {
 	Logger           *slog.Logger
 	Login            TelegramLogin
 	AdminLogin       AdminLogin
+	AdminStepUp      AdminStepUp
 	Sessions         SessionManagement
 	AccountProfiles  AccountProfileManagement
 	AccountLinks     AccountLinkManagement
@@ -119,6 +124,11 @@ type Handler struct {
 	Directory        AccountDirectory
 	AdminPermissions AdminPermissionChecker
 	Files            FileManagement
+}
+
+type adminStepUpRequest struct {
+	TOTPCode string `json:"totp_code"`
+	Scope    string `json:"scope"`
 }
 
 func (Handler) GetPublicPing(w http.ResponseWriter, r *http.Request) {
@@ -474,6 +484,24 @@ func (h Handler) PostAdminAuthRefresh(w http.ResponseWriter, r *http.Request, _ 
 	}
 	http.SetCookie(w, &http.Cookie{Name: "drlife_admin_refresh", Value: result.RefreshToken, Path: "/v1/admin/auth", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
 	httpx.WriteOK(w, r, gen.AdminLoginData{AccessToken: result.AccessToken, AccessExpiresIn: result.AccessExpiresIn})
+}
+
+func (h Handler) PostAdminAuthStepUp(w http.ResponseWriter, r *http.Request) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok || identity.Role != gateway.RoleAdmin || h.AdminStepUp == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return
+	}
+	body, valid := decodeJSON[adminStepUpRequest](w, r)
+	if !valid || body.TOTPCode == "" || body.Scope == "" {
+		return
+	}
+	result, err := h.AdminStepUp.Issue(r.Context(), identity.AccountID, body.TOTPCode, body.Scope, h.ClientIP.Resolve(r), httpx.RequestIDFromContext(r.Context()))
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, result)
 }
 
 func (h Handler) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {
