@@ -105,6 +105,16 @@ func TestIAMMigration(t *testing.T) {
 
 	seedFixtures(t, ctx, admin)
 
+	t.Run("admin sessions retain the existing rotation storage", func(t *testing.T) {
+		const adminID = "01ARZ3NDEKTSV4RRFFQ69G5FB0"
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ($1,'Admin Session','admin-session@example.test','argon2-hash','finance','active')`, adminID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.session (public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB1',(SELECT id FROM iam.admin_user WHERE public_id=$1),'01ARZ3NDEKTSV4RRFFQ69G5FB1',decode('00','hex'),'test-kid',now()+interval '1 hour',now())`, adminID); err != nil {
+			t.Fatalf("admin session must share iam.session rotation storage: %v", err)
+		}
+	})
+
 	t.Run("person and account constraints", func(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23505", fmt.Sprintf(`INSERT INTO iam.person (public_id, tg_user_id) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FA1', 1001)`))
 		assertSQLState(t, ctx, admin, "23505", `INSERT INTO iam.person (public_id, tg_user_id) VALUES ('`+personPublicID+`', 1002)`)
