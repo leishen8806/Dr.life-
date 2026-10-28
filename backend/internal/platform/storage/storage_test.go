@@ -117,6 +117,20 @@ func TestVerifyLocalURLRejectsExpiredAndModifiedURLs(t *testing.T) {
 	}
 }
 
+func TestVerifyLocalURLRejectsEmptySecretAndInvalidObjectKey(t *testing.T) {
+	const key = "objects/../../etc/passwd"
+	values := url.Values{"expires": {"2000"}, "method": {"GET"}}
+	values.Set("signature", signature([]byte("test-secret"), "GET", key, values))
+	rawURL := "https://files.example.test/" + key + "?" + values.Encode()
+
+	if !errors.Is(VerifyLocalURL(rawURL, nil, time.Unix(1000, 0)), ErrSecretRequired) {
+		t.Fatal("empty secret was accepted")
+	}
+	if !errors.Is(VerifyLocalURL(rawURL, []byte("test-secret"), time.Unix(1000, 0)), ErrInvalidObjectKey) {
+		t.Fatal("invalid object key was accepted")
+	}
+}
+
 func TestPolicyFailsClosedWithoutExplicitLimits(t *testing.T) {
 	for _, policy := range []Policy{
 		{},

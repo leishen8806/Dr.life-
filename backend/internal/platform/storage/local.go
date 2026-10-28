@@ -64,6 +64,9 @@ func (s *localStorage) signed(method, key, contentType string, contentLength int
 }
 
 func VerifyLocalURL(rawURL string, secret []byte, now time.Time) error {
+	if len(secret) == 0 {
+		return ErrSecretRequired
+	}
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return fmt.Errorf("parse signed URL: %w", err)
@@ -76,6 +79,9 @@ func VerifyLocalURL(rawURL string, secret []byte, now time.Time) error {
 	signatureValue := values.Get("signature")
 	values.Del("signature")
 	key := strings.TrimPrefix(u.EscapedPath(), "/")
+	if !validRandomKey(key) {
+		return ErrInvalidObjectKey
+	}
 	if !hmac.Equal([]byte(signatureValue), []byte(signature(secret, values.Get("method"), key, values))) {
 		return ErrInvalidSignature
 	}
