@@ -91,6 +91,35 @@ test("mutation: host.docker.internal is local-only", () => {
   );
 });
 
+test("accepts app-a only when explicitly allow-listed for TARGET_ENV=test", () => {
+  const result = validateTargetEnv({
+    TARGET_ENV: "test",
+    BASE_URL: "http://app-a:8080",
+    LOADTEST_TEST_HOSTS: "app-a",
+  });
+  assert.equal(result.host, "app-a");
+});
+
+test("mutation: app-a is rejected without its explicit test allow-list or outside TARGET_ENV=test", () => {
+  assert.throws(
+    () => validateTargetEnv({ TARGET_ENV: "test", BASE_URL: "http://app-a:8080" }),
+    GuardError,
+  );
+  assert.throws(() => validateTargetEnv({ TARGET_ENV: "local", BASE_URL: "http://app-a:8080" }), GuardError);
+});
+
+test("mutation: prod-styled host remains rejected", () => {
+  assert.throws(
+    () =>
+      validateTargetEnv({
+        TARGET_ENV: "test",
+        BASE_URL: "http://app-a.prod.example:8080",
+        LOADTEST_TEST_HOSTS: "app-a.prod.example",
+      }),
+    GuardError,
+  );
+});
+
 const rejected = [
   ["missing TARGET_ENV", { BASE_URL: "http://localhost:8080" }],
   ["empty TARGET_ENV", { TARGET_ENV: "  ", BASE_URL: "http://localhost:8080" }],

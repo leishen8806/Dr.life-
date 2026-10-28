@@ -224,5 +224,8 @@ test("the CI smoke workflow is path-filtered and proves the guard every run", ()
   assert.match(workflow, /grafana\/k6:2\.3\.0/);
   assert.match(workflow, /-e TARGET_ENV=prod\b/);
   assert.match(workflow, /if \[ "\$code" -eq 0 \]/);
+  assert.match(workflow, /TARGET_ENV: test/);
+  assert.match(workflow, /LOADTEST_TEST_HOSTS: app-a/);
+  assert.match(workflow, /-e TARGET_ENV -e BASE_URL -e LOADTEST_TEST_HOSTS/);
   assert.match(workflow, /loadtest\/scenarios\/smoke\.js/);
 });

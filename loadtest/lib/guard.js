@@ -1,5 +1,6 @@
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 const LOCAL_ONLY_HOSTS = new Set(["host.docker.internal", "app"]);
+const COMPOSE_TEST_HOSTS = new Set(["app-a"]);
 const FORBIDDEN_HOST_LABELS = new Set(["prod", "production", "live"]);
 const IPV4_RE = /^(?:\d{1,3}\.){3}\d{1,3}$/;
 const HOSTNAME_RE = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
@@ -125,7 +126,7 @@ function parseTestHosts(raw) {
     if (entry.includes("*") || entry.includes("/") || entry.includes(":") || entry.includes("@") || entry.includes("?") || entry.includes("#")) {
       fail(`LOADTEST_TEST_HOSTS entry is not a bare hostname: ${entry}`);
     }
-    if (IPV4_RE.test(entry) || !HOSTNAME_RE.test(entry)) {
+    if (IPV4_RE.test(entry) || (!HOSTNAME_RE.test(entry) && !COMPOSE_TEST_HOSTS.has(entry))) {
       fail(`LOADTEST_TEST_HOSTS entry is not a valid test hostname: ${entry}`);
     }
     hosts.add(entry);
