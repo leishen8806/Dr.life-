@@ -264,6 +264,7 @@ func main() {
 	var accountLinkService *iam.AccountLinkService
 	var consentService *iam.ConsentService
 	var accountDirectory *iam.AccountDirectory
+	var adminPermissions *iam.AdminPermissionStore
 	var authenticator gateway.Authenticator
 	checks := []server.ReadinessCheck{database.Ping}
 	if reportReadiness != nil {
@@ -286,6 +287,7 @@ func main() {
 		}
 		defer iamDatabase.Close()
 		accountDirectory = &iam.AccountDirectory{DB: iamDatabase}
+		adminPermissions = &iam.AdminPermissionStore{DB: iamDatabase}
 		checks = append(checks, iamDatabase.Ping)
 		jwtKeys, keyErr := iam.LoadJWTKeyringFromEnvironment()
 		if keyErr != nil {
@@ -374,9 +376,10 @@ func main() {
 		AccountLinks:    accountLinkService,
 		Consents:        consentService,
 		Ledger:          ledgerReader,
-		Directory:       accountDirectory,
-		Files:           fileService,
-		Bulkhead:        bulkhead,
+		Directory:        accountDirectory,
+		AdminPermissions: adminPermissions,
+		Files:            fileService,
+		Bulkhead:         bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)
 	// WriteTimeout stays unset so future real-time streams can remain open.

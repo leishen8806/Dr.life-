@@ -17,5 +17,6 @@ CREATE INDEX ix_session_admin_user_id ON iam.session (admin_user_id) WHERE admin
 -- +goose Down
 DROP INDEX iam.ix_session_admin_user_id;
 ALTER TABLE iam.session DROP CONSTRAINT ck_session_owner;
+DELETE FROM iam.session WHERE admin_user_id IS NOT NULL;
 ALTER TABLE iam.session ALTER COLUMN account_id SET NOT NULL;
 ALTER TABLE iam.session DROP COLUMN admin_user_id;

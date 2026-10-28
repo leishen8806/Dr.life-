@@ -115,6 +115,31 @@ func TestIAMMigration(t *testing.T) {
 		}
 	})
 
+	t.Run("admin permission checker reads the seeded matrix and data scope", func(t *testing.T) {
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pool.Close()
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,data_scope,status) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB2','Scoped Finance','scoped-finance@example.test','argon2-hash','finance',ARRAY['PP'],'active')`); err != nil {
+			t.Fatal(err)
+		}
+
+		checker := iam.AdminPermissionStore{DB: pool}
+		allowed, err := checker.Can(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB2", "fund", "view")
+		if err != nil || !allowed {
+			t.Fatalf("finance fund view allowed=%v err=%v, want true nil", allowed, err)
+		}
+		allowed, err = checker.Can(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB2", "rbac", "view")
+		if err != nil || allowed {
+			t.Fatalf("finance rbac view allowed=%v err=%v, want false nil", allowed, err)
+		}
+		scoped, err := checker.HasDataScope(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB2")
+		if err != nil || !scoped {
+			t.Fatalf("scoped administrator data scope=%v err=%v, want true nil", scoped, err)
+		}
+	})
+
 	t.Run("person and account constraints", func(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23505", fmt.Sprintf(`INSERT INTO iam.person (public_id, tg_user_id) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FA1', 1001)`))
 		assertSQLState(t, ctx, admin, "23505", `INSERT INTO iam.person (public_id, tg_user_id) VALUES ('`+personPublicID+`', 1002)`)
