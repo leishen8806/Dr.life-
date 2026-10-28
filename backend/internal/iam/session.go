@@ -106,6 +106,7 @@ type refreshRow struct {
 	RotatedAt                                                     *time.Time
 	ExpiresAt, LastUsedAt                                         time.Time
 	DeviceID                                                      *string
+	Admin                                                         bool
 }
 
 func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (RefreshResult, error) {
@@ -120,7 +121,15 @@ func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	var row refreshRow
-	err = tx.QueryRow(ctx, `SELECT s.id,s.public_id,s.family_id,s.refresh_token_hash,s.previous_hash,s.rotated_at,s.expires_at,s.last_used_at,s.rotation,COALESCE(s.refresh_kid,''),s.device_id,a.id,a.public_id,a.role,a.status,a.token_epoch FROM iam.session s JOIN iam.account a ON a.id=s.account_id WHERE s.revoked_at IS NULL AND (s.refresh_token_hash=$1 OR s.previous_hash=$1) ORDER BY CASE WHEN s.refresh_token_hash=$1 THEN 0 ELSE 1 END LIMIT 1 FOR UPDATE OF s,a`, hash[:]).Scan(&row.ID, &row.PublicID, &row.FamilyID, &row.CurrentHash, &row.PreviousHash, &row.RotatedAt, &row.ExpiresAt, &row.LastUsedAt, &row.Rotation, &row.RefreshKID, &row.DeviceID, &row.AccountID, &row.AccountPublicID, &row.Role, &row.Status, &row.Epoch)
+	err = tx.QueryRow(ctx, `
+		SELECT s.id,s.public_id,s.family_id,s.refresh_token_hash,s.previous_hash,s.rotated_at,s.expires_at,s.last_used_at,s.rotation,COALESCE(s.refresh_kid,''),s.device_id,
+			COALESCE(a.id,u.id),COALESCE(a.public_id,u.public_id),COALESCE(a.role,'admin'),COALESCE(a.status,u.status),COALESCE(a.token_epoch,0),s.admin_user_id IS NOT NULL
+		FROM iam.session s
+		LEFT JOIN iam.account a ON a.id=s.account_id
+		LEFT JOIN iam.admin_user u ON u.id=s.admin_user_id
+		WHERE s.revoked_at IS NULL AND (s.refresh_token_hash=$1 OR s.previous_hash=$1)
+		ORDER BY CASE WHEN s.refresh_token_hash=$1 THEN 0 ELSE 1 END
+		LIMIT 1 FOR UPDATE OF s`, hash[:]).Scan(&row.ID, &row.PublicID, &row.FamilyID, &row.CurrentHash, &row.PreviousHash, &row.RotatedAt, &row.ExpiresAt, &row.LastUsedAt, &row.Rotation, &row.RefreshKID, &row.DeviceID, &row.AccountID, &row.AccountPublicID, &row.Role, &row.Status, &row.Epoch, &row.Admin)
 	if err != nil {
 		s.metric("unknown", "invalid")
 		return RefreshResult{}, httpx.NewAppError(httpx.CodeUnauthenticated)
@@ -203,8 +212,13 @@ func (s *SessionService) revokeFamilyForReuse(ctx context.Context, tx pgx.Tx, ro
 	if _, err := tx.Exec(ctx, `UPDATE iam.session SET revoked_at=$1,revoked_reason='refresh_reuse',updated_at=$1 WHERE family_id=$2 AND revoked_at IS NULL`, now, row.FamilyID); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE iam.account SET token_epoch=token_epoch+1,updated_at=$1 WHERE id=$2`, now, row.AccountID); err != nil {
-		return err
+	if !row.Admin {
+		if _, err := tx.Exec(ctx, `UPDATE iam.account SET token_epoch=token_epoch+1,updated_at=$1 WHERE id=$2`, now, row.AccountID); err != nil {
+			return err
+		}
+	}
+	if row.Admin {
+		return nil
 	}
 	publicID, err := ids.NewULID()
 	if err != nil {
