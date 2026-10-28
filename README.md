@@ -23,20 +23,9 @@ Telegram Mini App 电商平台，首版聚焦商家仓储与配送，并由平�
 | [未来 APP 规划](<Dr.life+未来APP规划文档.md>) | 后续原生/独立 App 方向与边界 |
 | [柬埔寨落地方案](<Dr.life+柬埔寨落地方案.md>) | 柬埔寨市场验证、实施路径与业务边界 |
 | [Shopee 官方合作仓申请方案](<Dr.life+Shopee官方合作仓申请方案.md>) | 申请成为 Shopee 柬埔寨官方合作仓的前置确认、差距、材料与待办卡片 |
-| [Codex 任务提示词 F-01 至 F-03](<Dr.life+Codex任务提示词-F01至F03.md>) | 项目骨架任务的自包含执行提示与评审重点 |
-| [Codex 任务提示词 F-04 与 F-08](<Dr.life+Codex任务提示词-F04与F08.md>) | OpenAPI 骨架与 CI 任务的自包含执行提示、评审重点与设置必需检查的步骤 |
-| [Codex 任务提示词 F-05 与 F-10](<Dr.life+Codex任务提示词-F05与F10.md>) | 网关中间件与密钥/信封加密任务的自包含执行提示与评审重点 |
-| [Codex 任务提示词 A-01、L-01、F-06](<Dr.life+Codex任务提示词-A01-L01-F06.md>) | iam 表、账务表与硬约束、前端工作区任务的自包含执行提示与评审重点 |
-| [Codex 任务提示词 L-13（资金类 HTTP 接口层）](<Dr.life+Codex任务提示词-L13-资金接口层.md>) | 钱包、提现、后台出款复核、出款冻结与用户侧 step-up 的 HTTP 接口 |
-| [Codex 任务提示词 A-02b（登录加固补丁）](<Dr.life+Codex任务提示词-A02b补丁.md>) | 商户老板账号复用与歧义、登录审计表只追加、审计写失败可见 |
+| Codex 任务提示词 | 只保存在本机（`E:\Dr.life+\`），不放进仓库（2026-10-28 起） |
 | [开发总路线图与任务状态](<Dr.life+开发总路线图与任务状态.md>) | 全部开发任务的状态、依赖、阻塞与放行顺序，以及提示词文件索引 |
-| Codex 任务提示词 · 波次 0–6（[PoC](<Dr.life+Codex任务提示词-波次0-PoC.md>)、[账号与平台](<Dr.life+Codex任务提示词-波次1-账号与平台.md>)、[商品与交易](<Dr.life+Codex任务提示词-波次2-商品与交易.md>)、[仓储与物流](<Dr.life+Codex任务提示词-波次3-仓储与物流.md>)、[通知AI与运营](<Dr.life+Codex任务提示词-波次4-通知AI与运营.md>)、[账务收尾与运维](<Dr.life+Codex任务提示词-波次5-账务收尾与运维.md>)、[前端](<Dr.life+Codex任务提示词-波次6-前端.md>)） | 全部剩余开发任务的自包含执行提示 |
 | [API 安全协议、容量保护与队列设计](<Dr.life+API安全协议与容量及队列设计.md>) | 各端与服务端的接口安全协议、过载保护与降级、asynq 队列逻辑（S-01 至 S-06 的规范来源） |
-| [Codex 任务提示词 S-01 至 S-06](<Dr.life+Codex任务提示词-S01至S06.md>) | 网关安全、过载保护、队列平台、Telegram 发送限速、压测与韧性、前端客户端韧性的自包含执行提示 |
-| [Codex 任务提示词 L-07、L-12、A-02](<Dr.life+Codex任务提示词-L07-L12-A02.md>) | 每日对账与快照、账务对外接口收口、Telegram 登录（含真机验收合并闸门）任务的自包含执行提示与评审重点 |
-| [Codex 任务提示词 L-04、L-05、L-06](<Dr.life+Codex任务提示词-L04-L05-L06.md>) | 冻结明细、提现与复核、冲销任务的自包含执行提示、待确认业务问题与评审重点 |
-| [Codex 任务提示词 L-03、F-07、F-11](<Dr.life+Codex任务提示词-L03-F07-F11.md>) | 业务入账封装（含分账倒挤与按单托管检查）、多语言基础、可观测性任务的自包含执行提示与评审重点 |
-| [Codex 任务提示词 P0-1 与 L-02](<Dr.life+Codex任务提示词-P01与L02.md>) | Telegram initData + Bot 池 PoC（含六个测试 Bot 准备清单）与 `Post()` 入账核心任务的自包含执行提示与评审重点 |
 | [backend/](backend/README.md) | Go 后端目录用途与设计依据 |
 | [backend/cmd/](backend/cmd/README.md) | Go 可执行程序入口 |
 | [backend/internal/](backend/internal/README.md) | 后端内部模块与平台组件 |
