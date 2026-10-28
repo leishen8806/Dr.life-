@@ -4,6 +4,9 @@
 ALTER TABLE iam.session
     ADD COLUMN admin_user_id bigint REFERENCES iam.admin_user(id);
 
+ALTER TABLE iam.admin_user
+    ADD COLUMN password_change_required boolean NOT NULL DEFAULT false;
+
 ALTER TABLE iam.session
     ALTER COLUMN account_id DROP NOT NULL;
 
@@ -20,3 +23,4 @@ ALTER TABLE iam.session DROP CONSTRAINT ck_session_owner;
 DELETE FROM iam.session WHERE admin_user_id IS NOT NULL;
 ALTER TABLE iam.session ALTER COLUMN account_id SET NOT NULL;
 ALTER TABLE iam.session DROP COLUMN admin_user_id;
+ALTER TABLE iam.admin_user DROP COLUMN password_change_required;
