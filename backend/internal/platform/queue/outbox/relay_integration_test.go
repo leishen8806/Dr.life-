@@ -133,6 +133,74 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	}
 }
 
+func TestReconAlertsRelayWithoutConfigurationDegradesEndToEnd(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	database := newRelayPostgres(t, ctx)
+	defer database.Close()
+	redisURL := newRelayRedis(t, ctx)
+	if _, err := database.Exec(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES('ledger.recon.failed', '{"run_id":7,"day":"2026-10-27","counts":{"BALANCE_CACHE":2}}')`); err != nil {
+		t.Fatal(err)
+	}
+	options, err := asynq.ParseRedisURI(redisURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := asynq.NewClient(options)
+	defer client.Close()
+	relay, err := outbox.New(ledger.New(database, ledger.Options{}), client, outbox.Options{Routes: outbox.LedgerRoutes()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count, err := relay.RunOnce(ctx); err != nil || count != 1 {
+		t.Fatalf("relay count=%d err=%v", count, err)
+	}
+	registry := queue.NewRegistry()
+	if err := outbox.RegisterLedgerTasks(registry); err != nil {
+		t.Fatal(err)
+	}
+	observer := &relayObserver{counts: make(map[string]int)}
+	worker, err := queue.NewWorker(redisURL, registry, queue.WorkerOptions{Observer: observer, ShutdownTimeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sender := &alertSender{}
+	metrics := &alertMetrics{}
+	alerts := opsalert.NewReconciliationHandlers(opsalert.Options{Sender: sender, Metrics: metrics, MergeWindow: time.Nanosecond, Scheduler: client})
+	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, nil, alerts.Alert); err != nil {
+		t.Fatal(err)
+	}
+	if err := worker.Register(opsalert.TaskFlush, alerts.Flush); err != nil {
+		t.Fatal(err)
+	}
+	workerCtx, stop := context.WithCancel(ctx)
+	defer stop()
+	if err := worker.Start(workerCtx); err != nil {
+		t.Fatal(err)
+	}
+	eventuallyRelay(t, 20*time.Second, func() bool {
+		return observer.Count(outbox.TaskReconFailed) == 1 && observer.Count(opsalert.TaskFlush) == 1
+	})
+	if got := len(sender.messages); got != 0 {
+		t.Fatalf("Telegram requests=%d, want 0 when unconfigured", got)
+	}
+	if metrics.undeliverable != 1 {
+		t.Fatalf("undeliverable=%d, want 1", metrics.undeliverable)
+	}
+}
+
+func eventuallyRelay(t *testing.T, timeout time.Duration, condition func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("timed out waiting for worker deliveries")
+}
+
 func relayTelegramServer(t *testing.T) (*httptest.Server, func() []string) {
 	t.Helper()
 	var mu sync.Mutex
