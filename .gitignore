@@ -31,3 +31,6 @@ Desktop.ini
 
 .pnpm-store/
 *.tsbuildinfo
+
+# Codex task prompts stay local
+Dr.life+Codex任务提示词-*.md
