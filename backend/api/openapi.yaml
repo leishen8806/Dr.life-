@@ -58,6 +58,26 @@ paths:
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalServerError" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/admin/auth/refresh:
+    post:
+      tags: [admin]
+      operationId: postAdminAuthRefresh
+      summary: Rotate the administration refresh cookie
+      description: "Requires an allowed admin Origin and X-Requested-With: drlife."
+      x-roles: ["none"]
+      security: []
+      parameters:
+        - name: X-Requested-With
+          in: header
+          required: true
+          schema: { type: string, enum: [drlife] }
+      responses:
+        "200": { $ref: "#/components/responses/AdminRefreshSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /v1/admin/financial-center:
     get:
       tags: [admin]
@@ -2143,6 +2163,11 @@ components:
       content:
         application/json:
           schema: {$ref: "#/components/schemas/AccountDeviceListSuccessResponse"}
+    AdminRefreshSucceeded:
+      description: Refresh cookie rotated successfully; the refresh token is not returned in JSON.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AdminLoginSuccessResponse" }
     LedgerReadSucceeded:
       description: Read-only ledger response.
       content:

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	api "github.com/leishen8806/Dr.life-/backend/internal/api"
+	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
@@ -68,7 +69,9 @@ func (f *fakeAdminRefresh) Refresh(_ context.Context, token, ip string) (iam.Ref
 	return f.result, f.err
 }
 
-func (*fakeAdminRefresh) ListSessions(context.Context, string) ([]iam.SessionInfo, error) { return nil, nil }
+func (*fakeAdminRefresh) ListSessions(context.Context, string) ([]iam.SessionInfo, error) {
+	return nil, nil
+}
 func (*fakeAdminRefresh) RevokeSession(context.Context, string, string, string) error { return nil }
 
 func (f *fakeAdminLogin) Login(_ context.Context, input iam.AdminLoginInput) (iam.AdminLoginResult, error) {
@@ -104,7 +107,10 @@ func TestAdminRefreshHandlerUsesHostOnlyCookieAndDoesNotExposeRefreshToken(t *te
 	req.RemoteAddr = "198.51.100.7:42"
 	req.AddCookie(&http.Cookie{Name: "drlife_admin_refresh", Value: "old-refresh"})
 	w := httptest.NewRecorder()
-	httpx.RequestID(http.HandlerFunc((api.Handler{Sessions: fake}).PostAdminAuthRefresh)).ServeHTTP(w, req)
+	handler := api.Handler{Sessions: fake}
+	httpx.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler.PostAdminAuthRefresh(w, r, gen.PostAdminAuthRefreshParams{})
+	})).ServeHTTP(w, req)
 	if w.Code != http.StatusOK || fake.input != "old-refresh" || fake.ip != "198.51.100.7" {
 		t.Fatalf("status/input=%d token=%q ip=%q", w.Code, fake.input, fake.ip)
 	}

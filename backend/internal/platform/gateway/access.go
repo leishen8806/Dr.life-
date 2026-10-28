@@ -79,7 +79,7 @@ func writeUnauthenticated(w http.ResponseWriter, r *http.Request) {
 }
 
 func classifyPath(path, publicWebhookPrefix string) audience {
-	if path == "/v1/admin/auth/login" {
+	if path == "/v1/admin/auth/login" || path == "/v1/admin/auth/refresh" {
 		return audience{public: true, known: true}
 	}
 	// RouteFit has one public, signature-verified callback. Do not widen this

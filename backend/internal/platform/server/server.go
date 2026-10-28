@@ -98,6 +98,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.Use(httpx.RequestLogger(logger, gateway.RoleFromContext))
 	router.Use(observability.Recover(logger, options.ErrorReporter))
 	router.Use(gateway.GroupedCORS(options.OriginGroups))
+	router.Use(gateway.RequireAdminRefreshCSRF(options.OriginGroups))
 	router.Use(options.Bulkhead.Middleware)
 	router.Use(gateway.LimitByIP(options.Limiter, options.ClientIP, options.IPRules))
 	router.Use(options.AdminAccess.Middleware)

@@ -457,6 +457,25 @@ func (h Handler) PostAdminAuthLogin(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, gen.AdminLoginData{AccessToken: result.AccessToken, AccessExpiresIn: result.AccessExpiresIn})
 }
 
+func (h Handler) PostAdminAuthRefresh(w http.ResponseWriter, r *http.Request, _ gen.PostAdminAuthRefreshParams) {
+	if h.Sessions == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	cookie, err := r.Cookie("drlife_admin_refresh")
+	if err != nil || cookie.Value == "" {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return
+	}
+	result, err := h.Sessions.Refresh(r.Context(), cookie.Value, h.ClientIP.Resolve(r))
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "drlife_admin_refresh", Value: result.RefreshToken, Path: "/v1/admin/auth", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
+	httpx.WriteOK(w, r, gen.AdminLoginData{AccessToken: result.AccessToken, AccessExpiresIn: result.AccessExpiresIn})
+}
+
 func (h Handler) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {
 	if h.Sessions == nil {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))

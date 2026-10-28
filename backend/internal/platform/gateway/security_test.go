@@ -68,10 +68,13 @@ func TestAdminRefreshCSRFRequiresTrustedOriginAndRequestedWithHeader(t *testing.
 	handler := RequireAdminRefreshCSRF(groups)(next)
 
 	for name, mutate := range map[string]func(*http.Request){
-		"missing origin": func(_ *http.Request) {},
-		"untrusted origin": func(r *http.Request) { r.Header.Set("Origin", "https://evil.example") },
+		"missing origin":         func(_ *http.Request) {},
+		"untrusted origin":       func(r *http.Request) { r.Header.Set("Origin", "https://evil.example") },
 		"missing requested with": func(r *http.Request) { r.Header.Set("Origin", "https://admin.settlecore.org") },
-		"wrong requested with": func(r *http.Request) { r.Header.Set("Origin", "https://admin.settlecore.org"); r.Header.Set("X-Requested-With", "other") },
+		"wrong requested with": func(r *http.Request) {
+			r.Header.Set("Origin", "https://admin.settlecore.org")
+			r.Header.Set("X-Requested-With", "other")
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/refresh", nil)
