@@ -220,7 +220,7 @@ func (m redisMerger) Restore(ctx context.Context, topic string, restored mergedP
 	}
 	_, err = m.client.Eval(ctx, `
 redis.call('HSETNX', KEYS[1], 'payload', ARGV[1])
-for i = 2, #ARGV do redis.call('HSET', KEYS[1], 'id:' .. ARGV[i], '1') end
+for i = 2, #ARGV - 1 do redis.call('HSET', KEYS[1], 'id:' .. ARGV[i], '1') end
 redis.call('PEXPIRE', KEYS[1], ARGV[#ARGV])
 return 1
 `, []string{mergeKey(topic)}, append([]interface{}{encoded}, append(int64SliceToInterfaces(ids), int64((24*time.Hour).Milliseconds()))...)...).Result()
@@ -325,7 +325,6 @@ func (h *handler) deliver(ctx context.Context, topic string) error {
 		return nil
 	}
 	if h.options.Sender == nil || strings.TrimSpace(h.options.BotID) == "" || h.options.ChatID == 0 {
-		_ = h.merger.Discard(ctx, topic)
 		h.undeliverable("unconfigured")
 		return nil
 	}
@@ -337,9 +336,6 @@ func (h *handler) deliver(ctx context.Context, topic string) error {
 				return errors.New("operations alert deduplication unavailable")
 			}
 		}
-		if err := h.merger.Discard(ctx, topic); err != nil {
-			return errors.New("operations alert merge unavailable")
-		}
 		return nil
 	case telegram.ResultRateLimited, telegram.ResultTemporaryError:
 		if err := h.merger.Restore(ctx, topic, merged); err != nil {
@@ -347,7 +343,6 @@ func (h *handler) deliver(ctx context.Context, topic string) error {
 		}
 		return errors.New("operations alert delivery retryable")
 	default:
-		_ = h.merger.Discard(ctx, topic)
 		h.undeliverable("telegram_permanent")
 		return fmt.Errorf("%w: operations alert undeliverable", asynq.SkipRetry)
 	}
