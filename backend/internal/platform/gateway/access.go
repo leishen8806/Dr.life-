@@ -79,6 +79,9 @@ func writeUnauthenticated(w http.ResponseWriter, r *http.Request) {
 }
 
 func classifyPath(path, publicWebhookPrefix string) audience {
+	if path == "/v1/admin/auth/login" {
+		return audience{public: true, known: true}
+	}
 	// RouteFit has one public, signature-verified callback. Do not widen this
 	// exception to the integrations prefix: all other integration paths fail
 	// closed at the gateway.

@@ -37,6 +37,10 @@ type TelegramLogin interface {
 	Login(context.Context, iam.LoginInput) (iam.LoginResult, error)
 }
 
+type AdminLogin interface {
+	Login(context.Context, iam.AdminLoginInput) (iam.AdminLoginResult, error)
+}
+
 type SessionManagement interface {
 	Refresh(context.Context, string, string) (iam.RefreshResult, error)
 	ListSessions(context.Context, string) ([]iam.SessionInfo, error)
@@ -103,6 +107,7 @@ type Handler struct {
 	Merchants        MerchantResolver
 	Logger           *slog.Logger
 	Login            TelegramLogin
+	AdminLogin       AdminLogin
 	Sessions         SessionManagement
 	AccountProfiles  AccountProfileManagement
 	AccountLinks     AccountLinkManagement
@@ -425,6 +430,31 @@ func (h Handler) PostTelegramAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteOK(w, r, result)
+}
+
+func (h Handler) PostAdminAuthLogin(w http.ResponseWriter, r *http.Request) {
+	if h.AdminLogin == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	body, ok := decodeJSON[gen.AdminLoginRequest](w, r)
+	if !ok || body.Email == "" || body.Password == "" || body.TotpCode == "" {
+		if ok {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	device := ""
+	if body.DeviceId != nil {
+		device = *body.DeviceId
+	}
+	result, err := h.AdminLogin.Login(r.Context(), iam.AdminLoginInput{Email: string(body.Email), Password: body.Password, TOTPCode: body.TotpCode, DeviceID: device, IP: h.ClientIP.Resolve(r), RequestID: httpx.RequestIDFromContext(r.Context())})
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "drlife_admin_refresh", Value: result.RefreshToken, Path: "/v1/admin/auth", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
+	httpx.WriteOK(w, r, gen.AdminLoginData{AccessToken: result.AccessToken, AccessExpiresIn: result.AccessExpiresIn})
 }
 
 func (h Handler) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {

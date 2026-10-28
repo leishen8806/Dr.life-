@@ -50,6 +50,39 @@ func (f *fakeFiles) DownloadURL(context.Context, int64, string) (storage.SignedU
 	return storage.SignedURL{}, f.downloadErr
 }
 
+type fakeAdminLogin struct {
+	input  iam.AdminLoginInput
+	result iam.AdminLoginResult
+	err    error
+}
+
+func (f *fakeAdminLogin) Login(_ context.Context, input iam.AdminLoginInput) (iam.AdminLoginResult, error) {
+	f.input = input
+	return f.result, f.err
+}
+
+func TestAdminLoginHandlerSetsHostOnlyRefreshCookieAndUnifiesFailures(t *testing.T) {
+	fake := &fakeAdminLogin{result: iam.AdminLoginResult{AccessToken: "access", AccessExpiresIn: 600, RefreshToken: "refresh"}}
+	req := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/login", strings.NewReader(`{"email":"admin@example.com","password":"not-logged","totp_code":"123456","device_id":"web:1"}`))
+	req.RemoteAddr = "198.51.100.7:42"
+	w := httptest.NewRecorder()
+	httpx.RequestID(http.HandlerFunc((api.Handler{AdminLogin: fake}).PostAdminAuthLogin)).ServeHTTP(w, req)
+	if w.Code != http.StatusOK || fake.input.IP != "198.51.100.7" || fake.input.Password != "not-logged" {
+		t.Fatalf("status/input=%d %+v", w.Code, fake.input)
+	}
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != "drlife_admin_refresh" || cookies[0].Path != "/v1/admin/auth" || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteStrictMode || cookies[0].Domain != "" {
+		t.Fatalf("cookie=%+v", cookies)
+	}
+	fake.err = httpx.NewAppError(httpx.CodeTelegramLoginFailed)
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/admin/auth/login", strings.NewReader(`{"email":"admin@example.com","password":"secret","totp_code":"000000"}`))
+	httpx.RequestID(http.HandlerFunc((api.Handler{AdminLogin: fake}).PostAdminAuthLogin)).ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), `"code":2005`) || strings.Contains(w.Body.String(), "secret") {
+		t.Fatalf("body=%s", w.Body.String())
+	}
+}
+
 type fakeAccountLinks struct {
 	candidates []iam.AccountLinkCandidate
 	link       iam.AccountLink

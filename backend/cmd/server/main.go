@@ -259,6 +259,7 @@ func main() {
 		}
 	}
 	var loginService *iam.Service
+	var adminLoginService *iam.AdminLoginService
 	var sessionService *iam.SessionService
 	var accountProfileService *iam.AccountProfileService
 	var accountLinkService *iam.AccountLinkService
@@ -328,6 +329,9 @@ func main() {
 			Metrics:  metrics.Business(),
 			Logger:   logger,
 		}
+		adminTokens := tokens
+		adminTokens.AccessTTL = 10 * time.Minute
+		adminLoginService = &iam.AdminLoginService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Audit: auditStore, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: sessionCache}
 		authenticator = iam.Authenticator{Tokens: tokens}
 	}
 
@@ -370,6 +374,7 @@ func main() {
 		Merchants:       directory,
 		Logger:          logger,
 		Login:           loginService,
+		AdminLogin:      adminLoginService,
 		Audit:           auditStore,
 		Sessions:        sessionService,
 		AccountProfiles: accountProfileService,

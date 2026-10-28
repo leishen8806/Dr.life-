@@ -34,6 +34,30 @@ tags:
 security:
   - bearerAuth: []
 paths:
+  /v1/admin/auth/login:
+    post:
+      tags: [admin]
+      operationId: postAdminAuthLogin
+      summary: Sign in to the administration web application
+      x-roles: ["none"]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminLoginRequest" }
+      responses:
+        "200":
+          description: Login succeeded and a host-only refresh cookie is set.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminLoginSuccessResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/LoginFailed" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /v1/admin/financial-center:
     get:
       tags: [admin]
@@ -1228,6 +1252,30 @@ components:
           minLength: 1
           maxLength: 128
           pattern: "^[A-Za-z0-9_:-]+$"
+    AdminLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password, totp_code]
+      properties:
+        email: { type: string, format: email, minLength: 3, maxLength: 320 }
+        password: { type: string, minLength: 1, maxLength: 1024 }
+        totp_code: { type: string, pattern: "^[0-9]{6,8}$" }
+        device_id: { type: string, minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_:-]+$" }
+    AdminLoginData:
+      type: object
+      additionalProperties: false
+      required: [access_token, access_expires_in]
+      properties:
+        access_token: { type: string }
+        access_expires_in: { type: integer, format: int64, minimum: 1 }
+    AdminLoginSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AdminLoginData" }
+        request_id: { type: string, minLength: 1 }
     TelegramAccount:
       type: object
       additionalProperties: false

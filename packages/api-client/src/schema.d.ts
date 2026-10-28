@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/v1/admin/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign in to the administration web application */
+        post: operations["postAdminAuthLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/financial-center": {
         parameters: {
             query?: never;
@@ -984,6 +1001,24 @@ export interface components {
             init_data: string;
             device_id?: string;
         };
+        AdminLoginRequest: {
+            /** Format: email */
+            email: string;
+            password: string;
+            totp_code: string;
+            device_id?: string;
+        };
+        AdminLoginData: {
+            access_token: string;
+            /** Format: int64 */
+            access_expires_in: number;
+        };
+        AdminLoginSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["AdminLoginData"];
+            request_id: string;
+        };
         TelegramAccount: {
             public_id: string;
             /** @enum {string} */
@@ -1720,6 +1755,36 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    postAdminAuthLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Login succeeded and a host-only refresh cookie is set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminLoginSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["LoginFailed"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     getAdminFinancialCenter: {
         parameters: {
             query?: {

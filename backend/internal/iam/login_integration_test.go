@@ -23,6 +23,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pquerna/otp/totp"
 	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -123,6 +124,7 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	t.Run("refresh plaintext is absent", f.testRefreshNotStored)
 	t.Run("refresh rotation concurrency reuse and revocation", f.testSessionLifecycle)
 	t.Run("admin refresh rotation uses the shared session storage", f.testAdminSessionRefresh)
+	t.Run("admin password TOTP login locks per account and IP", f.testAdminPasswordLogin)
 	t.Run("session ownership cache rebuild and fail policy", f.testSessionAccess)
 	t.Run("account language profile and safe devices", f.testAccountLanguageProfileAndSafeDevices)
 	t.Run("account status changes revoke sessions", f.testAccountStatus)
@@ -193,6 +195,49 @@ func (f *loginFixture) testAccountLanguageProfileAndSafeDevices(t *testing.T) {
 	devices, err = profiles.Devices(ctx, first.Account.PublicID, noDeviceSession)
 	if err != nil || len(devices) != 2 || devices[0].IsCurrent || devices[1].IsCurrent {
 		t.Fatalf("no-device session devices=%+v err=%v", devices, err)
+	}
+}
+
+func (f *loginFixture) testAdminPasswordLogin(t *testing.T) {
+	ctx := context.Background()
+	password := "correct horse battery staple"
+	hash, err := HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "JBSWY3DPEHPK3PXP"
+	adminID, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc, err := EncryptTOTPSecret(ctx, f.envelope, adminID, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status) VALUES($1,'Login Admin','login-admin@example.test',$2,$3,'super','active')`, adminID, hash, enc); err != nil {
+		t.Fatal(err)
+	}
+	code, err := totp.GenerateCode(secret, f.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := &AdminLoginService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: f.cache, Now: func() time.Time { return f.now }}
+	input := AdminLoginInput{Email: "login-admin@example.test", Password: password, TOTPCode: code, IP: "198.51.100.4", DeviceID: "web:1", RequestID: "admin-login-test"}
+	result, err := service.Login(ctx, input)
+	if err != nil || result.AccessToken == "" || result.RefreshToken == "" || result.AccessExpiresIn != 600 {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if _, err := service.Login(ctx, AdminLoginInput{Email: input.Email, Password: "wrong", TOTPCode: code, IP: input.IP, DeviceID: input.DeviceID, RequestID: input.RequestID}); err == nil {
+		t.Fatal("wrong password accepted")
+	}
+	for range 4 {
+		_, _ = service.Login(ctx, AdminLoginInput{Email: input.Email, Password: "wrong", TOTPCode: code, IP: input.IP, DeviceID: input.DeviceID, RequestID: input.RequestID})
+	}
+	if _, err := service.Login(ctx, input); err == nil {
+		t.Fatal("fifth consecutive failure did not lock the account/IP pair")
+	}
+	if _, err := service.Login(ctx, AdminLoginInput{Email: input.Email, Password: password, TOTPCode: "000000", IP: "198.51.100.5", DeviceID: input.DeviceID, RequestID: input.RequestID}); err == nil {
+		t.Fatal("invalid TOTP accepted")
 	}
 }
 
