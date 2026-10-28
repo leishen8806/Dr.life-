@@ -33,6 +33,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 )
 
 type loginFixture struct {
@@ -45,6 +46,13 @@ type loginFixture struct {
 	service  *Service
 	tokens   map[telegram.End][]string
 	cache    *testSessionCache
+}
+
+type stepUpAuditWriter struct{ entries []platformaudit.Entry }
+
+func (w *stepUpAuditWriter) Append(_ context.Context, entry platformaudit.Entry) (platformaudit.Record, error) {
+	w.entries = append(w.entries, entry)
+	return platformaudit.Record{}, nil
 }
 
 func TestTelegramLoginIntegration(t *testing.T) {
@@ -222,7 +230,8 @@ func (f *loginFixture) testAdminStepUp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := &AdminStepUpService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, Permissions: AdminPermissionStore{DB: f.pool}, Now: func() time.Time { return f.now }}
+	audit := &stepUpAuditWriter{}
+	service := &AdminStepUpService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, Permissions: AdminPermissionStore{DB: f.pool}, Audit: audit, Now: func() time.Time { return f.now }}
 	result, err := service.Issue(ctx, adminID, code, "withdrawal_review", "198.51.100.5", "step-up-test")
 	if err != nil || result.Token == "" || result.Scope != "withdrawal_review" {
 		t.Fatalf("result=%+v err=%v", result, err)
@@ -232,6 +241,9 @@ func (f *loginFixture) testAdminStepUp(t *testing.T) {
 	}
 	if _, err := service.Issue(ctx, adminID, code, "withdraw", "198.51.100.5", "step-up-invalid"); err == nil {
 		t.Fatal("non-whitelisted scope accepted")
+	}
+	if len(audit.entries) != 3 || string(audit.entries[0].Detail) != `{"result":"ok","scope":"withdrawal_review"}` || string(audit.entries[0].Detail) == code || audit.entries[0].Action != platformaudit.ActionStepUp {
+		t.Fatalf("unexpected audit entries: %#v", audit.entries)
 	}
 }
 
