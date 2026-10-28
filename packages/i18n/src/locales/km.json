@@ -72,6 +72,10 @@
 ,"error.1011": "[TODO-KM-REVIEW] This action was already processed."
 ,"error.2003": "[TODO-KM-REVIEW] Additional verification is required."
 ,"error.2004": "[TODO-KM-REVIEW] Verification could not be completed."
+,"error.2005": "[TODO-KM-REVIEW] Login could not be verified. Sign in again."
+,"error.2006": "[TODO-KM-REVIEW] This account is unavailable. Contact support."
+,"error.2007": "[TODO-KM-REVIEW] Too many login attempts. Please wait a moment."
+,"error.2007.countdown": "[TODO-KM-REVIEW] Too many login attempts. Wait {seconds}s."
 ,"error.7001": "[TODO-KM-REVIEW] The external service could not complete the request."
 ,"error.circuitOpen": "[TODO-KM-REVIEW] The service is temporarily unavailable. Try again later."
 }
