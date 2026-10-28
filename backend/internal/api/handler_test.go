@@ -64,6 +64,17 @@ type fakeAdminRefresh struct {
 	err    error
 }
 
+type fakeAdminStepUp struct {
+	adminID, code, scope, ip, requestID string
+	result                             iam.AdminStepUpResult
+	err                                error
+}
+
+func (f *fakeAdminStepUp) Issue(_ context.Context, adminID, code, scope, ip, requestID string) (iam.AdminStepUpResult, error) {
+	f.adminID, f.code, f.scope, f.ip, f.requestID = adminID, code, scope, ip, requestID
+	return f.result, f.err
+}
+
 func (f *fakeAdminRefresh) Refresh(_ context.Context, token, ip string) (iam.RefreshResult, error) {
 	f.input, f.ip = token, ip
 	return f.result, f.err
@@ -120,6 +131,25 @@ func TestAdminRefreshHandlerUsesHostOnlyCookieAndDoesNotExposeRefreshToken(t *te
 	cookies := w.Result().Cookies()
 	if len(cookies) != 1 || cookies[0].Name != "drlife_admin_refresh" || cookies[0].Value != "new-refresh" || cookies[0].Path != "/v1/admin/auth" || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteStrictMode || cookies[0].Domain != "" {
 		t.Fatalf("cookie=%+v", cookies)
+	}
+}
+
+func TestAdminStepUpHandlerRequiresAdminIdentityAndNeverLeaksTokenOnFailure(t *testing.T) {
+	fake := &fakeAdminStepUp{result: iam.AdminStepUpResult{Token: "step-up-token", Scope: "withdrawal_review", ExpiresAt: time.Unix(1_800_000_300, 0)}}
+	handler := api.Handler{AdminStepUp: fake}
+	request := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/step-up", strings.NewReader(`{"totp_code":"123456","scope":"withdrawal_review"}`))
+	request.RemoteAddr = "198.51.100.7:42"
+	request = gateway.WithIdentity(request, gateway.Identity{AccountID: "admin-account", Role: gateway.RoleAdmin})
+	w := httptest.NewRecorder()
+	httpx.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.PostAdminAuthStepUp(w, r) })).ServeHTTP(w, request)
+	if w.Code != http.StatusOK || fake.adminID != "admin-account" || fake.code != "123456" || fake.scope != "withdrawal_review" || !strings.Contains(w.Body.String(), "step-up-token") {
+		t.Fatalf("status=%d input=%+v body=%s", w.Code, fake, w.Body.String())
+	}
+	fake.err = httpx.NewAppError(httpx.CodeTelegramLoginFailed)
+	w = httptest.NewRecorder()
+	httpx.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.PostAdminAuthStepUp(w, r) })).ServeHTTP(w, request)
+	if w.Code != http.StatusUnauthorized || strings.Contains(w.Body.String(), "step-up-token") {
+		t.Fatalf("failure body=%s", w.Body.String())
 	}
 }
 
