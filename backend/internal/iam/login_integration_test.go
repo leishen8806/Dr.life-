@@ -203,20 +203,36 @@ func (f *loginFixture) testAdminStepUp(t *testing.T) {
 	ctx := context.Background()
 	password := "step-up-password"
 	hash, err := HashPassword(password)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	secret := "JBSWY3DPEHPK3PXP"
 	adminID, err := ids.NewULID()
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	enc, err := EncryptTOTPSecret(ctx, f.envelope, adminID, secret)
-	if err != nil { t.Fatal(err) }
-	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status) VALUES($1,'Step Up Admin','step-up-admin@example.test',$2,$3,'finance','active')`, adminID, hash, enc); err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status) VALUES($1,'Step Up Admin','step-up-admin@example.test',$2,$3,'finance','active')`, adminID, hash, enc); err != nil {
+		t.Fatal(err)
+	}
 	code, err := totp.GenerateCode(secret, f.now)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	service := &AdminStepUpService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, Permissions: AdminPermissionStore{DB: f.pool}, Now: func() time.Time { return f.now }}
 	result, err := service.Issue(ctx, adminID, code, "withdrawal_review", "198.51.100.5", "step-up-test")
-	if err != nil || result.Token == "" || result.Scope != "withdrawal_review" { t.Fatalf("result=%+v err=%v", result, err) }
-	if _, err := service.Issue(ctx, adminID, code, "withdrawal_review", "198.51.100.5", "step-up-replay"); err == nil { t.Fatal("replayed TOTP accepted") }
-	if _, err := service.Issue(ctx, adminID, code, "withdraw", "198.51.100.5", "step-up-invalid"); err == nil { t.Fatal("non-whitelisted scope accepted") }
+	if err != nil || result.Token == "" || result.Scope != "withdrawal_review" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if _, err := service.Issue(ctx, adminID, code, "withdrawal_review", "198.51.100.5", "step-up-replay"); err == nil {
+		t.Fatal("replayed TOTP accepted")
+	}
+	if _, err := service.Issue(ctx, adminID, code, "withdraw", "198.51.100.5", "step-up-invalid"); err == nil {
+		t.Fatal("non-whitelisted scope accepted")
+	}
 }
 
 func (f *loginFixture) testAdminPasswordLogin(t *testing.T) {
