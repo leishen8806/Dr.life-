@@ -288,6 +288,26 @@ func TestExplicitEmptyMetricsAddressDisablesListener(t *testing.T) {
 	}
 }
 
+func TestLoadOperationsAlertConfiguration(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{
+		"APP_ENV": "test", "OPS_ALERT_BOT_ID": "55", "OPS_ALERT_CHAT_ID": "-100123", "OPS_ALERT_MERGE_WINDOW": "2m",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.OpsAlertBotID != 55 || cfg.OpsAlertChatID != -100123 || cfg.OpsAlertMergeWindow != 2*time.Minute {
+		t.Fatalf("unexpected operations alert config: %+v", cfg)
+	}
+	for _, values := range []map[string]string{
+		{"OPS_ALERT_BOT_ID": "0"}, {"OPS_ALERT_BOT_ID": "bad"}, {"OPS_ALERT_CHAT_ID": "0"}, {"OPS_ALERT_CHAT_ID": "bad"}, {"OPS_ALERT_MERGE_WINDOW": "0s"},
+	} {
+		values["APP_ENV"] = "test"
+		if _, err := load(lookup(values)); err == nil {
+			t.Fatalf("invalid operations alert config accepted: %+v", values)
+		}
+	}
+}
+
 func lookup(values map[string]string) func(string) string {
 	return func(key string) string { return values[key] }
 }
