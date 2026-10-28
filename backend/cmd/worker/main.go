@@ -68,11 +68,6 @@ func main() {
 	}
 	alertRedis := redis.NewClient(alertRedisOptions)
 	defer alertRedis.Close()
-	alerts := reconciliationAlerts(cfg, logger, metrics.Business(), opsalert.NewRedisDeduper(alertRedis))
-	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, logger, alerts); err != nil {
-		fmt.Fprintln(os.Stderr, "queue handler error:", err)
-		os.Exit(1)
-	}
 	asynqOptions, err := asynq.ParseRedisURI(cfg.QueueRedisURL)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "queue Redis configuration error:", err)
@@ -80,6 +75,15 @@ func main() {
 	}
 	client := asynq.NewClient(asynqOptions)
 	defer client.Close()
+	alerts := reconciliationAlerts(cfg, logger, metrics.Business(), opsalert.NewRedisDeduper(alertRedis), client)
+	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, logger, alerts.Alert); err != nil {
+		fmt.Fprintln(os.Stderr, "queue handler error:", err)
+		os.Exit(1)
+	}
+	if err := worker.Register(opsalert.TaskFlush, alerts.Flush); err != nil {
+		fmt.Fprintln(os.Stderr, "queue handler error:", err)
+		os.Exit(1)
+	}
 	relay, err := outbox.New(ledger.New(database, ledger.Options{}), client, outbox.Options{Routes: outbox.LedgerRoutes()})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "outbox relay configuration error:", err)
@@ -98,15 +102,15 @@ func main() {
 	<-ctx.Done()
 }
 
-func reconciliationAlerts(cfg config.Config, logger *slog.Logger, metrics opsalert.Metrics, deduper opsalert.Deduper) queue.Handler {
-	options := opsalert.Options{Environment: cfg.AppEnv, Language: cfg.OpsAlertLang, MergeWindow: cfg.OpsAlertMergeWindow, Metrics: metrics, Logger: logger, Deduper: deduper}
+func reconciliationAlerts(cfg config.Config, logger *slog.Logger, metrics opsalert.Metrics, deduper opsalert.Deduper, scheduler opsalert.Scheduler) opsalert.Handlers {
+	options := opsalert.Options{Environment: cfg.AppEnv, Language: cfg.OpsAlertLang, MergeWindow: cfg.OpsAlertMergeWindow, Metrics: metrics, Logger: logger, Deduper: deduper, Scheduler: scheduler}
 	token := os.Getenv("OPS_ALERT_BOT_TOKEN")
 	if cfg.OpsAlertBotID == 0 || cfg.OpsAlertChatID == 0 || token == "" {
 		logger.Warn("operations reconciliation alerts are not configured; undeliverable alerts will be logged and counted")
-		return opsalert.NewReconciliationHandler(options)
+		return opsalert.NewReconciliationHandlers(options)
 	}
 	options.Sender = commsTelegram.NewHTTPSender("https://api.telegram.org", commsTelegram.StaticTokenProvider{strconv.FormatInt(cfg.OpsAlertBotID, 10): token}, commsTelegram.SenderOptions{})
 	options.BotID = strconv.FormatInt(cfg.OpsAlertBotID, 10)
 	options.ChatID = cfg.OpsAlertChatID
-	return opsalert.NewReconciliationHandler(options)
+	return opsalert.NewReconciliationHandlers(options)
 }

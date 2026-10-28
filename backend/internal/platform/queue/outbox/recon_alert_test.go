@@ -14,15 +14,18 @@ import (
 
 func TestReconciliationAlertHandlerSendsSanitizedAlertOnce(t *testing.T) {
 	sender := &alertSender{}
-	handler := opsalert.NewReconciliationHandler(opsalert.Options{
+	handlers := opsalert.NewReconciliationHandlers(opsalert.Options{
 		Sender: sender, BotID: "ops-alert", ChatID: -1001, Environment: "test", Language: "en",
 		MergeWindow: time.Minute,
 	})
 	task := asynq.NewTask(outbox.TaskReconFailed, []byte(`{"outbox_id":41,"alert":{"run_id":7,"day":"2026-10-27","counts":{"BALANCE_CACHE":2},"account_ids":[9988],"amount":12345}}`))
-	if err := handler(context.Background(), task); err != nil {
+	if err := handlers.Alert(context.Background(), task); err != nil {
 		t.Fatal(err)
 	}
-	if err := handler(context.Background(), task); err != nil {
+	if err := handlers.Alert(context.Background(), task); err != nil {
+		t.Fatal(err)
+	}
+	if err := handlers.Flush(context.Background(), flushTask(outbox.TaskReconFailed)); err != nil {
 		t.Fatal(err)
 	}
 	if len(sender.messages) != 1 {
@@ -55,8 +58,11 @@ func TestReconciliationAlertHandlerClassifiesTelegramErrors(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sender := &alertSender{result: tc.result}
-			handler := opsalert.NewReconciliationHandler(opsalert.Options{Sender: sender, BotID: "ops-alert", ChatID: -1001})
-			err := handler(context.Background(), asynq.NewTask(outbox.TaskReconStale, []byte(`{"outbox_id":42,"alert":{"run_id":8,"day":"2026-10-27"}}`)))
+			handlers := opsalert.NewReconciliationHandlers(opsalert.Options{Sender: sender, BotID: "ops-alert", ChatID: -1001})
+			if err := handlers.Alert(context.Background(), asynq.NewTask(outbox.TaskReconStale, []byte(`{"outbox_id":42,"alert":{"run_id":8,"day":"2026-10-27"}}`))); err != nil {
+				t.Fatal(err)
+			}
+			err := handlers.Flush(context.Background(), flushTask(outbox.TaskReconStale))
 			if (err != nil && strings.Contains(err.Error(), asynq.SkipRetry.Error())) != tc.wantSkip {
 				t.Fatalf("err=%v, wantSkip=%v", err, tc.wantSkip)
 			}
@@ -70,13 +76,20 @@ func TestReconciliationAlertHandlerClassifiesTelegramErrors(t *testing.T) {
 func TestReconciliationAlertHandlerWithoutConfigurationDoesNotSend(t *testing.T) {
 	sender := &alertSender{}
 	metrics := &alertMetrics{}
-	handler := opsalert.NewReconciliationHandler(opsalert.Options{Sender: sender, Metrics: metrics})
-	if err := handler(context.Background(), asynq.NewTask(outbox.TaskReconFailed, []byte(`{"outbox_id":43,"alert":{"run_id":9}}`))); err != nil {
+	handlers := opsalert.NewReconciliationHandlers(opsalert.Options{Sender: sender, Metrics: metrics})
+	if err := handlers.Alert(context.Background(), asynq.NewTask(outbox.TaskReconFailed, []byte(`{"outbox_id":43,"alert":{"run_id":9}}`))); err != nil {
+		t.Fatal(err)
+	}
+	if err := handlers.Flush(context.Background(), flushTask(outbox.TaskReconFailed)); err != nil {
 		t.Fatal(err)
 	}
 	if len(sender.messages) != 0 || metrics.undeliverable != 1 {
 		t.Fatalf("sent=%d undeliverable=%d, want 0/1", len(sender.messages), metrics.undeliverable)
 	}
+}
+
+func flushTask(topic string) *asynq.Task {
+	return asynq.NewTask(opsalert.TaskFlush, []byte(`{"topic":"`+topic+`"}`))
 }
 
 type alertSender struct {

@@ -79,11 +79,14 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	}
 	alertRedis := redis.NewClient(alertRedisOptions)
 	defer alertRedis.Close()
-	alerts := opsalert.NewReconciliationHandler(opsalert.Options{
+	alerts := opsalert.NewReconciliationHandlers(opsalert.Options{
 		Sender: telegram.NewHTTPSender(telegramServer.URL, telegram.StaticTokenProvider{"ops": "test-token"}, telegram.SenderOptions{}),
-		BotID:  "ops", ChatID: -1001, Environment: "test", MergeWindow: time.Nanosecond, Logger: logger, Deduper: opsalert.NewRedisDeduper(alertRedis),
+		BotID:  "ops", ChatID: -1001, Environment: "test", MergeWindow: time.Nanosecond, Logger: logger, Deduper: opsalert.NewRedisDeduper(alertRedis), Scheduler: client,
 	})
-	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, logger, alerts); err != nil {
+	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, logger, alerts.Alert); err != nil {
+		t.Fatal(err)
+	}
+	if err := worker.Register(opsalert.TaskFlush, alerts.Flush); err != nil {
 		t.Fatal(err)
 	}
 	workerCtx, stop := context.WithCancel(ctx)
@@ -99,8 +102,8 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if completed.Pending != 0 || completed.Active != 0 || completed.Processed != 2 || completed.Failed != 0 {
-		t.Fatalf("critical queue pending=%d active=%d processed=%d failed=%d, want 0/0/2/0", completed.Pending, completed.Active, completed.Processed, completed.Failed)
+	if completed.Pending != 0 || completed.Active != 0 || completed.Processed != 4 || completed.Failed != 0 {
+		t.Fatalf("critical queue pending=%d active=%d processed=%d failed=%d, want 0/0/4/0", completed.Pending, completed.Active, completed.Processed, completed.Failed)
 	}
 	t.Logf("inspector critical pending=%d active=%d processed=%d failed=%d", completed.Pending, completed.Active, completed.Processed, completed.Failed)
 	if got := observer.Count("ops:outbox_unknown:v1"); got != 0 {
@@ -181,7 +184,7 @@ func waitForRelayDeliveries(t *testing.T, ctx context.Context, observer *relayOb
 	tick := time.NewTicker(20 * time.Millisecond)
 	defer tick.Stop()
 	for {
-		if observer.Count(outbox.TaskReconFailed) == 1 && observer.Count(outbox.TaskReconStale) == 1 {
+		if observer.Count(outbox.TaskReconFailed) == 1 && observer.Count(outbox.TaskReconStale) == 1 && observer.Count(opsalert.TaskFlush) == 2 {
 			return
 		}
 		select {

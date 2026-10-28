@@ -12,6 +12,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/opsalert"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 )
 
@@ -56,6 +57,7 @@ func RegisterLedgerTasks(registry *queue.Registry) error {
 		{Name: TaskLedgerInfo, Queue: queue.QueueDefault, Timeout: time.Second * 30, MaxRetry: 3},
 		{Name: TaskReconFailed, Queue: queue.QueueCritical, Timeout: time.Second * 30, MaxRetry: 3},
 		{Name: TaskReconStale, Queue: queue.QueueCritical, Timeout: time.Second * 30, MaxRetry: 3},
+		{Name: opsalert.TaskFlush, Queue: queue.QueueCritical, Timeout: time.Second * 30, MaxRetry: 3},
 	} {
 		if err := registry.Register(spec); err != nil {
 			return err
