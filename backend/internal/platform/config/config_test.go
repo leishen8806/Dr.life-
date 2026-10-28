@@ -30,7 +30,7 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if cfg.HTTPAddr != ":8080" || cfg.MetricsAddr != "127.0.0.1:9100" || cfg.LogLevel != slog.LevelInfo || cfg.ShutdownTimeout != 15*time.Second || cfg.ReadHeaderTimeout != 10*time.Second || cfg.ReadTimeout != 30*time.Second || cfg.IdleTimeout != 60*time.Second || cfg.DBMaxConns != 10 || cfg.DBReportMaxConns != 4 || cfg.DBWorkerMaxConns != 4 || cfg.DBMinConns != 2 || cfg.DBConnectTimeout != 5*time.Second || cfg.DBAcquireTimeout != 100*time.Millisecond || cfg.DBSlowQuery != 200*time.Millisecond || cfg.RateLimitIP != 600 || cfg.RateLimitAccount != 300 || cfg.RateLimitLogin != 10 || cfg.RateLimitWithdraw != 5 || cfg.RateLimitAI != 30 || cfg.RateLimitAdmin != 60 || cfg.LedgerReconTimezone != "Asia/Phnom_Penh" || cfg.TelegramInitDataMaxAge != 24*time.Hour || cfg.AccessTokenTTL != 15*time.Minute || cfg.RefreshTokenTTL != 7*24*time.Hour || cfg.RefreshTokenGrace != 10*time.Second || cfg.SessionIdleTTL != 24*time.Hour || cfg.SessionMaxPerAccount != 5 || cfg.TokenIssuer != "drlife" || !cfg.TokenLegacyAcceptUntil.IsZero() || cfg.LoginFailureLimit != 20 || cfg.LoginFailureWindow != 10*time.Minute || cfg.BotTokenCacheTTL != 5*time.Minute {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
-	if cfg.DatabaseURL != "" || cfg.IAMDatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" || cfg.QueueRedisURL != "" {
+	if cfg.DatabaseURL != "" || cfg.IAMDatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" || cfg.CacheRedisURL != "" || cfg.QueueRedisURL != "" {
 		t.Fatalf("optional URLs should be empty: %+v", cfg)
 	}
 	if len(cfg.CORSBuyerOrigins) != 2 || cfg.CORSBuyerOrigins[1] != "http://localhost:5173" || len(cfg.CORSPublicOrigins) != 7 || cfg.WebhookPrefix != "" || cfg.TrustedProxyHeader != "" || len(cfg.TrustedProxyCIDRs) != 0 {
@@ -47,6 +47,41 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 		cfg.BrownoutDBWaitThreshold != 100*time.Millisecond || cfg.BrownoutDBWaitRecovery != 50*time.Millisecond ||
 		cfg.BrownoutInFlightRatioThreshold != .8 || cfg.BrownoutInFlightRatioRecovery != .6 || cfg.BrownoutSampleInterval != time.Second {
 		t.Fatalf("unexpected brownout defaults: %+v", cfg)
+	}
+}
+
+func TestCacheRedisURLNeverFallsBackToStateRedis(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{
+		"APP_ENV":   "test",
+		"REDIS_URL": "redis://state-only.example/0",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RedisURL == "" || cfg.CacheRedisURL != "" {
+		t.Fatalf("state Redis must not enable public cache: %+v", cfg)
+	}
+}
+
+func TestCacheRedisURLMustUseADifferentInstance(t *testing.T) {
+	for name, values := range map[string]map[string]string{
+		"same state instance": {
+			"APP_ENV": "test", "REDIS_URL": "redis://shared.example:6379/0", "CACHE_REDIS_URL": "redis://shared.example:6379/0",
+		},
+		"same queue instance": {
+			"APP_ENV": "test", "QUEUE_REDIS_URL": "redis://shared.example:6379/0", "CACHE_REDIS_URL": "redis://shared.example:6379/0",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := load(lookup(values)); err == nil {
+				t.Fatal("shared public cache Redis instance was accepted")
+			}
+		})
+	}
+	if _, err := load(lookup(map[string]string{
+		"APP_ENV": "test", "REDIS_URL": "redis://shared.example:6379/0", "CACHE_REDIS_URL": "redis://shared.example:6379/1",
+	})); err != nil {
+		t.Fatalf("separate Redis database should be accepted: %v", err)
 	}
 }
 
@@ -140,6 +175,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"DB_SLOW_QUERY_MS":                "250",
 		"SENTRY_DSN":                      "https://public@example.invalid/1",
 		"REDIS_URL":                       "redis://placeholder",
+		"CACHE_REDIS_URL":                 "redis://cache-placeholder",
 		"QUEUE_REDIS_URL":                 "redis://queue-placeholder",
 		"QUEUE_ALLOW_EVICTION":            "true",
 		"CORS_BUYER_ORIGINS":              "https://buyer.example",
@@ -177,7 +213,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.IAMDatabaseURL != "postgres://iam-placeholder" || cfg.AuditDatabaseURL != "postgres://audit-placeholder" || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.QueueRedisURL != "redis://queue-placeholder" || !cfg.QueueAllowEviction || cfg.DBMaxConns != 20 || cfg.DBReportMaxConns != 6 || cfg.DBWorkerMaxConns != 5 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBAcquireTimeout != 150*time.Millisecond || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" || cfg.TelegramInitDataMaxAge != 12*time.Hour || cfg.AccessTokenTTL != 10*time.Minute || cfg.RefreshTokenTTL != 240*time.Hour || cfg.RefreshTokenGrace != 12*time.Second || cfg.SessionIdleTTL != 12*time.Hour || cfg.SessionMaxPerAccount != 3 || cfg.TokenIssuer != "drlife-staging" || !cfg.TokenLegacyAcceptUntil.Equal(time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC)) || cfg.LoginFailureLimit != 8 || cfg.LoginFailureWindow != 3*time.Minute || cfg.BotTokenCacheTTL != 2*time.Minute {
+	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.IAMDatabaseURL != "postgres://iam-placeholder" || cfg.AuditDatabaseURL != "postgres://audit-placeholder" || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.CacheRedisURL != "redis://cache-placeholder" || cfg.QueueRedisURL != "redis://queue-placeholder" || !cfg.QueueAllowEviction || cfg.DBMaxConns != 20 || cfg.DBReportMaxConns != 6 || cfg.DBWorkerMaxConns != 5 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBAcquireTimeout != 150*time.Millisecond || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" || cfg.TelegramInitDataMaxAge != 12*time.Hour || cfg.AccessTokenTTL != 10*time.Minute || cfg.RefreshTokenTTL != 240*time.Hour || cfg.RefreshTokenGrace != 12*time.Second || cfg.SessionIdleTTL != 12*time.Hour || cfg.SessionMaxPerAccount != 3 || cfg.TokenIssuer != "drlife-staging" || !cfg.TokenLegacyAcceptUntil.Equal(time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC)) || cfg.LoginFailureLimit != 8 || cfg.LoginFailureWindow != 3*time.Minute || cfg.BotTokenCacheTTL != 2*time.Minute {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	for _, raw := range []string{"0", "-1", "abc"} {

@@ -9,7 +9,8 @@ x-app-env: &app-env
   METRICS_ADDR: ":9100"
   DATABASE_URL: "postgres://drlife:loadtest-only@postgres:5432/drlife?sslmode=disable"
   REPORT_DATABASE_URL: "postgres://drlife:loadtest-only@postgres-replica:5432/drlife?sslmode=disable"
-  REDIS_URL: "redis://redis-cache:6379/0"
+  REDIS_URL: "redis://redis-state:6379/0"
+  CACHE_REDIS_URL: "redis://redis-cache:6379/0"
   QUEUE_REDIS_URL: "redis://redis-queue:6379/0"
   QUEUE_ALLOW_EVICTION: "false"
   DB_MAX_CONNS: "20"
@@ -76,6 +77,15 @@ services:
       timeout: 3s
       retries: 30
 
+  redis-state:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
   redis-queue:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory-policy", "noeviction"]
@@ -101,6 +111,8 @@ services:
         condition: service_healthy
       redis-cache:
         condition: service_healthy
+      redis-state:
+        condition: service_healthy
       redis-queue:
         condition: service_healthy
     healthcheck:
@@ -121,6 +133,8 @@ services:
       postgres-replica:
         condition: service_healthy
       redis-cache:
+        condition: service_healthy
+      redis-state:
         condition: service_healthy
       redis-queue:
         condition: service_healthy

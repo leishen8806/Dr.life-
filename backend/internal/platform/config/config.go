@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type Config struct {
@@ -36,6 +38,11 @@ type Config struct {
 	DBSlowQuery                    time.Duration
 	SentryDSN                      string
 	RedisURL                       string
+	CacheRedisURL                  string
+	CacheStaleTTL                  time.Duration
+	CacheNegativeTTL               time.Duration
+	CacheRefreshTimeout            time.Duration
+	CacheMaxEntries                int
 	QueueRedisURL                  string
 	QueueAllowEviction             bool
 	CORSBuyerOrigins               []string
@@ -164,6 +171,14 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		return Config{}, err
 	}
 	idleSeconds, err := durationSeconds(getenv, "IDLE_TIMEOUT_SECONDS", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	cacheStaleSeconds, err := durationSeconds(getenv, "CACHE_STALE_TTL_SECONDS", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	cacheNegativeSeconds, err := durationSeconds(getenv, "CACHE_NEGATIVE_TTL_SECONDS", 30)
 	if err != nil {
 		return Config{}, err
 	}
@@ -425,6 +440,14 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
+	cacheMaxEntries, err := positiveInt(getenv, "CACHE_MAX_ENTRIES", 10000)
+	if err != nil {
+		return Config{}, err
+	}
+	cacheRefreshTimeout, err := positiveDuration(getenv, "CACHE_REFRESH_TIMEOUT", 2*time.Second)
+	if err != nil || cacheRefreshTimeout > 10*time.Second {
+		return Config{}, fmt.Errorf("CACHE_REFRESH_TIMEOUT must be between 1ns and 10s")
+	}
 	opsAlertBotID, err := optionalPositiveInt64(getenv("OPS_ALERT_BOT_ID"))
 	if err != nil {
 		return Config{}, fmt.Errorf("OPS_ALERT_BOT_ID must be a positive integer")
@@ -461,6 +484,12 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 			return Config{}, fmt.Errorf("QUEUE_ALLOW_EVICTION must be true or false")
 		}
 	}
+	cacheRedisURL := strings.TrimSpace(getenv("CACHE_REDIS_URL"))
+	redisURL := strings.TrimSpace(getenv("REDIS_URL"))
+	queueRedisURL := strings.TrimSpace(getenv("QUEUE_REDIS_URL"))
+	if err := validateDedicatedCacheRedisURLs(cacheRedisURL, redisURL, queueRedisURL); err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		HTTPAddr:               httpAddr,
@@ -484,8 +513,13 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		DBAcquireTimeout:       time.Duration(dbAcquireMilliseconds) * time.Millisecond,
 		DBSlowQuery:            time.Duration(dbSlowQueryMS) * time.Millisecond,
 		SentryDSN:              strings.TrimSpace(getenv("SENTRY_DSN")),
-		RedisURL:               strings.TrimSpace(getenv("REDIS_URL")),
-		QueueRedisURL:          strings.TrimSpace(getenv("QUEUE_REDIS_URL")),
+		RedisURL:               redisURL,
+		CacheRedisURL:          cacheRedisURL,
+		CacheStaleTTL:          time.Duration(cacheStaleSeconds) * time.Second,
+		CacheNegativeTTL:       time.Duration(cacheNegativeSeconds) * time.Second,
+		CacheRefreshTimeout:    cacheRefreshTimeout,
+		CacheMaxEntries:        cacheMaxEntries,
+		QueueRedisURL:          queueRedisURL,
 		QueueAllowEviction:     queueAllowEviction,
 		CORSBuyerOrigins:       cors["CORS_BUYER_ORIGINS"],
 		CORSMerchantOrigins:    cors["CORS_MERCHANT_ORIGINS"],
@@ -536,6 +570,32 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		JWTActiveKeyID:         jwtActiveKeyID,
 		JWTSigningConfigured:   jwtConfigured,
 	}, nil
+}
+
+func validateDedicatedCacheRedisURLs(cacheURL, stateURL, queueURL string) error {
+	if cacheURL == "" {
+		return nil
+	}
+	cacheOptions, err := redis.ParseURL(cacheURL)
+	if err != nil {
+		return fmt.Errorf("CACHE_REDIS_URL must be a valid Redis URL")
+	}
+	for _, candidate := range []struct {
+		name string
+		url  string
+	}{{"REDIS_URL", stateURL}, {"QUEUE_REDIS_URL", queueURL}} {
+		if candidate.url == "" {
+			continue
+		}
+		options, parseErr := redis.ParseURL(candidate.url)
+		if parseErr != nil {
+			return fmt.Errorf("%s must be a valid Redis URL", candidate.name)
+		}
+		if strings.EqualFold(cacheOptions.Addr, options.Addr) && cacheOptions.DB == options.DB {
+			return fmt.Errorf("CACHE_REDIS_URL must not use the same Redis instance as %s", candidate.name)
+		}
+	}
+	return nil
 }
 
 func optionalPositiveInt64(raw string) (int64, error) {
