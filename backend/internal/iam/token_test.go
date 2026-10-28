@@ -249,3 +249,27 @@ func TestJWTAuthenticatorThroughGateway(t *testing.T) {
 		t.Fatalf("expired status=%d", w.Code)
 	}
 }
+
+func TestStepUpTokenBindsAdminScopeAndExpiresInFiveMinutes(t *testing.T) {
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+	ring, _ := secrets.NewKeyring(map[string][]byte{"active": key}, "active")
+	now := time.Unix(1_800_000_000, 0)
+	manager := TokenManager{Keys: ring, Issuer: "drlife", Now: func() time.Time { return now }}
+	raw, expiresAt, err := manager.IssueStepUp(context.Background(), "admin-account", "withdrawal_review")
+	if err != nil || !expiresAt.Equal(now.Add(5*time.Minute)) {
+		t.Fatalf("issue expires=%s err=%v", expiresAt, err)
+	}
+	if _, err := manager.VerifyStepUp(context.Background(), raw, "withdrawal_review", "admin-account"); err != nil {
+		t.Fatalf("verify valid step-up: %v", err)
+	}
+	for _, check := range []struct{ scope, account string }{{"withdrawal_paid", "admin-account"}, {"withdrawal_review", "other-admin"}} {
+		if _, err := manager.VerifyStepUp(context.Background(), raw, check.scope, check.account); err == nil {
+			t.Fatalf("accepted scope=%q account=%q", check.scope, check.account)
+		}
+	}
+	manager.Now = func() time.Time { return now.Add(5*time.Minute + time.Second) }
+	if _, err := manager.VerifyStepUp(context.Background(), raw, "withdrawal_review", "admin-account"); err == nil {
+		t.Fatal("accepted expired step-up")
+	}
+}
