@@ -62,6 +62,38 @@ func TestGroupedCORSSeparatesClients(t *testing.T) {
 	}
 }
 
+func TestAdminRefreshCSRFRequiresTrustedOriginAndRequestedWithHeader(t *testing.T) {
+	groups := OriginGroups{Admin: []string{"https://admin.settlecore.org"}}
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	handler := RequireAdminRefreshCSRF(groups)(next)
+
+	for name, mutate := range map[string]func(*http.Request){
+		"missing origin": func(_ *http.Request) {},
+		"untrusted origin": func(r *http.Request) { r.Header.Set("Origin", "https://evil.example") },
+		"missing requested with": func(r *http.Request) { r.Header.Set("Origin", "https://admin.settlecore.org") },
+		"wrong requested with": func(r *http.Request) { r.Header.Set("Origin", "https://admin.settlecore.org"); r.Header.Set("X-Requested-With", "other") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/refresh", nil)
+			mutate(req)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			if w.Code != http.StatusForbidden {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+		})
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/refresh", nil)
+	req.Header.Set("Origin", "https://admin.settlecore.org")
+	req.Header.Set("X-Requested-With", "drlife")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("trusted request status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestSecurityHeaders(t *testing.T) {
 	for _, env := range []string{"dev", "prod"} {
 		response := httptest.NewRecorder()

@@ -56,6 +56,21 @@ type fakeAdminLogin struct {
 	err    error
 }
 
+type fakeAdminRefresh struct {
+	input  string
+	ip     string
+	result iam.RefreshResult
+	err    error
+}
+
+func (f *fakeAdminRefresh) Refresh(_ context.Context, token, ip string) (iam.RefreshResult, error) {
+	f.input, f.ip = token, ip
+	return f.result, f.err
+}
+
+func (*fakeAdminRefresh) ListSessions(context.Context, string) ([]iam.SessionInfo, error) { return nil, nil }
+func (*fakeAdminRefresh) RevokeSession(context.Context, string, string, string) error { return nil }
+
 func (f *fakeAdminLogin) Login(_ context.Context, input iam.AdminLoginInput) (iam.AdminLoginResult, error) {
 	f.input = input
 	return f.result, f.err
@@ -80,6 +95,25 @@ func TestAdminLoginHandlerSetsHostOnlyRefreshCookieAndUnifiesFailures(t *testing
 	httpx.RequestID(http.HandlerFunc((api.Handler{AdminLogin: fake}).PostAdminAuthLogin)).ServeHTTP(w, req)
 	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), `"code":2005`) || strings.Contains(w.Body.String(), "secret") {
 		t.Fatalf("body=%s", w.Body.String())
+	}
+}
+
+func TestAdminRefreshHandlerUsesHostOnlyCookieAndDoesNotExposeRefreshToken(t *testing.T) {
+	fake := &fakeAdminRefresh{result: iam.RefreshResult{AccessToken: "new-access", AccessExpiresIn: 600, RefreshToken: "new-refresh"}}
+	req := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/refresh", nil)
+	req.RemoteAddr = "198.51.100.7:42"
+	req.AddCookie(&http.Cookie{Name: "drlife_admin_refresh", Value: "old-refresh"})
+	w := httptest.NewRecorder()
+	httpx.RequestID(http.HandlerFunc((api.Handler{Sessions: fake}).PostAdminAuthRefresh)).ServeHTTP(w, req)
+	if w.Code != http.StatusOK || fake.input != "old-refresh" || fake.ip != "198.51.100.7" {
+		t.Fatalf("status/input=%d token=%q ip=%q", w.Code, fake.input, fake.ip)
+	}
+	if strings.Contains(w.Body.String(), "new-refresh") || !strings.Contains(w.Body.String(), "new-access") {
+		t.Fatalf("body=%s", w.Body.String())
+	}
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != "drlife_admin_refresh" || cookies[0].Value != "new-refresh" || cookies[0].Path != "/v1/admin/auth" || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteStrictMode || cookies[0].Domain != "" {
+		t.Fatalf("cookie=%+v", cookies)
 	}
 }
 
