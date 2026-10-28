@@ -37,6 +37,11 @@ type AccessClaims struct {
 	jwt.RegisteredClaims
 }
 
+type StepUpClaims struct {
+	Scope string `json:"scope"`
+	jwt.RegisteredClaims
+}
+
 type TokenManager struct {
 	Keys              secrets.KeyProvider
 	AccessTTL         time.Duration
@@ -64,6 +69,70 @@ func (m TokenManager) IssueAccess(ctx context.Context, accountPublicID, role, se
 		return "", err
 	}
 	return m.signAccess(accountPublicID, role, sessionPublicID, kid, key, now, jti)
+}
+
+func (m TokenManager) IssueStepUp(ctx context.Context, adminPublicID, scope string) (string, time.Time, error) {
+	if m.Keys == nil || adminPublicID == "" || scope == "" {
+		return "", time.Time{}, ErrInvalidToken
+	}
+	now := time.Now()
+	if m.Now != nil {
+		now = m.Now()
+	}
+	kid, key, err := m.Keys.ActiveKey(ctx)
+	if err != nil {
+		return "", time.Time{}, ErrInvalidToken
+	}
+	defer wipe(key)
+	jti, err := randomToken(16)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	issuer := m.Issuer
+	if issuer == "" {
+		issuer = "drlife"
+	}
+	expiresAt := now.Add(5 * time.Minute)
+	claims := StepUpClaims{Scope: scope, RegisteredClaims: jwt.RegisteredClaims{Issuer: issuer, Subject: adminPublicID, Audience: jwt.ClaimStrings{"drlife:admin"}, IssuedAt: jwt.NewNumericDate(now), ExpiresAt: jwt.NewNumericDate(expiresAt), ID: jti}}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token.Header["kid"] = kid
+	token.Header["typ"] = "su+jwt"
+	raw, err := token.SignedString(key)
+	if err != nil {
+		return "", time.Time{}, ErrInvalidToken
+	}
+	return raw, expiresAt, nil
+}
+
+func (m TokenManager) VerifyStepUp(ctx context.Context, raw, expectedScope, expectedAdminID string) (string, error) {
+	if m.Keys == nil || raw == "" || expectedScope == "" || expectedAdminID == "" {
+		return "", ErrInvalidToken
+	}
+	claims := new(StepUpClaims)
+	now := time.Now
+	if m.Now != nil {
+		now = m.Now
+	}
+	var tokenType string
+	parsed, err := jwt.ParseWithClaims(raw, claims, func(token *jwt.Token) (any, error) {
+		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, ErrInvalidToken
+		}
+		kid, ok := token.Header["kid"].(string)
+		if !ok || kid == "" {
+			return nil, ErrInvalidToken
+		}
+		tokenType, _ = token.Header["typ"].(string)
+		return m.Keys.KeyByID(ctx, kid)
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired(), jwt.WithTimeFunc(now))
+	issuer := m.Issuer
+	if issuer == "" {
+		issuer = "drlife"
+	}
+	if err != nil || !parsed.Valid || tokenType != "su+jwt" || claims.Issuer != issuer || len(claims.Audience) != 1 || claims.Audience[0] != "drlife:admin" || claims.Subject != expectedAdminID || claims.Scope != expectedScope || claims.ID == "" {
+		return "", ErrInvalidToken
+	}
+	return claims.ID, nil
 }
 
 func (m TokenManager) IssueRotatedAccess(ctx context.Context, accountPublicID, role, sessionPublicID, kid string, rotation int64, issuedAt time.Time) (string, error) {
