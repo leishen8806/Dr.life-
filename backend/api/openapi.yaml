@@ -102,6 +102,155 @@ paths:
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalServerError" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/admin/auth/password:
+    post:
+      tags: [admin]
+      operationId: changeAdminPassword
+      summary: Change an administrator password and clear first-login restriction
+      x-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminPasswordChangeRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/ActionSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/LoginFailed" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/admins:
+    get:
+      tags: [admin]
+      operationId: listAdminUsers
+      summary: List administrator accounts
+      x-roles: [admin]
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string, minLength: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: Administrator accounts in created-at keyset order.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserListSuccessResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    post:
+      tags: [admin]
+      operationId: createAdminUser
+      summary: Create an administrator account
+      x-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/XStepUpToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminUserCreateRequest" }
+      responses:
+        "201":
+          description: Administrator created; bootstrap credentials appear only in this response.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserCreatedSuccessResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/admins/{public_id}:
+    get:
+      tags: [admin]
+      operationId: getAdminUser
+      summary: Get an administrator account
+      x-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/AdminPublicID"
+      responses:
+        "200":
+          description: Administrator account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserSuccessResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/admins/{public_id}/disable:
+    post:
+      tags: [admin]
+      operationId: disableAdminUser
+      summary: Disable an administrator account
+      x-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/AdminPublicID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/XStepUpToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminUserDisableRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/AdminUserSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/admins/{public_id}/enable:
+    post:
+      tags: [admin]
+      operationId: enableAdminUser
+      summary: Enable an administrator account
+      x-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/AdminPublicID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/XStepUpToken"
+      responses:
+        "200": { $ref: "#/components/responses/AdminUserSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/admins/{public_id}/role:
+    patch:
+      tags: [admin]
+      operationId: updateAdminUserRole
+      summary: Change an administrator role and data scope
+      x-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/AdminPublicID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/XStepUpToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminUserRoleUpdateRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/AdminUserSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { $ref: "#/components/responses/UnsupportedMediaType" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /v1/admin/financial-center:
     get:
       tags: [admin]
@@ -1174,6 +1323,14 @@ components:
         type: string
         minLength: 1
         maxLength: 4096
+    AdminPublicID:
+      name: public_id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
   headers:
     IdempotentReplayed:
       description: True when the stored response for an identical request is replayed.
@@ -1342,6 +1499,104 @@ components:
       properties:
         ok: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/AdminLoginData" }
+        request_id: { type: string, minLength: 1 }
+    AdminUser:
+      type: object
+      additionalProperties: false
+      required: [public_id, name, email, role, data_scope, status, last_login_at, created_at]
+      properties:
+        public_id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [super, ops, finance, logi, cs, auditor] }
+        data_scope:
+          type: array
+          items: { type: string }
+        status: { type: string, enum: [active, disabled] }
+        last_login_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+    AdminUserCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name, email, role, data_scope]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        email: { type: string, format: email, minLength: 3, maxLength: 320 }
+        role: { type: string, enum: [super, ops, finance, logi, cs, auditor] }
+        data_scope:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 64 }
+          maxItems: 100
+    AdminUserDisableRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    AdminUserRoleUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [role, data_scope]
+      properties:
+        role: { type: string, enum: [super, ops, finance, logi, cs, auditor] }
+        data_scope:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 64 }
+          maxItems: 100
+    AdminPasswordChangeRequest:
+      type: object
+      additionalProperties: false
+      required: [current_password, new_password, totp_code]
+      properties:
+        current_password: { type: string, minLength: 1, maxLength: 1024 }
+        new_password: { type: string, minLength: 20, maxLength: 1024 }
+        totp_code: { type: string, pattern: "^[0-9]{6,8}$" }
+    AdminUserData:
+      type: object
+      additionalProperties: false
+      required: [admin]
+      properties:
+        admin: { $ref: "#/components/schemas/AdminUser" }
+    AdminUserListData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AdminUser" }
+        next_cursor: { type: string, nullable: true }
+    AdminUserCreatedData:
+      type: object
+      additionalProperties: false
+      required: [admin, initial_password, totp_provisioning_uri]
+      properties:
+        admin: { $ref: "#/components/schemas/AdminUser" }
+        initial_password: { type: string, minLength: 20 }
+        totp_provisioning_uri: { type: string, format: uri }
+    AdminUserSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AdminUserData" }
+        request_id: { type: string, minLength: 1 }
+    AdminUserListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AdminUserListData" }
+        request_id: { type: string, minLength: 1 }
+    AdminUserCreatedSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AdminUserCreatedData" }
         request_id: { type: string, minLength: 1 }
     TelegramAccount:
       type: object
@@ -2210,6 +2465,11 @@ components:
       content:
         application/json:
           schema: {$ref: "#/components/schemas/AccountDeviceListSuccessResponse"}
+    AdminUserSucceeded:
+      description: Administrator account returned without credential material.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AdminUserSuccessResponse" }
     AdminRefreshSucceeded:
       description: Refresh cookie rotated successfully; the refresh token is not returned in JSON.
       content:

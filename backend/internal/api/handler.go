@@ -107,6 +107,7 @@ type FileManagement interface {
 // 零值 Handler 只提供 /v1/public/ping；商品接口在依赖未注入时返回 500，
 // 这样 server.NewHandler(nil) 与契约测试的既有行为保持不变。
 type Handler struct {
+	gen.Unimplemented
 	Catalog          *catalog.Service
 	Merchants        MerchantResolver
 	Logger           *slog.Logger
