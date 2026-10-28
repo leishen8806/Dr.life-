@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -120,6 +121,8 @@ func (d *memoryDeduper) Remember(_ context.Context, id int64) error {
 
 type redisDeduper struct{ client redis.Cmdable }
 
+type redisMerger struct{ client redis.Cmdable }
+
 func NewRedisDeduper(client redis.Cmdable) Deduper {
 	if client == nil {
 		return nil
@@ -134,6 +137,58 @@ func (d redisDeduper) Remember(ctx context.Context, id int64) error {
 	return d.client.Set(ctx, key(id), "1", 30*24*time.Hour).Err()
 }
 func key(id int64) string { return fmt.Sprintf("ops:recon_alert:sent:%d", id) }
+
+// NewRedisMerger stores window state separately from idempotency, under a
+// dedicated prefix shared by every worker consuming the same queue.
+func NewRedisMerger(client redis.Cmdable) Merger {
+	if client == nil {
+		return nil
+	}
+	return redisMerger{client: client}
+}
+
+func (m redisMerger) Add(ctx context.Context, topic string, p payload) (bool, error) {
+	encoded, err := json.Marshal(p)
+	if err != nil {
+		return false, err
+	}
+	created, err := m.client.Eval(ctx, `
+local created = redis.call('HSETNX', KEYS[1], 'payload', ARGV[2])
+redis.call('HSET', KEYS[1], 'id:' .. ARGV[1], '1')
+if created == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[3]) end
+return created
+`, []string{mergeKey(topic)}, p.OutboxID, encoded, int64((24 * time.Hour).Milliseconds())).Int()
+	return created == 1, err
+}
+
+func (m redisMerger) Peek(ctx context.Context, topic string) (mergedPayload, bool, error) {
+	values, err := m.client.HGetAll(ctx, mergeKey(topic)).Result()
+	if err != nil || len(values) == 0 {
+		return mergedPayload{}, len(values) != 0, err
+	}
+	var result mergedPayload
+	if err := json.Unmarshal([]byte(values["payload"]), &result.Payload); err != nil {
+		return mergedPayload{}, false, err
+	}
+	result.IDs = make(map[int64]struct{})
+	for field := range values {
+		if !strings.HasPrefix(field, "id:") {
+			continue
+		}
+		id, err := strconv.ParseInt(strings.TrimPrefix(field, "id:"), 10, 64)
+		if err != nil || id <= 0 {
+			return mergedPayload{}, false, errors.New("invalid operations alert merge state")
+		}
+		result.IDs[id] = struct{}{}
+	}
+	return result, len(result.IDs) > 0, nil
+}
+
+func (m redisMerger) Discard(ctx context.Context, topic string) error {
+	return m.client.Del(ctx, mergeKey(topic)).Err()
+}
+
+func mergeKey(topic string) string { return "dr.life:opsalert:merge:" + topic }
 
 func NewReconciliationHandler(options Options) queue.Handler {
 	return NewReconciliationHandlers(options).Alert

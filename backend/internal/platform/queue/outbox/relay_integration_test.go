@@ -79,14 +79,16 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	}
 	alertRedis := redis.NewClient(alertRedisOptions)
 	defer alertRedis.Close()
-	alerts := opsalert.NewReconciliationHandlers(opsalert.Options{
+	alertOptions := opsalert.Options{
 		Sender: telegram.NewHTTPSender(telegramServer.URL, telegram.StaticTokenProvider{"ops": "test-token"}, telegram.SenderOptions{}),
-		BotID:  "ops", ChatID: -1001, Environment: "test", MergeWindow: time.Nanosecond, Logger: logger, Deduper: opsalert.NewRedisDeduper(alertRedis), Scheduler: client,
-	})
+		BotID:  "ops", ChatID: -1001, Environment: "test", MergeWindow: time.Nanosecond, Logger: logger, Deduper: opsalert.NewRedisDeduper(alertRedis), Merger: opsalert.NewRedisMerger(alertRedis), Scheduler: client,
+	}
+	alerts := opsalert.NewReconciliationHandlers(alertOptions)
+	flushOnSecondWorker := opsalert.NewReconciliationHandlers(alertOptions)
 	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, logger, alerts.Alert); err != nil {
 		t.Fatal(err)
 	}
-	if err := worker.Register(opsalert.TaskFlush, alerts.Flush); err != nil {
+	if err := worker.Register(opsalert.TaskFlush, flushOnSecondWorker.Flush); err != nil {
 		t.Fatal(err)
 	}
 	workerCtx, stop := context.WithCancel(ctx)

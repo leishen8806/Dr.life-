@@ -75,7 +75,7 @@ func main() {
 	}
 	client := asynq.NewClient(asynqOptions)
 	defer client.Close()
-	alerts := reconciliationAlerts(cfg, logger, metrics.Business(), opsalert.NewRedisDeduper(alertRedis), client)
+	alerts := reconciliationAlerts(cfg, logger, metrics.Business(), opsalert.NewRedisDeduper(alertRedis), opsalert.NewRedisMerger(alertRedis), client)
 	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, logger, alerts.Alert); err != nil {
 		fmt.Fprintln(os.Stderr, "queue handler error:", err)
 		os.Exit(1)
@@ -102,8 +102,8 @@ func main() {
 	<-ctx.Done()
 }
 
-func reconciliationAlerts(cfg config.Config, logger *slog.Logger, metrics opsalert.Metrics, deduper opsalert.Deduper, scheduler opsalert.Scheduler) opsalert.Handlers {
-	options := opsalert.Options{Environment: cfg.AppEnv, Language: cfg.OpsAlertLang, MergeWindow: cfg.OpsAlertMergeWindow, Metrics: metrics, Logger: logger, Deduper: deduper, Scheduler: scheduler}
+func reconciliationAlerts(cfg config.Config, logger *slog.Logger, metrics opsalert.Metrics, deduper opsalert.Deduper, merger opsalert.Merger, scheduler opsalert.Scheduler) opsalert.Handlers {
+	options := opsalert.Options{Environment: cfg.AppEnv, Language: cfg.OpsAlertLang, MergeWindow: cfg.OpsAlertMergeWindow, Metrics: metrics, Logger: logger, Deduper: deduper, Merger: merger, Scheduler: scheduler}
 	token := os.Getenv("OPS_ALERT_BOT_TOKEN")
 	if cfg.OpsAlertBotID == 0 || cfg.OpsAlertChatID == 0 || token == "" {
 		logger.Warn("operations reconciliation alerts are not configured; undeliverable alerts will be logged and counted")
