@@ -81,7 +81,12 @@ func (c DBSessionChecker) Active(ctx context.Context, accountID, sessionID strin
 	var epoch int64
 	var expiresAt, lastUsedAt time.Time
 	var status string
-	err = c.DB.QueryRow(ctx, `SELECT a.token_epoch,a.status,s.expires_at,s.last_used_at FROM iam.session s JOIN iam.account a ON a.id=s.account_id WHERE s.public_id=$1 AND a.public_id=$2 AND s.revoked_at IS NULL`, sessionID, accountID).Scan(&epoch, &status, &expiresAt, &lastUsedAt)
+	err = c.DB.QueryRow(ctx, `
+		SELECT COALESCE(a.token_epoch,0),COALESCE(a.status,u.status),s.expires_at,s.last_used_at
+		FROM iam.session s
+		LEFT JOIN iam.account a ON a.id=s.account_id
+		LEFT JOIN iam.admin_user u ON u.id=s.admin_user_id
+		WHERE s.public_id=$1 AND COALESCE(a.public_id,u.public_id)=$2 AND s.revoked_at IS NULL`, sessionID, accountID).Scan(&epoch, &status, &expiresAt, &lastUsedAt)
 	if errors.Is(err, pgx.ErrNoRows) || err == nil && (status != "active" || !now.Before(expiresAt) || !now.Before(lastUsedAt.Add(idleTTL))) {
 		return false, nil
 	}

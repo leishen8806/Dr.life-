@@ -115,6 +115,26 @@ func TestIAMMigration(t *testing.T) {
 		}
 	})
 
+	t.Run("admin sessions are active through the shared session checker", func(t *testing.T) {
+		const adminID = "01ARZ3NDEKTSV4RRFFQ69G5FB3"
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ($1,'Active Admin Session','active-admin-session@example.test','argon2-hash','finance','active')`, adminID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.session (public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB4',(SELECT id FROM iam.admin_user WHERE public_id=$1),'01ARZ3NDEKTSV4RRFFQ69G5FB4',decode('01','hex'),'test-kid',now()+interval '1 hour',now())`, adminID); err != nil {
+			t.Fatal(err)
+		}
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pool.Close()
+		checker := iam.DBSessionChecker{DB: pool, Cache: &sessionCacheMiss{}}
+		active, err := checker.Active(ctx, adminID, "01ARZ3NDEKTSV4RRFFQ69G5FB4")
+		if err != nil || !active {
+			t.Fatalf("admin session active=%v err=%v, want true nil", active, err)
+		}
+	})
+
 	t.Run("admin permission checker reads the seeded matrix and data scope", func(t *testing.T) {
 		pool, err := pgxpool.New(ctx, dsn)
 		if err != nil {
@@ -699,4 +719,17 @@ func migrationDirectory(t *testing.T) string {
 		t.Fatal("cannot locate migration directory")
 	}
 	return filepath.Join(filepath.Dir(file), "..", "..", "migrations")
+}
+
+type sessionCacheMiss struct{}
+
+func (*sessionCacheMiss) Get(context.Context, string, string) (bool, bool, error) {
+	return false, false, nil
+}
+func (*sessionCacheMiss) Put(context.Context, string, string, int64, time.Duration) error {
+	return nil
+}
+func (*sessionCacheMiss) Revoke(context.Context, string, time.Duration) error { return nil }
+func (*sessionCacheMiss) SetAccountEpoch(context.Context, string, int64, time.Duration) error {
+	return nil
 }
