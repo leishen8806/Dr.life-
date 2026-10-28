@@ -149,6 +149,32 @@ func TestAccessTokenTypeAudienceIssuerAndLegacyWindow(t *testing.T) {
 	}
 }
 
+func TestAdminAccessTokenHasAdminAudienceAndTenMinuteLifetime(t *testing.T) {
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+	ring, _ := secrets.NewKeyring(map[string][]byte{"active": key}, "active")
+	now := time.Unix(1_800_000_000, 0)
+	manager := TokenManager{Keys: ring, AccessTTL: 10 * time.Minute, Issuer: "drlife", Now: func() time.Time { return now }}
+	raw, err := manager.IssueAccess(context.Background(), "admin-user", "admin", "admin-session")
+	if err != nil {
+		t.Fatalf("issue admin access token: %v", err)
+	}
+	parsed, _, err := jwt.NewParser().ParseUnverified(raw, new(AccessClaims))
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims := parsed.Claims.(*AccessClaims)
+	if len(claims.Audience) != 1 || claims.Audience[0] != "drlife:admin" || claims.ExpiresAt.Time.Sub(now) != 10*time.Minute {
+		t.Fatalf("admin claims=%+v", claims.RegisteredClaims)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v1/admin/ledger/txns", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
+	identity, ok, err := (Authenticator{Tokens: manager}).Authenticate(req)
+	if err != nil || !ok || identity.Role != gateway.RoleAdmin || identity.AccountID != "admin-user" {
+		t.Fatalf("admin auth=%+v ok=%v err=%v", identity, ok, err)
+	}
+}
+
 func TestWrongAudienceIsUnauthenticatedBeforeRoleAuthorization(t *testing.T) {
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)

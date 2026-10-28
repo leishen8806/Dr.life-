@@ -248,7 +248,7 @@ func ordinaryRead(r *http.Request) bool {
 }
 
 func validRole(role string) bool {
-	return role == string(gateway.RoleBuyer) || role == string(gateway.RoleMerchant) || role == string(gateway.RoleDriver)
+	return role == string(gateway.RoleBuyer) || role == string(gateway.RoleMerchant) || role == string(gateway.RoleDriver) || role == string(gateway.RoleAdmin) || role == string(gateway.RoleWMS)
 }
 
 func wipe(value []byte) {
