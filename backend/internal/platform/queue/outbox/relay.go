@@ -69,8 +69,19 @@ type workerRegistrar interface {
 }
 
 func RegisterLedgerHandlers(worker workerRegistrar, logger *slog.Logger) error {
+	return RegisterLedgerHandlersWithAlerts(worker, logger, nil)
+}
+
+// RegisterLedgerHandlersWithAlerts leaves all non-reconciliation events at the
+// existing log-only landing handler. A nil alerts handler deliberately degrades
+// reconciliation alerts without preventing the worker from starting.
+func RegisterLedgerHandlersWithAlerts(worker workerRegistrar, logger *slog.Logger, alerts queue.Handler) error {
 	for taskType, topic := range map[string]string{TaskLedgerInfo: "ledger.info", TaskReconFailed: "ledger.recon.failed", TaskReconStale: "ledger.recon.stale_run"} {
-		if err := worker.Register(taskType, landingHandler(logger, topic)); err != nil {
+		handler := landingHandler(logger, topic)
+		if alerts != nil && (taskType == TaskReconFailed || taskType == TaskReconStale) {
+			handler = alerts
+		}
+		if err := worker.Register(taskType, handler); err != nil {
 			return err
 		}
 	}
@@ -122,9 +133,7 @@ func (r *Relay) RunOnce(ctx context.Context) (int, error) {
 	}
 	for _, event := range events {
 		taskType, options := r.route(event.Topic)
-		payload, err := json.Marshal(struct {
-			OutboxID int64 `json:"outbox_id"`
-		}{OutboxID: event.ID})
+		payload, err := relayPayload(event)
 		if err == nil {
 			_, err = r.client.EnqueueContext(ctx, asynq.NewTask(taskType, payload), append(options, asynq.TaskID("outbox:"+strconv.FormatInt(event.ID, 10)))...)
 		}
@@ -137,6 +146,27 @@ func (r *Relay) RunOnce(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	return len(events), nil
+}
+
+func relayPayload(event ledger.OutboxEvent) ([]byte, error) {
+	payload := struct {
+		OutboxID int64 `json:"outbox_id"`
+		Alert    any   `json:"alert,omitempty"`
+	}{OutboxID: event.ID}
+	if event.Topic == "ledger.recon.failed" || event.Topic == "ledger.recon.stale_run" {
+		var source struct {
+			RunID  int64          `json:"run_id"`
+			Day    string         `json:"day"`
+			Counts map[string]int `json:"counts"`
+		}
+		if err := json.Unmarshal(event.Payload, &source); err != nil {
+			return nil, fmt.Errorf("invalid reconciliation outbox payload: %w", err)
+		}
+		// Deliberately exclude account IDs, transaction IDs, amounts and timestamps
+		// before the payload reaches queue Redis.
+		payload.Alert = source
+	}
+	return json.Marshal(payload)
 }
 
 func (r *Relay) route(topic string) (string, []asynq.Option) {

@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,10 +18,12 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/leishen8806/Dr.life-/backend/internal/comms/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue/outbox"
 	"github.com/pressly/goose/v3"
+	"github.com/redis/go-redis/v9"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	tcredis "github.com/testcontainers/testcontainers-go/modules/redis"
@@ -31,8 +37,11 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	redisURL := newRelayRedis(t, ctx)
 
 	var ids [2]int64
-	for i, topic := range []string{"ledger.recon.failed", "ledger.recon.stale_run"} {
-		if err := database.QueryRow(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES($1,'{}'::jsonb) RETURNING id`, topic).Scan(&ids[i]); err != nil {
+	for i, event := range []struct{ topic, payload string }{
+		{"ledger.recon.failed", `{"run_id":7,"day":"2026-10-27","counts":{"BALANCE_CACHE":2},"account_ids":[9988],"amount":12345}`},
+		{"ledger.recon.stale_run", `{"run_id":8,"day":"2026-10-27","account_ids":[9989]}`},
+	} {
+		if err := database.QueryRow(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES($1,$2::jsonb) RETURNING id`, event.topic, event.payload).Scan(&ids[i]); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -61,7 +70,19 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := outbox.RegisterLedgerHandlers(worker, logger); err != nil {
+	telegramServer, messages := relayTelegramServer(t)
+	defer telegramServer.Close()
+	alertRedisOptions, err := redis.ParseURL(redisURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alertRedis := redis.NewClient(alertRedisOptions)
+	defer alertRedis.Close()
+	alerts := outbox.NewReconciliationAlertHandler(outbox.ReconciliationAlertOptions{
+		Sender: telegram.NewHTTPSender(telegramServer.URL, telegram.StaticTokenProvider{"ops": "test-token"}, telegram.SenderOptions{}),
+		BotID:  "ops", ChatID: -1001, Environment: "test", MergeWindow: time.Nanosecond, Logger: logger, Deduper: outbox.NewRedisAlertDeduper(alertRedis),
+	})
+	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, logger, alerts); err != nil {
 		t.Fatal(err)
 	}
 	workerCtx, stop := context.WithCancel(ctx)
@@ -94,15 +115,44 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 		}
 		t.Logf("handler received topic=%s task_type=%s", delivery.topic, delivery.taskType)
 	}
-	if logsText := logs.String(); !bytes.Contains([]byte(logsText), []byte("ledger.recon.failed")) || !bytes.Contains([]byte(logsText), []byte("ledger.recon.stale_run")) {
-		t.Fatalf("handler logs missing reconciliation topics: %s", logsText)
-	}
 	var sent int
 	if err := database.QueryRow(ctx, `SELECT count(*) FROM ledger.outbox WHERE id=ANY($1) AND sent_at IS NOT NULL`, ids[:]).Scan(&sent); err != nil {
 		t.Fatal(err)
 	}
 	if sent != len(ids) {
 		t.Fatalf("sent rows=%d, want %d", sent, len(ids))
+	}
+	if got := messages(); len(got) != 2 {
+		t.Fatalf("Telegram messages=%d, want 2: %v", len(got), got)
+	} else if strings.Contains(strings.Join(got, " "), "9988") || strings.Contains(strings.Join(got, " "), "12345") {
+		t.Fatalf("Telegram alert leaked queue-sensitive payload: %v", got)
+	}
+}
+
+func relayTelegramServer(t *testing.T) (*httptest.Server, func() []string) {
+	t.Helper()
+	var mu sync.Mutex
+	var messages []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		var body struct {
+			Text string `json:"text"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode Telegram request: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		mu.Lock()
+		messages = append(messages, body.Text)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	return server, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), messages...)
 	}
 }
 
