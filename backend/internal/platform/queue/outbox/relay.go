@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -231,6 +232,9 @@ func isRetryableDatabaseError(err error) bool {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
+	if pgconn.SafeToRetry(err) {
+		return true
+	}
 	if errors.Is(err, pgconn.ErrConnClosed) {
 		return true
 	}
@@ -240,7 +244,7 @@ func isRetryableDatabaseError(err error) bool {
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
-		return pgErr.Code == "40001" || pgErr.Code == "40P01"
+		return strings.HasPrefix(pgErr.Code, "08") || strings.HasPrefix(pgErr.Code, "57P0") || pgErr.Code == "40001" || pgErr.Code == "40P01"
 	}
 	var networkErr net.Error
 	return errors.As(err, &networkErr) && (networkErr.Timeout() || networkErr.Temporary())
