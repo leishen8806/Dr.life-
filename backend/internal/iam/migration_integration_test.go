@@ -247,6 +247,16 @@ func TestIAMMigration(t *testing.T) {
 		}
 	})
 
+	t.Run("administrators default to no forced password change", func(t *testing.T) {
+		var nullable, defaultExpr string
+		if err := admin.QueryRow(ctx, `SELECT is_nullable,column_default FROM information_schema.columns WHERE table_schema='iam' AND table_name='admin_user' AND column_name='password_change_required'`).Scan(&nullable, &defaultExpr); err != nil {
+			t.Fatal(err)
+		}
+		if nullable != "NO" || defaultExpr != "false" {
+			t.Fatalf("password_change_required nullable=%q default=%q", nullable, defaultExpr)
+		}
+	})
+
 	t.Run("merchant staff and role permission constraints", func(t *testing.T) {
 		insertStaff(t, ctx, admin, "01ARZ3NDEKTSV4RRFFQ69G5FAC", "invite-1", "\\x1111")
 		assertSQLState(t, ctx, admin, "23505", `INSERT INTO iam.merchant_staff (public_id,merchant_id,name,phone_enc,phone_hash,role,status,invite_code) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FAD',id,'B','\x02','\x1111','sales','invited','invite-2' FROM iam.merchant WHERE public_id='`+merchantPublicID+`'`)
