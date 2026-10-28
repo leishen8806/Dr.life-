@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 )
 
@@ -25,15 +26,21 @@ type AdminStepUpService struct {
 	Tokens      TokenManager
 	Cipher      TOTPSecretCipher
 	Permissions AdminPermissionStore
+	Audit       platformaudit.Writer
 	Now         func() time.Time
 
 	mu   sync.Mutex
 	used map[string]time.Time
 }
 
-func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, code, scope, ip, _ string) (AdminStepUpResult, error) {
+func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, code, scope, ip, requestID string) (AdminStepUpResult, error) {
 	module, allowed := adminStepUpScopes[scope]
 	if s == nil || s.DB == nil || s.Cipher == nil || !allowed {
+		var id int64
+		if s != nil && s.DB != nil && adminPublicID != "" {
+			_ = s.DB.QueryRow(ctx, `SELECT id FROM iam.admin_user WHERE public_id=$1`, adminPublicID).Scan(&id)
+			s.appendAudit(ctx, id, adminPublicID, scope, "failed", ip, requestID)
+		}
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeInvalidArgument)
 	}
 	if adminPublicID == "" || net.ParseIP(ip) == nil {
@@ -44,11 +51,13 @@ func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, code, sco
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 	if !can {
+		s.appendAudit(ctx, 0, adminPublicID, scope, "denied", ip, requestID)
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodePermissionDenied)
 	}
+	var id int64
 	var secretEnc []byte
 	var status AdminStatus
-	err = s.DB.QueryRow(ctx, `SELECT totp_secret_enc,status FROM iam.admin_user WHERE public_id=$1`, adminPublicID).Scan(&secretEnc, &status)
+	err = s.DB.QueryRow(ctx, `SELECT id,totp_secret_enc,status FROM iam.admin_user WHERE public_id=$1`, adminPublicID).Scan(&id, &secretEnc, &status)
 	if err != nil || status != AdminStatusActive {
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
@@ -62,13 +71,29 @@ func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, code, sco
 		now = s.Now()
 	}
 	if !ValidateTOTP(string(secret), code, now) || !s.consume(adminPublicID, code, now) {
+		s.appendAudit(ctx, id, adminPublicID, scope, "failed", ip, requestID)
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
 	token, expiresAt, err := s.Tokens.IssueStepUp(ctx, adminPublicID, scope)
 	if err != nil {
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
+	s.appendAudit(ctx, id, adminPublicID, scope, "ok", ip, requestID)
 	return AdminStepUpResult{Token: token, Scope: scope, ExpiresAt: expiresAt}, nil
+}
+
+func (s *AdminStepUpService) appendAudit(ctx context.Context, id int64, publicID, scope, result, ip, requestID string) {
+	if s == nil || s.Audit == nil || id <= 0 || publicID == "" || requestID == "" {
+		return
+	}
+	_, _ = s.Audit.Append(ctx, platformaudit.Entry{Time: s.now(), ActorID: id, ActorRole: "admin", Action: platformaudit.ActionStepUp, Target: "admin:" + publicID, Detail: []byte(`{"result":"` + result + `","scope":"` + scope + `"}`), IP: ip, RequestID: requestID})
+}
+
+func (s *AdminStepUpService) now() time.Time {
+	if s.Now != nil {
+		return s.Now()
+	}
+	return time.Now()
 }
 
 func (s *AdminStepUpService) consume(adminPublicID, code string, now time.Time) bool {

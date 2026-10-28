@@ -29,11 +29,11 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
-	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 )
 
 type loginFixture struct {
