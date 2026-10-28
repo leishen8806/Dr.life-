@@ -231,7 +231,8 @@ func (f *loginFixture) testAdminStepUp(t *testing.T) {
 		t.Fatal(err)
 	}
 	audit := &stepUpAuditWriter{}
-	service := &AdminStepUpService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, Permissions: AdminPermissionStore{DB: f.pool}, Audit: audit, Now: func() time.Time { return f.now }}
+	guard := &AdminFailureGuard{}
+	service := &AdminStepUpService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, Permissions: AdminPermissionStore{DB: f.pool}, Audit: audit, Failures: guard, Now: func() time.Time { return f.now }}
 	result, err := service.Issue(ctx, adminID, code, "withdrawal_review", "198.51.100.5", "step-up-test")
 	if err != nil || result.Token == "" || result.Scope != "withdrawal_review" {
 		t.Fatalf("result=%+v err=%v", result, err)
@@ -244,6 +245,12 @@ func (f *loginFixture) testAdminStepUp(t *testing.T) {
 	}
 	if len(audit.entries) != 3 || string(audit.entries[0].Detail) != `{"result":"ok","scope":"withdrawal_review"}` || string(audit.entries[0].Detail) == code || audit.entries[0].Action != platformaudit.ActionStepUp {
 		t.Fatalf("unexpected audit entries: %#v", audit.entries)
+	}
+	for i := 0; i < adminLoginFailureLimit; i++ {
+		_, _ = service.Issue(ctx, adminID, "000000", "withdrawal_review", "198.51.100.5", "step-up-limit")
+	}
+	if !guard.locked("step-up-admin@example.test\x00198.51.100.5", f.now) {
+		t.Fatal("step-up failures did not use the administrator login limiter")
 	}
 }
 
