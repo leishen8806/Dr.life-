@@ -7,10 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/opsalert"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
@@ -35,8 +38,11 @@ type Route struct {
 }
 
 type Options struct {
-	BatchSize int
-	Routes    map[string]Route
+	BatchSize         int
+	Routes            map[string]Route
+	RetryInitialDelay time.Duration
+	RetryMaxDelay     time.Duration
+	OnRetry           func(error)
 }
 
 // LedgerRoutes maps every ledger-published topic to its minimal landing task.
@@ -120,6 +126,12 @@ func New(ledger ledgerOutbox, client queue.Client, options Options) (*Relay, err
 	if options.BatchSize <= 0 {
 		options.BatchSize = DefaultBatchSize
 	}
+	if options.RetryInitialDelay <= 0 {
+		options.RetryInitialDelay = 100 * time.Millisecond
+	}
+	if options.RetryMaxDelay < options.RetryInitialDelay {
+		options.RetryMaxDelay = 2 * time.Second
+	}
 	return &Relay{ledger: ledger, client: client, options: options}, nil
 }
 
@@ -180,25 +192,83 @@ func (r *Relay) route(topic string) (string, []asynq.Option) {
 	return unknownTaskType, []asynq.Option{asynq.Queue(queue.QueueDefault), asynq.MaxRetry(0)}
 }
 
-// Run polls continuously, using bounded idle backoff while the outbox is empty.
+// Run polls continuously, using bounded idle and retry backoff. Transient
+// database failures keep the worker alive; invalid database configuration is
+// returned to the process supervisor as a fatal error.
 func (r *Relay) Run(ctx context.Context) error {
-	delay := 10 * time.Millisecond
+	idleDelay := 10 * time.Millisecond
+	retryDelay := r.options.RetryInitialDelay
 	for {
 		count, err := r.RunOnce(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if isRetryableDatabaseError(err) {
+				if r.options.OnRetry != nil {
+					r.options.OnRetry(err)
+				}
+				if !wait(ctx, retryDelay) {
+					return ctx.Err()
+				}
+				retryDelay = nextBackoff(retryDelay, r.options.RetryMaxDelay)
+				continue
+			}
 			return err
 		}
+		retryDelay = r.options.RetryInitialDelay
 		if count > 0 {
-			delay = 10 * time.Millisecond
+			idleDelay = 10 * time.Millisecond
 			continue
 		}
-		select {
-		case <-ctx.Done():
+		if !wait(ctx, idleDelay) {
 			return ctx.Err()
-		case <-time.After(delay):
-			if delay < 2*time.Second {
-				delay *= 2
-			}
 		}
+		idleDelay = nextBackoff(idleDelay, 2*time.Second)
 	}
+}
+
+func isRetryableDatabaseError(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	// ConnectError can wrap a PgError returned during authentication or startup.
+	// Inspect its SQLSTATE before treating a connection-stage failure as transient.
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return strings.HasPrefix(pgErr.Code, "08") || pgErr.Code == "57P01" || pgErr.Code == "57P02" || pgErr.Code == "57P03" || pgErr.Code == "40001" || pgErr.Code == "40P01"
+	}
+	if pgconn.SafeToRetry(err) {
+		return true
+	}
+	if errors.Is(err, pgconn.ErrConnClosed) {
+		return true
+	}
+	var connectErr *pgconn.ConnectError
+	if errors.As(err, &connectErr) {
+		return true
+	}
+	var networkErr net.Error
+	return errors.As(err, &networkErr) && (networkErr.Timeout() || networkErr.Temporary())
+}
+
+func wait(ctx context.Context, delay time.Duration) bool {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+func nextBackoff(delay, max time.Duration) time.Duration {
+	if delay >= max {
+		return max
+	}
+	if delay > max/2 {
+		return max
+	}
+	return delay * 2
 }
