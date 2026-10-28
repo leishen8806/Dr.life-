@@ -192,7 +192,7 @@
   |---|---|---|
   | 应用服务器 | 2 | Go 服务（网关与所有业务模块）、静态前端；两台同时服务，一台故障不中断 |
   | PostgreSQL | 2（主 + 从） | 主库写，从库实时复制并可只读查询（报表）；主库故障时手动或半自动切换；**WAL 连续归档到异地**，满足 RPO ≤ 15 分钟 |
-  | Redis | 1 台 / **3 个实例**：`redis-cache`（仅公开缓存；`CACHE_REDIS_URL`；`allkeys-lru` + 内存上限）、`redis-state`（会话撤销、step-up、限流、幂等；`REDIS_URL`；`noeviction` + AOF everysec）与 `redis-queue`（仅 asynq；`QUEUE_REDIS_URL`；`noeviction` + AOF everysec + 内存上限） | 公共缓存可淘汰，身份与资金安全控制和队列绝不淘汰键；三个用途不共用实例。公共缓存未配置时禁用，不能静默使用 `REDIS_URL`；账务仍以数据库为准，队列靠发件箱恢复；详见《API 安全协议、容量保护与队列设计》第六章 |
+  | Redis | 1 台 / **3 个实例**：`redis-cache`（仅公开缓存；`CACHE_REDIS_URL`；`allkeys-lru` + 内存上限）、`redis-state`（会话撤销、step-up、限流、幂等；`REDIS_URL`；`noeviction` + AOF everysec）与 `redis-queue`（仅 asynq；`QUEUE_REDIS_URL`；`noeviction` + AOF everysec + 内存上限） | 公共缓存可淘汰，身份与资金安全控制和队列绝不淘汰键；三个用途不共用实例。公共缓存未配置时禁用，且配置拒绝与状态或队列同 host、port、DB；启动对有内存上限的 `REDIS_URL` 强制 `noeviction`。账务仍以数据库为准，队列靠发件箱恢复；详见《API 安全协议、容量保护与队列设计》第六章 |
   | AI（Ollama） | 1（局域网，带 GPU） | 与应用服务器同一内网，**不需要 VPN**，只允许应用服务器访问 |
   | 备份与监控 | 1 | 数据库备份、监控（Grafana/Prometheus/Loki）、日志；备份再加密同步到异地对象存储 |
 - **网络：** **Cloudflare 放在最前面**（域名、CDN、WAF、限流、证书）；服务器通过 **Cloudflare Tunnel 对外**，机柜防火墙**不开放入站端口**；运维人员只能通过 **WireGuard VPN** 登录服务器；内网分区：应用区 / 数据区 / AI 区，数据区只允许应用区访问。

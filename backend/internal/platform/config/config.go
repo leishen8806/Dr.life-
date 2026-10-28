@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type Config struct {
@@ -458,6 +460,12 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 			return Config{}, fmt.Errorf("QUEUE_ALLOW_EVICTION must be true or false")
 		}
 	}
+	cacheRedisURL := strings.TrimSpace(getenv("CACHE_REDIS_URL"))
+	redisURL := strings.TrimSpace(getenv("REDIS_URL"))
+	queueRedisURL := strings.TrimSpace(getenv("QUEUE_REDIS_URL"))
+	if err := validateDedicatedCacheRedisURLs(cacheRedisURL, redisURL, queueRedisURL); err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		HTTPAddr:               httpAddr,
@@ -481,13 +489,13 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		DBAcquireTimeout:       time.Duration(dbAcquireMilliseconds) * time.Millisecond,
 		DBSlowQuery:            time.Duration(dbSlowQueryMS) * time.Millisecond,
 		SentryDSN:              strings.TrimSpace(getenv("SENTRY_DSN")),
-		RedisURL:               strings.TrimSpace(getenv("REDIS_URL")),
-		CacheRedisURL:          strings.TrimSpace(getenv("CACHE_REDIS_URL")),
+		RedisURL:               redisURL,
+		CacheRedisURL:          cacheRedisURL,
 		CacheStaleTTL:          time.Duration(cacheStaleSeconds) * time.Second,
 		CacheNegativeTTL:       time.Duration(cacheNegativeSeconds) * time.Second,
 		CacheRefreshTimeout:    cacheRefreshTimeout,
 		CacheMaxEntries:        cacheMaxEntries,
-		QueueRedisURL:          strings.TrimSpace(getenv("QUEUE_REDIS_URL")),
+		QueueRedisURL:          queueRedisURL,
 		QueueAllowEviction:     queueAllowEviction,
 		CORSBuyerOrigins:       cors["CORS_BUYER_ORIGINS"],
 		CORSMerchantOrigins:    cors["CORS_MERCHANT_ORIGINS"],
@@ -534,6 +542,32 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		JWTActiveKeyID:         jwtActiveKeyID,
 		JWTSigningConfigured:   jwtConfigured,
 	}, nil
+}
+
+func validateDedicatedCacheRedisURLs(cacheURL, stateURL, queueURL string) error {
+	if cacheURL == "" {
+		return nil
+	}
+	cacheOptions, err := redis.ParseURL(cacheURL)
+	if err != nil {
+		return fmt.Errorf("CACHE_REDIS_URL must be a valid Redis URL")
+	}
+	for _, candidate := range []struct {
+		name string
+		url  string
+	}{{"REDIS_URL", stateURL}, {"QUEUE_REDIS_URL", queueURL}} {
+		if candidate.url == "" {
+			continue
+		}
+		options, parseErr := redis.ParseURL(candidate.url)
+		if parseErr != nil {
+			return fmt.Errorf("%s must be a valid Redis URL", candidate.name)
+		}
+		if strings.EqualFold(cacheOptions.Addr, options.Addr) && cacheOptions.DB == options.DB {
+			return fmt.Errorf("CACHE_REDIS_URL must not use the same Redis instance as %s", candidate.name)
+		}
+	}
+	return nil
 }
 
 func routeClasses(raw string) (map[string]string, error) {

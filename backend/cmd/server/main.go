@@ -41,6 +41,12 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	metrics := observability.NewMetrics()
+	if cfg.RedisURL != "" {
+		if redisErr := cache.StateRedisPolicy(ctx, cfg.RedisURL); redisErr != nil {
+			logger.Error("state Redis policy failed", "error", redisErr)
+			os.Exit(1)
+		}
+	}
 	if cfg.CacheRedisURL != "" {
 		if cacheErr := cache.RedisPolicy(ctx, cfg.CacheRedisURL); cacheErr != nil {
 			logger.Error("public cache Redis policy failed", "error", cacheErr)

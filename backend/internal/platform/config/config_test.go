@@ -63,6 +63,28 @@ func TestCacheRedisURLNeverFallsBackToStateRedis(t *testing.T) {
 	}
 }
 
+func TestCacheRedisURLMustUseADifferentInstance(t *testing.T) {
+	for name, values := range map[string]map[string]string{
+		"same state instance": {
+			"APP_ENV": "test", "REDIS_URL": "redis://shared.example:6379/0", "CACHE_REDIS_URL": "redis://shared.example:6379/0",
+		},
+		"same queue instance": {
+			"APP_ENV": "test", "QUEUE_REDIS_URL": "redis://shared.example:6379/0", "CACHE_REDIS_URL": "redis://shared.example:6379/0",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := load(lookup(values)); err == nil {
+				t.Fatal("shared public cache Redis instance was accepted")
+			}
+		})
+	}
+	if _, err := load(lookup(map[string]string{
+		"APP_ENV": "test", "REDIS_URL": "redis://shared.example:6379/0", "CACHE_REDIS_URL": "redis://shared.example:6379/1",
+	})); err != nil {
+		t.Fatalf("separate Redis database should be accepted: %v", err)
+	}
+}
+
 func TestLoadBrownoutConfiguration(t *testing.T) {
 	cfg, err := load(lookup(map[string]string{
 		"APP_ENV": "test", "BROWNOUT_ESCALATE_AFTER_SECONDS": "3", "BROWNOUT_RECOVER_AFTER_SECONDS": "90",

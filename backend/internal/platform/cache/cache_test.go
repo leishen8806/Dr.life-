@@ -391,3 +391,51 @@ func TestRedisPolicyWithContainer(t *testing.T) {
 		t.Fatalf("unbounded cache policy error = %v, want ErrRedisEviction", err)
 	}
 }
+
+func TestStateRedisPolicyWithContainer(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	container, err := testcontainers.Run(ctx, "redis:7-alpine", testcontainers.WithExposedPorts("6379/tcp"), testcontainers.WithWaitStrategy(wait.ForListeningPort("6379/tcp")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = testcontainers.TerminateContainer(container) })
+	host, err := container.Host(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := container.MappedPort(ctx, "6379/tcp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawURL := "redis://" + host + ":" + port.Port() + "/0"
+	store, err := NewRedisStore(rawURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.client.ConfigSet(ctx, "maxmemory", "1048576").Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.client.ConfigSet(ctx, "maxmemory-policy", "allkeys-lru").Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := StateRedisPolicy(ctx, rawURL); !errors.Is(err, ErrRedisEviction) {
+		t.Fatalf("allkeys-lru state policy error = %v, want ErrRedisEviction", err)
+	}
+	if err := store.client.ConfigSet(ctx, "maxmemory-policy", "noeviction").Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := StateRedisPolicy(ctx, rawURL); err != nil {
+		t.Fatalf("noeviction state policy error = %v", err)
+	}
+	if err := store.client.ConfigSet(ctx, "maxmemory", "0").Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.client.ConfigSet(ctx, "maxmemory-policy", "allkeys-lru").Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := StateRedisPolicy(ctx, rawURL); err != nil {
+		t.Fatalf("unbounded state policy error = %v", err)
+	}
+}

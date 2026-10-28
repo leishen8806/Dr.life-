@@ -163,8 +163,8 @@ Cloudflare（WAF、机器人防护、边缘限流、缓存公开 GET）
 ### 6.1 前提：Redis 按公共缓存、状态安全、队列分三个实例
 asynq、会话撤销、step-up、限流和幂等都不能容忍键被淘汰，使用 `maxmemory-policy noeviction`；公开缓存则需要有界的 `allkeys-lru`。**三种用途不能共用一个 Redis 实例**。
 **方案（默认）：** 同一台机器上起**三个 Redis 进程**：
-- `redis-cache`（仅公开缓存；`CACHE_REDIS_URL`；`allkeys-lru` + 内存上限；只接受 catalog/config/i18n 公共键；未配置时缓存层禁用，绝不回退到 `REDIS_URL`）；
-- `redis-state`（会话撤销、step-up、限流、幂等；既有 `REDIS_URL`；`noeviction` + AOF `everysec`；资金与后台路由依赖它时继续 fail-closed）；
+- `redis-cache`（仅公开缓存；`CACHE_REDIS_URL`；`allkeys-lru` + 内存上限；只接受 catalog/config/i18n 公共键；未配置时缓存层禁用，绝不回退到 `REDIS_URL`；配置拒绝与 `REDIS_URL` 或 `QUEUE_REDIS_URL` 相同 host、port、DB）；
+- `redis-state`（会话撤销、step-up、限流、幂等；既有 `REDIS_URL`；`noeviction` + AOF `everysec`；启动读取 `maxmemory` 与 `maxmemory-policy`，有内存上限但非 `noeviction` 立即失败；资金与后台路由依赖它时继续 fail-closed）；
 - `redis-queue`（仅 asynq；既有 `QUEUE_REDIS_URL`；`noeviction` + AOF `everysec`；设内存上限并告警 70%）。
 《技术架构》机柜清单为"Redis 1 台 / 3 个实例"；规模变大再拆物理机。
 

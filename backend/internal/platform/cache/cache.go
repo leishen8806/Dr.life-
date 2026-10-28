@@ -462,6 +462,37 @@ func RedisPolicy(ctx context.Context, rawURL string) error {
 	return nil
 }
 
+// StateRedisPolicy protects session, step-up, rate-limit, and idempotency
+// keys. A bounded state Redis must never evict keys. An unbounded instance has
+// no Redis eviction path and is accepted to retain the existing contract.
+func StateRedisPolicy(ctx context.Context, rawURL string) error {
+	options, err := redis.ParseURL(rawURL)
+	if err != nil {
+		return errors.New("invalid state Redis URL")
+	}
+	client := redis.NewClient(options)
+	defer client.Close()
+	maxmemory, err := client.ConfigGet(ctx, "maxmemory").Result()
+	if err != nil {
+		return fmt.Errorf("read state Redis maxmemory: %w", err)
+	}
+	limit, err := strconv.ParseInt(maxmemory["maxmemory"], 10, 64)
+	if err != nil {
+		return fmt.Errorf("parse state Redis maxmemory: %w", err)
+	}
+	if limit == 0 {
+		return nil
+	}
+	policy, err := client.ConfigGet(ctx, "maxmemory-policy").Result()
+	if err != nil {
+		return fmt.Errorf("read state Redis maxmemory-policy: %w", err)
+	}
+	if policy["maxmemory-policy"] != "noeviction" {
+		return ErrRedisEviction
+	}
+	return nil
+}
+
 func (s *RedisStore) Get(ctx context.Context, key string) (Entry, bool, error) {
 	value, err := s.client.Get(ctx, key).Bytes()
 	if errors.Is(err, redis.Nil) {
