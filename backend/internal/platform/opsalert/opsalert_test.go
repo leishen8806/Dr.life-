@@ -82,6 +82,26 @@ func TestFlushDoesNotDiscardAlertAddedDuringSend(t *testing.T) {
 	}
 }
 
+func TestAlertReschedulesUnmarkedMergeGroup(t *testing.T) {
+	merger := &memoryMerger{groups: make(map[string]mergedPayload)}
+	p := payload{OutboxID: 81}
+	if leader, err := merger.Add(context.Background(), "ledger:recon_failed:v1", p); err != nil || !leader {
+		t.Fatalf("seed Add leader=%v err=%v", leader, err)
+	}
+	scheduler := &testScheduler{}
+	handlers := NewReconciliationHandlers(Options{Merger: merger, Scheduler: scheduler, MergeWindow: time.Minute})
+	task := asynq.NewTask("ledger:recon_failed:v1", []byte(`{"outbox_id":82,"alert":{"run_id":7,"day":"2026-10-27"}}`))
+	if err := handlers.Alert(context.Background(), task); err != nil {
+		t.Fatal(err)
+	}
+	if got := scheduler.Count(); got != 1 {
+		t.Fatalf("scheduled flushes=%d, want 1", got)
+	}
+	if leader, err := merger.Add(context.Background(), "ledger:recon_failed:v1", payload{OutboxID: 83}); err != nil || leader {
+		t.Fatalf("marked Add leader=%v err=%v, want false/nil", leader, err)
+	}
+}
+
 type testSender struct {
 	mu       sync.Mutex
 	messages []string
@@ -93,6 +113,24 @@ type blockingSender struct {
 	started chan struct{}
 	release chan struct{}
 	once    sync.Once
+}
+
+type testScheduler struct {
+	mu    sync.Mutex
+	tasks []*asynq.Task
+}
+
+func (s *testScheduler) EnqueueContext(_ context.Context, task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tasks = append(s.tasks, task)
+	return &asynq.TaskInfo{}, nil
+}
+
+func (s *testScheduler) Count() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.tasks)
 }
 
 func (s *blockingSender) SendMessage(ctx context.Context, botID string, chatID int64, text string, options telegram.SendOptions) telegram.Result {

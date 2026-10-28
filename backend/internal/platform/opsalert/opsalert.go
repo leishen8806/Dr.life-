@@ -33,6 +33,7 @@ type Scheduler interface {
 
 type Merger interface {
 	Add(context.Context, string, payload) (leader bool, error error)
+	MarkScheduled(context.Context, string) error
 	Take(context.Context, string) (mergedPayload, bool, error)
 	Restore(context.Context, string, mergedPayload) error
 	Discard(context.Context, string) error
@@ -71,8 +72,9 @@ type memoryDeduper struct {
 }
 
 type mergedPayload struct {
-	Payload payload
-	IDs     map[int64]struct{}
+	Payload   payload
+	IDs       map[int64]struct{}
+	Scheduled bool
 }
 
 type memoryMerger struct {
@@ -90,7 +92,19 @@ func (m *memoryMerger) Add(_ context.Context, topic string, p payload) (bool, er
 	}
 	group.IDs[p.OutboxID] = struct{}{}
 	m.groups[topic] = group
-	return false, nil
+	return !group.Scheduled, nil
+}
+
+func (m *memoryMerger) MarkScheduled(_ context.Context, topic string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	group, ok := m.groups[topic]
+	if !ok {
+		return nil
+	}
+	group.Scheduled = true
+	m.groups[topic] = group
+	return nil
 }
 
 func (m *memoryMerger) Take(_ context.Context, topic string) (mergedPayload, bool, error) {
@@ -106,12 +120,14 @@ func (m *memoryMerger) Restore(_ context.Context, topic string, restored mergedP
 	defer m.mu.Unlock()
 	current, ok := m.groups[topic]
 	if !ok {
+		restored.Scheduled = true
 		m.groups[topic] = restored
 		return nil
 	}
 	for id := range restored.IDs {
 		current.IDs[id] = struct{}{}
 	}
+	current.Scheduled = true
 	m.groups[topic] = current
 	return nil
 }
@@ -169,13 +185,21 @@ func (m redisMerger) Add(ctx context.Context, topic string, p payload) (bool, er
 	if err != nil {
 		return false, err
 	}
-	created, err := m.client.Eval(ctx, `
+	needsSchedule, err := m.client.Eval(ctx, `
 local created = redis.call('HSETNX', KEYS[1], 'payload', ARGV[2])
 redis.call('HSET', KEYS[1], 'id:' .. ARGV[1], '1')
 if created == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[3]) end
-return created
+return redis.call('HEXISTS', KEYS[1], 'scheduled') == 0 and 1 or 0
 `, []string{mergeKey(topic)}, p.OutboxID, encoded, int64((24 * time.Hour).Milliseconds())).Int()
-	return created == 1, err
+	return needsSchedule == 1, err
+}
+
+func (m redisMerger) MarkScheduled(ctx context.Context, topic string) error {
+	_, err := m.client.Eval(ctx, `
+if redis.call('EXISTS', KEYS[1]) == 1 then redis.call('HSET', KEYS[1], 'scheduled', '1') end
+return 1
+`, []string{mergeKey(topic)}).Result()
+	return err
 }
 
 func (m redisMerger) Take(ctx context.Context, topic string) (mergedPayload, bool, error) {
@@ -221,6 +245,7 @@ func (m redisMerger) Restore(ctx context.Context, topic string, restored mergedP
 	_, err = m.client.Eval(ctx, `
 redis.call('HSETNX', KEYS[1], 'payload', ARGV[1])
 for i = 2, #ARGV - 1 do redis.call('HSET', KEYS[1], 'id:' .. ARGV[i], '1') end
+redis.call('HSET', KEYS[1], 'scheduled', '1')
 redis.call('PEXPIRE', KEYS[1], ARGV[#ARGV])
 return 1
 `, []string{mergeKey(topic)}, append([]interface{}{encoded}, append(int64SliceToInterfaces(ids), int64((24*time.Hour).Milliseconds()))...)...).Result()
@@ -287,22 +312,31 @@ func (h *handler) handle(ctx context.Context, task *asynq.Task) error {
 	if seen {
 		return nil
 	}
-	leader, err := h.merger.Add(ctx, task.Type(), p)
+	needsSchedule, err := h.merger.Add(ctx, task.Type(), p)
 	if err != nil {
 		return errors.New("operations alert merge unavailable")
 	}
-	if !leader {
+	if !needsSchedule {
 		return nil
 	}
+	return h.schedule(ctx, task.Type())
+}
+
+func (h *handler) schedule(ctx context.Context, topic string) error {
 	if h.options.Scheduler != nil {
-		_, err = h.options.Scheduler.EnqueueContext(ctx, asynq.NewTask(TaskFlush, []byte(`{"topic":"`+task.Type()+`"}`)), asynq.Queue("critical"), asynq.ProcessIn(h.options.MergeWindow), asynq.MaxRetry(3))
+		_, err := h.options.Scheduler.EnqueueContext(ctx, asynq.NewTask(TaskFlush, []byte(`{"topic":"`+topic+`"}`)), asynq.Queue("critical"), asynq.ProcessIn(h.options.MergeWindow), asynq.MaxRetry(3))
 		if err != nil {
-			_ = h.merger.Discard(ctx, task.Type())
 			return errors.New("operations alert merge scheduling unavailable")
+		}
+		if err := h.merger.MarkScheduled(ctx, topic); err != nil {
+			return errors.New("operations alert merge unavailable")
 		}
 		return nil
 	}
-	time.AfterFunc(h.options.MergeWindow, func() { _ = h.deliver(context.Background(), task.Type()) })
+	time.AfterFunc(h.options.MergeWindow, func() { _ = h.deliver(context.Background(), topic) })
+	if err := h.merger.MarkScheduled(ctx, topic); err != nil {
+		return errors.New("operations alert merge unavailable")
+	}
 	return nil
 }
 
@@ -338,6 +372,12 @@ func (h *handler) deliver(ctx context.Context, topic string) error {
 		}
 		return nil
 	case telegram.ResultRateLimited, telegram.ResultTemporaryError:
+		if retryCount, hasRetryCount := asynq.GetRetryCount(ctx); hasRetryCount {
+			if maxRetry, hasMaxRetry := asynq.GetMaxRetry(ctx); hasMaxRetry && retryCount >= maxRetry {
+				h.undeliverable("retry_exhausted")
+				return fmt.Errorf("%w: operations alert retries exhausted", asynq.SkipRetry)
+			}
+		}
 		if err := h.merger.Restore(ctx, topic, merged); err != nil {
 			return errors.New("operations alert merge unavailable")
 		}
