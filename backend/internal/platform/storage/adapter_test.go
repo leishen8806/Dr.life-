@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"net/url"
 	"strings"
@@ -9,6 +11,8 @@ import (
 )
 
 func TestAdaptersSharePresignContract(t *testing.T) {
+	sum := sha256.Sum256([]byte("test"))
+	checksum := base64.StdEncoding.EncodeToString(sum[:])
 	local, err := NewLocal(LocalConfig{BaseURL: "https://files.example.test", Secret: []byte("test-secret")}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100})
 	if err != nil {
 		t.Fatal(err)
@@ -20,7 +24,7 @@ func TestAdaptersSharePresignContract(t *testing.T) {
 	}
 	for name, adapter := range adapters {
 		t.Run(name, func(t *testing.T) {
-			signed, err := adapter.PresignPut(context.Background(), PutRequest{ContentType: "image/jpeg", ContentLength: 100})
+			signed, err := adapter.PresignPut(context.Background(), PutRequest{ContentType: "image/jpeg", ContentLength: 100, ChecksumSHA256: checksum})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -33,8 +37,8 @@ func TestAdaptersSharePresignContract(t *testing.T) {
 					t.Fatal(err)
 				}
 				headers := u.Query().Get("X-Amz-SignedHeaders")
-				if !strings.Contains(headers, "content-type") || !strings.Contains(headers, "content-length") {
-					t.Fatalf("signed headers = %q, want content type and length", headers)
+				if !strings.Contains(headers, "content-type") || !strings.Contains(headers, "content-length") || u.Query().Get("X-Amz-Checksum-Sha256") != checksum || signed.Headers["X-Amz-Checksum-Sha256"] != checksum {
+					t.Fatalf("URL/signed headers = %q/%#v/%q, want content type, length and checksum", headers, signed.Headers, u.Query())
 				}
 			}
 			if _, err := adapter.PresignGet(context.Background(), signed.Key); err != nil {

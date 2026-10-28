@@ -3,7 +3,10 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -69,7 +72,8 @@ func TestMinIOPresignedURLs(t *testing.T) {
 	}
 	store := NewMinIO(MinIOConfig{Bucket: "files", Endpoint: endpoint, AccessKey: "testaccess", SecretKey: "testsecret"}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100})
 
-	put, err := store.PresignPut(ctx, PutRequest{ContentType: "image/jpeg", ContentLength: 3})
+	sum := sha256.Sum256([]byte("jpg"))
+	put, err := store.PresignPut(ctx, PutRequest{ContentType: "image/jpeg", ContentLength: 3, ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:])})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +86,7 @@ func TestMinIOPresignedURLs(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "image/jpeg")
+	req.Header.Set("x-amz-checksum-sha256", base64.StdEncoding.EncodeToString(sum[:]))
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +94,41 @@ func TestMinIOPresignedURLs(t *testing.T) {
 	response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("PUT status = %d", response.StatusCode)
+	}
+	wrong, err := store.PresignPut(ctx, PutRequest{ContentType: "image/jpeg", ContentLength: 3, ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:])})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err = http.NewRequestWithContext(ctx, http.MethodPut, wrong.URL, bytes.NewReader([]byte("bad")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "image/jpeg")
+	response, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("tampered upload status = %d, RustFS should expose it for worker verification", response.StatusCode)
+	}
+	contents, err := store.Open(ctx, wrong.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := io.ReadAll(contents)
+	contents.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "bad" {
+		t.Fatalf("Open() = %q, want tampered content", data)
+	}
+	if err := store.Delete(ctx, wrong.Key); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Open(ctx, wrong.Key); err == nil {
+		t.Fatal("deleted object remained readable")
 	}
 
 	get, err := store.PresignGet(ctx, put.Key)

@@ -3,7 +3,9 @@ package storage
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
+	"io"
 	"time"
 )
 
@@ -21,6 +23,7 @@ var (
 	ErrPolicyNotConfigured   = errors.New("storage upload policy must be explicitly configured")
 	ErrSecretRequired        = errors.New("storage local signing secret is required")
 	ErrInvalidObjectKey      = errors.New("storage object key is invalid")
+	ErrChecksumInvalid       = errors.New("storage SHA-256 checksum is invalid")
 )
 
 type Policy struct {
@@ -29,19 +32,32 @@ type Policy struct {
 }
 
 type PutRequest struct {
-	ContentType   string
-	ContentLength int64
+	ContentType    string
+	ContentLength  int64
+	ChecksumSHA256 string
 }
 
 type SignedURL struct {
 	Key       string
 	URL       string
 	ExpiresAt time.Time
+	Headers   map[string]string
+}
+
+// ObjectStat is immutable object metadata returned by the storage provider.
+// ChecksumSHA256 uses standard base64 as required by S3's checksum header.
+type ObjectStat struct {
+	Size           int64
+	ContentType    string
+	ChecksumSHA256 string
 }
 
 type Storage interface {
 	PresignPut(context.Context, PutRequest) (SignedURL, error)
 	PresignGet(context.Context, string) (SignedURL, error)
+	Stat(context.Context, string) (ObjectStat, error)
+	Open(context.Context, string) (io.ReadCloser, error)
+	Delete(context.Context, string) error
 }
 
 func (p Policy) validate(in PutRequest) error {
@@ -56,6 +72,10 @@ func (p Policy) validate(in PutRequest) error {
 	}
 	for _, contentType := range p.AllowedContentTypes {
 		if in.ContentType == contentType {
+			checksum, err := base64.StdEncoding.DecodeString(in.ChecksumSHA256)
+			if err != nil || len(checksum) != 32 {
+				return ErrChecksumInvalid
+			}
 			return nil
 		}
 	}

@@ -2,11 +2,13 @@ package storage
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type S3Config struct {
@@ -20,6 +22,7 @@ type S3Config struct {
 
 type s3Storage struct {
 	bucket     string
+	objects    *awss3.Client
 	client     *awss3.PresignClient
 	policy     Policy
 	putExpires time.Duration
@@ -41,7 +44,7 @@ func newS3(config S3Config, policy Policy, putExpires, getExpires time.Duration)
 		}
 		o.UsePathStyle = config.UsePathStyle
 	})
-	return &s3Storage{bucket: config.Bucket, client: awss3.NewPresignClient(client), policy: policy, putExpires: putExpires, getExpires: getExpires}
+	return &s3Storage{bucket: config.Bucket, objects: client, client: awss3.NewPresignClient(client), policy: policy, putExpires: putExpires, getExpires: getExpires}
 }
 
 func (s *s3Storage) PresignPut(ctx context.Context, in PutRequest) (SignedURL, error) {
@@ -49,11 +52,50 @@ func (s *s3Storage) PresignPut(ctx context.Context, in PutRequest) (SignedURL, e
 		return SignedURL{}, err
 	}
 	key := randomKey()
-	request, err := s.client.PresignPutObject(ctx, &awss3.PutObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key), ContentType: aws.String(in.ContentType), ContentLength: aws.Int64(in.ContentLength)}, func(o *awss3.PresignOptions) { o.Expires = s.putExpires })
+	request, err := s.client.PresignPutObject(ctx, &awss3.PutObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key), ContentType: aws.String(in.ContentType), ContentLength: aws.Int64(in.ContentLength), ChecksumAlgorithm: types.ChecksumAlgorithmSha256, ChecksumSHA256: aws.String(in.ChecksumSHA256)}, func(o *awss3.PresignOptions) { o.Expires = s.putExpires })
 	if err != nil {
 		return SignedURL{}, err
 	}
-	return SignedURL{Key: key, URL: request.URL, ExpiresAt: time.Now().Add(s.putExpires)}, nil
+	headers := make(map[string]string, len(request.SignedHeader))
+	for name, values := range request.SignedHeader {
+		if len(values) > 0 {
+			headers[name] = values[0]
+		}
+	}
+	if headers["X-Amz-Checksum-Sha256"] == "" {
+		headers["X-Amz-Checksum-Sha256"] = in.ChecksumSHA256
+	}
+	return SignedURL{Key: key, URL: request.URL, ExpiresAt: time.Now().Add(s.putExpires), Headers: headers}, nil
+}
+
+func (s *s3Storage) Stat(ctx context.Context, key string) (ObjectStat, error) {
+	if !validRandomKey(key) {
+		return ObjectStat{}, ErrInvalidObjectKey
+	}
+	object, err := s.objects.HeadObject(ctx, &awss3.HeadObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key), ChecksumMode: types.ChecksumModeEnabled})
+	if err != nil {
+		return ObjectStat{}, err
+	}
+	return ObjectStat{Size: aws.ToInt64(object.ContentLength), ContentType: aws.ToString(object.ContentType), ChecksumSHA256: aws.ToString(object.ChecksumSHA256)}, nil
+}
+
+func (s *s3Storage) Open(ctx context.Context, key string) (io.ReadCloser, error) {
+	if !validRandomKey(key) {
+		return nil, ErrInvalidObjectKey
+	}
+	object, err := s.objects.GetObject(ctx, &awss3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	if err != nil {
+		return nil, err
+	}
+	return object.Body, nil
+}
+
+func (s *s3Storage) Delete(ctx context.Context, key string) error {
+	if !validRandomKey(key) {
+		return ErrInvalidObjectKey
+	}
+	_, err := s.objects.DeleteObject(ctx, &awss3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	return err
 }
 
 func (s *s3Storage) PresignGet(ctx context.Context, key string) (SignedURL, error) {

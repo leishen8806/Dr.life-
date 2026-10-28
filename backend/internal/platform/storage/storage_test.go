@@ -3,6 +3,8 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"log/slog"
 	"net/url"
@@ -18,6 +20,11 @@ func newTestLocal(t *testing.T, policy Policy) Storage {
 		t.Fatal(err)
 	}
 	return store
+}
+
+func validChecksum(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return base64.StdEncoding.EncodeToString(sum[:])
 }
 
 func TestPresignPutRejectsInvalidRequests(t *testing.T) {
@@ -44,12 +51,20 @@ func TestPresignPutRejectsInvalidRequests(t *testing.T) {
 	}
 }
 
+func TestPresignPutRequiresAValidSHA256Checksum(t *testing.T) {
+	store := newTestLocal(t, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 1024})
+	checksum := base64.StdEncoding.EncodeToString(sha256.New().Sum(nil)[:31])
+	if _, err := store.PresignPut(context.Background(), PutRequest{ContentType: "image/jpeg", ContentLength: 1, ChecksumSHA256: checksum}); !errors.Is(err, ErrChecksumInvalid) {
+		t.Fatalf("PresignPut() error = %v, want %v", err, ErrChecksumInvalid)
+	}
+}
+
 func TestPresignedURLsHaveRequiredTTLAndNoPII(t *testing.T) {
 	store := newTestLocal(t, Policy{
 		AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 1024,
 	})
 
-	put, err := store.PresignPut(context.Background(), PutRequest{ContentType: "image/jpeg", ContentLength: 42})
+	put, err := store.PresignPut(context.Background(), PutRequest{ContentType: "image/jpeg", ContentLength: 42, ChecksumSHA256: validChecksum("put")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +106,7 @@ func TestPresigningDoesNotLogSignature(t *testing.T) {
 	t.Cleanup(func() { slog.SetDefault(previous) })
 
 	store := newTestLocal(t, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 1})
-	signed, err := store.PresignPut(context.Background(), PutRequest{ContentType: "image/jpeg", ContentLength: 1})
+	signed, err := store.PresignPut(context.Background(), PutRequest{ContentType: "image/jpeg", ContentLength: 1, ChecksumSHA256: validChecksum("put")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +152,7 @@ func TestPolicyFailsClosedWithoutExplicitLimits(t *testing.T) {
 		{AllowedContentTypes: []string{"image/jpeg"}},
 		{MaxContentLength: 1},
 	} {
-		_, err := newTestLocal(t, policy).PresignPut(context.Background(), PutRequest{ContentType: "image/jpeg", ContentLength: 1})
+		_, err := newTestLocal(t, policy).PresignPut(context.Background(), PutRequest{ContentType: "image/jpeg", ContentLength: 1, ChecksumSHA256: validChecksum("put")})
 		if !errors.Is(err, ErrPolicyNotConfigured) {
 			t.Fatalf("PresignPut() error = %v, want %v", err, ErrPolicyNotConfigured)
 		}
