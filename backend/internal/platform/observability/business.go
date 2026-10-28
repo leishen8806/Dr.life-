@@ -21,7 +21,7 @@ type Business struct {
 	auditVerifyFailures   prometheus.Counter
 	auditAnchorMissing    prometheus.Gauge
 	spotChecksDropped     prometheus.Counter
-	opsAlertUndeliverable prometheus.Counter
+	opsAlertUndeliverable *prometheus.CounterVec
 }
 
 func newBusiness(registry *prometheus.Registry) *Business {
@@ -40,7 +40,7 @@ func newBusiness(registry *prometheus.Registry) *Business {
 		auditVerifyFailures:   prometheus.NewCounter(prometheus.CounterOpts{Name: "drlife_audit_verify_failures_total", Help: "Audit chain verification failures."}),
 		auditAnchorMissing:    prometheus.NewGauge(prometheus.GaugeOpts{Name: "drlife_audit_anchor_missing", Help: "Whether the latest audit anchor is older than 24 hours."}),
 		spotChecksDropped:     prometheus.NewCounter(prometheus.CounterOpts{Name: "drlife_ledger_spot_checks_dropped_total", Help: "Ledger spot checks dropped at the concurrency limit."}),
-		opsAlertUndeliverable: prometheus.NewCounter(prometheus.CounterOpts{Name: "ops_alert_undeliverable_total", Help: "Operations reconciliation alerts that could not be delivered."}),
+		opsAlertUndeliverable: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "ops_alert_undeliverable_total", Help: "Operations reconciliation alerts that could not be delivered."}, []string{"reason"}),
 	}
 	registry.MustRegister(b.orders, b.withdrawals, b.ai, b.bots, b.loginFailures, b.loginAuditFailures, b.sessionRefresh, b.ledger, b.reconciliationRuns, b.reconciliation, b.spotChecksDropped, b.opsAlertUndeliverable, b.auditAppends, b.auditVerifyFailures, b.auditAnchorMissing)
 	return b
@@ -121,7 +121,9 @@ func (b *Business) AuditAnchorMissing(missing bool) {
 	}
 }
 func (b *Business) ReconSpotCheckDropped() { b.spotChecksDropped.Inc() }
-func (b *Business) OpsAlertUndeliverable() { b.opsAlertUndeliverable.Inc() }
+func (b *Business) OpsAlertUndeliverable(reason string) {
+	b.opsAlertUndeliverable.WithLabelValues(bounded(reason, "unconfigured", "telegram_permanent", "retry_exhausted")).Inc()
+}
 
 func bounded(value string, allowed ...string) string {
 	for _, candidate := range allowed {

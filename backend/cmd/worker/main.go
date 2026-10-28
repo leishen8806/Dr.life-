@@ -11,14 +11,13 @@ import (
 
 	"github.com/hibiken/asynq"
 	commsTelegram "github.com/leishen8806/Dr.life-/backend/internal/comms/telegram"
-	iamTelegram "github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/opsalert"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue/outbox"
-	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -69,7 +68,7 @@ func main() {
 	}
 	alertRedis := redis.NewClient(alertRedisOptions)
 	defer alertRedis.Close()
-	alerts := reconciliationAlerts(ctx, cfg, logger, metrics.Business(), outbox.NewRedisAlertDeduper(alertRedis))
+	alerts := reconciliationAlerts(cfg, logger, metrics.Business(), opsalert.NewRedisDeduper(alertRedis))
 	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, logger, alerts); err != nil {
 		fmt.Fprintln(os.Stderr, "queue handler error:", err)
 		os.Exit(1)
@@ -99,36 +98,15 @@ func main() {
 	<-ctx.Done()
 }
 
-func reconciliationAlerts(ctx context.Context, cfg config.Config, logger *slog.Logger, metrics outbox.AlertMetrics, deduper outbox.AlertDeduper) queue.Handler {
-	options := outbox.ReconciliationAlertOptions{Environment: cfg.AppEnv, MergeWindow: cfg.OpsAlertMergeWindow, Metrics: metrics, Logger: logger, Deduper: deduper}
-	if cfg.OpsAlertBotID == 0 || cfg.OpsAlertChatID == 0 {
+func reconciliationAlerts(cfg config.Config, logger *slog.Logger, metrics opsalert.Metrics, deduper opsalert.Deduper) queue.Handler {
+	options := opsalert.Options{Environment: cfg.AppEnv, Language: cfg.OpsAlertLang, MergeWindow: cfg.OpsAlertMergeWindow, Metrics: metrics, Logger: logger, Deduper: deduper}
+	token := os.Getenv("OPS_ALERT_BOT_TOKEN")
+	if cfg.OpsAlertBotID == 0 || cfg.OpsAlertChatID == 0 || token == "" {
 		logger.Warn("operations reconciliation alerts are not configured; undeliverable alerts will be logged and counted")
-		return outbox.NewReconciliationAlertHandler(options)
+		return opsalert.NewReconciliationHandler(options)
 	}
-	if cfg.IAMDatabaseURL == "" {
-		logger.Warn("operations reconciliation alerts unavailable: IAM database is not configured")
-		return outbox.NewReconciliationAlertHandler(options)
-	}
-	keys, err := secrets.LoadFromEnvironment()
-	if err != nil {
-		logger.Warn("operations reconciliation alerts unavailable: bot token keys are not configured")
-		return outbox.NewReconciliationAlertHandler(options)
-	}
-	envelope, err := secrets.NewEnvelope(keys)
-	if err != nil {
-		logger.Warn("operations reconciliation alerts unavailable: bot token envelope is not configured")
-		return outbox.NewReconciliationAlertHandler(options)
-	}
-	iamCfg := cfg
-	iamCfg.DatabaseURL = cfg.IAMDatabaseURL
-	iamDB, err := observability.NewWorkerPool(ctx, iamCfg, nil, logger)
-	if err != nil {
-		logger.Warn("operations reconciliation alerts unavailable: IAM token provider cannot start")
-		return outbox.NewReconciliationAlertHandler(options)
-	}
-	// The process owns this pool until shutdown, matching the worker's primary pool.
-	options.Sender = commsTelegram.NewHTTPSender("https://api.telegram.org", iamTelegram.DBBotTokenProvider{DB: iamDB, Envelope: envelope}, commsTelegram.SenderOptions{})
+	options.Sender = commsTelegram.NewHTTPSender("https://api.telegram.org", commsTelegram.StaticTokenProvider{strconv.FormatInt(cfg.OpsAlertBotID, 10): token}, commsTelegram.SenderOptions{})
 	options.BotID = strconv.FormatInt(cfg.OpsAlertBotID, 10)
 	options.ChatID = cfg.OpsAlertChatID
-	return outbox.NewReconciliationAlertHandler(options)
+	return opsalert.NewReconciliationHandler(options)
 }

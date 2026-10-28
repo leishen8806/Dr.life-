@@ -8,13 +8,14 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/leishen8806/Dr.life-/backend/internal/comms/telegram"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/opsalert"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue/outbox"
 )
 
 func TestReconciliationAlertHandlerSendsSanitizedAlertOnce(t *testing.T) {
 	sender := &alertSender{}
-	handler := outbox.NewReconciliationAlertHandler(outbox.ReconciliationAlertOptions{
-		Sender: sender, BotID: "ops-alert", ChatID: -1001, Environment: "test",
+	handler := opsalert.NewReconciliationHandler(opsalert.Options{
+		Sender: sender, BotID: "ops-alert", ChatID: -1001, Environment: "test", Language: "en",
 		MergeWindow: time.Minute,
 	})
 	task := asynq.NewTask(outbox.TaskReconFailed, []byte(`{"outbox_id":41,"alert":{"run_id":7,"day":"2026-10-27","counts":{"BALANCE_CACHE":2},"account_ids":[9988],"amount":12345}}`))
@@ -54,7 +55,7 @@ func TestReconciliationAlertHandlerClassifiesTelegramErrors(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			sender := &alertSender{result: tc.result}
-			handler := outbox.NewReconciliationAlertHandler(outbox.ReconciliationAlertOptions{Sender: sender, BotID: "ops-alert", ChatID: -1001})
+			handler := opsalert.NewReconciliationHandler(opsalert.Options{Sender: sender, BotID: "ops-alert", ChatID: -1001})
 			err := handler(context.Background(), asynq.NewTask(outbox.TaskReconStale, []byte(`{"outbox_id":42,"alert":{"run_id":8,"day":"2026-10-27"}}`)))
 			if (err != nil && strings.Contains(err.Error(), asynq.SkipRetry.Error())) != tc.wantSkip {
 				t.Fatalf("err=%v, wantSkip=%v", err, tc.wantSkip)
@@ -69,7 +70,7 @@ func TestReconciliationAlertHandlerClassifiesTelegramErrors(t *testing.T) {
 func TestReconciliationAlertHandlerWithoutConfigurationDoesNotSend(t *testing.T) {
 	sender := &alertSender{}
 	metrics := &alertMetrics{}
-	handler := outbox.NewReconciliationAlertHandler(outbox.ReconciliationAlertOptions{Sender: sender, Metrics: metrics})
+	handler := opsalert.NewReconciliationHandler(opsalert.Options{Sender: sender, Metrics: metrics})
 	if err := handler(context.Background(), asynq.NewTask(outbox.TaskReconFailed, []byte(`{"outbox_id":43,"alert":{"run_id":9}}`))); err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +86,7 @@ type alertSender struct {
 
 type alertMetrics struct{ undeliverable int }
 
-func (m *alertMetrics) OpsAlertUndeliverable() { m.undeliverable++ }
+func (m *alertMetrics) OpsAlertUndeliverable(string) { m.undeliverable++ }
 
 func (s *alertSender) SendMessage(_ context.Context, _ string, _ int64, text string, _ telegram.SendOptions) telegram.Result {
 	s.messages = append(s.messages, text)

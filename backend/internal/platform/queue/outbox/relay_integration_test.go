@@ -20,6 +20,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/leishen8806/Dr.life-/backend/internal/comms/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/opsalert"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue/outbox"
 	"github.com/pressly/goose/v3"
@@ -78,9 +79,9 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	}
 	alertRedis := redis.NewClient(alertRedisOptions)
 	defer alertRedis.Close()
-	alerts := outbox.NewReconciliationAlertHandler(outbox.ReconciliationAlertOptions{
+	alerts := opsalert.NewReconciliationHandler(opsalert.Options{
 		Sender: telegram.NewHTTPSender(telegramServer.URL, telegram.StaticTokenProvider{"ops": "test-token"}, telegram.SenderOptions{}),
-		BotID:  "ops", ChatID: -1001, Environment: "test", MergeWindow: time.Nanosecond, Logger: logger, Deduper: outbox.NewRedisAlertDeduper(alertRedis),
+		BotID:  "ops", ChatID: -1001, Environment: "test", MergeWindow: time.Nanosecond, Logger: logger, Deduper: opsalert.NewRedisDeduper(alertRedis),
 	})
 	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, logger, alerts); err != nil {
 		t.Fatal(err)

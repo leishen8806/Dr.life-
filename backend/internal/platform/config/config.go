@@ -95,6 +95,7 @@ type Config struct {
 	OpsAlertBotID                  int64
 	OpsAlertChatID                 int64
 	OpsAlertMergeWindow            time.Duration
+	OpsAlertLang                   string
 	JWTActiveKeyID                 string
 	JWTSigningConfigured           bool
 }
@@ -436,6 +437,13 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
+	opsAlertLang := strings.TrimSpace(getenv("OPS_ALERT_LANG"))
+	if opsAlertLang == "" {
+		opsAlertLang = "zh"
+	}
+	if opsAlertLang != "zh" && opsAlertLang != "en" && opsAlertLang != "km" {
+		return Config{}, fmt.Errorf("OPS_ALERT_LANG must be zh, en, or km")
+	}
 	jwtActiveKeyID := strings.TrimSpace(getenv("JWT_ACTIVE_KEY_ID"))
 	jwtKeys := strings.TrimSpace(getenv("JWT_SIGNING_KEYS"))
 	jwtConfigured := jwtKeys != "" || jwtActiveKeyID != ""
@@ -524,6 +532,7 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		OpsAlertBotID:          opsAlertBotID,
 		OpsAlertChatID:         opsAlertChatID,
 		OpsAlertMergeWindow:    opsAlertMergeWindow,
+		OpsAlertLang:           opsAlertLang,
 		JWTActiveKeyID:         jwtActiveKeyID,
 		JWTSigningConfigured:   jwtConfigured,
 	}, nil
