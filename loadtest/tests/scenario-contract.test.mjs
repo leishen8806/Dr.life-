@@ -100,6 +100,22 @@ test("worker overrides the HTTP image health check with a process probe", () => 
   assert.doesNotMatch(worker, /healthz/);
 });
 
+test("the rig applies goose migrations before app and worker start", () => {
+  const compose = read("loadtest/docker-compose.yml");
+  const migrate = compose.match(/^  migrate:\n([\s\S]*?)(?=^  \w|\z)/m)?.[1] ?? "";
+  for (const fragment of [
+    'entrypoint: ["/migrate"]',
+    "postgres:",
+    "condition: service_healthy",
+  ]) {
+    assert.match(migrate, new RegExp(fragment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `migration service is missing ${fragment}`);
+  }
+  for (const service of ["app-a", "app-b", "worker"]) {
+    const body = compose.match(new RegExp(`^  ${service}:\\n([\\s\\S]*?)(?=^  \\w|\\z)`, "m"))?.[1] ?? "";
+    assert.match(body, /migrate:\n\s+condition: service_completed_successfully/, `${service} must wait for migrations`);
+  }
+});
+
 test("the five fault drills are present and guarded", () => {
   const drills = read("loadtest/drills/run-drill.mjs");
   for (const name of ["redis-cache-down", "redis-queue-down", "replica-lag", "kill-worker", "kill-app"]) {
