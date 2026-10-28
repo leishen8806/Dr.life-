@@ -7,40 +7,42 @@ import (
 )
 
 type Business struct {
-	orders              *prometheus.CounterVec
-	withdrawals         *prometheus.CounterVec
-	ai                  *prometheus.CounterVec
-	bots                *prometheus.CounterVec
-	loginFailures       *prometheus.CounterVec
-	loginAuditFailures  *prometheus.CounterVec
-	sessionRefresh      *prometheus.CounterVec
-	ledger              *prometheus.CounterVec
-	reconciliationRuns  *prometheus.CounterVec
-	reconciliation      *prometheus.CounterVec
-	auditAppends        *prometheus.CounterVec
-	auditVerifyFailures prometheus.Counter
-	auditAnchorMissing  prometheus.Gauge
-	spotChecksDropped   prometheus.Counter
+	orders                *prometheus.CounterVec
+	withdrawals           *prometheus.CounterVec
+	ai                    *prometheus.CounterVec
+	bots                  *prometheus.CounterVec
+	loginFailures         *prometheus.CounterVec
+	loginAuditFailures    *prometheus.CounterVec
+	sessionRefresh        *prometheus.CounterVec
+	ledger                *prometheus.CounterVec
+	reconciliationRuns    *prometheus.CounterVec
+	reconciliation        *prometheus.CounterVec
+	auditAppends          *prometheus.CounterVec
+	auditVerifyFailures   prometheus.Counter
+	auditAnchorMissing    prometheus.Gauge
+	spotChecksDropped     prometheus.Counter
+	opsAlertUndeliverable *prometheus.CounterVec
 }
 
 func newBusiness(registry *prometheus.Registry) *Business {
 	b := &Business{
-		orders:              prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_orders_total", Help: "Order lifecycle events."}, []string{"event"}),
-		withdrawals:         prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_withdrawals_total", Help: "Withdrawal lifecycle events."}, []string{"event"}),
-		ai:                  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ai_requests_total", Help: "AI requests and fallback events."}, []string{"event", "level"}),
-		bots:                prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_bot_sends_total", Help: "Bot send results."}, []string{"endpoint", "bot", "status", "reason"}),
-		loginFailures:       prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_login_validation_failures_total", Help: "Login validation failures."}, []string{"endpoint", "reason"}),
-		loginAuditFailures:  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_login_audit_write_failures_total", Help: "Login audit write failures."}, []string{"endpoint"}),
-		sessionRefresh:      prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_session_refresh_total", Help: "Refresh-token rotation results."}, []string{"endpoint", "result"}),
-		ledger:              prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_posts_total", Help: "Ledger posting results."}, []string{"status", "reason"}),
-		reconciliationRuns:  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_reconciliation_runs_total", Help: "Ledger reconciliation runs."}, []string{"status"}),
-		reconciliation:      prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_reconciliation_mismatches_total", Help: "Ledger reconciliation mismatches."}, []string{"check_code"}),
-		auditAppends:        prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_audit_appends_total", Help: "Audit append results."}, []string{"status"}),
-		auditVerifyFailures: prometheus.NewCounter(prometheus.CounterOpts{Name: "drlife_audit_verify_failures_total", Help: "Audit chain verification failures."}),
-		auditAnchorMissing:  prometheus.NewGauge(prometheus.GaugeOpts{Name: "drlife_audit_anchor_missing", Help: "Whether the latest audit anchor is older than 24 hours."}),
-		spotChecksDropped:   prometheus.NewCounter(prometheus.CounterOpts{Name: "drlife_ledger_spot_checks_dropped_total", Help: "Ledger spot checks dropped at the concurrency limit."}),
+		orders:                prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_orders_total", Help: "Order lifecycle events."}, []string{"event"}),
+		withdrawals:           prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_withdrawals_total", Help: "Withdrawal lifecycle events."}, []string{"event"}),
+		ai:                    prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ai_requests_total", Help: "AI requests and fallback events."}, []string{"event", "level"}),
+		bots:                  prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_bot_sends_total", Help: "Bot send results."}, []string{"endpoint", "bot", "status", "reason"}),
+		loginFailures:         prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_login_validation_failures_total", Help: "Login validation failures."}, []string{"endpoint", "reason"}),
+		loginAuditFailures:    prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_login_audit_write_failures_total", Help: "Login audit write failures."}, []string{"endpoint"}),
+		sessionRefresh:        prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_session_refresh_total", Help: "Refresh-token rotation results."}, []string{"endpoint", "result"}),
+		ledger:                prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_posts_total", Help: "Ledger posting results."}, []string{"status", "reason"}),
+		reconciliationRuns:    prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_reconciliation_runs_total", Help: "Ledger reconciliation runs."}, []string{"status"}),
+		reconciliation:        prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_reconciliation_mismatches_total", Help: "Ledger reconciliation mismatches."}, []string{"check_code"}),
+		auditAppends:          prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_audit_appends_total", Help: "Audit append results."}, []string{"status"}),
+		auditVerifyFailures:   prometheus.NewCounter(prometheus.CounterOpts{Name: "drlife_audit_verify_failures_total", Help: "Audit chain verification failures."}),
+		auditAnchorMissing:    prometheus.NewGauge(prometheus.GaugeOpts{Name: "drlife_audit_anchor_missing", Help: "Whether the latest audit anchor is older than 24 hours."}),
+		spotChecksDropped:     prometheus.NewCounter(prometheus.CounterOpts{Name: "drlife_ledger_spot_checks_dropped_total", Help: "Ledger spot checks dropped at the concurrency limit."}),
+		opsAlertUndeliverable: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "ops_alert_undeliverable_total", Help: "Operations reconciliation alerts that could not be delivered."}, []string{"reason"}),
 	}
-	registry.MustRegister(b.orders, b.withdrawals, b.ai, b.bots, b.loginFailures, b.loginAuditFailures, b.sessionRefresh, b.ledger, b.reconciliationRuns, b.reconciliation, b.spotChecksDropped, b.auditAppends, b.auditVerifyFailures, b.auditAnchorMissing)
+	registry.MustRegister(b.orders, b.withdrawals, b.ai, b.bots, b.loginFailures, b.loginAuditFailures, b.sessionRefresh, b.ledger, b.reconciliationRuns, b.reconciliation, b.spotChecksDropped, b.opsAlertUndeliverable, b.auditAppends, b.auditVerifyFailures, b.auditAnchorMissing)
 	return b
 }
 
@@ -119,6 +121,9 @@ func (b *Business) AuditAnchorMissing(missing bool) {
 	}
 }
 func (b *Business) ReconSpotCheckDropped() { b.spotChecksDropped.Inc() }
+func (b *Business) OpsAlertUndeliverable(reason string) {
+	b.opsAlertUndeliverable.WithLabelValues(bounded(reason, "unconfigured", "telegram_permanent", "retry_exhausted")).Inc()
+}
 
 func bounded(value string, allowed ...string) string {
 	for _, candidate := range allowed {

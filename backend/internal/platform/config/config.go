@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -91,6 +92,10 @@ type Config struct {
 	LoginFailureLimit              int
 	LoginFailureWindow             time.Duration
 	BotTokenCacheTTL               time.Duration
+	OpsAlertBotID                  int64
+	OpsAlertChatID                 int64
+	OpsAlertMergeWindow            time.Duration
+	OpsAlertLang                   string
 	JWTActiveKeyID                 string
 	JWTSigningConfigured           bool
 }
@@ -420,6 +425,25 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
+	opsAlertBotID, err := optionalPositiveInt64(getenv("OPS_ALERT_BOT_ID"))
+	if err != nil {
+		return Config{}, fmt.Errorf("OPS_ALERT_BOT_ID must be a positive integer")
+	}
+	opsAlertChatID, err := optionalNonZeroInt64(getenv("OPS_ALERT_CHAT_ID"))
+	if err != nil {
+		return Config{}, fmt.Errorf("OPS_ALERT_CHAT_ID must be a non-zero integer")
+	}
+	opsAlertMergeWindow, err := positiveDuration(getenv, "OPS_ALERT_MERGE_WINDOW", 5*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	opsAlertLang := strings.TrimSpace(getenv("OPS_ALERT_LANG"))
+	if opsAlertLang == "" {
+		opsAlertLang = "zh"
+	}
+	if opsAlertLang != "zh" && opsAlertLang != "en" && opsAlertLang != "km" {
+		return Config{}, fmt.Errorf("OPS_ALERT_LANG must be zh, en, or km")
+	}
 	jwtActiveKeyID := strings.TrimSpace(getenv("JWT_ACTIVE_KEY_ID"))
 	jwtKeys := strings.TrimSpace(getenv("JWT_SIGNING_KEYS"))
 	jwtConfigured := jwtKeys != "" || jwtActiveKeyID != ""
@@ -505,9 +529,37 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		LoginFailureLimit:      loginFailureLimit,
 		LoginFailureWindow:     loginFailureWindow,
 		BotTokenCacheTTL:       botTokenCacheTTL,
+		OpsAlertBotID:          opsAlertBotID,
+		OpsAlertChatID:         opsAlertChatID,
+		OpsAlertMergeWindow:    opsAlertMergeWindow,
+		OpsAlertLang:           opsAlertLang,
 		JWTActiveKeyID:         jwtActiveKeyID,
 		JWTSigningConfigured:   jwtConfigured,
 	}, nil
+}
+
+func optionalPositiveInt64(raw string) (int64, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value <= 0 {
+		return 0, errors.New("invalid positive integer")
+	}
+	return value, nil
+}
+
+func optionalNonZeroInt64(raw string) (int64, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, nil
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value == 0 {
+		return 0, errors.New("invalid non-zero integer")
+	}
+	return value, nil
 }
 
 func routeClasses(raw string) (map[string]string, error) {

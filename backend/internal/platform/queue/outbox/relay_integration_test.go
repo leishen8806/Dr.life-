@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,10 +18,13 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/leishen8806/Dr.life-/backend/internal/comms/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/opsalert"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue/outbox"
 	"github.com/pressly/goose/v3"
+	"github.com/redis/go-redis/v9"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	tcredis "github.com/testcontainers/testcontainers-go/modules/redis"
@@ -31,8 +38,11 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	redisURL := newRelayRedis(t, ctx)
 
 	var ids [2]int64
-	for i, topic := range []string{"ledger.recon.failed", "ledger.recon.stale_run"} {
-		if err := database.QueryRow(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES($1,'{}'::jsonb) RETURNING id`, topic).Scan(&ids[i]); err != nil {
+	for i, event := range []struct{ topic, payload string }{
+		{"ledger.recon.failed", `{"run_id":7,"day":"2026-10-27","counts":{"BALANCE_CACHE":2},"account_ids":[9988],"amount":12345}`},
+		{"ledger.recon.stale_run", `{"run_id":8,"day":"2026-10-27","account_ids":[9989]}`},
+	} {
+		if err := database.QueryRow(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES($1,$2::jsonb) RETURNING id`, event.topic, event.payload).Scan(&ids[i]); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -61,7 +71,24 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := outbox.RegisterLedgerHandlers(worker, logger); err != nil {
+	telegramServer, messages := relayTelegramServer(t)
+	defer telegramServer.Close()
+	alertRedisOptions, err := redis.ParseURL(redisURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alertRedis := redis.NewClient(alertRedisOptions)
+	defer alertRedis.Close()
+	alertOptions := opsalert.Options{
+		Sender: telegram.NewHTTPSender(telegramServer.URL, telegram.StaticTokenProvider{"ops": "test-token"}, telegram.SenderOptions{}),
+		BotID:  "ops", ChatID: -1001, Environment: "test", MergeWindow: time.Nanosecond, Logger: logger, Deduper: opsalert.NewRedisDeduper(alertRedis), Merger: opsalert.NewRedisMerger(alertRedis), Scheduler: client,
+	}
+	alerts := opsalert.NewReconciliationHandlers(alertOptions)
+	flushOnSecondWorker := opsalert.NewReconciliationHandlers(alertOptions)
+	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, logger, alerts.Alert); err != nil {
+		t.Fatal(err)
+	}
+	if err := worker.Register(opsalert.TaskFlush, flushOnSecondWorker.Flush); err != nil {
 		t.Fatal(err)
 	}
 	workerCtx, stop := context.WithCancel(ctx)
@@ -77,8 +104,8 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if completed.Pending != 0 || completed.Active != 0 || completed.Processed != 2 || completed.Failed != 0 {
-		t.Fatalf("critical queue pending=%d active=%d processed=%d failed=%d, want 0/0/2/0", completed.Pending, completed.Active, completed.Processed, completed.Failed)
+	if completed.Pending != 0 || completed.Active != 0 || completed.Processed != 4 || completed.Failed != 0 {
+		t.Fatalf("critical queue pending=%d active=%d processed=%d failed=%d, want 0/0/4/0", completed.Pending, completed.Active, completed.Processed, completed.Failed)
 	}
 	t.Logf("inspector critical pending=%d active=%d processed=%d failed=%d", completed.Pending, completed.Active, completed.Processed, completed.Failed)
 	if got := observer.Count("ops:outbox_unknown:v1"); got != 0 {
@@ -94,15 +121,112 @@ func TestReconAlertsRelayToDedicatedHandlersEndToEnd(t *testing.T) {
 		}
 		t.Logf("handler received topic=%s task_type=%s", delivery.topic, delivery.taskType)
 	}
-	if logsText := logs.String(); !bytes.Contains([]byte(logsText), []byte("ledger.recon.failed")) || !bytes.Contains([]byte(logsText), []byte("ledger.recon.stale_run")) {
-		t.Fatalf("handler logs missing reconciliation topics: %s", logsText)
-	}
 	var sent int
 	if err := database.QueryRow(ctx, `SELECT count(*) FROM ledger.outbox WHERE id=ANY($1) AND sent_at IS NOT NULL`, ids[:]).Scan(&sent); err != nil {
 		t.Fatal(err)
 	}
 	if sent != len(ids) {
 		t.Fatalf("sent rows=%d, want %d", sent, len(ids))
+	}
+	if got := messages(); len(got) != 2 {
+		t.Fatalf("Telegram messages=%d, want 2: %v", len(got), got)
+	} else if strings.Contains(strings.Join(got, " "), "9988") || strings.Contains(strings.Join(got, " "), "12345") {
+		t.Fatalf("Telegram alert leaked queue-sensitive payload: %v", got)
+	}
+}
+
+func TestReconAlertsRelayWithoutConfigurationDegradesEndToEnd(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	database := newRelayPostgres(t, ctx)
+	defer database.Close()
+	redisURL := newRelayRedis(t, ctx)
+	if _, err := database.Exec(ctx, `INSERT INTO ledger.outbox(topic,payload) VALUES('ledger.recon.failed', '{"run_id":7,"day":"2026-10-27","counts":{"BALANCE_CACHE":2}}')`); err != nil {
+		t.Fatal(err)
+	}
+	options, err := asynq.ParseRedisURI(redisURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := asynq.NewClient(options)
+	defer client.Close()
+	relay, err := outbox.New(ledger.New(database, ledger.Options{}), client, outbox.Options{Routes: outbox.LedgerRoutes()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count, err := relay.RunOnce(ctx); err != nil || count != 1 {
+		t.Fatalf("relay count=%d err=%v", count, err)
+	}
+	registry := queue.NewRegistry()
+	if err := outbox.RegisterLedgerTasks(registry); err != nil {
+		t.Fatal(err)
+	}
+	observer := &relayObserver{counts: make(map[string]int)}
+	worker, err := queue.NewWorker(redisURL, registry, queue.WorkerOptions{Observer: observer, ShutdownTimeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sender := &alertSender{}
+	metrics := &alertMetrics{}
+	alerts := opsalert.NewReconciliationHandlers(opsalert.Options{Sender: sender, Metrics: metrics, MergeWindow: time.Nanosecond, Scheduler: client})
+	if err := outbox.RegisterLedgerHandlersWithAlerts(worker, nil, alerts.Alert); err != nil {
+		t.Fatal(err)
+	}
+	if err := worker.Register(opsalert.TaskFlush, alerts.Flush); err != nil {
+		t.Fatal(err)
+	}
+	workerCtx, stop := context.WithCancel(ctx)
+	defer stop()
+	if err := worker.Start(workerCtx); err != nil {
+		t.Fatal(err)
+	}
+	eventuallyRelay(t, 20*time.Second, func() bool {
+		return observer.Count(outbox.TaskReconFailed) == 1 && observer.Count(opsalert.TaskFlush) == 1
+	})
+	if got := len(sender.messages); got != 0 {
+		t.Fatalf("Telegram requests=%d, want 0 when unconfigured", got)
+	}
+	if metrics.undeliverable != 1 {
+		t.Fatalf("undeliverable=%d, want 1", metrics.undeliverable)
+	}
+}
+
+func eventuallyRelay(t *testing.T, timeout time.Duration, condition func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("timed out waiting for worker deliveries")
+}
+
+func relayTelegramServer(t *testing.T) (*httptest.Server, func() []string) {
+	t.Helper()
+	var mu sync.Mutex
+	var messages []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		var body struct {
+			Text string `json:"text"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Errorf("decode Telegram request: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		mu.Lock()
+		messages = append(messages, body.Text)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	return server, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), messages...)
 	}
 }
 
@@ -130,7 +254,7 @@ func waitForRelayDeliveries(t *testing.T, ctx context.Context, observer *relayOb
 	tick := time.NewTicker(20 * time.Millisecond)
 	defer tick.Stop()
 	for {
-		if observer.Count(outbox.TaskReconFailed) == 1 && observer.Count(outbox.TaskReconStale) == 1 {
+		if observer.Count(outbox.TaskReconFailed) == 1 && observer.Count(outbox.TaskReconStale) == 1 && observer.Count(opsalert.TaskFlush) == 2 {
 			return
 		}
 		select {
