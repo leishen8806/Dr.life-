@@ -232,6 +232,12 @@ func isRetryableDatabaseError(err error) bool {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
+	// ConnectError can wrap a PgError returned during authentication or startup.
+	// Inspect its SQLSTATE before treating a connection-stage failure as transient.
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return strings.HasPrefix(pgErr.Code, "08") || pgErr.Code == "57P01" || pgErr.Code == "57P02" || pgErr.Code == "57P03" || pgErr.Code == "40001" || pgErr.Code == "40P01"
+	}
 	if pgconn.SafeToRetry(err) {
 		return true
 	}
@@ -241,10 +247,6 @@ func isRetryableDatabaseError(err error) bool {
 	var connectErr *pgconn.ConnectError
 	if errors.As(err, &connectErr) {
 		return true
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return strings.HasPrefix(pgErr.Code, "08") || strings.HasPrefix(pgErr.Code, "57P0") || pgErr.Code == "40001" || pgErr.Code == "40P01"
 	}
 	var networkErr net.Error
 	return errors.As(err, &networkErr) && (networkErr.Timeout() || networkErr.Temporary())

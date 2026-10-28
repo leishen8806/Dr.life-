@@ -374,6 +374,49 @@ func waitForRelayDeliveries(t *testing.T, ctx context.Context, observer *relayOb
 	}
 }
 
+func TestRelayReturnsFatalForConnectErrorWrappingAuthenticationFailure(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	database, container := newRestartableRelayPostgres(t, ctx)
+	defer database.Close()
+	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		dsn  string
+	}{
+		{name: "authentication", dsn: strings.Replace(dsn, "test-only", "wrong-password", 1)},
+		{name: "missing_database", dsn: strings.Replace(dsn, "relay_test", "missing_database", 1)},
+		{name: "unknown_role", dsn: strings.Replace(dsn, "test_admin", "missing_role", 1)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pool, err := pgxpool.New(ctx, tc.dsn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer pool.Close()
+			_, err = pool.Begin(ctx)
+			if err == nil {
+				t.Fatal("Begin succeeded with invalid connection configuration")
+			}
+
+			ledgerOutbox := &failingLedgerOutbox{errs: []error{err}}
+			relay, err := outbox.New(ledgerOutbox, discardQueueClient{}, outbox.Options{RetryInitialDelay: time.Nanosecond, RetryMaxDelay: time.Nanosecond})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := relay.Run(ctx); err == nil {
+				t.Fatal("Run accepted permanent connection configuration failure as retryable")
+			}
+			if ledgerOutbox.calls != 1 {
+				t.Fatalf("calls=%d, want 1 for permanent connection configuration failure", ledgerOutbox.calls)
+			}
+		})
+	}
+}
+
 func newRelayPostgres(t *testing.T, ctx context.Context) *pgxpool.Pool {
 	database, _ := newRestartableRelayPostgres(t, ctx)
 	return database

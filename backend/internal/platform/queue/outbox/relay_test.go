@@ -141,6 +141,24 @@ func TestRelayRunReturnsFatalDatabaseConfigurationError(t *testing.T) {
 	}
 }
 
+func TestRelayRunReturnsFatalPermanentDatabaseErrors(t *testing.T) {
+	for _, code := range []string{"28P01", "3D000", "3F000", "42501", "42P01", "57P04"} {
+		t.Run(code, func(t *testing.T) {
+			ledgerOutbox := &failingLedgerOutbox{errs: []error{&pgconn.PgError{Code: code}}}
+			relay, err := outbox.New(ledgerOutbox, discardQueueClient{}, outbox.Options{RetryInitialDelay: time.Nanosecond, RetryMaxDelay: time.Nanosecond})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := relay.Run(context.Background()); err == nil {
+				t.Fatalf("Run accepted permanent SQLSTATE %s as retryable", code)
+			}
+			if ledgerOutbox.calls != 1 {
+				t.Fatalf("calls=%d, want 1 for permanent SQLSTATE %s", ledgerOutbox.calls, code)
+			}
+		})
+	}
+}
+
 type discardQueueClient struct{}
 
 func (discardQueueClient) EnqueueContext(context.Context, *asynq.Task, ...asynq.Option) (*asynq.TaskInfo, error) {
