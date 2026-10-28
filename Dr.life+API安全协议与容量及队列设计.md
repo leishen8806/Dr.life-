@@ -160,12 +160,13 @@ Cloudflare（WAF、机器人防护、边缘限流、缓存公开 GET）
 
 ## 六、队列与异步任务（asynq）逻辑
 
-### 6.1 前提与一个必须先解决的问题：Redis 要分两个实例
-asynq 要求 Redis 使用 `maxmemory-policy noeviction`（不能淘汰键，否则任务会丢），而缓存、限流、幂等需要 `allkeys-lru`。**同一个 Redis 实例两者不能兼顾**。
-**方案（默认）：** 同一台机器上起**两个 Redis 进程**：
-- `redis-cache`（缓存、限流、幂等、会话撤销集；`allkeys-lru`，设内存上限；丢失可重建，**资金接口对其不可用时 fail-closed**）；
-- `redis-queue`（仅 asynq；`noeviction` + AOF `everysec`；设内存上限并告警 70%）。
-《技术架构》机柜清单里的"Redis 1 台"改为"1 台 / 2 个实例"（成本几乎为零）。**【待确认】** 是否接受；规模变大再拆物理机。
+### 6.1 前提：Redis 按公共缓存、状态安全、队列分三个实例
+asynq、会话撤销、step-up、限流和幂等都不能容忍键被淘汰，使用 `maxmemory-policy noeviction`；公开缓存则需要有界的 `allkeys-lru`。**三种用途不能共用一个 Redis 实例**。
+**方案（默认）：** 同一台机器上起**三个 Redis 进程**：
+- `redis-cache`（仅公开缓存；`CACHE_REDIS_URL`；`allkeys-lru` + 内存上限；只接受 catalog/config/i18n 公共键；未配置时缓存层禁用，绝不回退到 `REDIS_URL`）；
+- `redis-state`（会话撤销、step-up、限流、幂等；既有 `REDIS_URL`；`noeviction` + AOF `everysec`；资金与后台路由依赖它时继续 fail-closed）；
+- `redis-queue`（仅 asynq；既有 `QUEUE_REDIS_URL`；`noeviction` + AOF `everysec`；设内存上限并告警 70%）。
+《技术架构》机柜清单为"Redis 1 台 / 3 个实例"；规模变大再拆物理机。
 
 ### 6.2 队列划分与隔离
 | 队列 | 用途 | 工作进程并发（默认） | 权重 | 说明 |
@@ -246,7 +247,7 @@ asynq 要求 Redis 使用 `maxmemory-policy noeviction`（不能淘汰键，否�
 
 | # | 问题 | 默认做法 |
 |---|---|---|
-| 1 | 同一台机器上两个 Redis 实例（缓存 / 队列分离） | 采用 |
+| 1 | 同一台机器上三个 Redis 实例（公共缓存 / 状态安全 / 队列分离） | 采用 |
 | 2 | Mini App 刷新令牌绝对有效期 7 天、空闲 24 小时；Web 后台绝对 8 小时、空闲 15 分钟 | 采用（可配置） |
 | 3 | 二次验证方式：Mini App 用短信验证码还是支付密码（"支付密码"需要做设置与找回流程） | 先短信验证码（短信渠道仅做资金安全兜底，已决定） |
 | 4 | `/v1/admin/*` 的 IP 白名单来源（办公室固定 IP / VPN 出口） | 由运维提供，配置项留好 |

@@ -35,6 +35,11 @@ type Config struct {
 	DBSlowQuery                    time.Duration
 	SentryDSN                      string
 	RedisURL                       string
+	CacheRedisURL                  string
+	CacheStaleTTL                  time.Duration
+	CacheNegativeTTL               time.Duration
+	CacheRefreshTimeout            time.Duration
+	CacheMaxEntries                int
 	QueueRedisURL                  string
 	QueueAllowEviction             bool
 	CORSBuyerOrigins               []string
@@ -159,6 +164,14 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		return Config{}, err
 	}
 	idleSeconds, err := durationSeconds(getenv, "IDLE_TIMEOUT_SECONDS", 60)
+	if err != nil {
+		return Config{}, err
+	}
+	cacheStaleSeconds, err := durationSeconds(getenv, "CACHE_STALE_TTL_SECONDS", 30)
+	if err != nil {
+		return Config{}, err
+	}
+	cacheNegativeSeconds, err := durationSeconds(getenv, "CACHE_NEGATIVE_TTL_SECONDS", 30)
 	if err != nil {
 		return Config{}, err
 	}
@@ -420,6 +433,14 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
+	cacheMaxEntries, err := positiveInt(getenv, "CACHE_MAX_ENTRIES", 10000)
+	if err != nil {
+		return Config{}, err
+	}
+	cacheRefreshTimeout, err := positiveDuration(getenv, "CACHE_REFRESH_TIMEOUT", 2*time.Second)
+	if err != nil || cacheRefreshTimeout > 10*time.Second {
+		return Config{}, fmt.Errorf("CACHE_REFRESH_TIMEOUT must be between 1ns and 10s")
+	}
 	jwtActiveKeyID := strings.TrimSpace(getenv("JWT_ACTIVE_KEY_ID"))
 	jwtKeys := strings.TrimSpace(getenv("JWT_SIGNING_KEYS"))
 	jwtConfigured := jwtKeys != "" || jwtActiveKeyID != ""
@@ -461,6 +482,11 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		DBSlowQuery:            time.Duration(dbSlowQueryMS) * time.Millisecond,
 		SentryDSN:              strings.TrimSpace(getenv("SENTRY_DSN")),
 		RedisURL:               strings.TrimSpace(getenv("REDIS_URL")),
+		CacheRedisURL:          strings.TrimSpace(getenv("CACHE_REDIS_URL")),
+		CacheStaleTTL:          time.Duration(cacheStaleSeconds) * time.Second,
+		CacheNegativeTTL:       time.Duration(cacheNegativeSeconds) * time.Second,
+		CacheRefreshTimeout:    cacheRefreshTimeout,
+		CacheMaxEntries:        cacheMaxEntries,
 		QueueRedisURL:          strings.TrimSpace(getenv("QUEUE_REDIS_URL")),
 		QueueAllowEviction:     queueAllowEviction,
 		CORSBuyerOrigins:       cors["CORS_BUYER_ORIGINS"],

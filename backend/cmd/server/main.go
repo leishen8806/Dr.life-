@@ -17,6 +17,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/cache"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
@@ -40,6 +41,26 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	metrics := observability.NewMetrics()
+	if cfg.CacheRedisURL != "" {
+		if cacheErr := cache.RedisPolicy(ctx, cfg.CacheRedisURL); cacheErr != nil {
+			logger.Error("public cache Redis policy failed", "error", cacheErr)
+			os.Exit(1)
+		}
+		redisCache, cacheErr := cache.NewRedisStore(cfg.CacheRedisURL)
+		if cacheErr != nil {
+			logger.Error("public cache Redis configuration failed", "error", cacheErr)
+			os.Exit(1)
+		}
+		defer redisCache.Close()
+		publicCache := cache.New(cache.Options{
+			Environment: cfg.AppEnv, Version: "v1", StaleTTL: cfg.CacheStaleTTL,
+			NegativeTTL: cfg.CacheNegativeTTL, RefreshTimeout: cfg.CacheRefreshTimeout,
+			MaxEntries: cfg.CacheMaxEntries,
+		}, redisCache)
+		logger.Info("public cache initialized", "backend", "dedicated-redis", "max_entries", publicCache.MaxEntries())
+	} else {
+		logger.Info("public cache disabled", "reason", "CACHE_REDIS_URL is not configured")
+	}
 	bulkhead := overload.New(overload.Config{Total: cfg.BulkheadTotal, Wait: cfg.BulkheadWait, Limits: overload.Limits{Critical: cfg.BulkheadLimits["critical"], Auth: cfg.BulkheadLimits["auth"], Write: cfg.BulkheadLimits["write"], Read: cfg.BulkheadLimits["read"], Heavy: cfg.BulkheadLimits["heavy"], Stream: cfg.BulkheadLimits["stream"]}, Timeouts: overload.DefaultConfig().Timeouts, Rules: routeClasses(cfg.BulkheadRules), CriticalPrefixes: cfg.BulkheadCriticalPrefixes, DeadlineExemptions: cfg.BulkheadDeadlineExemptions, Metrics: metrics})
 	reporter, err := observability.NewErrorReporter(cfg.SentryDSN, cfg.AppEnv, cfg.AppRelease, nil)
 	if err != nil {
