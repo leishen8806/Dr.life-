@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -38,6 +39,11 @@ type AdminCreateResult struct {
 	Admin               AdminUser
 	InitialPassword     string
 	TOTPProvisioningURI string
+}
+
+type adminListCursor struct {
+	CreatedAt time.Time `json:"created_at"`
+	ID        int64     `json:"id"`
 }
 
 // AdminManagementService owns sensitive administrator creation. The initial
@@ -98,6 +104,71 @@ func (s *AdminManagementService) Create(ctx context.Context, input AdminCreateIn
 		return AdminCreateResult{}, err
 	}
 	return AdminCreateResult{Admin: user, InitialPassword: password, TOTPProvisioningURI: key.URL()}, nil
+}
+
+// List returns credential-safe administrator records using the (created_at,id)
+// keyset required by the administrator management API.
+func (s *AdminManagementService) List(ctx context.Context, cursor string, limit int) ([]AdminUser, string, error) {
+	if s == nil || s.DB == nil {
+		return nil, "", errors.New("iam: administrator management database unavailable")
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	var after adminListCursor
+	var afterSet bool
+	if cursor != "" {
+		decoded, err := base64.RawURLEncoding.DecodeString(cursor)
+		if err != nil || json.Unmarshal(decoded, &after) != nil || after.ID <= 0 || after.CreatedAt.IsZero() {
+			return nil, "", errors.New("iam: invalid administrator cursor")
+		}
+		afterSet = true
+	}
+
+	rows, err := s.DB.Query(ctx, `
+		SELECT id,public_id,name,email,role,data_scope,status,last_login_at,created_at
+		FROM iam.admin_user
+		WHERE NOT $1::boolean OR (created_at,id) > ($2,$3)
+		ORDER BY created_at,id
+		LIMIT $4`, afterSet, after.CreatedAt, after.ID, limit+1)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+	type listedAdmin struct {
+		AdminUser
+		id int64
+	}
+	listed := make([]listedAdmin, 0, limit+1)
+	for rows.Next() {
+		var item listedAdmin
+		if err := rows.Scan(&item.id, &item.PublicID, &item.Name, &item.Email, &item.Role, &item.DataScope, &item.Status, &item.LastLoginAt, &item.CreatedAt); err != nil {
+			return nil, "", err
+		}
+		listed = append(listed, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", err
+	}
+
+	next := ""
+	if len(listed) > limit {
+		last := listed[limit-1]
+		encoded, err := json.Marshal(adminListCursor{CreatedAt: last.CreatedAt, ID: last.id})
+		if err != nil {
+			return nil, "", err
+		}
+		next = base64.RawURLEncoding.EncodeToString(encoded)
+		listed = listed[:limit]
+	}
+	items := make([]AdminUser, 0, len(listed))
+	for _, item := range listed {
+		items = append(items, item.AdminUser)
+	}
+	return items, next, nil
 }
 
 func (s *AdminManagementService) now() time.Time {

@@ -21,6 +21,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // maxBodyBytes 限制请求体大小，避免超大 JSON 进入内存。
@@ -87,6 +88,12 @@ type AdminPermissionChecker interface {
 	HasDataScope(context.Context, string) (bool, error)
 }
 
+// AdminManagement is the credential-safe IAM port for administrator records.
+// It deliberately has no method that returns hashes or encrypted TOTP values.
+type AdminManagement interface {
+	List(context.Context, string, int) ([]iam.AdminUser, string, error)
+}
+
 type LedgerReader interface {
 	ListAdminTransactions(context.Context, int) ([]ledger.AdminTransaction, error)
 	GetAdminTransaction(context.Context, string) (ledger.AdminTransaction, bool, error)
@@ -125,6 +132,7 @@ type Handler struct {
 	Directory        AccountDirectory
 	AdminPermissions AdminPermissionChecker
 	Files            FileManagement
+	AdminManagement  AdminManagement
 }
 
 type adminStepUpRequest struct {
@@ -292,6 +300,60 @@ func (h Handler) adminLedgerAccess(w http.ResponseWriter, r *http.Request) bool 
 	}
 	scoped, err := h.AdminPermissions.HasDataScope(r.Context(), identity.AccountID)
 	if err != nil || scoped {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	return true
+}
+
+func (h Handler) ListAdminUsers(w http.ResponseWriter, r *http.Request, params gen.ListAdminUsersParams) {
+	if !h.adminRBACAccess(w, r, "view") {
+		return
+	}
+	if h.AdminManagement == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	cursor := ""
+	if params.Cursor != nil {
+		cursor = *params.Cursor
+	}
+	limit := 50
+	if params.Limit != nil {
+		limit = *params.Limit
+	}
+	items, next, err := h.AdminManagement.List(r.Context(), cursor, limit)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	result := make([]gen.AdminUser, 0, len(items))
+	for _, user := range items {
+		result = append(result, gen.AdminUser{
+			PublicId: user.PublicID, Name: user.Name, Email: openapi_types.Email(user.Email),
+			Role: gen.AdminUserRole(user.Role), DataScope: user.DataScope,
+			Status: gen.AdminUserStatus(user.Status), LastLoginAt: user.LastLoginAt, CreatedAt: user.CreatedAt,
+		})
+	}
+	data := gen.AdminUserListData{Items: result}
+	if next != "" {
+		data.NextCursor = &next
+	}
+	httpx.WriteOK(w, r, data)
+}
+
+func (h Handler) adminRBACAccess(w http.ResponseWriter, r *http.Request, required string) bool {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return false
+	}
+	if identity.Role != gateway.RoleAdmin || h.AdminPermissions == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	allowed, err := h.AdminPermissions.Can(r.Context(), identity.AccountID, "rbac", required)
+	if err != nil || !allowed {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
 		return false
 	}
