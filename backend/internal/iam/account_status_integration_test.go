@@ -20,7 +20,7 @@ func (f *loginFixture) testAccountStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	service := &AccountStatusService{DB: f.pool, Cache: f.cache, AbsoluteTTL: 48 * time.Hour, Now: func() time.Time { return f.now }}
-	actor := StatusActor{Type: "admin", ID: "admin-status-test"}
+	actor := StatusActor{Type: "admin", ID: "  admin-status-test  "}
 	if _, err := service.SetAccountStatus(ctx, login.Account.PublicID, "frozen", "  ", actor); err == nil {
 		t.Fatal("blank freeze reason accepted")
 	}
@@ -40,11 +40,15 @@ func (f *loginFixture) testAccountStatus(t *testing.T) {
 	var epoch int64
 	var revoked int
 	var reason *string
+	var actorID string
 	if err := f.pool.QueryRow(ctx, `SELECT status,status_reason,token_epoch FROM iam.account WHERE public_id=$1`, login.Account.PublicID).Scan(&status, &reason, &epoch); err != nil || status != "frozen" || reason == nil || *reason != "review required" || epoch != 1 {
 		t.Fatalf("frozen account status=%q reason=%v epoch=%d err=%v", status, reason, epoch, err)
 	}
 	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.session s JOIN iam.account a ON a.id=s.account_id WHERE a.public_id=$1 AND s.revoked_reason='account_frozen'`, login.Account.PublicID).Scan(&revoked); err != nil || revoked != 1 {
 		t.Fatalf("revoked sessions=%d err=%v", revoked, err)
+	}
+	if err := f.pool.QueryRow(ctx, `SELECT actor_id FROM iam.account_status_log WHERE account_id=(SELECT id FROM iam.account WHERE public_id=$1) ORDER BY id LIMIT 1`, login.Account.PublicID).Scan(&actorID); err != nil || actorID != "admin-status-test" {
+		t.Fatalf("logged actor_id=%q err=%v", actorID, err)
 	}
 	f.cache.mu.Lock()
 	epochTTL := f.cache.epochTTL
