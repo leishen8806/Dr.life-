@@ -14,6 +14,9 @@ type Store interface {
 	CreateProduct(ctx context.Context, merchantID int64, input ProductInput) (Product, error)
 	UpdateProduct(ctx context.Context, merchantID int64, publicID string, patch ProductPatch) (Product, error)
 	PublishProduct(ctx context.Context, merchantID int64, publicID string) (Product, error)
+	SearchProducts(ctx context.Context, filter ProductFilter, query SearchQuery) (SearchPage, error)
+	SuggestProducts(ctx context.Context, filter ProductFilter, prefix string) ([]SearchSuggestion, error)
+	LogSearch(ctx context.Context, query string, resultN int) error
 }
 
 // MerchantDirectory 是 iam 商户状态在 catalog 侧的只读端口。
@@ -102,6 +105,66 @@ func (s *Service) PublicProducts(ctx context.Context, query ListQuery) (ProductP
 		return page, nil
 	}
 	return s.store.ListProducts(ctx, ProductFilter{MerchantIDs: sellable, Status: StatusOn}, plan)
+}
+
+func (s *Service) PublicSearch(ctx context.Context, query SearchQuery) (SearchPage, error) {
+	query.Query = strings.TrimSpace(query.Query)
+	if query.Query == "" {
+		return SearchPage{}, invalid("q", "search query is required")
+	}
+	if query.MinPriceE4 < 0 || query.MaxPriceE4 < 0 || (query.MaxPriceE4 > 0 && query.MinPriceE4 > query.MaxPriceE4) {
+		return SearchPage{}, invalid("price", "invalid price range")
+	}
+	if query.PageSize <= 0 {
+		query.PageSize = DefaultPageSize
+	}
+	if query.PageSize > MaxPageSize {
+		query.PageSize = MaxPageSize
+	}
+	if query.Sort == "" {
+		query.Sort = SearchSortRelevance
+	}
+	switch query.Sort {
+	case SearchSortRelevance, SearchSortPriceAsc, SearchSortPriceDesc, SearchSortNewest:
+	default:
+		return SearchPage{}, invalid("sort", "unsupported search sort")
+	}
+	directory, err := s.directory()
+	if err != nil {
+		return SearchPage{}, err
+	}
+	sellable, err := directory.SellableMerchants(ctx)
+	if err != nil {
+		return SearchPage{}, err
+	}
+	if len(sellable) == 0 {
+		return SearchPage{Items: []Product{}, Recommendations: []Product{}}, nil
+	}
+	page, err := s.store.SearchProducts(ctx, ProductFilter{MerchantIDs: sellable, Status: StatusOn}, query)
+	if err != nil {
+		return SearchPage{}, err
+	}
+	_ = s.store.LogSearch(ctx, query.Query, len(page.Items))
+	return page, nil
+}
+
+func (s *Service) PublicSuggestions(ctx context.Context, prefix string) ([]SearchSuggestion, error) {
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "" {
+		return []SearchSuggestion{}, nil
+	}
+	directory, err := s.directory()
+	if err != nil {
+		return nil, err
+	}
+	sellable, err := directory.SellableMerchants(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(sellable) == 0 {
+		return []SearchSuggestion{}, nil
+	}
+	return s.store.SuggestProducts(ctx, ProductFilter{MerchantIDs: sellable, Status: StatusOn}, prefix)
 }
 
 // MerchantProducts 的商家范围由服务端强制，客户端无法扩大。

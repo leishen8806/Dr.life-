@@ -172,3 +172,32 @@ type ProductPage struct {
 	Items                 []Product
 	Page, PageSize, Total int
 }
+
+type SearchSort string
+
+const (
+	SearchSortRelevance SearchSort = "relevance"
+	SearchSortPriceAsc  SearchSort = "price_asc"
+	SearchSortPriceDesc SearchSort = "price_desc"
+	SearchSortNewest    SearchSort = "newest"
+)
+
+// SearchQuery is the public product search filter. Prices are e4 integers.
+type SearchQuery struct {
+	Query                  string
+	Category               string
+	MinPriceE4, MaxPriceE4 int64
+	Sort                   SearchSort
+	Cursor                 string
+	PageSize               int
+}
+
+type SearchPage struct {
+	Items           []Product
+	NextCursor      string
+	Recommendations []Product
+}
+
+type SearchSuggestion struct {
+	Text string
+}

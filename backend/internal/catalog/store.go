@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 )
@@ -17,6 +18,7 @@ import (
 type rowQuerier interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...any) pgx.Row
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
 }
 
 // pool 在 rowQuerier 之上额外提供事务能力；只有 *pgxpool.Pool 满足这一层。

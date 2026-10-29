@@ -51,7 +51,20 @@ type stubStore struct {
 	listCalls    int
 	filter       catalog.ProductFilter
 	plan         catalog.Plan
+	search       struct {
+		Filter catalog.ProductFilter
+		Query  catalog.SearchQuery
+	}
 }
+
+func (s *stubStore) SearchProducts(_ context.Context, filter catalog.ProductFilter, query catalog.SearchQuery) (catalog.SearchPage, error) {
+	s.search.Filter, s.search.Query = filter, query
+	return catalog.SearchPage{Items: []catalog.Product{}}, nil
+}
+func (s *stubStore) SuggestProducts(context.Context, catalog.ProductFilter, string) ([]catalog.SearchSuggestion, error) {
+	return []catalog.SearchSuggestion{}, nil
+}
+func (s *stubStore) LogSearch(context.Context, string, int) error { return nil }
 
 func (s *stubStore) ListCategories(context.Context, catalog.Plan) (catalog.CategoryPage, error) {
 	return catalog.CategoryPage{Items: []catalog.Category{{PublicID: productULID, Code: "c1"}}}, nil
