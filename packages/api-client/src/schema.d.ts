@@ -932,6 +932,18 @@ export interface components {
         };
         /** @description At least two tiers, each with a unique minimum order quantity. */
         ProductTierList: components["schemas"]["ProductTier"][];
+        SKU: {
+            public_id: string;
+            attribute_values: {
+                [key: string]: string;
+            };
+            merchant_sku_code?: string;
+            /** @enum {string} */
+            status: "draft" | "review" | "on" | "off" | "rejected";
+            unit?: string | null;
+            tiers: components["schemas"]["ProductTierList"];
+        };
+        SKUList: components["schemas"]["SKU"][];
         Category: {
             public_id: string;
             code: string;
@@ -957,6 +969,7 @@ export interface components {
             source_ref?: string | null;
             std_score?: number | null;
             tiers: components["schemas"]["ProductTierList"];
+            skus: components["schemas"]["SKUList"];
             /** Format: date-time */
             updated_at: string;
         };
@@ -977,7 +990,7 @@ export interface components {
         ProductUpdateRequest: {
             category_code?: string;
             name?: components["schemas"]["LocalizedText"];
-            spec?: components["schemas"]["LocalizedText"];
+            spec?: components["schemas"]["LocalizedText"] | null;
             unit?: string;
             /** @enum {string} */
             origin?: "cn" | "lc";

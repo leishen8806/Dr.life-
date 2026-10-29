@@ -1240,9 +1240,7 @@ type ProductUpdateRequest struct {
 	Name      *LocalizedText              `json:"name,omitempty"`
 	Origin    *ProductUpdateRequestOrigin `json:"origin,omitempty"`
 	SourceRef *string                     `json:"source_ref,omitempty"`
-
-	// Spec Trilingual text; every language must be present before a product can be published.
-	Spec *LocalizedText `json:"spec,omitempty"`
+	Spec      *LocalizedText              `json:"spec,omitempty"`
 
 	// Status Merchants may only move a product between draft and off; on is reached through publish.
 	Status *ProductUpdateRequestStatus `json:"status,omitempty"`
