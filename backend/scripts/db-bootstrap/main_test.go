@@ -26,3 +26,19 @@ func TestCatalogLoginGrantsAreNarrow(t *testing.T) {
 		}
 	}
 }
+
+func TestFileWorkerLoginUsesOnlyThePromotionRole(t *testing.T) {
+	var found *role
+	for i := range roles {
+		if roles[i].login == "app_file_worker" {
+			found = &roles[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("app_file_worker login is not provisioned")
+	}
+	if found.permission != "ops_file_worker" || found.passwordEnv != "FILE_WORKER_DB_PASSWORD" {
+		t.Fatalf("file worker role = %+v, want ops_file_worker / FILE_WORKER_DB_PASSWORD", *found)
+	}
+}
