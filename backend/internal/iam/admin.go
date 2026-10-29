@@ -300,7 +300,10 @@ type TOTPSecretCipher interface {
 
 type AdminStatus string
 
-const AdminStatusActive AdminStatus = "active"
+const (
+	AdminStatusActive   AdminStatus = "active"
+	AdminStatusDisabled AdminStatus = "disabled"
+)
 
 var ErrAdminAuthentication = errors.New("iam: administrator authentication failed")
 

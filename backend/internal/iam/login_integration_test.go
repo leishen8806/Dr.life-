@@ -264,7 +264,7 @@ func (f *loginFixture) testAdminManagementStatusAndRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	insertSession := func(sessionID string) {
-		if _, err := f.pool.Exec(ctx, `INSERT INTO iam.session(public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES($1,(SELECT id FROM iam.admin_user WHERE public_id=$2),$1,decode('01','hex'),'test-kid',$3,$4)`, sessionID, target.Admin.PublicID, f.now.Add(time.Hour), f.now); err != nil {
+		if _, err := f.pool.Exec(ctx, `INSERT INTO iam.session(public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES($1,(SELECT id FROM iam.admin_user WHERE public_id=$2),$1,convert_to($1,'UTF8'),'test-kid',$3,$4)`, sessionID, target.Admin.PublicID, f.now.Add(time.Hour), f.now); err != nil {
 			t.Fatal(err)
 		}
 		if err := f.cache.Put(ctx, target.Admin.PublicID, sessionID, 0, time.Hour); err != nil {

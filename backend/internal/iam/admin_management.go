@@ -59,10 +59,198 @@ type adminListCursor struct {
 // password and provisioning URI are returned only to the direct caller and are
 // deliberately not persisted in result-like database columns or audit detail.
 type AdminManagementService struct {
-	DB     *pgxpool.Pool
-	Cipher TOTPSecretCipher
-	Audit  platformaudit.Writer
-	Now    func() time.Time
+	DB           *pgxpool.Pool
+	Cipher       TOTPSecretCipher
+	Audit        platformaudit.Writer
+	SessionCache SessionCache
+	Now          func() time.Time
+}
+
+// DisableWithAudit disables an administrator and immediately revokes all of
+// their existing sessions. The database trigger remains the concurrent guard
+// against removing the final active super administrator.
+func (s *AdminManagementService) DisableWithAudit(ctx context.Context, publicID, reason string, auditInput AdminAuditInput) (AdminUser, error) {
+	if strings.TrimSpace(reason) == "" {
+		return AdminUser{}, errors.New("iam: administrator disable reason is required")
+	}
+	return s.changeStatusWithAudit(ctx, publicID, AdminStatus("disabled"), auditInput)
+}
+
+// EnableWithAudit enables an administrator. Existing sessions remain revoked;
+// the administrator must sign in again.
+func (s *AdminManagementService) EnableWithAudit(ctx context.Context, publicID string, auditInput AdminAuditInput) (AdminUser, error) {
+	return s.changeStatusWithAudit(ctx, publicID, AdminStatusActive, auditInput)
+}
+
+func (s *AdminManagementService) changeStatusWithAudit(ctx context.Context, publicID string, status AdminStatus, auditInput AdminAuditInput) (AdminUser, error) {
+	if status != AdminStatusActive && status != AdminStatus("disabled") {
+		return AdminUser{}, errors.New("iam: invalid administrator status")
+	}
+	actorID, actorPublicID, err := s.auditActor(ctx, auditInput)
+	if err != nil {
+		return AdminUser{}, err
+	}
+	if actorPublicID == strings.TrimSpace(publicID) {
+		return AdminUser{}, errors.New("iam: administrator cannot change own status")
+	}
+	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return AdminUser{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	before, err := scanAdminUser(tx.QueryRow(ctx, `SELECT public_id,name,email,role,data_scope,status,last_login_at,created_at FROM iam.admin_user WHERE public_id=$1 FOR UPDATE`, strings.TrimSpace(publicID)))
+	if err != nil {
+		return AdminUser{}, err
+	}
+	after, err := scanAdminUser(tx.QueryRow(ctx, `UPDATE iam.admin_user SET status=$1,updated_at=$2 WHERE public_id=$3 RETURNING public_id,name,email,role,data_scope,status,last_login_at,created_at`, status, s.now(), before.PublicID))
+	if err != nil {
+		return AdminUser{}, err
+	}
+	var revoked []adminSession
+	if status != AdminStatusActive {
+		rows, err := tx.Query(ctx, `UPDATE iam.session SET revoked_at=$1,revoked_reason='admin_disabled',updated_at=$1 WHERE admin_user_id=(SELECT id FROM iam.admin_user WHERE public_id=$2) AND revoked_at IS NULL RETURNING public_id,expires_at`, s.now(), before.PublicID)
+		if err != nil {
+			return AdminUser{}, err
+		}
+		for rows.Next() {
+			var item adminSession
+			if err := rows.Scan(&item.ID, &item.ExpiresAt); err != nil {
+				rows.Close()
+				return AdminUser{}, err
+			}
+			revoked = append(revoked, item)
+		}
+		if err := rows.Err(); err != nil {
+			rows.Close()
+			return AdminUser{}, err
+		}
+		rows.Close()
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return AdminUser{}, err
+	}
+	s.revokeCachedAdminSessions(ctx, before.PublicID, revoked)
+	if err := s.appendManagementAudit(ctx, actorID, actorPublicID, before, after, auditInput); err != nil {
+		return AdminUser{}, err
+	}
+	return after, nil
+}
+
+// UpdateRoleWithAudit updates role and data scope and revokes all sessions so
+// a new access token is required for the changed privileges.
+func (s *AdminManagementService) UpdateRoleWithAudit(ctx context.Context, publicID string, role Role, dataScope []string, auditInput AdminAuditInput) (AdminUser, error) {
+	if !validAdminRole(role) {
+		return AdminUser{}, errors.New("iam: invalid administrator role")
+	}
+	actorID, actorPublicID, err := s.auditActor(ctx, auditInput)
+	if err != nil {
+		return AdminUser{}, err
+	}
+	if actorPublicID == strings.TrimSpace(publicID) {
+		return AdminUser{}, errors.New("iam: administrator cannot change own role")
+	}
+	if dataScope == nil {
+		dataScope = []string{}
+	}
+	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return AdminUser{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	before, err := scanAdminUser(tx.QueryRow(ctx, `SELECT public_id,name,email,role,data_scope,status,last_login_at,created_at FROM iam.admin_user WHERE public_id=$1 FOR UPDATE`, strings.TrimSpace(publicID)))
+	if err != nil {
+		return AdminUser{}, err
+	}
+	after, err := scanAdminUser(tx.QueryRow(ctx, `UPDATE iam.admin_user SET role=$1,data_scope=$2,updated_at=$3 WHERE public_id=$4 RETURNING public_id,name,email,role,data_scope,status,last_login_at,created_at`, role, dataScope, s.now(), before.PublicID))
+	if err != nil {
+		return AdminUser{}, err
+	}
+	rows, err := tx.Query(ctx, `UPDATE iam.session SET revoked_at=$1,revoked_reason='admin_role_changed',updated_at=$1 WHERE admin_user_id=(SELECT id FROM iam.admin_user WHERE public_id=$2) AND revoked_at IS NULL RETURNING public_id,expires_at`, s.now(), before.PublicID)
+	if err != nil {
+		return AdminUser{}, err
+	}
+	var revoked []adminSession
+	for rows.Next() {
+		var item adminSession
+		if err := rows.Scan(&item.ID, &item.ExpiresAt); err != nil {
+			rows.Close()
+			return AdminUser{}, err
+		}
+		revoked = append(revoked, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return AdminUser{}, err
+	}
+	rows.Close()
+	if err := tx.Commit(ctx); err != nil {
+		return AdminUser{}, err
+	}
+	s.revokeCachedAdminSessions(ctx, before.PublicID, revoked)
+	if err := s.appendManagementAudit(ctx, actorID, actorPublicID, before, after, auditInput); err != nil {
+		return AdminUser{}, err
+	}
+	return after, nil
+}
+
+type adminSession struct {
+	ID        string
+	ExpiresAt time.Time
+}
+
+func (s *AdminManagementService) revokeCachedAdminSessions(ctx context.Context, adminPublicID string, sessions []adminSession) {
+	if s.SessionCache == nil {
+		return
+	}
+	now := s.now()
+	for _, session := range sessions {
+		_ = s.SessionCache.Revoke(ctx, session.ID, positiveTTL(now, session.ExpiresAt))
+	}
+}
+
+func (s *AdminManagementService) auditActor(ctx context.Context, input AdminAuditInput) (int64, string, error) {
+	if s == nil || s.DB == nil || s.Audit == nil {
+		return 0, "", errors.New("iam: administrator management audit unavailable")
+	}
+	actorPublicID := strings.TrimSpace(input.ActorPublicID)
+	if actorPublicID == "" || strings.TrimSpace(input.RequestID) == "" {
+		return 0, "", errors.New("iam: administrator management audit context is required")
+	}
+	var actorID int64
+	if err := s.DB.QueryRow(ctx, `SELECT id FROM iam.admin_user WHERE public_id=$1 AND status='active'`, actorPublicID).Scan(&actorID); err != nil {
+		return 0, "", err
+	}
+	return actorID, actorPublicID, nil
+}
+
+func (s *AdminManagementService) appendManagementAudit(ctx context.Context, actorID int64, actorPublicID string, before, after AdminUser, input AdminAuditInput) error {
+	detail, err := json.Marshal(struct {
+		ActorPublicID  string    `json:"actor_public_id"`
+		TargetPublicID string    `json:"target_public_id"`
+		Before         adminView `json:"before"`
+		After          adminView `json:"after"`
+	}{ActorPublicID: actorPublicID, TargetPublicID: after.PublicID, Before: auditAdminView(before), After: auditAdminView(after)})
+	if err != nil {
+		return err
+	}
+	_, err = s.Audit.Append(ctx, platformaudit.Entry{Time: s.now(), ActorID: actorID, ActorRole: "admin", Action: platformaudit.ActionPermissionChanged, Target: "admin:" + after.PublicID, Detail: detail, IP: input.IP, RequestID: input.RequestID})
+	return err
+}
+
+type adminView struct {
+	Role      Role        `json:"role"`
+	Status    AdminStatus `json:"status"`
+	DataScope []string    `json:"data_scope"`
+}
+
+func auditAdminView(user AdminUser) adminView {
+	return adminView{Role: user.Role, Status: user.Status, DataScope: user.DataScope}
+}
+
+func scanAdminUser(row pgx.Row) (AdminUser, error) {
+	var user AdminUser
+	err := row.Scan(&user.PublicID, &user.Name, &user.Email, &user.Role, &user.DataScope, &user.Status, &user.LastLoginAt, &user.CreatedAt)
+	return user, err
 }
 
 func (s *AdminManagementService) Create(ctx context.Context, input AdminCreateInput) (AdminCreateResult, error) {
