@@ -156,3 +156,24 @@ func TestProductStatusIsBoundedAndMerchantSettable(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateSKURequiresUniqueEnumValuesAndTwoTiers(t *testing.T) {
+	attributes := []catalog.CategoryAttribute{{
+		Key:            "color",
+		Type:           catalog.AttributeTypeEnum,
+		Required:       true,
+		IsSKUDimension: true,
+		Values: []catalog.AttributeValue{
+			{Code: "red", Name: catalog.LocalizedText{"zh": "红", "en": "Red", "km": "ក្រហម"}},
+		},
+	}}
+	valid := catalog.SKUInput{AttributeValues: map[string]string{"color": "red"}, Tiers: []catalog.Tier{{MinQty: "1", UnitPriceE4: 10}, {MinQty: "10", UnitPriceE4: 9}}}
+	if err := catalog.ValidateSKU(attributes, valid); err != nil {
+		t.Fatalf("ValidateSKU(valid) = %v", err)
+	}
+	invalid := valid
+	invalid.AttributeValues = map[string]string{"color": "blue"}
+	if err := catalog.ValidateSKU(attributes, invalid); err == nil {
+		t.Fatal("unknown enum value must fail")
+	}
+}

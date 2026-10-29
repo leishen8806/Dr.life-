@@ -156,6 +156,9 @@ func (s *PgStore) CreateProduct(ctx context.Context, merchantID int64, input Pro
 	if err := replaceTiers(ctx, tx, productID, input.Tiers); err != nil {
 		return Product{}, err
 	}
+	if err := createDefaultSKU(ctx, tx, productID, input.Tiers); err != nil {
+		return Product{}, err
+	}
 	product, err := productByID(ctx, tx, productID)
 	if err != nil {
 		return Product{}, err
@@ -252,6 +255,9 @@ func (s *PgStore) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 	}
 	if patch.Tiers != nil {
 		if err := replaceTiers(ctx, tx, productID, patch.Tiers); err != nil {
+			return Product{}, err
+		}
+		if err := replaceDefaultSKUTiers(ctx, tx, productID, patch.Tiers); err != nil {
 			return Product{}, err
 		}
 	}
@@ -485,6 +491,43 @@ func replaceTiers(ctx context.Context, tx pgx.Tx, productID int64, tiers []Tier)
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4)
 			VALUES ($1, $2::text::numeric, $3)`, productID, quantity, tier.UnitPriceE4); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func createDefaultSKU(ctx context.Context, tx pgx.Tx, productID int64, tiers []Tier) error {
+	publicID, err := ids.NewULID()
+	if err != nil {
+		return err
+	}
+	var skuID int64
+	if err := tx.QueryRow(ctx, `INSERT INTO catalog.sku (public_id, product_id, attribute_values) VALUES ($1, $2, '{}'::jsonb) RETURNING id`, publicID, productID).Scan(&skuID); err != nil {
+		return err
+	}
+	return replaceSKUTiers(ctx, tx, skuID, tiers)
+}
+
+func replaceDefaultSKUTiers(ctx context.Context, tx pgx.Tx, productID int64, tiers []Tier) error {
+	var skuID int64
+	err := tx.QueryRow(ctx, `SELECT id FROM catalog.sku WHERE product_id = $1 AND attribute_values = '{}'::jsonb FOR UPDATE`, productID).Scan(&skuID)
+	if err != nil {
+		return err
+	}
+	return replaceSKUTiers(ctx, tx, skuID, tiers)
+}
+
+func replaceSKUTiers(ctx context.Context, tx pgx.Tx, skuID int64, tiers []Tier) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM catalog.sku_tier WHERE sku_id = $1`, skuID); err != nil {
+		return err
+	}
+	for _, tier := range tiers {
+		quantity, err := ParseDecimal(tier.MinQty, 3)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO catalog.sku_tier (sku_id, min_qty, unit_price_e4) VALUES ($1, $2::text::numeric, $3)`, skuID, quantity, tier.UnitPriceE4); err != nil {
 			return err
 		}
 	}

@@ -94,7 +94,7 @@ func TestCatalogMigration(t *testing.T) {
 			WHERE c.table_schema = 'catalog' AND c.table_name <> 'search_log_default'`).Scan(&identityCount, &badTimestamp); err != nil {
 			t.Fatal(err)
 		}
-		if identityCount != 6 || badTimestamp != 0 {
+		if identityCount != 9 || badTimestamp != 0 {
 			t.Fatalf("identity columns=%d, bad timestamps=%d", identityCount, badTimestamp)
 		}
 	})
@@ -229,6 +229,19 @@ func TestCatalogMigration(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23503", fmt.Sprintf(`INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4) VALUES (999999, 1, 1)`))
 	})
 
+	t.Run("sku backfill and constraints", func(t *testing.T) {
+		var skuID int64
+		if err := admin.QueryRow(ctx, `INSERT INTO catalog.sku (public_id, product_id, attribute_values) SELECT '01H5K000000000000000000001', id, '{}'::jsonb FROM catalog.product WHERE public_id = $1 RETURNING id`, firstProductPublicID).Scan(&skuID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `INSERT INTO catalog.sku_tier (sku_id, min_qty, unit_price_e4) VALUES ($1, 1, 120000)`, skuID); err != nil {
+			t.Fatal(err)
+		}
+		assertSQLState(t, ctx, admin, "23514", `INSERT INTO catalog.category_attribute (category_id, key, name, type, is_sku_dimension) SELECT id, 'length', '{"zh":"长","en":"Length","km":"ប្រវែង"}'::jsonb, 'number', true FROM catalog.category LIMIT 1`)
+		assertSQLState(t, ctx, admin, "23514", `INSERT INTO catalog.category_attribute (category_id, key, name, type, value_json) SELECT id, 'color', '{"zh":"颜色","en":"Color","km":"ពណ៌"}'::jsonb, 'enum', '[]'::jsonb FROM catalog.category LIMIT 1`)
+		assertSQLState(t, ctx, admin, "23503", `INSERT INTO catalog.sku_tier (sku_id, min_qty, unit_price_e4) VALUES (999999, 1, 1)`)
+	})
+
 	t.Run("search and import constraints", func(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO catalog.search_synonym (terms) VALUES (ARRAY['瓷砖'])`)
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO catalog.search_log (q) VALUES ('   ')`)
@@ -314,7 +327,7 @@ func seedCatalogFixtures(t *testing.T, ctx context.Context, admin *pgx.Conn) {
 
 func assertCatalogTables(t *testing.T, database *sql.DB, want bool) {
 	t.Helper()
-	for _, name := range []string{"category", "product", "product_tier", "product_import", "search_synonym", "search_log"} {
+	for _, name := range []string{"category", "product", "product_tier", "category_attribute", "sku", "sku_tier", "product_import", "search_synonym", "search_log"} {
 		var exists bool
 		if err := database.QueryRow(`SELECT to_regclass('catalog.' || $1) IS NOT NULL`, name).Scan(&exists); err != nil {
 			t.Fatal(err)

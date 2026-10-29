@@ -5,6 +5,35 @@ import (
 	"strings"
 )
 
+func ValidateSKU(attributes []CategoryAttribute, input SKUInput) error {
+	byKey := make(map[string]CategoryAttribute, len(attributes))
+	for _, attribute := range attributes {
+		byKey[attribute.Key] = attribute
+		if attribute.Required && strings.TrimSpace(input.AttributeValues[attribute.Key]) == "" {
+			return invalid("skus.attribute_values."+attribute.Key, "required attribute is missing")
+		}
+	}
+	for key, value := range input.AttributeValues {
+		attribute, ok := byKey[key]
+		if !ok {
+			return invalid("skus.attribute_values."+key, "unknown attribute")
+		}
+		if attribute.Type == AttributeTypeEnum {
+			found := false
+			for _, choice := range attribute.Values {
+				if value == choice.Code {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return invalid("skus.attribute_values."+key, "unknown enum value")
+			}
+		}
+	}
+	return ValidateTiers(input.Tiers)
+}
+
 // languages 是上架所需的三语顺序；报错按此顺序定位第一个缺失的语言。
 var languages = []string{LangZH, LangEN, LangKM}
 
