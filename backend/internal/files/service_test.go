@@ -88,6 +88,17 @@ func TestCompleteFailsClosedWithoutVerificationQueue(t *testing.T) {
 	}
 }
 
+func TestCompleteReturnsFileToPendingWhenVerificationEnqueueFails(t *testing.T) {
+	store := &memoryStore{file: File{PublicID: "file-1", OwnerAccount: 7, Status: StatusPending}}
+	service := New(store, &fakeObjects{}, Options{Verifier: failingVerifier{}})
+	if _, err := service.Complete(context.Background(), 7, "file-1"); err == nil {
+		t.Fatal("Complete accepted a failed verification enqueue")
+	}
+	if store.file.Status != StatusPending {
+		t.Fatalf("status after enqueue failure=%q, want pending for retry", store.file.Status)
+	}
+}
+
 func TestDownloadURLRequiresOwnedReadyFile(t *testing.T) {
 	store := &memoryStore{file: File{PublicID: "file-1", OwnerAccount: 7, ObjectKey: "objects/test", Status: StatusReady}}
 	objects := &fakeObjects{download: storage.SignedURL{URL: "https://example.test/get", ExpiresAt: time.Now().Add(time.Minute)}}
@@ -137,6 +148,12 @@ type fakeVerifier struct{ file File }
 func (v *fakeVerifier) EnqueueVerification(_ context.Context, file File) error {
 	v.file = file
 	return nil
+}
+
+type failingVerifier struct{}
+
+func (failingVerifier) EnqueueVerification(context.Context, File) error {
+	return errors.New("queue unavailable")
 }
 
 func (s *fakeObjects) PresignPut(_ context.Context, in storage.PutRequest) (storage.SignedURL, error) {
