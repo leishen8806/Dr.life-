@@ -644,6 +644,12 @@ func (f fakeAdminPermissions) HasDataScope(context.Context, string) (bool, error
 	return f.scoped, nil
 }
 
+type fakeAdminManagement struct{ users []iam.AdminUser }
+
+func (f fakeAdminManagement) List(context.Context, string, int) ([]iam.AdminUser, string, error) {
+	return f.users, "", nil
+}
+
 func ledgerHandler(auth gateway.Authenticator, reader api.LedgerReader, directory api.AccountDirectory, permissions api.AdminPermissionChecker) http.Handler {
 	return server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: auth, Ledger: reader, Directory: directory, AdminPermissions: permissions})
 }
@@ -679,6 +685,19 @@ func TestFinancialCenterUsesAuthorizedLedgerReader(t *testing.T) {
 	}
 	if reader.financial.From != time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC) || reader.financial.To != time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC) || reader.financial.MerchantLimit != 25 {
 		t.Fatalf("filter=%+v", reader.financial)
+	}
+}
+
+func TestAdminManagementListRequiresRBACViewAndOmitsCredentials(t *testing.T) {
+	manager := fakeAdminManagement{users: []iam.AdminUser{{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAA", Name: "Admin", Email: "admin@example.test", Role: iam.RoleSupport, Status: iam.AdminStatusActive, CreatedAt: time.Unix(1_800_000_000, 0)}}}
+	denied := server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, AdminPermissions: fakeAdminPermissions{allowed: false}, AdminManagement: manager})
+	if got := serve(t, denied, httptest.NewRequest(http.MethodGet, "/v1/admin/admins", nil)); got.Code != http.StatusForbidden {
+		t.Fatalf("without rbac view status=%d body=%s", got.Code, got.Body.String())
+	}
+	allowed := server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, AdminPermissions: fakeAdminPermissions{allowed: true}, AdminManagement: manager})
+	got := serve(t, allowed, httptest.NewRequest(http.MethodGet, "/v1/admin/admins?limit=50", nil))
+	if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), "admin@example.test") || strings.Contains(got.Body.String(), "password_hash") || strings.Contains(got.Body.String(), "totp_secret_enc") {
+		t.Fatalf("list response status=%d body=%s", got.Code, got.Body.String())
 	}
 }
 
