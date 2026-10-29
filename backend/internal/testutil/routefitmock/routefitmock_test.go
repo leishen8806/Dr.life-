@@ -33,8 +33,9 @@ func request(t *testing.T, h http.Handler, method, path, key string, body any) *
 	}
 	r := httptest.NewRequest(method, path, reader)
 	if key != "" {
-		r.Header.Set("Idempotency-Key", key)
+		r.Header.Set("Idempotency-Key", "0123456789abcdef-"+key)
 	}
+	r.Header.Set("If-Match", "1")
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
