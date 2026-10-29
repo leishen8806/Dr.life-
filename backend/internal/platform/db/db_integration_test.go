@@ -78,6 +78,19 @@ func TestDatabaseFramework(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer admin.Close(ctx)
+
+	t.Run("ops file writer cannot delete or truncate files", func(t *testing.T) {
+		for _, privilege := range []string{"DELETE", "TRUNCATE"} {
+			var allowed bool
+			if err := admin.QueryRow(ctx, `SELECT has_table_privilege('ops_rw', 'ops.file', $1)`, privilege).Scan(&allowed); err != nil {
+				t.Fatal(err)
+			}
+			if allowed {
+				t.Fatalf("ops_rw unexpectedly has %s on ops.file", privilege)
+			}
+		}
+	})
+
 	createPermissionFixtures(t, ctx, admin)
 
 	t.Run("module roles cannot cross schema boundaries", func(t *testing.T) {
