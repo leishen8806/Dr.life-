@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"io"
+	"net/url"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -99,6 +100,15 @@ func (s *s3Storage) Delete(ctx context.Context, key string) error {
 	}
 	_, err := s.objects.DeleteObject(ctx, &awss3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
 	return err
+}
+
+func (s *s3Storage) Promote(ctx context.Context, key string) (string, error) {
+	if !validRandomKey(key) {
+		return "", ErrInvalidObjectKey
+	}
+	destination := randomKey()
+	_, err := s.objects.CopyObject(ctx, &awss3.CopyObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(destination), CopySource: aws.String(url.PathEscape(s.bucket + "/" + key)), MetadataDirective: types.MetadataDirectiveCopy})
+	return destination, err
 }
 
 func (s *s3Storage) PresignGet(ctx context.Context, key string) (SignedURL, error) {

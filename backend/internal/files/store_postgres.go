@@ -86,8 +86,18 @@ func (s PostgresStore) GetVerifying(ctx context.Context, publicID string) (File,
 	return file, err
 }
 
-func (s PostgresStore) MarkReady(ctx context.Context, publicID string) error {
-	return s.markVerificationStatus(ctx, publicID, StatusReady)
+func (s PostgresStore) MarkReady(ctx context.Context, publicID, objectKey string) error {
+	if s.DB == nil {
+		return ErrNotConfigured
+	}
+	result, err := s.DB.Exec(ctx, `UPDATE ops.file SET status='ready', object_key=$2, updated_at=now() WHERE public_id=$1 AND status='verifying'`, publicID, objectKey)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s PostgresStore) MarkRejected(ctx context.Context, publicID string) error {

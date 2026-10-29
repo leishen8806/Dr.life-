@@ -87,6 +87,37 @@ func (s *localStorage) Delete(_ context.Context, key string) error {
 	return os.Remove(filepath.Join(s.rootDir, filepath.FromSlash(key)))
 }
 
+func (s *localStorage) Promote(_ context.Context, key string) (string, error) {
+	if !validRandomKey(key) || s.rootDir == "" {
+		return "", os.ErrNotExist
+	}
+	destination := randomKey()
+	sourcePath := filepath.Join(s.rootDir, filepath.FromSlash(key))
+	destinationPath := filepath.Join(s.rootDir, filepath.FromSlash(destination))
+	if err := os.MkdirAll(filepath.Dir(destinationPath), 0o700); err != nil {
+		return "", err
+	}
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return "", err
+	}
+	defer source.Close()
+	target, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return "", err
+	}
+	_, copyErr := io.Copy(target, source)
+	closeErr := target.Close()
+	if copyErr != nil {
+		return "", copyErr
+	}
+	if closeErr != nil {
+		return "", closeErr
+	}
+	s.puts[destination] = s.puts[key]
+	return destination, nil
+}
+
 func (s *localStorage) PresignGet(_ context.Context, key string) (SignedURL, error) {
 	if !validRandomKey(key) {
 		return SignedURL{}, ErrInvalidObjectKey

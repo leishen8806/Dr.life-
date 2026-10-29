@@ -22,8 +22,8 @@ func TestVerificationWorkerMarksMatchingObjectReady(t *testing.T) {
 	if err := NewVerificationWorker(store, objects).Handle(context.Background(), asynq.NewTask(TaskVerify, []byte(`{"public_id":"file-1"}`))); err != nil {
 		t.Fatal(err)
 	}
-	if store.file.Status != StatusReady || objects.deleted {
-		t.Fatalf("status=%q deleted=%t", store.file.Status, objects.deleted)
+	if store.file.Status != StatusReady {
+		t.Fatalf("status=%q", store.file.Status)
 	}
 	if store.file.ObjectKey == "objects/file-1" {
 		t.Fatal("ready file retained the key exposed by the upload URL")
@@ -62,11 +62,12 @@ func (s *verificationMemoryStore) GetVerifying(_ context.Context, publicID strin
 	}
 	return s.file, nil
 }
-func (s *verificationMemoryStore) MarkReady(_ context.Context, publicID string) error {
+func (s *verificationMemoryStore) MarkReady(_ context.Context, publicID, objectKey string) error {
 	if s.file.PublicID != publicID || s.file.Status != StatusVerifying {
 		return ErrNotFound
 	}
 	s.file.Status = StatusReady
+	s.file.ObjectKey = objectKey
 	return nil
 }
 func (s *verificationMemoryStore) MarkRejected(_ context.Context, publicID string) error {
@@ -94,6 +95,9 @@ func (s *verificationObjects) Stat(context.Context, string) (storage.ObjectStat,
 }
 func (s *verificationObjects) Open(context.Context, string) (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(s.body)), nil
+}
+func (s *verificationObjects) Promote(context.Context, string) (string, error) {
+	return "objects/ready-file-1", nil
 }
 func (s *verificationObjects) Delete(context.Context, string) error { s.deleted = true; return nil }
 

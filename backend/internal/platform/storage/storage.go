@@ -63,6 +63,7 @@ type Storage interface {
 type ObjectVerifier interface {
 	Stat(context.Context, string) (ObjectStat, error)
 	Open(context.Context, string) (io.ReadCloser, error)
+	Promote(context.Context, string) (string, error)
 	Delete(context.Context, string) error
 }
 

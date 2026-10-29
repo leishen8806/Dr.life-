@@ -17,7 +17,7 @@ import (
 // VerificationStore is the worker-only state transition port.
 type VerificationStore interface {
 	GetVerifying(context.Context, string) (File, error)
-	MarkReady(context.Context, string) error
+	MarkReady(context.Context, string, string) error
 	MarkRejected(context.Context, string) error
 }
 
@@ -81,7 +81,15 @@ func (w *VerificationWorker) Handle(ctx context.Context, task *asynq.Task) error
 	if subtle.ConstantTimeCompare(hash.Sum(nil), file.SHA256) != 1 {
 		return w.reject(ctx, file)
 	}
-	return w.store.MarkReady(ctx, file.PublicID)
+	readyKey, err := w.objects.Promote(ctx, file.ObjectKey)
+	if err != nil {
+		return err
+	}
+	if err := w.store.MarkReady(ctx, file.PublicID, readyKey); err != nil {
+		_ = w.objects.Delete(ctx, readyKey)
+		return err
+	}
+	return w.objects.Delete(ctx, file.ObjectKey)
 }
 
 func matchesMetadata(file File, stat storage.ObjectStat) bool {
