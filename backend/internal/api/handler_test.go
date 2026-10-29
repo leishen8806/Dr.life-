@@ -30,21 +30,23 @@ type fakeLogin struct {
 }
 
 type fakeFiles struct {
-	presign files.PresignResult
-	input   files.PresignInput
-	owner   int64
-	err     error
+	presign     files.PresignResult
+	input       files.PresignInput
+	owner       int64
+	err         error
+	completeErr error
+	downloadErr error
 }
 
 func (f *fakeFiles) Presign(_ context.Context, owner int64, in files.PresignInput) (files.PresignResult, error) {
 	f.owner, f.input = owner, in
 	return f.presign, f.err
 }
-func (*fakeFiles) Complete(context.Context, int64, string) (files.File, error) {
-	return files.File{}, nil
+func (f *fakeFiles) Complete(context.Context, int64, string) (files.File, error) {
+	return files.File{}, f.completeErr
 }
-func (*fakeFiles) DownloadURL(context.Context, int64, string) (storage.SignedURL, error) {
-	return storage.SignedURL{}, nil
+func (f *fakeFiles) DownloadURL(context.Context, int64, string) (storage.SignedURL, error) {
+	return storage.SignedURL{}, f.downloadErr
 }
 
 type fakeAccountLinks struct {
@@ -280,6 +282,7 @@ func TestFileCompleteAndDownloadHideCrossOwnerFiles(t *testing.T) {
 			req := httptest.NewRequest(test.method, test.path, nil)
 			if test.method == http.MethodPost {
 				req.Header.Set("Idempotency-Key", "file-cross-owner-1")
+				req.Header.Set("Content-Type", "application/json")
 			}
 			w := httptest.NewRecorder()
 			h.ServeHTTP(w, req)
