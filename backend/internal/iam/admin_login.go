@@ -109,9 +109,10 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 	}
 
 	var id int64
+	var passwordChangeRequired bool
 	var credential AdminCredentials
-	err := s.DB.QueryRow(ctx, `SELECT id,public_id,password_hash,totp_secret_enc,status FROM iam.admin_user WHERE email=$1`, email).
-		Scan(&id, &credential.PublicID, &credential.PasswordHash, &credential.TOTPSecretEnc, &credential.Status)
+	err := s.DB.QueryRow(ctx, `SELECT id,public_id,password_hash,totp_secret_enc,status,password_change_required FROM iam.admin_user WHERE email=$1`, email).
+		Scan(&id, &credential.PublicID, &credential.PasswordHash, &credential.TOTPSecretEnc, &credential.Status, &passwordChangeRequired)
 	if err != nil || AuthenticateAdmin(ctx, s.Cipher, credential, input.Password, input.TOTPCode, now) != nil {
 		if err == nil {
 			s.appendAudit(ctx, id, credential.PublicID, "failed", input, now)
@@ -146,7 +147,12 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 	if err = tx.Commit(ctx); err != nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
-	access, err := s.Tokens.IssueAccess(ctx, credential.PublicID, "admin", sessionID)
+	var access string
+	if passwordChangeRequired {
+		access, err = s.Tokens.IssueRestrictedAdminAccess(ctx, credential.PublicID, sessionID)
+	} else {
+		access, err = s.Tokens.IssueAccess(ctx, credential.PublicID, "admin", sessionID)
+	}
 	if err != nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
