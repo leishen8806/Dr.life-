@@ -162,6 +162,36 @@ func TestPublicProductsSkipTheQueryWhenNoMerchantIsSellable(t *testing.T) {
 	}
 }
 
+func TestPublicSearchNormalizesQueryAndForcesOnSaleScope(t *testing.T) {
+	store := &stubStore{}
+	service := serviceWith(t, store, activeMerchant())
+
+	_, err := service.PublicSearch(context.Background(), catalog.SearchQuery{Query: "  tile  ", Sort: catalog.SearchSortPriceAsc, PageSize: 12})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if store.search.Filter.Status != catalog.StatusOn || !slices.Equal(store.search.Filter.MerchantIDs, []int64{merchantID}) {
+		t.Fatalf("search filter = %+v, want on-sale active-merchant scope", store.search.Filter)
+	}
+	if store.search.Query.Query != "tile" || store.search.Query.Sort != catalog.SearchSortPriceAsc || store.search.Query.PageSize != 12 {
+		t.Fatalf("search query = %+v", store.search.Query)
+	}
+}
+
+func TestPublicSearchRejectsInvalidPriceAndSort(t *testing.T) {
+	service := serviceWith(t, &stubStore{}, activeMerchant())
+	for _, query := range []catalog.SearchQuery{
+		{Query: "tile", MinPriceE4: -1},
+		{Query: "tile", MinPriceE4: 20, MaxPriceE4: 10},
+		{Query: "tile", Sort: "advertised"},
+		{Query: ""},
+	} {
+		if _, err := service.PublicSearch(context.Background(), query); err == nil {
+			t.Fatalf("query %+v must fail", query)
+		}
+	}
+}
+
 // 验收标准③：商家只能改自己商品。
 func TestMerchantCannotReachAnotherMerchantProduct(t *testing.T) {
 	store := &stubStore{product: catalog.Product{PublicID: productULID, MerchantID: merchantID, Status: catalog.StatusDraft}}
