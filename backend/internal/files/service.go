@@ -16,12 +16,17 @@ var (
 	ErrUnsupportedPurpose = errors.New("unsupported file purpose")
 	ErrNotConfigured      = errors.New("files service is not configured")
 	ErrNotFound           = errors.New("file not found")
+	ErrNotReady           = errors.New("file is not ready for download")
 	ErrQuotaExceeded      = errors.New("file upload quota exceeded")
 )
 
 type Status string
 
-const StatusPending Status = "pending"
+const (
+	StatusPending   Status = "pending"
+	StatusVerifying Status = "verifying"
+	StatusReady     Status = "ready"
+)
 
 type File struct {
 	PublicID, Purpose, ObjectKey, ContentType string
@@ -100,6 +105,29 @@ func (s *Service) Presign(ctx context.Context, ownerAccount int64, in PresignInp
 		return PresignResult{}, err
 	}
 	return PresignResult{File: file, Upload: upload}, nil
+}
+
+// Complete makes a pending upload visible to the verification worker. It does
+// not inspect object bytes in the API process.
+func (s *Service) Complete(ctx context.Context, ownerAccount int64, publicID string) (File, error) {
+	if s == nil || s.store == nil || ownerAccount <= 0 || publicID == "" {
+		return File{}, ErrNotConfigured
+	}
+	return s.store.MarkVerifying(ctx, ownerAccount, publicID)
+}
+
+func (s *Service) DownloadURL(ctx context.Context, ownerAccount int64, publicID string) (storage.SignedURL, error) {
+	if s == nil || s.store == nil || s.objects == nil || ownerAccount <= 0 || publicID == "" {
+		return storage.SignedURL{}, ErrNotConfigured
+	}
+	file, err := s.store.GetOwned(ctx, ownerAccount, publicID)
+	if err != nil {
+		return storage.SignedURL{}, err
+	}
+	if file.Status != StatusReady {
+		return storage.SignedURL{}, ErrNotReady
+	}
+	return s.objects.PresignGet(ctx, file.ObjectKey)
 }
 
 func purposeAllows(purpose, contentType string) bool {
