@@ -113,26 +113,29 @@ func TestMinIOPresignedURLs(t *testing.T) {
 		t.Fatal(err)
 	}
 	response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("tampered upload status = %d, RustFS should expose it for worker verification", response.StatusCode)
-	}
-	contents, err := verifier.Open(ctx, wrong.Key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := io.ReadAll(contents)
-	contents.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(data) != "bad" {
-		t.Fatalf("Open() = %q, want tampered content", data)
-	}
-	if err := verifier.Delete(ctx, wrong.Key); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := verifier.Open(ctx, wrong.Key); err == nil {
-		t.Fatal("deleted object remained readable")
+	if response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
+		// RustFS accepts this pre-signed PUT without enforcing x-amz-checksum-sha256;
+		// AC-b3 is enforced by the worker SHA-256 verification after upload.
+		contents, err := verifier.Open(ctx, wrong.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(contents)
+		contents.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(data) != "bad" {
+			t.Fatalf("Open() = %q, want tampered content", data)
+		}
+		if err := verifier.Delete(ctx, wrong.Key); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := verifier.Open(ctx, wrong.Key); err == nil {
+			t.Fatal("deleted object remained readable")
+		}
+	} else if response.StatusCode < http.StatusBadRequest || response.StatusCode >= http.StatusInternalServerError {
+		t.Fatalf("tampered upload status = %d, want success or 4xx rejection", response.StatusCode)
 	}
 
 	get, err := store.PresignGet(ctx, put.Key)
