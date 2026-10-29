@@ -1,5 +1,6 @@
 import { createApiClient, withIdempotencyKey } from "@drlife/api-client";
 import type {
+  Category,
   Product,
   ProductCreateRequest,
   ProductUpdateRequest
@@ -8,10 +9,14 @@ import type { ProductStatus } from "./status";
 
 type ApiClient = ReturnType<typeof createApiClient>;
 
+/** 分页上限，与 openapi.yaml 的 PageSize 一致；品类表远小于这个数。 */
+const maxPageSize = 100;
+
 export type ProductStatusFilter = ProductStatus | "all";
 
 export interface MerchantProductApi {
   list(filter: ProductStatusFilter): Promise<Product[]>;
+  listCategories(): Promise<Category[]>;
   create(request: ProductCreateRequest): Promise<Product>;
   update(publicId: string, patch: ProductUpdateRequest): Promise<Product>;
   publish(publicId: string): Promise<Product>;
@@ -35,6 +40,13 @@ export function createMerchantProductApi(client: ApiClient): MerchantProductApi 
     async list(filter) {
       const { data } = await client.GET("/v1/merchant/products", {
         params: { query: filter === "all" ? {} : { status: filter } }
+      });
+      return required(data).data.items;
+    },
+    async listCategories() {
+      // 接口已按 sort 再 code 排好序，而且只返回启用的品类，前端不再重排。
+      const { data } = await client.GET("/v1/public/categories", {
+        params: { query: { page_size: maxPageSize } }
       });
       return required(data).data.items;
     },

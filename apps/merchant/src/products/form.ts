@@ -2,6 +2,7 @@ import type { components } from "@drlife/api-client";
 import type { TranslationKey } from "@drlife/i18n";
 
 export type Product = components["schemas"]["Product"];
+export type Category = components["schemas"]["Category"];
 export type ProductCreateRequest = components["schemas"]["ProductCreateRequest"];
 export type ProductUpdateRequest = components["schemas"]["ProductUpdateRequest"];
 type LocalizedText = components["schemas"]["LocalizedText"];
