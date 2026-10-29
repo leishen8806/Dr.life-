@@ -197,8 +197,12 @@ func (m *Mock) AddSKU(ownerRef string, sku SKU, warehouseID string, qty int64) {
 		m.skus[ownerRef] = map[string]SKU{}
 	}
 	m.skus[ownerRef][sku.ID] = sku
+	key := stockKey(ownerRef, warehouseID, sku.ID)
 	s := stock{Quantity: qty, Version: 1}
-	m.stocks[stockKey(ownerRef, warehouseID, sku.ID)] = s
+	if old, exists := m.stocks[key]; exists {
+		s.Version = old.Version + 1
+	}
+	m.stocks[key] = s
 	m.recordInventoryChanged(ownerRef, warehouseID, sku.ID, s)
 }
 func (m *Mock) AddEvidence(id string, e Evidence) {
@@ -252,7 +256,7 @@ func (m *Mock) AdvanceFulfillment(id, state string) (Event, error) {
 	if f == nil {
 		return Event{}, fmt.Errorf("fulfillment %q not found", id)
 	}
-	eventType, ok := map[string]string{"accepted": "fulfillment.accepted", "rejected": "fulfillment.rejected", "picked": "fulfillment.picked", "packed": "fulfillment.packed", "shipped": "fulfillment.shipped", "delivery_reported": "fulfillment.delivery_reported", "delivered_verified": "fulfillment.delivered_verified", "delivery_failed": "fulfillment.delivery_failed", "returned": "fulfillment.returned"}[state]
+	eventType, ok := map[string]string{"accepted": "fulfillment.accepted", "rejected": "fulfillment.rejected", "cancelled": "fulfillment.cancelled", "picked": "fulfillment.picked", "packed": "fulfillment.packed", "shipped": "fulfillment.shipped", "delivery_reported": "fulfillment.delivery_reported", "delivered_verified": "fulfillment.delivered_verified", "delivery_failed": "fulfillment.delivery_failed", "returned": "fulfillment.returned"}[state]
 	if !ok {
 		return Event{}, fmt.Errorf("unsupported fulfillment state %q", state)
 	}
@@ -610,8 +614,10 @@ func (m *Mock) cancel(w http.ResponseWriter, r *http.Request, id string) {
 		}
 	}
 	f.Version++
-	payload, _ := json.Marshal(map[string]any{"fulfillmentId": f.ID, "externalOrderId": f.Request.ExternalOrderID, "fulfillmentState": f.State})
-	m.events = append(m.events, Event{ID: m.id("event"), Type: "fulfillment.cancelled", SchemaVersion: "v1", OccurredAt: time.Now().UTC(), Aggregate: Aggregate{Type: "fulfillment", ID: f.ID, Version: f.Version}, Payload: payload})
+	if f.State == "cancelled" {
+		payload, _ := json.Marshal(map[string]any{"fulfillmentId": f.ID, "externalOrderId": f.Request.ExternalOrderID, "fulfillmentState": f.State})
+		m.events = append(m.events, Event{ID: m.id("event"), Type: "fulfillment.cancelled", SchemaVersion: "v1", OccurredAt: time.Now().UTC(), Aggregate: Aggregate{Type: "fulfillment", ID: f.ID, Version: f.Version}, Payload: payload})
+	}
 	result := fulfillmentResponse(f, false)
 	m.cancelIdempotency[key] = result
 	writeJSON(w, 200, result)

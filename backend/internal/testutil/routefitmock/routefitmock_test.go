@@ -292,7 +292,7 @@ func TestReviewFixesCancelEventTimingAndInventoryVersion(t *testing.T) {
 	}
 	m.AddSKU("merchant-1", SKU{ID: "sku-1", State: "active"}, "wh-1", 20)
 	items := request(t, m.Handler(), http.MethodGet, "/api/platform/v1/owners/merchant-1/inventory?skuIds=sku-1", "", nil)
-	if !strings.Contains(items.Body.String(), `"sourceVersion":2`) {
+	if !strings.Contains(items.Body.String(), `"sourceVersion":3`) {
 		t.Fatalf("inventory version reset: %s", items.Body.String())
 	}
 }
