@@ -310,7 +310,7 @@ func (f *loginFixture) testAdminManagementStatusAndRole(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.pool.Exec(ctx, `UPDATE iam.admin_user SET role='ops' WHERE public_id=$1`, actor.Admin.PublicID); err != nil {
+	if _, err := f.pool.Exec(ctx, `UPDATE iam.admin_user SET role='ops' WHERE role='super' AND public_id<>$1`, lastSuper.Admin.PublicID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.DisableWithAudit(ctx, lastSuper.Admin.PublicID, "guard", input); !errors.Is(err, ErrLastActiveSuper) {
