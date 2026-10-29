@@ -325,11 +325,11 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 | # | 业务 | txn.type | 分录 | 说明与约束 |
 |---|---|---|---|---|
 | 6-B.3 | **KESS 收款入钱包**（充值，或买家为订单付款） | `topup_kess`（新增） | DR `CHANNEL_KESS` / CR `WALLET_AVAIL(A)` | 只在服务端**主动查单**确认 KESS `SUCCESS` 后入账；幂等键 = `topup_kess:<商户支付号>`，同一支付号只入一次。`UNKNOWN` 不入账。金额取支付意向的服务端应收，不取浏览器回传。**订单付款时，6-B.3 与 6-B.5 必须在同一事务内完成**，钱不能在可用余额里停留，否则买家可在两步之间提现 |
-| 6-B.4 | **KESS 结算到银行** | `channel_settle`（新增） | DR `BANK_DEDICATED`（净额）+ DR `PLATFORM_HELD`(category=`channel_fee`，手续费，见 6-B.9 Q1) / CR `CHANNEL_KESS`（毛额） | 按 KESS 结算报表逐批入账；毛额 = 净额 + 手续费；与银行流水逐笔对。手续费由谁承担未定，暂按平台承担记账，定案后再调整（Q1） |
+| 6-B.4 | **KESS 结算到银行** | `channel_settle`（新增） | DR `BANK_DEDICATED`（净额）+ DR `PLATFORM_HELD`(category=`channel_fee`，手续费) / CR `CHANNEL_KESS`（毛额） | 按 KESS 结算报表逐批入账；毛额 = 净额 + 手续费；与银行流水逐笔核对。手续费由平台承担（6-B.11 Q1，含余额不足时的处理） |
 | 6-B.5 | **订单付款进托管** | `freeze`（沿用 6.2，`FreezeHold`） | DR `WALLET_AVAIL(buyer)` / CR `WALLET_FROZEN(buyer)` | 6-B.3 入账后，同一事务按子订单建**两个 hold**：`hold(order_goods)`（货款，收款方为商户）；买家付运费时另建 `hold(order_shipping)`（运费，收款方为 RouteFit 与平台加价）。商户包邮的子订单只有货款 hold |
 | 6-B.6 | **货款结算给商户** | `settle`（沿用 6.3，`SettleHold`） | DR `WALLET_FROZEN(buyer)` / CR `WALLET_AVAIL(M)` | 触发条件：RouteFit `delivered_verified` 后满 7 天（后台可调）且无未结售后。佣金为 0，`Fee` 仍必须为 0 |
 | 6-B.7 | **买家运费结算** | `shipping_settle`（新增） | DR `WALLET_FROZEN(buyer)` / CR `PAYABLE_CARRIER`（RouteFit 报价部分）+ CR `PLATFORM_HELD`(category=`delivery_margin`，加价部分) | 触发条件：RouteFit `delivered_verified`，不等 7 天，因为配送服务已完成。金额与拆分取下单时的报价快照：RouteFit 部分 = 报价，加价部分 = 托管额 − 报价（最后一项倒挤）。走 hold 状态机：需新增“按快照拆分结算”的强类型方法，不复用 `SettleHold`（后者只支持单一收款钱包）。加价率为 0 时只有一条贷方分录 |
-| 6-B.8a | **退款**（拒单、取消、售后退款） | `refund`（沿用 6.4，`RefundHold`） | DR `WALLET_FROZEN(buyer)` / CR `WALLET_AVAIL(buyer)` | 退回买家钱包；原路退到 KESS 由财务人工处理（RouteFit KESS 规则：退款类渠道状态交人工），单独走提现流程 6.5–6.7。已结算的运费是否退给买家由售后判定，判定退的由商户承担：从商户钱包扣，类型 `adjust`，需审批 |
+| 6-B.8a | **退款**（拒单、取消、售后退款） | `refund`（沿用 6.4，`RefundHold`） | DR `WALLET_FROZEN(buyer)` / CR `WALLET_AVAIL(buyer)` | 先退回买家钱包；买家可一键选择原路退回 KESS，流程见 6-B.11 Q3（`withdraw_req` 加新增的 `payout_kess`）。已结算的运费是否退给买家由售后判定，判定退的由商户承担：从商户钱包扣，类型 `adjust`，需审批 |
 | 6-B.8b | **仓配费用行扣款：仓储类**（storage、inbound、outbound、packing） | `storage_fee`（沿用类型，**贷方改变**） | DR `WALLET_AVAIL(M)` / CR `PAYABLE_CARRIER` | 金额 = RouteFit 费用行金额（美分 × 100 → e4，精确）。幂等键 = `rf_fee:<feeLineId>:v<version>`。余额不足时不扣成负数，费用行记为欠费，充值后按先后顺序补扣（沿用 6.8 的欠费规则），超过宽限期后暂停出库（R-06） |
 | 6-B.8c | **仓配费用行扣款：商户包邮的配送费** | `delivery_fee`（新增） | DR `WALLET_AVAIL(M)` / CR `PAYABLE_CARRIER`（报价部分）+ CR `PLATFORM_HELD`(category=`delivery_margin`，加价部分) | 金额 = 报价 × (1 + 加价率)，取下单时的快照；欠费处理同 6-B.8b |
 | 6-B.8d | **费用行调整** | `reversal`（沿用 6.18）后再按新版本扣款 | 原交易借贷互换，再记新的 6-B.8b 或 8c | RouteFit `fee.adjusted`：先冲销旧版本，再按新版本扣款，两笔同一事务。冲销白名单需加入 `delivery_fee` |
@@ -338,26 +338,29 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 #### 6-B.10 恒等式与审计影响
 
 - 第四章第 3 节恒等式右边加 `CHANNEL_KESS`，左边不变（`PAYABLE_CARRIER` 已在左边）。
-- 平台收入 `category` 新增 `channel_fee`（KESS 手续费，若由平台承担则为负向收入，按 Q1 定案）和 `routefit`（RouteFit 业务线收入）。财务中心与审计 #13 按新类别汇总。
+- 平台收入 `category` 新增三类，财务中心与审计 #13 按新类别汇总：
+  - `channel_fee`：KESS 手续费，由平台承担，记借方，是负向收入；
+  - `routefit`：RouteFit 业务线收入；
+  - `capital`：公司注资，用于承担手续费，不是收入，财务中心单列。
 - 新增审计检查：
   - `CHANNEL_KESS` 余额 = KESS 已确认未结算金额（日）；
   - `PAYABLE_CARRIER` = RouteFit 日结单累计 − 已核销（日）；
   - 买家付运费的子订单 `delivered_verified` 超过 24 小时仍未 `shipping_settle` 的，列为关注。
 - 停用的 `DELIVERY_ESCROW` 账户应保持余额 0，审计检查改为“非 0 即异常”。
 
-#### 6-B.11 待确认
+#### 6-B.11 已确认（项目负责人 2026-10-29）
 
-| # | 事项 | 影响 |
+| # | 事项 | 结论与账务落点 |
 |---|---|---|
-| Q1 | KESS 手续费由谁承担（平台 / 商户 / 买家），费率与结算周期 | 6-B.4 的分录 |
-| Q2 | `intercompany_settle` 之后，RouteFit 业务线收入是否需要划出专用账户（`sweep`），频率如何 | 6-B.9 之后的流程 |
-| Q3 | 买家退款是否只退回钱包、由买家自行提现，还是平台主动原路退回 KESS | 6-B.8a |
+| Q1 | KESS 手续费由谁承担 | **平台承担**。买家与商户付多少就到账多少；6-B.4 的手续费记 DR `PLATFORM_HELD`(category=`channel_fee`)，作为平台成本。费率与结算周期以 KESS 合同为准（E-4）。**约束**：`PLATFORM_HELD` 不允许负数，而试点期佣金为 0、加价默认为 0，平台收入可能不足以承担手续费。处理顺序：① 6-B.9 核销后的 `routefit` 收入先承担；② 仍不足时，由公司向专用账户注资，新增交易类型 `capital_in`：DR `BANK_DEDICATED` / CR `PLATFORM_HELD`(category=`capital`)，双人复核并附银行回单。不足时 `channel_settle` 整批挂起并告警，不得部分入账 |
+| Q2 | RouteFit 业务线收入是否划出专用账户 | **每月核销后划出**。6-B.9 `intercompany_settle` 完成后，与其他平台收入一起，按银行约定流程执行 6.16 `sweep`（DR `PLATFORM_HELD` / CR `BANK_DEDICATED`），双人复核。划出金额不得超过当时 `PLATFORM_HELD` 余额，也不得动用 Q1 中为承担手续费预留的部分 |
+| Q3 | 买家退款怎么退 | **默认退回买家钱包，买家可一键选择原路退回**。原路退复用提现状态机，出款渠道为 KESS：申请时沿用 6.5 `withdraw_req`（DR `WALLET_AVAIL(buyer)` / CR `PENDING_PAYOUT`），提现单记录 `channel=kess` 与原商户支付号；财务审核后在 KESS 人工退款，确认后新增 `payout_kess`：DR `PENDING_PAYOUT` / CR `CHANNEL_KESS`；KESS 退款失败或撤销沿用 6.7 `payout_fail`。原路退金额不得超过该支付号已收、未退的金额；KESS 退款手续费（如有）按 Q1 由平台承担 |
 
 #### 6-B.12 实现落点
 
 | 任务 | 落点 |
 |---|---|
-| P-02 | 6-B.3、6-B.4 |
+| P-02 | 6-B.3、6-B.4、6-B.11 Q1 的 `capital_in`、Q3 的 `payout_kess` |
 | T-10 | 6-B.5、6-B.6、6-B.7、6-B.8a |
 | R-04 | 6-B.8b、8c、8d、6-B.9 |
 
