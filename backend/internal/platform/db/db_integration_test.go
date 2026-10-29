@@ -79,15 +79,27 @@ func TestDatabaseFramework(t *testing.T) {
 	}
 	defer admin.Close(ctx)
 
-	t.Run("ops file writer cannot delete or truncate files", func(t *testing.T) {
-		for _, privilege := range []string{"DELETE", "TRUNCATE"} {
-			var allowed bool
-			if err := admin.QueryRow(ctx, `SELECT has_table_privilege('ops_rw', 'ops.file', $1)`, privilege).Scan(&allowed); err != nil {
-				t.Fatal(err)
-			}
-			if allowed {
-				t.Fatalf("ops_rw unexpectedly has %s on ops.file", privilege)
-			}
+	t.Run("ops file writer has only metadata lifecycle privileges", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `SET ROLE ops_rw`); err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _, _ = admin.Exec(ctx, `RESET ROLE`) }()
+		if _, err := admin.Exec(ctx, `INSERT INTO ops.file (public_id, owner_account, purpose, object_key, content_type, size, sha256, status) VALUES ('01HXFILEPERMISSIONS000000001', 1, 'product_image', 'objects/permissions', 'image/jpeg', 1, decode('0000000000000000000000000000000000000000000000000000000000000000', 'hex'), 'pending')`); err != nil {
+			t.Fatalf("ops_rw insert: %v", err)
+		}
+		if _, err := admin.Exec(ctx, `SELECT public_id FROM ops.file`); err != nil {
+			t.Fatalf("ops_rw select: %v", err)
+		}
+		if _, err := admin.Exec(ctx, `UPDATE ops.file SET status = 'verifying', updated_at = now()`); err != nil {
+			t.Fatalf("ops_rw lifecycle update: %v", err)
+		}
+		for _, statement := range []string{
+			`DELETE FROM ops.file`,
+			`TRUNCATE ops.file`,
+			`UPDATE ops.file SET owner_account = 2`,
+			`UPDATE ops.file SET object_key = 'objects/other'`,
+		} {
+			assertPermissionDenied(t, ctx, admin, statement)
 		}
 	})
 
