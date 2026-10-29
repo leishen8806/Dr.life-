@@ -11,9 +11,9 @@ var ErrRuntimeConfigInvalid = errors.New("storage runtime configuration is inval
 // configured object-store adapter. Callers must not log its credential fields.
 type RuntimeConfig struct {
 	Driver, Bucket, Region, Endpoint, AccessKey, SecretKey string
-	LocalBaseURL, LocalRootDir                            string
-	AllowedContentTypes                                   []string
-	MaxContentLength                                      int64
+	LocalBaseURL, LocalRootDir                             string
+	AllowedContentTypes                                    []string
+	MaxContentLength                                       int64
 }
 
 func NewFromConfig(config RuntimeConfig) (Storage, error) {

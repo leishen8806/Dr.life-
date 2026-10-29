@@ -80,9 +80,15 @@ type verificationObjects struct {
 	deleted bool
 }
 
-func (s *verificationObjects) PresignPut(context.Context, storage.PutRequest) (storage.SignedURL, error) { return storage.SignedURL{}, nil }
-func (s *verificationObjects) PresignGet(context.Context, string) (storage.SignedURL, error)               { return storage.SignedURL{}, nil }
-func (s *verificationObjects) Stat(context.Context, string) (storage.ObjectStat, error)                    { return s.stat, nil }
+func (s *verificationObjects) PresignPut(context.Context, storage.PutRequest) (storage.SignedURL, error) {
+	return storage.SignedURL{}, nil
+}
+func (s *verificationObjects) PresignGet(context.Context, string) (storage.SignedURL, error) {
+	return storage.SignedURL{}, nil
+}
+func (s *verificationObjects) Stat(context.Context, string) (storage.ObjectStat, error) {
+	return s.stat, nil
+}
 func (s *verificationObjects) Open(context.Context, string) (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(s.body)), nil
 }
