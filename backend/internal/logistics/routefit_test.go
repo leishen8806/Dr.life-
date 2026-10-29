@@ -6,11 +6,15 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hibiken/asynq"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 )
 
 func TestRouteFitReceiverRejectsMalformedEventAfterVerification(t *testing.T) {
@@ -45,6 +49,48 @@ func TestRouteFitReconciliationConfigDefaults(t *testing.T) {
 	if config.ScanEvery != 10*time.Minute || config.NoEventFor != 30*time.Minute {
 		t.Fatalf("defaults = %+v", config)
 	}
+}
+
+func TestRouteFitReconciliationScheduleAndHandler(t *testing.T) {
+	registry := queue.NewRegistry()
+	if err := RegisterRouteFitReconciliationTask(registry); err != nil {
+		t.Fatalf("RegisterRouteFitReconciliationTask() error = %v", err)
+	}
+	config := RouteFitReconciliationConfig{Schedule: "*/7 * * * *", NoEventFor: 45 * time.Minute}
+	task := RouteFitReconciliationScheduledTask(config)
+	if task.Cron != "*/7 * * * *" || task.Type != RouteFitReconciliationTaskType {
+		t.Fatalf("task = %+v", task)
+	}
+	payload := task.Payload(time.Date(2026, 10, 29, 8, 7, 0, 0, time.UTC))
+	var decoded RouteFitReconciliationTaskPayload
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatalf("payload JSON = %v", err)
+	}
+	if decoded.NoEventFor != "45m0s" || decoded.Window != "2026-10-29T08:07:00Z" {
+		t.Fatalf("payload = %+v", decoded)
+	}
+
+	runner := &routeFitReconciliationRunner{}
+	if err := NewRouteFitReconciliationHandler(runner)(context.Background(), asynq.NewTask(RouteFitReconciliationTaskType, payload)); err != nil {
+		t.Fatalf("handler() error = %v", err)
+	}
+	if runner.noEventFor != 45*time.Minute {
+		t.Fatalf("runner noEventFor = %s, want 45m", runner.noEventFor)
+	}
+}
+
+func TestRouteFitReconciliationHandlerRejectsInvalidPayload(t *testing.T) {
+	err := NewRouteFitReconciliationHandler(&routeFitReconciliationRunner{})(context.Background(), asynq.NewTask(RouteFitReconciliationTaskType, []byte(`{"no_event_for":"nope"}`)))
+	if err == nil || !strings.Contains(err.Error(), asynq.SkipRetry.Error()) {
+		t.Fatalf("handler error = %v, want SkipRetry", err)
+	}
+}
+
+type routeFitReconciliationRunner struct{ noEventFor time.Duration }
+
+func (r *routeFitReconciliationRunner) ReconcileRouteFitStaleShipments(_ context.Context, noEventFor time.Duration) error {
+	r.noEventFor = noEventFor
+	return nil
 }
 
 func TestRouteFitWebhookVerifierRejectsExpiredAndWrongSignature(t *testing.T) {
