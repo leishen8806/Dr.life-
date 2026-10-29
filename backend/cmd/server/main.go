@@ -13,6 +13,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
@@ -154,6 +155,7 @@ func main() {
 		go monitorAuditAnchor(ctx, auditStore, logger)
 	}
 
+	var fileEnqueuer *queue.Enqueuer
 	if cfg.QueueRedisURL != "" {
 		queueCollector, queueErr := queue.NewMetricsCollector(cfg.QueueRedisURL, queue.AllQueues,
 			func(ctx context.Context) (int64, time.Duration, error) { return queue.OutboxLag(ctx, database) })
@@ -169,8 +171,15 @@ func main() {
 		}
 		queueClient := asynq.NewClient(queueRedis)
 		defer queueClient.Close()
-		// The registry is empty until business modules register scheduled task types.
-		scheduler, queueErr := queue.NewScheduler(queue.NewEnqueuer(queueClient, queue.NewRegistry(), queue.EnqueueOptions{}), nil)
+		registry := queue.NewRegistry()
+		if cfg.StorageDriver != "" {
+			if queueErr := files.RegisterTasks(registry); queueErr != nil {
+				logger.Error("file queue registry configuration failed", "error", queueErr)
+				os.Exit(1)
+			}
+		}
+		fileEnqueuer = queue.NewEnqueuer(queueClient, registry, queue.EnqueueOptions{})
+		scheduler, queueErr := queue.NewScheduler(fileEnqueuer, nil)
 		if queueErr != nil {
 			logger.Error("queue scheduler configuration failed", "error", queueErr)
 			os.Exit(1)
@@ -180,6 +189,21 @@ func main() {
 			logger.Error("queue metrics registration failed", "error", queueErr)
 			os.Exit(1)
 		}
+	}
+	var fileService *files.Service
+	if cfg.StorageDriver != "" {
+		if fileEnqueuer == nil {
+			logger.Error("file storage requires QUEUE_REDIS_URL")
+			os.Exit(1)
+		}
+		objects, objectErr := files.NewObjectStore(cfg)
+		if objectErr != nil {
+			logger.Error("file storage configuration failed", "error", objectErr)
+			os.Exit(1)
+		}
+		fileService = files.New(files.PostgresStore{DB: database}, objects, files.Options{
+			Verifier: files.NewQueueVerifier(fileEnqueuer), MaxDailyUploads: cfg.FileMaxDailyUploads, MaxDailyBytes: cfg.FileMaxDailyBytes,
+		})
 	}
 
 	clientIP, err := gateway.NewClientIPResolver(cfg.TrustedProxyHeader, cfg.TrustedProxyCIDRs)
@@ -330,6 +354,7 @@ func main() {
 		AccountLinks:    accountLinkService,
 		Ledger:          ledgerReader,
 		Directory:       accountDirectory,
+		Files:           fileService,
 		Bulkhead:        bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)

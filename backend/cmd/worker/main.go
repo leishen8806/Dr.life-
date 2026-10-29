@@ -12,6 +12,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	commsTelegram "github.com/leishen8806/Dr.life-/backend/internal/comms/telegram"
+	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
@@ -19,6 +20,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/opsalert"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue/outbox"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -57,6 +59,20 @@ func main() {
 		fmt.Fprintln(os.Stderr, "queue registry error:", err)
 		os.Exit(1)
 	}
+	var fileStore files.PostgresStore
+	var fileObjects storage.Storage
+	if cfg.StorageDriver != "" {
+		fileObjects, err = files.NewObjectStore(cfg)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "file storage configuration error:", err)
+			os.Exit(1)
+		}
+		fileStore = files.PostgresStore{DB: database}
+		if err := files.RegisterTasks(registry); err != nil {
+			fmt.Fprintln(os.Stderr, "file queue registry error:", err)
+			os.Exit(1)
+		}
+	}
 	worker, err := queue.NewWorker(cfg.QueueRedisURL, registry, queue.WorkerOptions{ShutdownTimeout: cfg.ShutdownTimeout, Logger: logger, Observer: queueMetrics})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "worker configuration error:", err)
@@ -84,6 +100,12 @@ func main() {
 	if err := worker.Register(opsalert.TaskFlush, alerts.Flush); err != nil {
 		fmt.Fprintln(os.Stderr, "queue handler error:", err)
 		os.Exit(1)
+	}
+	if fileObjects != nil {
+		if err := files.RegisterVerificationHandler(worker, fileStore, fileObjects); err != nil {
+			fmt.Fprintln(os.Stderr, "file queue handler error:", err)
+			os.Exit(1)
+		}
 	}
 	relay, err := outbox.New(ledger.New(database, ledger.Options{}), client, outbox.Options{
 		Routes: outbox.LedgerRoutes(),
