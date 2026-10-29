@@ -1,12 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { ApiError, CircuitOpenError } from "@drlife/api-client";
+import { ApiError, type ApiErrorCode, CircuitOpenError } from "@drlife/api-client";
+import { appendFeed, firstFeed } from "./feed";
 import { compareQuantity, entryTier, formatPriceE4 } from "./money";
 import { localized } from "./localized";
 import { errorMessageKey } from "./resource";
-import type { ProductTier } from "./types";
+import type { Product, ProductPage, ProductTier } from "./types";
 
 function tier(min_qty: string, unit_price_e4: number): ProductTier {
   return { min_qty, unit_price_e4 };
+}
+
+function product(public_id: string): Product {
+  return {
+    public_id,
+    category_code: "c4",
+    name: { zh: "瓷砖", en: "Tile", km: "ក្បឿង" },
+    unit: "m2",
+    origin: "cn",
+    status: "on",
+    source: "manual",
+    tiers: [tier("1", 95_000)],
+    updated_at: "2026-10-29T00:00:00Z"
+  };
+}
+
+function productPage(
+  items: Product[],
+  overrides: Partial<ProductPage> = {}
+): ProductPage {
+  return { items, page: 1, page_size: 20, total: items.length, ...overrides };
 }
 
 describe("formatPriceE4", () => {
@@ -67,6 +89,59 @@ describe("localized", () => {
   });
 });
 
+describe("product feed", () => {
+  it("keeps the server total, which the page length does not report", () => {
+    const feed = firstFeed(productPage([product("a"), product("b")], { total: 57 }));
+
+    expect(feed.items).toHaveLength(2);
+    expect(feed.total).toBe(57);
+    expect(feed.hasMore).toBe(true);
+  });
+
+  it("appends the next page and stops offering more at the end of the list", () => {
+    const first = firstFeed(productPage([product("a")], { page_size: 1, total: 3 }));
+    const second = appendFeed(
+      first,
+      productPage([product("b")], { page: 2, page_size: 1, total: 3 })
+    );
+    expect(second.items.map((item) => item.public_id)).toEqual(["a", "b"]);
+    expect(second.page).toBe(2);
+    expect(second.hasMore).toBe(true);
+
+    const third = appendFeed(
+      second,
+      productPage([product("c")], { page: 3, page_size: 1, total: 3 })
+    );
+    expect(third.items).toHaveLength(3);
+    expect(third.page).toBe(3);
+    expect(third.hasMore).toBe(false);
+  });
+
+  it("drops an item the previous page already carried", () => {
+    const first = firstFeed(
+      productPage([product("a"), product("b")], { page_size: 2, total: 3 })
+    );
+    const second = appendFeed(
+      first,
+      productPage([product("b"), product("c")], { page: 2, page_size: 2, total: 3 })
+    );
+
+    expect(second.items.map((item) => item.public_id)).toEqual(["a", "b", "c"]);
+    expect(second.hasMore).toBe(false);
+  });
+
+  it("stops offering more once a page comes back empty, whatever the total says", () => {
+    const first = firstFeed(productPage([product("a")], { page_size: 1, total: 9 }));
+    const second = appendFeed(
+      first,
+      productPage([], { page: 2, page_size: 1, total: 9 })
+    );
+
+    expect(second.items).toHaveLength(1);
+    expect(second.hasMore).toBe(false);
+  });
+});
+
 describe("errorMessageKey", () => {
   it("maps a server error code to its translated message key", () => {
     expect(errorMessageKey(new ApiError(1004, "req_1", 429))).toBe("error.1004");
@@ -85,5 +160,14 @@ describe("errorMessageKey", () => {
       "common.networkError"
     );
     expect(errorMessageKey(undefined)).toBe("common.networkError");
+  });
+
+  /** A deployed server can answer with a code newer than the generated schema. */
+  it("never leaves the message blank for a code the schema does not list", () => {
+    const key = errorMessageKey(
+      new ApiError(4242 as ApiErrorCode, "req_9", 500)
+    );
+
+    expect(key).toBe("error.1001");
   });
 });

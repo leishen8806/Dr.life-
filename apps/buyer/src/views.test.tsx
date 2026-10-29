@@ -6,6 +6,7 @@ import { CategoryView } from "./views/category-view";
 import { HomeView } from "./views/home-view";
 import { ProductDetailView } from "./views/product-detail-view";
 import { errorMessageKey } from "./resource";
+import type { ProductFeed } from "./feed";
 import type { Translate } from "./views/common";
 import type { Category, Product } from "./types";
 
@@ -91,6 +92,10 @@ function home(
   );
 }
 
+function feed(overrides: Partial<ProductFeed> = {}): ProductFeed {
+  return { items: [product], page: 1, total: 1, hasMore: false, ...overrides };
+}
+
 function category(
   language: Language,
   overrides: Partial<Parameters<typeof CategoryView>[0]> = {}
@@ -101,8 +106,10 @@ function category(
       language={language}
       categories={categories}
       activeCode="c4"
-      products={{ status: "ready", value: [product] }}
+      products={{ status: "ready", value: feed() }}
+      loadingMore={false}
       onRetry={noOp}
+      onLoadMore={noOp}
       onBack={noOp}
       onSelectCategory={noOp}
       onSelectProduct={noOp}
@@ -212,13 +219,85 @@ describe("category view", () => {
       'role="status"'
     );
     expect(
-      visibleText(category("en", { products: { status: "ready", value: [] } }))
+      visibleText(
+        category("en", {
+          products: { status: "ready", value: feed({ items: [], total: 0 }) }
+        })
+      )
     ).toContain("No products on sale");
     const failed = category("en", {
       products: { status: "error", messageKey: "common.networkError" }
     });
     expect(failed).toContain('role="alert"');
     expect(visibleText(failed)).toContain("Network error");
+  });
+
+  /** The server returns one page, so the page length is not the category size. */
+  it("counts the products the server reported, not the rows on this page", () => {
+    const text = visibleText(
+      category("en", {
+        products: {
+          status: "ready",
+          value: feed({ items: [product], total: 57, hasMore: true })
+        }
+      })
+    );
+
+    expect(text).toContain("57 products");
+    expect(text).not.toContain("1 product");
+  });
+
+  it("offers a way to reach the products past the first page", () => {
+    const more = category("en", {
+      products: {
+        status: "ready",
+        value: feed({ items: [product], total: 57, hasMore: true })
+      }
+    });
+    expect(visibleText(more)).toContain("Show more");
+
+    expect(visibleText(category("en"))).not.toContain("Show more");
+  });
+
+  it("marks the load-more control busy while the next page is in flight", () => {
+    const markup = category("en", {
+      products: {
+        status: "ready",
+        value: feed({ items: [product], total: 57, hasMore: true })
+      },
+      loadingMore: true
+    });
+
+    expect(markup).toContain('aria-busy="true"');
+    expect(markup).toContain("disabled");
+    expect(visibleText(markup)).toContain("Loading");
+  });
+
+  it("keeps the loaded rows and reports a failed next page", () => {
+    const markup = category("en", {
+      products: {
+        status: "ready",
+        value: feed({ items: [product], total: 57, hasMore: true })
+      },
+      moreMessageKey: "common.networkError"
+    });
+    const text = visibleText(markup);
+
+    expect(markup).toContain('role="alert"');
+    expect(text).toContain("Network error");
+    expect(text).toContain("Polished tile 800×800");
+    expect(text).toContain("Show more");
+  });
+
+  it("shows no count at all for an empty category", () => {
+    const text = visibleText(
+      category("en", {
+        products: { status: "ready", value: feed({ items: [], total: 0 }) }
+      })
+    );
+
+    expect(text).not.toContain("0 products");
+    expect(text).toContain("No products on sale");
   });
 });
 
@@ -268,10 +347,15 @@ describe("khmer rendering", () => {
     expect(detail("km")).toContain('lang="km"');
   });
 
-  it("never truncates copy in the markup", () => {
+  /**
+   * The rules that stop Khmer from being clipped live in styles.css and are
+   * asserted in styles.test.ts. This guards the other half: no view may
+   * override them with an inline style.
+   */
+  it("renders no inline style, so the stylesheet keeps the last word", () => {
     for (const markup of [home("km"), category("km"), detail("km")]) {
-      expect(markup).not.toMatch(/text-overflow/);
-      expect(markup).not.toMatch(/nowrap/);
+      expect(markup).not.toMatch(/style="/);
+      expect(markup).not.toMatch(/text-overflow|nowrap|line-clamp/);
     }
   });
 });

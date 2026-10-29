@@ -28,11 +28,11 @@ const product: Product = {
   updated_at: "2026-10-29T00:00:00Z"
 };
 
-function recordingFetch(response: () => Response) {
+function recordingFetch(response: (call: number) => Response) {
   const urls: string[] = [];
   const transport: typeof globalThis.fetch = async (input, init) => {
     urls.push(new Request(input, init).url);
-    return response();
+    return response(urls.length - 1);
   };
   return { urls, transport };
 }
@@ -77,6 +77,30 @@ describe("loadCategories", () => {
     ]);
     expect(urls[0]).toBe("http://api.test/v1/public/categories?page_size=100");
   });
+
+  /** One page holds 100 categories; a longer catalogue must not be cut off. */
+  it("follows the remaining pages when the total exceeds one page", async () => {
+    const first = Array.from({ length: 100 }, (_, index) => ({
+      ...category,
+      public_id: `cat_${index}`,
+      code: `c${index}`
+    }));
+    const last: Category = { ...category, public_id: "cat_last", code: "c100" };
+    const { urls, transport } = recordingFetch((call) =>
+      call === 0
+        ? success({ items: first, page: 1, page_size: 100, total: 101 })
+        : success({ items: [last], page: 2, page_size: 100, total: 101 })
+    );
+
+    const categories = await loadCategories(client(transport));
+
+    expect(categories).toHaveLength(101);
+    expect(categories[100]).toEqual(last);
+    expect(urls).toEqual([
+      "http://api.test/v1/public/categories?page_size=100",
+      "http://api.test/v1/public/categories?page=2&page_size=100"
+    ]);
+  });
 });
 
 describe("loadProducts", () => {
@@ -87,9 +111,31 @@ describe("loadProducts", () => {
 
     await expect(
       loadProducts(client(transport), { category: "c4", pageSize: 20 })
-    ).resolves.toEqual([product]);
+    ).resolves.toEqual({ items: [product], page: 1, page_size: 20, total: 1 });
     expect(urls[0]).toBe(
       "http://api.test/v1/public/products?page_size=20&category=c4"
+    );
+  });
+
+  /** The count label reads `total`, so the envelope must survive the call. */
+  it("keeps the page numbers and the total the server reported", async () => {
+    const { transport } = recordingFetch(() =>
+      success({ items: [product], page: 1, page_size: 20, total: 57 })
+    );
+
+    await expect(loadProducts(client(transport), { category: "c4" })).resolves
+      .toMatchObject({ page: 1, page_size: 20, total: 57 });
+  });
+
+  it("asks for the page the feed is on", async () => {
+    const { urls, transport } = recordingFetch(() =>
+      success({ items: [product], page: 3, page_size: 20, total: 57 })
+    );
+
+    await loadProducts(client(transport), { category: "c4", page: 3 });
+
+    expect(urls[0]).toBe(
+      "http://api.test/v1/public/products?page=3&page_size=20&category=c4"
     );
   });
 
@@ -100,7 +146,7 @@ describe("loadProducts", () => {
 
     await expect(
       loadProducts(client(transport), { pageSize: 6 })
-    ).resolves.toEqual([]);
+    ).resolves.toEqual({ items: [], page: 1, page_size: 6, total: 0 });
     expect(urls[0]).toBe("http://api.test/v1/public/products?page_size=6");
   });
 

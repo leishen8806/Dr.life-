@@ -21,7 +21,8 @@ describe("buyer mall styles", () => {
       ".buyer-product__name",
       ".buyer-product__spec",
       ".buyer-category",
-      ".buyer-detail__name"
+      ".buyer-detail__name",
+      ".buyer-load-more"
     ]) {
       expect(ruleFor(selector)).toContain("overflow-wrap: anywhere");
     }
