@@ -124,6 +124,7 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	t.Run("refresh rotation concurrency reuse and revocation", f.testSessionLifecycle)
 	t.Run("session ownership cache rebuild and fail policy", f.testSessionAccess)
 	t.Run("account language profile and safe devices", f.testAccountLanguageProfileAndSafeDevices)
+	t.Run("account status changes revoke sessions", f.testAccountStatus)
 }
 
 func (f *loginFixture) testAccountLanguageProfileAndSafeDevices(t *testing.T) {
