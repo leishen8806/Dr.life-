@@ -100,6 +100,7 @@ type Handler struct {
 	AccountLinks     AccountLinkManagement
 	ClientIP         gateway.ClientIPResolver
 	Audit            *platformaudit.Store
+	AuditWriter      platformaudit.Writer
 	Ledger           LedgerReader
 	Directory        AccountDirectory
 	AdminPermissions AdminPermissionChecker
@@ -638,9 +639,16 @@ func (h Handler) PostFilePresign(w http.ResponseWriter, r *http.Request, _ gen.P
 	if !decodeFileJSON(w, r, &body) {
 		return
 	}
+	if h.AuditWriter == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
 	result, err := h.Files.Presign(r.Context(), owner, files.PresignInput{Purpose: string(body.Purpose), ContentType: string(body.ContentType), Size: body.Size, SHA256: body.Sha256})
 	if err != nil {
 		h.fileError(w, r, err)
+		return
+	}
+	if !h.appendFileAudit(w, r, owner, platformaudit.ActionFilePresigned, result.File) {
 		return
 	}
 	httpx.WriteOK(w, r, filePresignData(result))
@@ -651,9 +659,16 @@ func (h Handler) PostFileComplete(w http.ResponseWriter, r *http.Request, public
 	if !ok {
 		return
 	}
+	if h.AuditWriter == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
 	file, err := h.Files.Complete(r.Context(), owner, string(publicID))
 	if err != nil {
 		h.fileError(w, r, err)
+		return
+	}
+	if !h.appendFileAudit(w, r, owner, platformaudit.ActionFileVerificationRequested, file) {
 		return
 	}
 	httpx.WriteOK(w, r, fileData(file))
@@ -908,6 +923,26 @@ func (h Handler) fileError(w http.ResponseWriter, r *http.Request, err error) {
 	default:
 		h.writeError(w, r, err)
 	}
+}
+
+func (h Handler) appendFileAudit(w http.ResponseWriter, r *http.Request, owner int64, action platformaudit.Action, file files.File) bool {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return false
+	}
+	detail, err := json.Marshal(map[string]any{"purpose": file.Purpose, "content_type": file.ContentType, "size": file.Size, "status": file.Status})
+	if err == nil {
+		_, err = h.AuditWriter.Append(r.Context(), platformaudit.Entry{ActorID: owner, ActorRole: string(identity.Role), Action: action, Target: "file:" + file.PublicID, Detail: detail, IP: h.ClientIP.Resolve(r), RequestID: httpx.RequestIDFromContext(r.Context())})
+	}
+	if err != nil {
+		if h.Logger != nil {
+			h.Logger.ErrorContext(r.Context(), "file audit append failed", "request_id", httpx.RequestIDFromContext(r.Context()))
+		}
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInternalError))
+		return false
+	}
+	return true
 }
 
 func decodeFileJSON(w http.ResponseWriter, r *http.Request, body *gen.FilePresignRequest) bool {

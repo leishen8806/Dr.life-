@@ -15,9 +15,9 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
-	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/audit/audittest"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
@@ -218,7 +218,7 @@ func TestTelegramAuthHandlerContract(t *testing.T) {
 
 func TestFilePresignUsesGatewayAccountAndReturnsSignedMetadata(t *testing.T) {
 	fake := &fakeFiles{presign: files.PresignResult{File: files.File{PublicID: "file-1", Purpose: "product_image", ContentType: "image/jpeg", Size: 12, Status: files.StatusPending, CreatedAt: time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)}, Upload: storage.SignedURL{URL: "https://storage.test/put", Headers: map[string]string{"x-amz-checksum-sha256": "sum"}}}}
-	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake})
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake, AuditWriter: &audittest.Writer{}})
 	req := httptest.NewRequest(http.MethodPost, "/v1/files/presign", strings.NewReader(`{"purpose":"product_image","content_type":"image/jpeg","size":12,"sha256":"sum"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Idempotency-Key", "file-presign-1")
