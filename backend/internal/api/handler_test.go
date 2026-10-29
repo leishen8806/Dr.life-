@@ -34,6 +34,29 @@ type fakeAccountLinks struct {
 	linkID     string
 }
 
+type fakeAccountProfiles struct {
+	profile iam.AccountProfile
+	devices []iam.AccountDevice
+	account string
+	lang    string
+	err     error
+}
+
+func (f *fakeAccountProfiles) Me(_ context.Context, account string) (iam.AccountProfile, error) {
+	f.account = account
+	return f.profile, f.err
+}
+
+func (f *fakeAccountProfiles) SetLanguage(_ context.Context, account, lang string) error {
+	f.account, f.lang = account, lang
+	return f.err
+}
+
+func (f *fakeAccountProfiles) Devices(_ context.Context, account, _ string) ([]iam.AccountDevice, error) {
+	f.account = account
+	return f.devices, f.err
+}
+
 func (f *fakeAccountLinks) CandidateBuyers(_ context.Context, actor string) ([]iam.AccountLinkCandidate, error) {
 	f.actor = actor
 	return f.candidates, f.err
@@ -52,6 +75,105 @@ func (f *fakeAccountLinks) Unlink(_ context.Context, actor, linkID string) error
 func (f *fakeLogin) Login(_ context.Context, input iam.LoginInput) (iam.LoginResult, error) {
 	f.input = input
 	return f.result, f.err
+}
+
+func accountProfileHandler(profiles api.AccountProfileManagement, auth gateway.Authenticator) http.Handler {
+	return server.NewHandlerWithGateway(nil, server.GatewayOptions{
+		Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: auth, AccountProfiles: profiles,
+	})
+}
+
+func TestMeProfileLanguageAndDevicesExposeOnlySafeFields(t *testing.T) {
+	now := time.Date(2026, 10, 29, 3, 0, 0, 0, time.UTC)
+	profiles := &fakeAccountProfiles{
+		profile: iam.AccountProfile{PublicID: accountID, Role: "buyer", Lang: ptr("zh"), Status: "active", LangRegisteredAt: &now},
+		devices: []iam.AccountDevice{{PublicID: merchantULID, FirstSeenAt: now.Add(-time.Hour), LastSeenAt: now, IsCurrent: true}},
+	}
+	handler := accountProfileHandler(profiles, stubAuth{identity: gateway.Identity{AccountID: accountID, SessionID: "session", Role: gateway.RoleBuyer}})
+
+	me := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/buyer/me", nil))
+	if me.Code != http.StatusOK || profiles.account != accountID {
+		t.Fatalf("me status/account=%d/%q body=%s", me.Code, profiles.account, me.Body.String())
+	}
+	assertJSONKeys(t, me.Body.Bytes(), "public_id", "role", "lang", "needs_language", "status")
+	if strings.Contains(me.Body.String(), "telegram") || strings.Contains(me.Body.String(), "phone") {
+		t.Fatalf("me response leaked personal data: %s", me.Body.String())
+	}
+
+	devices := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/buyer/me/devices", nil))
+	if devices.Code != http.StatusOK {
+		t.Fatalf("devices status=%d body=%s", devices.Code, devices.Body.String())
+	}
+	var deviceEnvelope struct {
+		Data struct {
+			Items []map[string]any `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(devices.Body.Bytes(), &deviceEnvelope); err != nil {
+		t.Fatal(err)
+	}
+	if len(deviceEnvelope.Data.Items) != 1 || deviceEnvelope.Data.Items[0]["is_current"] != true {
+		t.Fatalf("devices=%s", devices.Body.String())
+	}
+	assertMapKeys(t, deviceEnvelope.Data.Items[0], "public_id", "first_seen_at", "last_seen_at", "is_current")
+	if strings.Contains(devices.Body.String(), "device_id") || strings.Contains(devices.Body.String(), "token") {
+		t.Fatalf("devices response leaked sensitive data: %s", devices.Body.String())
+	}
+
+	for _, language := range []string{"zh", "en", "km"} {
+		request := httptest.NewRequest(http.MethodPut, "/v1/buyer/me/language", strings.NewReader(`{"lang":"`+language+`"}`))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Idempotency-Key", "language-register-"+language)
+		response := serve(t, handler, request)
+		if response.Code != http.StatusOK || profiles.account != accountID || profiles.lang != language {
+			t.Fatalf("language %q status/account/lang=%d/%q/%q body=%s", language, response.Code, profiles.account, profiles.lang, response.Body.String())
+		}
+	}
+}
+
+func TestMeProfileRejectsInvalidLanguageAndUnauthorizedOrWrongAudience(t *testing.T) {
+	profiles := &fakeAccountProfiles{err: iam.ErrInvalidLanguage}
+	handler := accountProfileHandler(profiles, stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}})
+	for _, language := range []string{"fr", "", "ZH"} {
+		request := httptest.NewRequest(http.MethodPut, "/v1/buyer/me/language", strings.NewReader(`{"lang":"`+language+`"}`))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Idempotency-Key", "language-invalid-"+language)
+		response := serve(t, handler, request)
+		if response.Code != http.StatusBadRequest || decodeErrorCode(t, response) != 1002 {
+			t.Fatalf("language %q status/body=%d/%s", language, response.Code, response.Body.String())
+		}
+	}
+	if response := serve(t, accountProfileHandler(profiles, nil), httptest.NewRequest(http.MethodGet, "/v1/buyer/me", nil)); response.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/merchant/me", nil)); response.Code != http.StatusForbidden {
+		t.Fatalf("wrong audience status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func ptr(value string) *string { return &value }
+
+func assertJSONKeys(t *testing.T, raw []byte, keys ...string) {
+	t.Helper()
+	var envelope struct {
+		Data map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	assertMapKeys(t, envelope.Data, keys...)
+}
+
+func assertMapKeys(t *testing.T, values map[string]any, want ...string) {
+	t.Helper()
+	if len(values) != len(want) {
+		t.Fatalf("keys=%v want=%v", values, want)
+	}
+	for _, key := range want {
+		if _, ok := values[key]; !ok {
+			t.Fatalf("keys=%v missing=%q", values, key)
+		}
+	}
 }
 
 func TestTelegramAuthHandlerContract(t *testing.T) {

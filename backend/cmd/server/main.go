@@ -222,6 +222,7 @@ func main() {
 	}
 	var loginService *iam.Service
 	var sessionService *iam.SessionService
+	var accountProfileService *iam.AccountProfileService
 	var accountLinkService *iam.AccountLinkService
 	var accountDirectory *iam.AccountDirectory
 	var authenticator gateway.Authenticator
@@ -275,6 +276,7 @@ func main() {
 		checker := iam.DBSessionChecker{DB: iamDatabase, Cache: sessionCache, IdleTTL: cfg.SessionIdleTTL}
 		tokens := iam.TokenManager{Keys: jwtKeys, AccessTTL: cfg.AccessTokenTTL, Issuer: cfg.TokenIssuer, LegacyAcceptUntil: cfg.TokenLegacyAcceptUntil, Checker: checker}
 		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}}
+		accountProfileService = &iam.AccountProfileService{DB: iamDatabase}
 		accountLinkService = iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: iamDatabase}, ids.NewULID)
 		loginService = &iam.Service{
 			DB:       iamDatabase,
@@ -316,18 +318,19 @@ func main() {
 		IdempotencyExempt: func(r *http.Request) bool {
 			return r.Method == http.MethodPost && (r.URL.Path == "/v1/public/auth/telegram" || r.URL.Path == "/v1/public/auth/refresh")
 		},
-		Metrics:       metrics,
-		ErrorReporter: reporter,
-		Catalog:       catalogService,
-		Merchants:     directory,
-		Logger:        logger,
-		Login:         loginService,
-		Audit:         auditStore,
-		Sessions:      sessionService,
-		AccountLinks:  accountLinkService,
-		Ledger:        ledgerReader,
-		Directory:     accountDirectory,
-		Bulkhead:      bulkhead,
+		Metrics:         metrics,
+		ErrorReporter:   reporter,
+		Catalog:         catalogService,
+		Merchants:       directory,
+		Logger:          logger,
+		Login:           loginService,
+		Audit:           auditStore,
+		Sessions:        sessionService,
+		AccountProfiles: accountProfileService,
+		AccountLinks:    accountLinkService,
+		Ledger:          ledgerReader,
+		Directory:       accountDirectory,
+		Bulkhead:        bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)
 	// WriteTimeout stays unset so future real-time streams can remain open.
