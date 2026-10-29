@@ -160,6 +160,30 @@
   overflow-wrap: anywhere;
 }
 
+.buyer-load-more-row {
+  display: grid;
+  gap: var(--drl-space-2);
+  justify-items: center;
+  padding-top: var(--drl-space-3);
+}
+
+.buyer-load-more {
+  padding: var(--drl-space-2) var(--drl-space-4);
+  border: 1px solid var(--drl-color-border);
+  border-radius: var(--drl-radius);
+  color: inherit;
+  background: var(--drl-color-surface);
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+
+.buyer-load-more__error {
+  margin: 0;
+  color: var(--drl-color-danger);
+  font-size: var(--drl-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
 .buyer-back {
   justify-self: start;
   padding: var(--drl-space-2) var(--drl-space-3);

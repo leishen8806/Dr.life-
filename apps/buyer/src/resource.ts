@@ -33,8 +33,15 @@ const serverMessageKeys = {
   7001: "error.7001"
 } satisfies Record<components["schemas"]["ErrorCode"], TranslationKey>;
 
+/** A deployed server can answer with a code newer than the generated schema. */
+const knownMessageKeys = serverMessageKeys as Record<
+  number,
+  TranslationKey | undefined
+>;
+
 export function errorMessageKey(error: unknown): TranslationKey {
-  if (error instanceof ApiError) return serverMessageKeys[error.code];
+  if (error instanceof ApiError)
+    return knownMessageKeys[error.code] ?? "error.1001";
   if (error instanceof CircuitOpenError) return "error.circuitOpen";
   return "common.networkError";
 }

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type Language, useI18n } from "@drlife/i18n";
+import { type Language, type TranslationKey, useI18n } from "@drlife/i18n";
 import { LanguageSwitcher, useBackButton } from "@drlife/ui";
 import {
   type BuyerApiClient,
@@ -8,6 +8,7 @@ import {
   loadCategories,
   loadProducts
 } from "./api";
+import { appendFeed, firstFeed, type ProductFeed } from "./feed";
 import { errorMessageKey, type Resource } from "./resource";
 import type { Category, Product } from "./types";
 import { CategoryView } from "./views/category-view";
@@ -60,6 +61,59 @@ function useBuyerClient(language: Language): BuyerApiClient {
   );
 }
 
+/**
+ * One category list, page by page: the first page replaces the list, the next
+ * ones are appended. A failed next page keeps the rows already on screen.
+ */
+function useProductFeed(client: BuyerApiClient, code?: string) {
+  const [resource, setResource] = useState<Resource<ProductFeed>>({
+    status: "loading"
+  });
+  const [attempt, setAttempt] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreMessageKey, setMoreMessageKey] = useState<TranslationKey>();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setResource({ status: "loading" });
+    setLoadingMore(false);
+    setMoreMessageKey(undefined);
+    loadProducts(client, { category: code }, controller.signal).then(
+      (page) => {
+        if (!controller.signal.aborted)
+          setResource({ status: "ready", value: firstFeed(page) });
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted)
+          setResource({ status: "error", messageKey: errorMessageKey(error) });
+      }
+    );
+    return () => controller.abort();
+  }, [client, code, attempt]);
+
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+
+  const loadMore = useCallback(() => {
+    if (resource.status !== "ready" || !resource.value.hasMore || loadingMore)
+      return;
+    const current = resource.value;
+    setLoadingMore(true);
+    setMoreMessageKey(undefined);
+    loadProducts(client, { category: code, page: current.page + 1 }).then(
+      (page) => {
+        setResource({ status: "ready", value: appendFeed(current, page) });
+        setLoadingMore(false);
+      },
+      (error: unknown) => {
+        setMoreMessageKey(errorMessageKey(error));
+        setLoadingMore(false);
+      }
+    );
+  }, [client, code, loadingMore, resource]);
+
+  return { resource, retry, loadMore, loadingMore, moreMessageKey };
+}
+
 function CategoryPage({
   client,
   categories,
@@ -78,11 +132,8 @@ function CategoryPage({
   onBack: () => void;
 }) {
   const { language, t } = useI18n();
-  const load = useCallback(
-    (signal: AbortSignal) => loadProducts(client, { category: code }, signal),
-    [client, code]
-  );
-  const [products, retry] = useLoaded(load);
+  const { resource, retry, loadMore, loadingMore, moreMessageKey } =
+    useProductFeed(client, code);
 
   return (
     <CategoryView
@@ -90,11 +141,14 @@ function CategoryPage({
       language={language}
       categories={categories}
       activeCode={code}
-      products={products}
+      products={resource}
+      loadingMore={loadingMore}
+      moreMessageKey={moreMessageKey}
       actions={actions}
       onSelectCategory={onSelectCategory}
       onSelectProduct={onSelectProduct}
       onRetry={retry}
+      onLoadMore={loadMore}
       onBack={onBack}
     />
   );
@@ -126,8 +180,8 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
   );
   const [categories, retryCategories] = useLoaded(loadAllCategories);
   const loadFeatured = useCallback(
-    (signal: AbortSignal) =>
-      loadProducts(client, { pageSize: featuredPageSize }, signal),
+    async (signal: AbortSignal) =>
+      (await loadProducts(client, { pageSize: featuredPageSize }, signal)).items,
     [client]
   );
   const [featured, retryFeatured] = useLoaded(loadFeatured);
