@@ -13,21 +13,6 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
-// Defines values for AccountDeviceListSuccessResponseOk.
-const (
-	AccountDeviceListSuccessResponseOkTrue AccountDeviceListSuccessResponseOk = true
-)
-
-// Valid indicates whether the value is a known member of the AccountDeviceListSuccessResponseOk enum.
-func (e AccountDeviceListSuccessResponseOk) Valid() bool {
-	switch e {
-	case AccountDeviceListSuccessResponseOkTrue:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for AccountLinkCandidateListSuccessResponseOk.
 const (
 	AccountLinkCandidateListSuccessResponseOkTrue AccountLinkCandidateListSuccessResponseOk = true
@@ -82,84 +67,6 @@ const (
 func (e AccountLinkSuccessResponseOk) Valid() bool {
 	switch e {
 	case AccountLinkSuccessResponseOkTrue:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for AccountProfileDataLang.
-const (
-	AccountProfileDataLangEn AccountProfileDataLang = "en"
-	AccountProfileDataLangKm AccountProfileDataLang = "km"
-	AccountProfileDataLangZh AccountProfileDataLang = "zh"
-)
-
-// Valid indicates whether the value is a known member of the AccountProfileDataLang enum.
-func (e AccountProfileDataLang) Valid() bool {
-	switch e {
-	case AccountProfileDataLangEn:
-		return true
-	case AccountProfileDataLangKm:
-		return true
-	case AccountProfileDataLangZh:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for AccountProfileDataRole.
-const (
-	AccountProfileDataRoleBuyer    AccountProfileDataRole = "buyer"
-	AccountProfileDataRoleDriver   AccountProfileDataRole = "driver"
-	AccountProfileDataRoleMerchant AccountProfileDataRole = "merchant"
-)
-
-// Valid indicates whether the value is a known member of the AccountProfileDataRole enum.
-func (e AccountProfileDataRole) Valid() bool {
-	switch e {
-	case AccountProfileDataRoleBuyer:
-		return true
-	case AccountProfileDataRoleDriver:
-		return true
-	case AccountProfileDataRoleMerchant:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for AccountProfileDataStatus.
-const (
-	AccountProfileDataStatusActive   AccountProfileDataStatus = "active"
-	AccountProfileDataStatusDisabled AccountProfileDataStatus = "disabled"
-	AccountProfileDataStatusFrozen   AccountProfileDataStatus = "frozen"
-)
-
-// Valid indicates whether the value is a known member of the AccountProfileDataStatus enum.
-func (e AccountProfileDataStatus) Valid() bool {
-	switch e {
-	case AccountProfileDataStatusActive:
-		return true
-	case AccountProfileDataStatusDisabled:
-		return true
-	case AccountProfileDataStatusFrozen:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for AccountProfileSuccessResponseOk.
-const (
-	AccountProfileSuccessResponseOkTrue AccountProfileSuccessResponseOk = true
-)
-
-// Valid indicates whether the value is a known member of the AccountProfileSuccessResponseOk enum.
-func (e AccountProfileSuccessResponseOk) Valid() bool {
-	switch e {
-	case AccountProfileSuccessResponseOkTrue:
 		return true
 	default:
 		return false
@@ -310,6 +217,129 @@ func (e ErrorEnvelopeOk) Valid() bool {
 	}
 }
 
+// Defines values for FileDownloadURLSuccessResponseOk.
+const (
+	FileDownloadURLSuccessResponseOkTrue FileDownloadURLSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the FileDownloadURLSuccessResponseOk enum.
+func (e FileDownloadURLSuccessResponseOk) Valid() bool {
+	switch e {
+	case FileDownloadURLSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FilePresignRequestContentType.
+const (
+	Applicationpdf FilePresignRequestContentType = "application/pdf"
+	Imagejpeg      FilePresignRequestContentType = "image/jpeg"
+	Imagepng       FilePresignRequestContentType = "image/png"
+	Imagewebp      FilePresignRequestContentType = "image/webp"
+)
+
+// Valid indicates whether the value is a known member of the FilePresignRequestContentType enum.
+func (e FilePresignRequestContentType) Valid() bool {
+	switch e {
+	case Applicationpdf:
+		return true
+	case Imagejpeg:
+		return true
+	case Imagepng:
+		return true
+	case Imagewebp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FilePresignSuccessResponseOk.
+const (
+	FilePresignSuccessResponseOkTrue FilePresignSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the FilePresignSuccessResponseOk enum.
+func (e FilePresignSuccessResponseOk) Valid() bool {
+	switch e {
+	case FilePresignSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FilePurpose.
+const (
+	DeliveryProof FilePurpose = "delivery_proof"
+	InboundPhoto  FilePurpose = "inbound_photo"
+	MerchantKyc   FilePurpose = "merchant_kyc"
+	ProductImage  FilePurpose = "product_image"
+)
+
+// Valid indicates whether the value is a known member of the FilePurpose enum.
+func (e FilePurpose) Valid() bool {
+	switch e {
+	case DeliveryProof:
+		return true
+	case InboundPhoto:
+		return true
+	case MerchantKyc:
+		return true
+	case ProductImage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FileStatus.
+const (
+	FileStatusDeleted   FileStatus = "deleted"
+	FileStatusExpired   FileStatus = "expired"
+	FileStatusPending   FileStatus = "pending"
+	FileStatusReady     FileStatus = "ready"
+	FileStatusRejected  FileStatus = "rejected"
+	FileStatusVerifying FileStatus = "verifying"
+)
+
+// Valid indicates whether the value is a known member of the FileStatus enum.
+func (e FileStatus) Valid() bool {
+	switch e {
+	case FileStatusDeleted:
+		return true
+	case FileStatusExpired:
+		return true
+	case FileStatusPending:
+		return true
+	case FileStatusReady:
+		return true
+	case FileStatusRejected:
+		return true
+	case FileStatusVerifying:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FileSuccessResponseOk.
+const (
+	FileSuccessResponseOkTrue FileSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the FileSuccessResponseOk enum.
+func (e FileSuccessResponseOk) Valid() bool {
+	switch e {
+	case FileSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FinancialCenterSuccessResponseOk.
 const (
 	FinancialCenterSuccessResponseOkTrue FinancialCenterSuccessResponseOk = true
@@ -319,27 +349,6 @@ const (
 func (e FinancialCenterSuccessResponseOk) Valid() bool {
 	switch e {
 	case FinancialCenterSuccessResponseOkTrue:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for LanguageUpdateRequestLang.
-const (
-	LanguageUpdateRequestLangEn LanguageUpdateRequestLang = "en"
-	LanguageUpdateRequestLangKm LanguageUpdateRequestLang = "km"
-	LanguageUpdateRequestLangZh LanguageUpdateRequestLang = "zh"
-)
-
-// Valid indicates whether the value is a known member of the LanguageUpdateRequestLang enum.
-func (e LanguageUpdateRequestLang) Valid() bool {
-	switch e {
-	case LanguageUpdateRequestLangEn:
-		return true
-	case LanguageUpdateRequestLangKm:
-		return true
-	case LanguageUpdateRequestLangZh:
 		return true
 	default:
 		return false
@@ -648,19 +657,19 @@ func (e SuccessEnvelopeOk) Valid() bool {
 
 // Defines values for TelegramAccountLang.
 const (
-	TelegramAccountLangEn TelegramAccountLang = "en"
-	TelegramAccountLangKm TelegramAccountLang = "km"
-	TelegramAccountLangZh TelegramAccountLang = "zh"
+	En TelegramAccountLang = "en"
+	Km TelegramAccountLang = "km"
+	Zh TelegramAccountLang = "zh"
 )
 
 // Valid indicates whether the value is a known member of the TelegramAccountLang enum.
 func (e TelegramAccountLang) Valid() bool {
 	switch e {
-	case TelegramAccountLangEn:
+	case En:
 		return true
-	case TelegramAccountLangKm:
+	case Km:
 		return true
-	case TelegramAccountLangZh:
+	case Zh:
 		return true
 	default:
 		return false
@@ -690,19 +699,19 @@ func (e TelegramAccountRole) Valid() bool {
 
 // Defines values for TelegramAccountStatus.
 const (
-	TelegramAccountStatusActive   TelegramAccountStatus = "active"
-	TelegramAccountStatusDisabled TelegramAccountStatus = "disabled"
-	TelegramAccountStatusFrozen   TelegramAccountStatus = "frozen"
+	Active   TelegramAccountStatus = "active"
+	Disabled TelegramAccountStatus = "disabled"
+	Frozen   TelegramAccountStatus = "frozen"
 )
 
 // Valid indicates whether the value is a known member of the TelegramAccountStatus enum.
 func (e TelegramAccountStatus) Valid() bool {
 	switch e {
-	case TelegramAccountStatusActive:
+	case Active:
 		return true
-	case TelegramAccountStatusDisabled:
+	case Disabled:
 		return true
-	case TelegramAccountStatusFrozen:
+	case Frozen:
 		return true
 	default:
 		return false
@@ -799,29 +808,6 @@ func (e ListMerchantProductsParamsStatus) Valid() bool {
 	}
 }
 
-// AccountDevice defines model for AccountDevice.
-type AccountDevice struct {
-	FirstSeenAt time.Time `json:"first_seen_at"`
-	IsCurrent   bool      `json:"is_current"`
-	LastSeenAt  time.Time `json:"last_seen_at"`
-	PublicId    string    `json:"public_id"`
-}
-
-// AccountDeviceListData defines model for AccountDeviceListData.
-type AccountDeviceListData struct {
-	Items []AccountDevice `json:"items"`
-}
-
-// AccountDeviceListSuccessResponse defines model for AccountDeviceListSuccessResponse.
-type AccountDeviceListSuccessResponse struct {
-	Data      AccountDeviceListData              `json:"data"`
-	Ok        AccountDeviceListSuccessResponseOk `json:"ok"`
-	RequestId string                             `json:"request_id"`
-}
-
-// AccountDeviceListSuccessResponseOk defines model for AccountDeviceListSuccessResponse.Ok.
-type AccountDeviceListSuccessResponseOk bool
-
 // AccountLink defines model for AccountLink.
 type AccountLink struct {
 	BuyerAccountId string `json:"buyer_account_id"`
@@ -882,36 +868,6 @@ type AccountLinkSuccessResponse struct {
 
 // AccountLinkSuccessResponseOk defines model for AccountLinkSuccessResponse.Ok.
 type AccountLinkSuccessResponseOk bool
-
-// AccountProfileData defines model for AccountProfileData.
-type AccountProfileData struct {
-	Lang *AccountProfileDataLang `json:"lang"`
-
-	// NeedsLanguage True when the account has not completed its first language registration.
-	NeedsLanguage bool                     `json:"needs_language"`
-	PublicId      string                   `json:"public_id"`
-	Role          AccountProfileDataRole   `json:"role"`
-	Status        AccountProfileDataStatus `json:"status"`
-}
-
-// AccountProfileDataLang defines model for AccountProfileData.Lang.
-type AccountProfileDataLang string
-
-// AccountProfileDataRole defines model for AccountProfileData.Role.
-type AccountProfileDataRole string
-
-// AccountProfileDataStatus defines model for AccountProfileData.Status.
-type AccountProfileDataStatus string
-
-// AccountProfileSuccessResponse defines model for AccountProfileSuccessResponse.
-type AccountProfileSuccessResponse struct {
-	Data      AccountProfileData              `json:"data"`
-	Ok        AccountProfileSuccessResponseOk `json:"ok"`
-	RequestId string                          `json:"request_id"`
-}
-
-// AccountProfileSuccessResponseOk defines model for AccountProfileSuccessResponse.Ok.
-type AccountProfileSuccessResponseOk bool
 
 // ActionData defines model for ActionData.
 type ActionData struct {
@@ -1010,6 +966,83 @@ type ErrorEnvelope struct {
 // ErrorEnvelopeOk defines model for ErrorEnvelope.Ok.
 type ErrorEnvelopeOk bool
 
+// File defines model for File.
+type File struct {
+	ContentType string      `json:"content_type"`
+	CreatedAt   time.Time   `json:"created_at"`
+	PublicId    string      `json:"public_id"`
+	Purpose     FilePurpose `json:"purpose"`
+	Size        int64       `json:"size"`
+	Status      FileStatus  `json:"status"`
+}
+
+// FileDownloadURLData defines model for FileDownloadURLData.
+type FileDownloadURLData struct {
+	DownloadUrl string    `json:"download_url"`
+	ExpiresAt   time.Time `json:"expires_at"`
+}
+
+// FileDownloadURLSuccessResponse defines model for FileDownloadURLSuccessResponse.
+type FileDownloadURLSuccessResponse struct {
+	Data      FileDownloadURLData              `json:"data"`
+	Ok        FileDownloadURLSuccessResponseOk `json:"ok"`
+	RequestId string                           `json:"request_id"`
+}
+
+// FileDownloadURLSuccessResponseOk defines model for FileDownloadURLSuccessResponse.Ok.
+type FileDownloadURLSuccessResponseOk bool
+
+// FilePresignData defines model for FilePresignData.
+type FilePresignData struct {
+	ContentType   string            `json:"content_type"`
+	CreatedAt     time.Time         `json:"created_at"`
+	PublicId      string            `json:"public_id"`
+	Purpose       FilePurpose       `json:"purpose"`
+	Size          int64             `json:"size"`
+	Status        FileStatus        `json:"status"`
+	UploadHeaders map[string]string `json:"upload_headers"`
+	UploadUrl     string            `json:"upload_url"`
+}
+
+// FilePresignRequest defines model for FilePresignRequest.
+type FilePresignRequest struct {
+	ContentType FilePresignRequestContentType `json:"content_type"`
+	Purpose     FilePurpose                   `json:"purpose"`
+
+	// Sha256 Base64-encoded SHA-256 of the bytes sent directly to object storage.
+	Sha256 string `json:"sha256"`
+	Size   int64  `json:"size"`
+}
+
+// FilePresignRequestContentType defines model for FilePresignRequest.ContentType.
+type FilePresignRequestContentType string
+
+// FilePresignSuccessResponse defines model for FilePresignSuccessResponse.
+type FilePresignSuccessResponse struct {
+	Data      FilePresignData              `json:"data"`
+	Ok        FilePresignSuccessResponseOk `json:"ok"`
+	RequestId string                       `json:"request_id"`
+}
+
+// FilePresignSuccessResponseOk defines model for FilePresignSuccessResponse.Ok.
+type FilePresignSuccessResponseOk bool
+
+// FilePurpose defines model for FilePurpose.
+type FilePurpose string
+
+// FileStatus defines model for FileStatus.
+type FileStatus string
+
+// FileSuccessResponse defines model for FileSuccessResponse.
+type FileSuccessResponse struct {
+	Data      File                  `json:"data"`
+	Ok        FileSuccessResponseOk `json:"ok"`
+	RequestId string                `json:"request_id"`
+}
+
+// FileSuccessResponseOk defines model for FileSuccessResponse.Ok.
+type FileSuccessResponseOk bool
+
 // FinancialCenterData defines model for FinancialCenterData.
 type FinancialCenterData struct {
 	MerchantBalances []MerchantBalance   `json:"merchant_balances"`
@@ -1043,14 +1076,6 @@ type FundsPosition struct {
 	SuspenseE4       int64 `json:"suspense_e4"`
 	UserAvailableE4  int64 `json:"user_available_e4"`
 }
-
-// LanguageUpdateRequest defines model for LanguageUpdateRequest.
-type LanguageUpdateRequest struct {
-	Lang LanguageUpdateRequestLang `json:"lang"`
-}
-
-// LanguageUpdateRequestLang defines model for LanguageUpdateRequest.Lang.
-type LanguageUpdateRequestLang string
 
 // LedgerReadData Read-only ledger data. Amounts are signed or unsigned integer e4 values; clients format them only for display.
 type LedgerReadData map[string]interface{}
@@ -1394,12 +1419,6 @@ type XStepUpToken = string
 // AccountBlocked defines model for AccountBlocked.
 type AccountBlocked = ErrorEnvelope
 
-// AccountDeviceListSucceeded defines model for AccountDeviceListSucceeded.
-type AccountDeviceListSucceeded = AccountDeviceListSuccessResponse
-
-// AccountProfileSucceeded defines model for AccountProfileSucceeded.
-type AccountProfileSucceeded = AccountProfileSuccessResponse
-
 // ActionSucceeded defines model for ActionSucceeded.
 type ActionSucceeded = ActionSuccessResponse
 
@@ -1485,12 +1504,6 @@ type PostBuyerAuthLogoutParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
-// PutBuyerMeLanguageParams defines parameters for PutBuyerMeLanguage.
-type PutBuyerMeLanguageParams struct {
-	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
-	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
-}
-
 // DeleteBuyerMeSessionParams defines parameters for DeleteBuyerMeSession.
 type DeleteBuyerMeSessionParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
@@ -1503,26 +1516,26 @@ type PostDriverAuthLogoutParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
-// PutDriverMeLanguageParams defines parameters for PutDriverMeLanguage.
-type PutDriverMeLanguageParams struct {
-	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
-	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
-}
-
 // DeleteDriverMeSessionParams defines parameters for DeleteDriverMeSession.
 type DeleteDriverMeSessionParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
-// PostMerchantAuthLogoutParams defines parameters for PostMerchantAuthLogout.
-type PostMerchantAuthLogoutParams struct {
+// PostFilePresignParams defines parameters for PostFilePresign.
+type PostFilePresignParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
-// PutMerchantMeLanguageParams defines parameters for PutMerchantMeLanguage.
-type PutMerchantMeLanguageParams struct {
+// PostFileCompleteParams defines parameters for PostFileComplete.
+type PostFileCompleteParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PostMerchantAuthLogoutParams defines parameters for PostMerchantAuthLogout.
+type PostMerchantAuthLogoutParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
@@ -1608,14 +1621,8 @@ type ListPublicProductsParams struct {
 	Category *CategoryCode `form:"category,omitempty" json:"category,omitempty"`
 }
 
-// PutBuyerMeLanguageJSONRequestBody defines body for PutBuyerMeLanguage for application/json ContentType.
-type PutBuyerMeLanguageJSONRequestBody = LanguageUpdateRequest
-
-// PutDriverMeLanguageJSONRequestBody defines body for PutDriverMeLanguage for application/json ContentType.
-type PutDriverMeLanguageJSONRequestBody = LanguageUpdateRequest
-
-// PutMerchantMeLanguageJSONRequestBody defines body for PutMerchantMeLanguage for application/json ContentType.
-type PutMerchantMeLanguageJSONRequestBody = LanguageUpdateRequest
+// PostFilePresignJSONRequestBody defines body for PostFilePresign for application/json ContentType.
+type PostFilePresignJSONRequestBody = FilePresignRequest
 
 // CreateMerchantMeLinkJSONRequestBody defines body for CreateMerchantMeLink for application/json ContentType.
 type CreateMerchantMeLinkJSONRequestBody = AccountLinkCreateRequest
@@ -1655,15 +1662,6 @@ type ServerInterface interface {
 	// PostBuyerAuthLogout Revoke the current buyer session
 	// (POST /v1/buyer/auth/logout)
 	PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request, params PostBuyerAuthLogoutParams)
-	// GetBuyerMe Get the current buyer account profile
-	// (GET /v1/buyer/me)
-	GetBuyerMe(w http.ResponseWriter, r *http.Request)
-	// GetBuyerMeDevices List the current buyer account devices
-	// (GET /v1/buyer/me/devices)
-	GetBuyerMeDevices(w http.ResponseWriter, r *http.Request)
-	// PutBuyerMeLanguage Register or change the current buyer language
-	// (PUT /v1/buyer/me/language)
-	PutBuyerMeLanguage(w http.ResponseWriter, r *http.Request, params PutBuyerMeLanguageParams)
 	// GetBuyerMeSessions List the current buyer account sessions
 	// (GET /v1/buyer/me/sessions)
 	GetBuyerMeSessions(w http.ResponseWriter, r *http.Request)
@@ -1679,15 +1677,6 @@ type ServerInterface interface {
 	// PostDriverAuthLogout Revoke the current driver session
 	// (POST /v1/driver/auth/logout)
 	PostDriverAuthLogout(w http.ResponseWriter, r *http.Request, params PostDriverAuthLogoutParams)
-	// GetDriverMe Get the current driver account profile
-	// (GET /v1/driver/me)
-	GetDriverMe(w http.ResponseWriter, r *http.Request)
-	// GetDriverMeDevices List the current driver account devices
-	// (GET /v1/driver/me/devices)
-	GetDriverMeDevices(w http.ResponseWriter, r *http.Request)
-	// PutDriverMeLanguage Register or change the current driver language
-	// (PUT /v1/driver/me/language)
-	PutDriverMeLanguage(w http.ResponseWriter, r *http.Request, params PutDriverMeLanguageParams)
 	// GetDriverMeSessions List the current driver account sessions
 	// (GET /v1/driver/me/sessions)
 	GetDriverMeSessions(w http.ResponseWriter, r *http.Request)
@@ -1700,18 +1689,18 @@ type ServerInterface interface {
 	// GetDriverWalletTransaction Read one driver transaction visible to the authenticated account
 	// (GET /v1/driver/wallet/transactions/{txn_no})
 	GetDriverWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string)
+	// PostFilePresign Create a private upload and obtain a direct PUT URL
+	// (POST /v1/files/presign)
+	PostFilePresign(w http.ResponseWriter, r *http.Request, params PostFilePresignParams)
+	// PostFileComplete Submit a direct upload for asynchronous verification
+	// (POST /v1/files/{public_id}/complete)
+	PostFileComplete(w http.ResponseWriter, r *http.Request, publicId PublicID, params PostFileCompleteParams)
+	// GetFileDownloadUrl Obtain a five-minute private download URL for a verified file
+	// (GET /v1/files/{public_id}/download-url)
+	GetFileDownloadUrl(w http.ResponseWriter, r *http.Request, publicId PublicID)
 	// PostMerchantAuthLogout Revoke the current merchant session
 	// (POST /v1/merchant/auth/logout)
 	PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, params PostMerchantAuthLogoutParams)
-	// GetMerchantMe Get the current merchant account profile
-	// (GET /v1/merchant/me)
-	GetMerchantMe(w http.ResponseWriter, r *http.Request)
-	// GetMerchantMeDevices List the current merchant account devices
-	// (GET /v1/merchant/me/devices)
-	GetMerchantMeDevices(w http.ResponseWriter, r *http.Request)
-	// PutMerchantMeLanguage Register or change the current merchant language
-	// (PUT /v1/merchant/me/language)
-	PutMerchantMeLanguage(w http.ResponseWriter, r *http.Request, params PutMerchantMeLanguageParams)
 	// GetMerchantMeLinkCandidates List buyer accounts that may be linked to the authenticated merchant account
 	// (GET /v1/merchant/me/link-candidates)
 	GetMerchantMeLinkCandidates(w http.ResponseWriter, r *http.Request)
@@ -1811,24 +1800,6 @@ func (_ Unimplemented) PostBuyerAuthLogout(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// GetBuyerMe Get the current buyer account profile
-// (GET /v1/buyer/me)
-func (_ Unimplemented) GetBuyerMe(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// GetBuyerMeDevices List the current buyer account devices
-// (GET /v1/buyer/me/devices)
-func (_ Unimplemented) GetBuyerMeDevices(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// PutBuyerMeLanguage Register or change the current buyer language
-// (PUT /v1/buyer/me/language)
-func (_ Unimplemented) PutBuyerMeLanguage(w http.ResponseWriter, r *http.Request, params PutBuyerMeLanguageParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
 // GetBuyerMeSessions List the current buyer account sessions
 // (GET /v1/buyer/me/sessions)
 func (_ Unimplemented) GetBuyerMeSessions(w http.ResponseWriter, r *http.Request) {
@@ -1859,24 +1830,6 @@ func (_ Unimplemented) PostDriverAuthLogout(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// GetDriverMe Get the current driver account profile
-// (GET /v1/driver/me)
-func (_ Unimplemented) GetDriverMe(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// GetDriverMeDevices List the current driver account devices
-// (GET /v1/driver/me/devices)
-func (_ Unimplemented) GetDriverMeDevices(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// PutDriverMeLanguage Register or change the current driver language
-// (PUT /v1/driver/me/language)
-func (_ Unimplemented) PutDriverMeLanguage(w http.ResponseWriter, r *http.Request, params PutDriverMeLanguageParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
 // GetDriverMeSessions List the current driver account sessions
 // (GET /v1/driver/me/sessions)
 func (_ Unimplemented) GetDriverMeSessions(w http.ResponseWriter, r *http.Request) {
@@ -1901,27 +1854,27 @@ func (_ Unimplemented) GetDriverWalletTransaction(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// PostFilePresign Create a private upload and obtain a direct PUT URL
+// (POST /v1/files/presign)
+func (_ Unimplemented) PostFilePresign(w http.ResponseWriter, r *http.Request, params PostFilePresignParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostFileComplete Submit a direct upload for asynchronous verification
+// (POST /v1/files/{public_id}/complete)
+func (_ Unimplemented) PostFileComplete(w http.ResponseWriter, r *http.Request, publicId PublicID, params PostFileCompleteParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetFileDownloadUrl Obtain a five-minute private download URL for a verified file
+// (GET /v1/files/{public_id}/download-url)
+func (_ Unimplemented) GetFileDownloadUrl(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // PostMerchantAuthLogout Revoke the current merchant session
 // (POST /v1/merchant/auth/logout)
 func (_ Unimplemented) PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, params PostMerchantAuthLogoutParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// GetMerchantMe Get the current merchant account profile
-// (GET /v1/merchant/me)
-func (_ Unimplemented) GetMerchantMe(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// GetMerchantMeDevices List the current merchant account devices
-// (GET /v1/merchant/me/devices)
-func (_ Unimplemented) GetMerchantMeDevices(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// PutMerchantMeLanguage Register or change the current merchant language
-// (PUT /v1/merchant/me/language)
-func (_ Unimplemented) PutMerchantMeLanguage(w http.ResponseWriter, r *http.Request, params PutMerchantMeLanguageParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2331,79 +2284,6 @@ func (siw *ServerInterfaceWrapper) PostBuyerAuthLogout(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
-// GetBuyerMe operation middleware
-func (siw *ServerInterfaceWrapper) GetBuyerMe(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetBuyerMe(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetBuyerMeDevices operation middleware
-func (siw *ServerInterfaceWrapper) GetBuyerMeDevices(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetBuyerMeDevices(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PutBuyerMeLanguage operation middleware
-func (siw *ServerInterfaceWrapper) PutBuyerMeLanguage(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params PutBuyerMeLanguageParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "Idempotency-Key" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
-		var IdempotencyKey IdempotencyKey
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
-			return
-		}
-
-		params.IdempotencyKey = IdempotencyKey
-
-	} else {
-		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutBuyerMeLanguage(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // GetBuyerMeSessions operation middleware
 func (siw *ServerInterfaceWrapper) GetBuyerMeSessions(w http.ResponseWriter, r *http.Request) {
 
@@ -2557,79 +2437,6 @@ func (siw *ServerInterfaceWrapper) PostDriverAuthLogout(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
-// GetDriverMe operation middleware
-func (siw *ServerInterfaceWrapper) GetDriverMe(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDriverMe(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetDriverMeDevices operation middleware
-func (siw *ServerInterfaceWrapper) GetDriverMeDevices(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetDriverMeDevices(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PutDriverMeLanguage operation middleware
-func (siw *ServerInterfaceWrapper) PutDriverMeLanguage(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params PutDriverMeLanguageParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "Idempotency-Key" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
-		var IdempotencyKey IdempotencyKey
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
-			return
-		}
-
-		params.IdempotencyKey = IdempotencyKey
-
-	} else {
-		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutDriverMeLanguage(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // GetDriverMeSessions operation middleware
 func (siw *ServerInterfaceWrapper) GetDriverMeSessions(w http.ResponseWriter, r *http.Request) {
 
@@ -2738,6 +2545,131 @@ func (siw *ServerInterfaceWrapper) GetDriverWalletTransaction(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
+// PostFilePresign operation middleware
+func (siw *ServerInterfaceWrapper) PostFilePresign(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostFilePresignParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostFilePresign(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostFileComplete operation middleware
+func (siw *ServerInterfaceWrapper) PostFileComplete(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostFileCompleteParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostFileComplete(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFileDownloadUrl operation middleware
+func (siw *ServerInterfaceWrapper) GetFileDownloadUrl(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFileDownloadUrl(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PostMerchantAuthLogout operation middleware
 func (siw *ServerInterfaceWrapper) PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request) {
 
@@ -2774,79 +2706,6 @@ func (siw *ServerInterfaceWrapper) PostMerchantAuthLogout(w http.ResponseWriter,
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostMerchantAuthLogout(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetMerchantMe operation middleware
-func (siw *ServerInterfaceWrapper) GetMerchantMe(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetMerchantMe(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// GetMerchantMeDevices operation middleware
-func (siw *ServerInterfaceWrapper) GetMerchantMeDevices(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetMerchantMeDevices(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// PutMerchantMeLanguage operation middleware
-func (siw *ServerInterfaceWrapper) PutMerchantMeLanguage(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-	_ = err
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params PutMerchantMeLanguageParams
-
-	headers := r.Header
-
-	// ------------- Required header parameter "Idempotency-Key" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
-		var IdempotencyKey IdempotencyKey
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
-			return
-		}
-
-		params.IdempotencyKey = IdempotencyKey
-
-	} else {
-		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
-		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PutMerchantMeLanguage(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3645,33 +3504,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/v1/driver/me/sessions", wrapper.GetDriverMeSessions)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/v1/buyer/me", wrapper.GetBuyerMe)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/v1/merchant/me", wrapper.GetMerchantMe)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/v1/driver/me", wrapper.GetDriverMe)
-	})
-	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/v1/buyer/me/language", wrapper.PutBuyerMeLanguage)
-	})
-	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/v1/merchant/me/language", wrapper.PutMerchantMeLanguage)
-	})
-	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/v1/driver/me/language", wrapper.PutDriverMeLanguage)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/v1/buyer/me/devices", wrapper.GetBuyerMeDevices)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/v1/merchant/me/devices", wrapper.GetMerchantMeDevices)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/v1/driver/me/devices", wrapper.GetDriverMeDevices)
-	})
-	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/v1/buyer/me/sessions/{id}", wrapper.DeleteBuyerMeSession)
 	})
 	r.Group(func(r chi.Router) {
@@ -3742,6 +3574,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/merchant/products/{public_id}/publish", wrapper.PublishMerchantProduct)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/files/presign", wrapper.PostFilePresign)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/files/{public_id}/complete", wrapper.PostFileComplete)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/files/{public_id}/download-url", wrapper.GetFileDownloadUrl)
 	})
 
 	return r
