@@ -134,6 +134,7 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	t.Run("admin refresh rotation uses the shared session storage", f.testAdminSessionRefresh)
 	t.Run("admin password TOTP login locks per account and IP", f.testAdminPasswordLogin)
 	t.Run("admin first password login issues a restricted access token", f.testAdminFirstPasswordLogin)
+	t.Run("admin password change clears restriction and revokes other sessions", f.testAdminPasswordChange)
 	t.Run("admin creation returns bootstrap credentials only once", f.testAdminManagementCreate)
 	t.Run("admin status and role changes revoke sessions and audit", f.testAdminManagementStatusAndRole)
 	t.Run("admin step-up rejects replay and unauthorized scopes", f.testAdminStepUp)
@@ -439,6 +440,72 @@ func (f *loginFixture) testAdminFirstPasswordLogin(t *testing.T) {
 	identity, _, err := tokens.ParseAccess(ctx, result.AccessToken)
 	if err != nil || !identity.PasswordChangeOnly {
 		t.Fatalf("identity=%+v err=%v, want password-change-only access", identity, err)
+	}
+}
+
+func (f *loginFixture) testAdminPasswordChange(t *testing.T) {
+	ctx := context.Background()
+	oldPassword := "first password to replace"
+	newPassword := "a newly selected administrator password"
+	hash, err := HashPassword(oldPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "JBSWY3DPEHPK3PXP"
+	adminID, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc, err := EncryptTOTPSecret(ctx, f.envelope, adminID, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status,password_change_required) VALUES($1,'Password Change Admin','password-change-admin@example.test',$2,$3,'super','active',true)`, adminID, hash, enc); err != nil {
+		t.Fatal(err)
+	}
+	currentSession := "01ARZ3NDEKTSV4RRFFQ69G5FE1"
+	otherSession := "01ARZ3NDEKTSV4RRFFQ69G5FE2"
+	for _, sessionID := range []string{currentSession, otherSession} {
+		if _, err := f.pool.Exec(ctx, `INSERT INTO iam.session(public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES($1,(SELECT id FROM iam.admin_user WHERE public_id=$2),$1,convert_to($1,'UTF8'),'test-kid',$3,$4)`, sessionID, adminID, f.now.Add(time.Hour), f.now); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.cache.Put(ctx, adminID, sessionID, 0, time.Hour); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, err := totp.GenerateCode(secret, f.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	audit := &stepUpAuditWriter{}
+	service := &AdminPasswordService{DB: f.pool, Cipher: f.envelope, Audit: audit, SessionCache: f.cache, Now: func() time.Time { return f.now }}
+	err = service.Change(ctx, AdminPasswordChangeInput{AdminPublicID: adminID, SessionPublicID: currentSession, CurrentPassword: oldPassword, NewPassword: newPassword, TOTPCode: code, IP: "198.51.100.7", RequestID: "admin-password-change"})
+	if err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+	var required bool
+	var updatedHash string
+	if err := f.pool.QueryRow(ctx, `SELECT password_change_required,password_hash FROM iam.admin_user WHERE public_id=$1`, adminID).Scan(&required, &updatedHash); err != nil {
+		t.Fatal(err)
+	}
+	if required || !VerifyPassword(updatedHash, newPassword) || VerifyPassword(updatedHash, oldPassword) {
+		t.Fatalf("password update required=%v", required)
+	}
+	var currentRevoked, otherRevoked *time.Time
+	if err := f.pool.QueryRow(ctx, `SELECT revoked_at FROM iam.session WHERE public_id=$1`, currentSession).Scan(&currentRevoked); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.pool.QueryRow(ctx, `SELECT revoked_at FROM iam.session WHERE public_id=$1`, otherSession).Scan(&otherRevoked); err != nil {
+		t.Fatal(err)
+	}
+	if currentRevoked != nil || otherRevoked == nil {
+		t.Fatalf("session revocation current=%v other=%v", currentRevoked, otherRevoked)
+	}
+	if active, _, err := f.cache.Get(ctx, adminID, otherSession); err != nil || active {
+		t.Fatalf("other session cache active=%v err=%v", active, err)
+	}
+	if len(audit.entries) != 1 || audit.entries[0].Action != platformaudit.ActionAccountChanged || strings.Contains(string(audit.entries[0].Detail), oldPassword) || strings.Contains(string(audit.entries[0].Detail), newPassword) || strings.Contains(string(audit.entries[0].Detail), code) {
+		t.Fatalf("password audit=%#v", audit.entries)
 	}
 }
 
