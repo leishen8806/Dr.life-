@@ -135,7 +135,8 @@
 | `DELIVERY_ESCROW` | 负债 | 平台（单例）按订单分明细 | DH | 配送费托管 |
 | `AD_BUDGET` | 负债 | 每个商户一个 | ADB | 广告预算（已划扣未消耗） |
 | `PLATFORM_HELD` | 权益 | 平台（单例） | P | **平台自有收入**（仍在专用账户里，待划出）；每条分录带 `category` 区分来源 |
-| `PAYABLE_CARRIER` | 负债 | 平台，按承运方（中通） | ZTO | 应付中通 |
+| `PAYABLE_CARRIER` | 负债 | 平台（单例） | ZTO | ~~应付中通~~ **2026-10-29 起为“应付 Dr.RouteFit”**（仓配整体交给 RouteFit，中通由 RouteFit 对接），见第六章 6-B |
+| `CHANNEL_KESS` | 资产 | 平台（单例） | — | **2026-10-29 新增**：已经 KESS 确认收款、尚未结算到银行专用账户的渠道款，见 6-B |
 | `SUSPENSE` | 过渡 | 平台 | — | 对账差异、未识别入金暂存，**必须人工清零** |
 
 > **平台收入的 `category`：** `storage`（仓储费）、`delivery_margin`（配送留存）、`ads`（广告）、`settle_fee`（结算服务费，第一版为 0）、`member`（AI 会员费）——与原型财务中心的 5 类收入一致，**财务中心、审计 #13 都按它汇总**。
@@ -146,6 +147,7 @@
   + Σ AD_BUDGET + PAYABLE_CARRIER + PLATFORM_HELD + SUSPENSE
   =  BANK_DEDICATED（银行专用账户余额）
 ```
+**2026-10-29 修订（6-B）：** 右边改为 `BANK_DEDICATED + CHANNEL_KESS`。KESS 已确认、尚未结算到银行的渠道款也是客户资金，但不在银行余额里。`CHANNEL_KESS` 另与 KESS 结算报表逐笔核对。
 这等价于原型财务中心的"内部账户合计 = 银行外部净流入"检查。**每天、每次对账文件导入后都要验证；不成立就是"异常"。**
 
 ### 4. 币种与精度
@@ -300,6 +302,66 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 - 冲销交易必须逐条复制原分录的账户、金额、`role`、`category`，并只互换 `DEBIT` / `CREDIT`。延迟约束触发器在提交时比较两个分录多重集合，防止绕过服务直接写入不对称冲销。
 - 同一原交易最多一条冲销；冲销交易本身不能再次冲销。冲销仍执行账户余额非负检查，已花掉的充值不能用冲销强制形成客户负余额。
 - 服务调用必须携带非空原因、操作人及授权人；权限判断由 API 层执行。账务事务写 `ledger.txn.reversed` outbox 事件，审计模块消费事件并追加哈希链审计记录，账务模块不跨 schema 写审计表。
+
+### 6-B 商城与 Dr.RouteFit 分工后的分录修订（2026-10-29，待 LedgerAuditor 复核）
+
+依据：项目负责人 2026-10-29 的决定（《试点上线最小范围清单》第 1、6 节；《Dr.life+与Dr.RouteFit对接契约》v0.2 第 4.5、7、8、10 节）。
+
+- Dr.life+ 只做商城，仓储与配送由 Dr.RouteFit 承担。
+- 入金优先走 KESS。
+- 商户包邮或买家付运费，两种情况下运费都结算给 RouteFit。
+- 货款在 RouteFit 签收复核后满 7 天、且无未结售后时，结算给商户。
+- Dr.life+ 与 RouteFit 同属一家公司，**只记内部往来账，不实际转账**。
+
+本节**取代**下列行的适用范围：6.8（贷方改变）、6.9、6.10、6.11（停用）、6.17（停用，改为 6-B.8）、“货款凭证”行（停用，被 KESS 付款取代）。已合并的迁移不修改，新增类型与科目用新迁移追加 CHECK 取值；停用的类型保留取值，由服务层不再提供入口，审计 #13 继续能汇总历史数据。
+
+#### 6-B.1 新增科目
+
+- **`CHANNEL_KESS`**：资产，平台单例，借方为正，不允许负数。含义见第四章第 2 节。
+- **`PAYABLE_CARRIER`**：语义改为“应付 RouteFit”，结构不变（平台单例，负债）。
+
+#### 6-B.2 新增与改用的分录
+
+| # | 业务 | txn.type | 分录 | 说明与约束 |
+|---|---|---|---|---|
+| 6-B.3 | **KESS 收款入钱包**（充值，或买家为订单付款） | `topup_kess`（新增） | DR `CHANNEL_KESS` / CR `WALLET_AVAIL(A)` | 只在服务端**主动查单**确认 KESS `SUCCESS` 后入账；幂等键 = `topup_kess:<商户支付号>`，同一支付号只入一次。`UNKNOWN` 不入账。金额取支付意向的服务端应收，不取浏览器回传。**订单付款时，6-B.3 与 6-B.5 必须在同一事务内完成**，钱不能在可用余额里停留，否则买家可在两步之间提现 |
+| 6-B.4 | **KESS 结算到银行** | `channel_settle`（新增） | DR `BANK_DEDICATED`（净额）+ DR `PLATFORM_HELD`(category=`channel_fee`，手续费，见 6-B.9 Q1) / CR `CHANNEL_KESS`（毛额） | 按 KESS 结算报表逐批入账；毛额 = 净额 + 手续费；与银行流水逐笔对。手续费由谁承担未定，暂按平台承担记账，定案后再调整（Q1） |
+| 6-B.5 | **订单付款进托管** | `freeze`（沿用 6.2，`FreezeHold`） | DR `WALLET_AVAIL(buyer)` / CR `WALLET_FROZEN(buyer)` | 6-B.3 入账后，同一事务按子订单建**两个 hold**：`hold(order_goods)`（货款，收款方为商户）；买家付运费时另建 `hold(order_shipping)`（运费，收款方为 RouteFit 与平台加价）。商户包邮的子订单只有货款 hold |
+| 6-B.6 | **货款结算给商户** | `settle`（沿用 6.3，`SettleHold`） | DR `WALLET_FROZEN(buyer)` / CR `WALLET_AVAIL(M)` | 触发条件：RouteFit `delivered_verified` 后满 7 天（后台可调）且无未结售后。佣金为 0，`Fee` 仍必须为 0 |
+| 6-B.7 | **买家运费结算** | `shipping_settle`（新增） | DR `WALLET_FROZEN(buyer)` / CR `PAYABLE_CARRIER`（RouteFit 报价部分）+ CR `PLATFORM_HELD`(category=`delivery_margin`，加价部分) | 触发条件：RouteFit `delivered_verified`，不等 7 天，因为配送服务已完成。金额与拆分取下单时的报价快照：RouteFit 部分 = 报价，加价部分 = 托管额 − 报价（最后一项倒挤）。走 hold 状态机：需新增“按快照拆分结算”的强类型方法，不复用 `SettleHold`（后者只支持单一收款钱包）。加价率为 0 时只有一条贷方分录 |
+| 6-B.8a | **退款**（拒单、取消、售后退款） | `refund`（沿用 6.4，`RefundHold`） | DR `WALLET_FROZEN(buyer)` / CR `WALLET_AVAIL(buyer)` | 退回买家钱包；原路退到 KESS 由财务人工处理（RouteFit KESS 规则：退款类渠道状态交人工），单独走提现流程 6.5–6.7。已结算的运费是否退给买家由售后判定，判定退的由商户承担：从商户钱包扣，类型 `adjust`，需审批 |
+| 6-B.8b | **仓配费用行扣款：仓储类**（storage、inbound、outbound、packing） | `storage_fee`（沿用类型，**贷方改变**） | DR `WALLET_AVAIL(M)` / CR `PAYABLE_CARRIER` | 金额 = RouteFit 费用行金额（美分 × 100 → e4，精确）。幂等键 = `rf_fee:<feeLineId>:v<version>`。余额不足时不扣成负数，费用行记为欠费，充值后按先后顺序补扣（沿用 6.8 的欠费规则），超过宽限期后暂停出库（R-06） |
+| 6-B.8c | **仓配费用行扣款：商户包邮的配送费** | `delivery_fee`（新增） | DR `WALLET_AVAIL(M)` / CR `PAYABLE_CARRIER`（报价部分）+ CR `PLATFORM_HELD`(category=`delivery_margin`，加价部分) | 金额 = 报价 × (1 + 加价率)，取下单时的快照；欠费处理同 6-B.8b |
+| 6-B.8d | **费用行调整** | `reversal`（沿用 6.18）后再按新版本扣款 | 原交易借贷互换，再记新的 6-B.8b 或 8c | RouteFit `fee.adjusted`：先冲销旧版本，再按新版本扣款，两笔同一事务。冲销白名单需加入 `delivery_fee` |
+| 6-B.9 | **与 RouteFit 内部往来核销**（月度） | `intercompany_settle`（新增） | DR `PAYABLE_CARRIER` / CR `PLATFORM_HELD`(category=`routefit`，新增) | 同一公司，不实际转账：每月双方财务核对，确认“应付 RouteFit 余额 = 累计日结单合计 − 已核销”后，把已确认部分从“应付”重分类为公司自有收入（RouteFit 业务线）。双人复核，附月结单编号。之后与其他平台收入一样，只能经银行约定流程 `sweep`（6.16）划出专用账户；**不得因核销减少客户资金** |
+
+#### 6-B.10 恒等式与审计影响
+
+- 第四章第 3 节恒等式右边加 `CHANNEL_KESS`，左边不变（`PAYABLE_CARRIER` 已在左边）。
+- 平台收入 `category` 新增 `channel_fee`（KESS 手续费，若由平台承担则为负向收入，按 Q1 定案）和 `routefit`（RouteFit 业务线收入）。财务中心与审计 #13 按新类别汇总。
+- 新增审计检查：
+  - `CHANNEL_KESS` 余额 = KESS 已确认未结算金额（日）；
+  - `PAYABLE_CARRIER` = RouteFit 日结单累计 − 已核销（日）；
+  - 买家付运费的子订单 `delivered_verified` 超过 24 小时仍未 `shipping_settle` 的，列为关注。
+- 停用的 `DELIVERY_ESCROW` 账户应保持余额 0，审计检查改为“非 0 即异常”。
+
+#### 6-B.11 待确认
+
+| # | 事项 | 影响 |
+|---|---|---|
+| Q1 | KESS 手续费由谁承担（平台 / 商户 / 买家），费率与结算周期 | 6-B.4 的分录 |
+| Q2 | `intercompany_settle` 之后，RouteFit 业务线收入是否需要划出专用账户（`sweep`），频率如何 | 6-B.9 之后的流程 |
+| Q3 | 买家退款是否只退回钱包、由买家自行提现，还是平台主动原路退回 KESS | 6-B.8a |
+
+#### 6-B.12 实现落点
+
+| 任务 | 落点 |
+|---|---|
+| P-02 | 6-B.3、6-B.4 |
+| T-10 | 6-B.5、6-B.6、6-B.7、6-B.8a |
+| R-04 | 6-B.8b、8c、8d、6-B.9 |
+
+所有新增类型、科目与类别，用**同一个新迁移**追加到 `ledger.txn.type`、`ledger.account.kind`、`ledger.posting.category` 的 CHECK 中，由 GoSenior 或 DBEngineer 实现，经代码审查 → SecurityReviewer → LedgerAuditor 三道复核。
 
 ### 配套表
 ```sql
