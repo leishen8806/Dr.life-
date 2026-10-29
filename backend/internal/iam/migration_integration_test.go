@@ -367,6 +367,9 @@ func TestIAMMigration(t *testing.T) {
 		if _, err := reportLogin.Exec(ctx, `SELECT public_id,username,token_last4 FROM iam.bot`); err != nil {
 			t.Fatalf("report safe bot columns: %v", err)
 		}
+		if _, err := reportLogin.Exec(ctx, `SELECT id,public_id,person_id,role,merchant_id,status,lang,lang_registered_at,kyc_status,created_at,updated_at FROM iam.account`); err != nil {
+			t.Fatalf("report safe account columns: %v", err)
+		}
 		for _, statement := range []string{
 			`SELECT token_enc FROM iam.bot`,
 			`SELECT webhook_secret_enc FROM iam.bot`,
@@ -375,6 +378,7 @@ func TestIAMMigration(t *testing.T) {
 			`SELECT refresh_token_hash FROM iam.session`,
 			`SELECT previous_hash FROM iam.session`,
 			`SELECT phone_enc FROM iam.person`,
+			`SELECT status_reason FROM iam.account`,
 		} {
 			assertSQLState(t, ctx, reportLogin, "42501", statement)
 		}
