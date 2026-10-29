@@ -6,7 +6,39 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 )
+
+type routeFitTransactionStarter interface {
+	Begin(context.Context) (pgx.Tx, error)
+}
+
+// RouteFitEventHandler applies a supported event type inside the same
+// transaction as the inbox append and idempotency marker.
+type RouteFitEventHandler func(context.Context, pgx.Tx, RouteFitEvent) error
+
+// RouteFitEventRecorder makes the receipt durable before a webhook receives a
+// 2xx response. Unknown event types intentionally remain inbox-only.
+type RouteFitEventRecorder struct {
+	DB       routeFitTransactionStarter
+	Handlers map[string]RouteFitEventHandler
+}
+
+func (r RouteFitEventRecorder) Record(ctx context.Context, event RouteFitEvent, rawBody []byte) error {
+	return queue.Idempotent("routefit", queue.TransactionalHandler{
+		DB: r.DB,
+		Handle: func(ctx context.Context, tx pgx.Tx, _ string) error {
+			accepted, err := RecordRouteFitEvent(ctx, tx, event, rawBody)
+			if err != nil || !accepted {
+				return err
+			}
+			if handler := r.Handlers[event.EventType]; handler != nil {
+				return handler(ctx, tx, event)
+			}
+			return nil
+		},
+	})(ctx, event.EventID)
+}
 
 // RecordRouteFitEvent appends every first-delivery event. An event whose
 // aggregate version is not newer is retained as stale and never dispatched.
