@@ -521,6 +521,53 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 
 **落点补充**：P-02 增加 R1、R3、R5、R6、R8 中与 KESS 相关的部分；R-04 增加 R4、R7。新增的表、约束和白名单扩展放进同一个账务迁移，三道审查。
 
+#### 6-B.15 第三轮账务复审后的修订（2026-10-29，回应 LedgerAuditor 在 CMP-670 第 2 轮结论中的 R10、R11、R12、R14、R16；**与 6-B.13、6-B.14 冲突处以本节为准**）
+
+**R16**：KESS 手续费后台设置（6-B.13 第 (4) 条的补充）原先没进入 main，本 PR 一并补上（提交 `a5a24ba`）。今后手续费口径只有一套：按后台设置的生效版本计算预期，实际入账以 KESS 报表为准。
+
+**R11 KESS 批次与支付明细表、锁顺序**
+
+- 新表 `ledger.kess_batch(id, batch_no text NOT NULL UNIQUE, status text CHECK (status IN ('open','settled')), gross, fee, net, statement_ref, settled_txn_id, created_at, settled_at)`。
+- 新表 `ledger.kess_payment(id, trade_no text NOT NULL UNIQUE, intent_ref, amount bigint CHECK (> 0), topup_txn_id, batch_id NULL REFERENCES ledger.kess_batch, refunded_amount bigint NOT NULL DEFAULT 0 CHECK (refunded_amount BETWEEN 0 AND amount), created_at)`。
+  - `topup_kess` 入账时同事务插入一行，`batch_id` 为空。
+  - KESS 结算报表到达时，`channel_settle` 把报表列出的支付号挂到批次上。
+- **“未结算”的定义**：`batch_id IS NULL`，或所属批次 `status = 'open'`。
+- **原路退（`ConfirmKessRefund` → `payout_kess`）**：
+  - 同一事务内，先 `SELECT … FOR UPDATE` 锁该支付号的 `kess_payment` 行；若已挂批次，再锁批次行。
+  - 校验“未结算”，且 `refunded_amount + 本次 ≤ amount`，然后更新 `refunded_amount`，再调用 `Post`。
+  - 幂等键 `payout_kess:withdrawal:<提现单 ID>`，加上 6-B.14 R5 的 `kess_trade_no` 部分唯一索引，两者共同防止同一单确认两次。
+- **`channel_settle`**：同一事务内，先锁批次行，再按 `trade_no` 升序锁报表中的全部 `kess_payment` 行，把批次置为 `settled`，然后调用 `Post`。
+- **统一锁顺序**（防死锁）：`kess_batch` → `kess_payment`（按 `trade_no` 升序）→ `Post` 内部按 `account_id` 升序锁余额行。两个方法都严格按这个顺序加锁。
+- **竞态处理**：原路退与结算并发时，后拿到锁的一方会看到前者的结果。退款先完成，结算按扣除退款后的金额核对；结算先完成，退款因“已结算”被拒，钱留在买家钱包，买家改走提现。
+- 6-B.13 第 (6) 条“不会动用其他买家的未结算款，因为金额上限已按本批次未结算额限定”一句，改为：**由上述行锁与 `refunded_amount ≤ amount` 约束保证，`CHANNEL_KESS` 的非负约束只是最后一道防线。**
+- 6-B.14 R8 中 `CHANNEL_KESS` 对账项的右边，数据源明确为：`kess_payment` 中未结算行的 `amount − refunded_amount` 合计。
+
+**R10 结算报表里有未入账的付款**
+
+`channel_settle` 先把报表逐行与 `kess_payment` 匹配：
+- **匹配上的行**：贷 `CHANNEL_KESS`。
+- **报表有、系统没有的行**（例如回调丢失、主动查单还没确认）：先对每笔调用一次主动查单补记 `topup_kess`；仍无法确认的金额，贷 **`SUSPENSE`**，同时：
+  - 写 outbox 高优先级告警 `ledger.kess_unmatched`；
+  - 对应的银行流水视为“已认领到悬挂”，不再是无人认领；
+  - 由财务在 **3 个工作日**内查明后，用 `bank_diff` 从 `SUSPENSE` 转出：属于买家付款的，补记到该买家钱包；属于 KESS 差错的，由 KESS 退回；
+  - 超时升级给财务负责人和项目负责人（沿用 6.19“`SUSPENSE` 必须限期清零”）。
+
+因此 `channel_settle` 永远不会因 `CHANNEL_KESS` 不足而整批被拒，也就不存在“钱到了银行却没人认领”的窗口。
+
+**R14 手续费设置是资金闸门的输入，改设置要双人复核**
+
+- 手续费配置表每个版本落 `maker_actor`、`checker_actor`，并加 `CHECK (checker_actor <> maker_actor)`；未经复核的版本不生效。
+- **无生效版本时**：拒绝 `sweep` 以及一切借记 `PLATFORM_HELD` 的交易，并告警。设成 0 也需要双人复核。
+- `fee_reserve` 中的“预估下月手续费”与 6-B.13 第 (4) 条的预期手续费，**同源于同一个生效版本**，取值时一并记录版本号。
+
+**R12 备付金金额与补足**
+
+- **上线前置**：首笔备付金 ≥ 预估首月手续费的 2 倍（按生效的手续费设置与预估首月交易额计算，财务确认后入账），不是“任意金额的首笔转入”。
+- **日常**：每日审计计算平台净头寸。低于“预估一个月手续费”时，告警财务从备用金账户转入补足；跨行转账可能 T+1，**补足时限 2 个工作日**，超时升级给财务负责人和项目负责人。净头寸 < 0 时，按 6-B.14 R3 冻结平台资金。
+- `ledger.capital_injection.source_account_last4`：`purpose = 'fee_reserve'` 时必须非空，写入后不可修改（触发器保护）。
+
+**落点**：R10、R11、R14 并入 P-02；R12 的每日审计并入 L-07/L-10 改造，与 P-02 同一 PR。
+
 ### 配套表
 ```sql
 create table ledger.hold (          -- 冻结明细
