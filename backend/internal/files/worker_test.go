@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/hibiken/asynq"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
 )
 
@@ -89,10 +90,10 @@ func (s *verificationObjects) Delete(context.Context, string) error { s.deleted 
 
 type recordingWorker struct {
 	name    string
-	handler func(context.Context, *asynq.Task) error
+	handler queue.Handler
 }
 
-func (w *recordingWorker) Register(name string, handler func(context.Context, *asynq.Task) error) error {
+func (w *recordingWorker) Register(name string, handler queue.Handler) error {
 	w.name, w.handler = name, handler
 	return nil
 }

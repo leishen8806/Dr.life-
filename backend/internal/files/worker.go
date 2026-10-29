@@ -10,6 +10,7 @@ import (
 	"io"
 
 	"github.com/hibiken/asynq"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
 )
 
@@ -25,8 +26,19 @@ type VerificationWorker struct {
 	objects storage.Storage
 }
 
+type workerRegistrar interface {
+	Register(string, queue.Handler) error
+}
+
 func NewVerificationWorker(store VerificationStore, objects storage.Storage) *VerificationWorker {
 	return &VerificationWorker{store: store, objects: objects}
+}
+
+func RegisterVerificationHandler(worker workerRegistrar, store VerificationStore, objects storage.Storage) error {
+	if worker == nil {
+		return ErrNotConfigured
+	}
+	return worker.Register(TaskVerify, NewVerificationWorker(store, objects).Handle)
 }
 
 func (w *VerificationWorker) Handle(ctx context.Context, task *asynq.Task) error {
