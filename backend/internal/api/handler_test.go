@@ -656,6 +656,15 @@ func (f fakeAdminManagement) List(context.Context, string, int) ([]iam.AdminUser
 	return f.users, "", nil
 }
 
+func (f fakeAdminManagement) Get(_ context.Context, publicID string) (iam.AdminUser, bool, error) {
+	for _, user := range f.users {
+		if user.PublicID == publicID {
+			return user, true, nil
+		}
+	}
+	return iam.AdminUser{}, false, nil
+}
+
 func (f *fakeAdminManagement) CreateWithAudit(_ context.Context, input iam.AdminCreateInput, auditInput iam.AdminAuditInput) (iam.AdminCreateResult, error) {
 	f.createIn = input
 	f.auditIn = auditInput

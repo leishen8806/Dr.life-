@@ -417,6 +417,21 @@ func (s *AdminManagementService) List(ctx context.Context, cursor string, limit 
 	return items, next, nil
 }
 
+// Get returns one credential-safe administrator record by its public ID.
+func (s *AdminManagementService) Get(ctx context.Context, publicID string) (AdminUser, bool, error) {
+	if s == nil || s.DB == nil {
+		return AdminUser{}, false, errors.New("iam: administrator management database unavailable")
+	}
+	user, err := scanAdminUser(s.DB.QueryRow(ctx, `SELECT public_id,name,email,role,data_scope,status,last_login_at,created_at FROM iam.admin_user WHERE public_id=$1`, strings.TrimSpace(publicID)))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return AdminUser{}, false, nil
+	}
+	if err != nil {
+		return AdminUser{}, false, err
+	}
+	return user, true, nil
+}
+
 func (s *AdminManagementService) now() time.Time {
 	if s.Now != nil {
 		return s.Now()

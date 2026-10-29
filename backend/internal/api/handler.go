@@ -92,6 +92,7 @@ type AdminPermissionChecker interface {
 // It deliberately has no method that returns hashes or encrypted TOTP values.
 type AdminManagement interface {
 	List(context.Context, string, int) ([]iam.AdminUser, string, error)
+	Get(context.Context, string) (iam.AdminUser, bool, error)
 	CreateWithAudit(context.Context, iam.AdminCreateInput, iam.AdminAuditInput) (iam.AdminCreateResult, error)
 	DisableWithAudit(context.Context, string, string, iam.AdminAuditInput) (iam.AdminUser, error)
 	EnableWithAudit(context.Context, string, iam.AdminAuditInput) (iam.AdminUser, error)
@@ -337,6 +338,26 @@ func (h Handler) ListAdminUsers(w http.ResponseWriter, r *http.Request, params g
 		data.NextCursor = &next
 	}
 	httpx.WriteOK(w, r, data)
+}
+
+func (h Handler) GetAdminUser(w http.ResponseWriter, r *http.Request, publicID gen.AdminPublicID) {
+	if !h.adminRBACAccess(w, r, "view") {
+		return
+	}
+	if h.AdminManagement == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	user, found, err := h.AdminManagement.Get(r.Context(), string(publicID))
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	if !found {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
+		return
+	}
+	httpx.WriteOK(w, r, gen.AdminUserData{Admin: adminUser(user)})
 }
 
 func (h Handler) CreateAdminUser(w http.ResponseWriter, r *http.Request, _ gen.CreateAdminUserParams) {
