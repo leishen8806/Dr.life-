@@ -568,6 +568,72 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 
 **落点**：R10、R11、R14 并入 P-02；R12 的每日审计并入 L-07/L-10 改造，与 P-02 同一 PR。
 
+#### 6-B.16 第四轮账务复审后的修订（2026-10-29，回应 LedgerAuditor 在 CMP-670 第 3 轮结论中的 R17–R22 及 R12、R13、R15 余项；**与 6-B.13～6-B.15 冲突处以本节为准**）
+
+说明：第 3 轮复审基于 main `10f99ea`，当时 6-B.15 尚未合并。R14、R16、R20 已在 6-B.15（main `ecb9197`）中处理。其中 R16 的提交 `a5a24ba` 已在 main 上；R20 的 `kess_batch`、`kess_payment` 表与锁顺序见 6-B.15 R11。
+
+**R17 `cost_close` 不走净头寸闸门**
+
+- `cost_close` 同时减少 `PLATFORM_HELD` 与 `PLATFORM_COST` 同一金额，平台净头寸不变。因此它**不适用** 6-B.14 R3 的 `amount ≤ PLATFORM_HELD − PLATFORM_COST − fee_reserve` 校验，只校验 `amount ≤ PLATFORM_COST`（`PLATFORM_HELD ≥ 0` 由数据库保证）。
+- 6-B.14 R3 的“平台资金冻结”同样**不冻结 `cost_close`**。
+
+**R22 `cost_close` 按水位计算**
+
+- 冲抵额 = `channel_settle` 中手续费分录 `posting.id` 大于上次冲抵水位、小于等于本次水位的合计。
+- `ledger.cost_close` 改为 `(id, watermark_from_posting_id, watermark_to_posting_id UNIQUE, amount, period char(6), maker_actor, checker_actor, txn_id, created_at)`，并加 `CHECK (watermark_to_posting_id > watermark_from_posting_id)`。
+- 本次的 `watermark_from_posting_id` 必须等于上一行的 `watermark_to_posting_id`，服务层同一事务内锁表校验，保证区间首尾相接、不重不漏。
+- `period` 只作报表标签，不再唯一。幂等键改为 `cost_close:wm:<watermark_to_posting_id>`。
+
+**R18 `ledger.withdrawal` 的 KESS 渠道（新迁移修改 00004、00007 的约束与触发器）**
+
+1. `payee_account_text` 去掉 `NOT NULL`，改由 6-B.14 R5 的渠道 CHECK 约束：银行渠道非空，KESS 渠道为空。
+2. 提现状态机触发器增加 KESS 分支：
+   - **银行渠道**保持原规则：`paid` 要求 `bank_ref` 非空，`paid_txn_id` 的交易类型为 `payout`。
+   - **KESS 渠道**的 `paid` 要求：`bank_ref IS NULL`；新增列 `kess_refund_ref`（KESS 退款单号）非空，并加部分唯一索引 `WHERE channel = 'kess'`；`paid_txn_id` 的交易类型为 `payout_kess`，金额、`ref_type`、`ref_id` 的核对与银行渠道相同。
+   - 其余状态迁移两渠道共用。
+3. 6-B.14 R5 的部分唯一索引改为 `WHERE channel = 'kess' AND status NOT IN ('failed','cancelled')`，买家撤单后可以对同一支付号重新发起。
+4. `channel`、`kess_trade_no`、`kess_refund_ref`（一旦写入）加入 00007 的不可变列：任何状态迁移都不得修改。
+
+**R19 冲销后重记：幂等键加版本段**
+
+- 允许冲销后重记的类型（`channel_settle`、`capital_in`、`fee_period_adjust`，见 6-B.14 R6），幂等键都加第 4 段 `v<n>`：
+  - `channel_settle:kess:<批次号>:v<n>`
+  - `capital_in:bank:<bank_ref>:v<n>`
+  - `fee_period_adjust:feeline:<费用行 ID>:v<n>`
+  - 首次记账为 `v1`，每次冲销后重记 n+1。
+- 对应台账的唯一约束都改为“未冲销的唯一”：
+  - `ledger.capital_injection` 用 `UNIQUE (bank_ref) WHERE reversed_txn_id IS NULL` 代替 `bank_ref UNIQUE`；
+  - `kess_batch` 按批次号 + 当前版本唯一。
+- **`channel_settle` 的冲销条件**：只能在其手续费分录尚未被 `cost_close` 水位覆盖时冲销（服务层校验：手续费分录的 `posting.id` 大于最新 `watermark_to_posting_id`）。已被冲抵的批次如发现导入错误，**不冲销**，改用两笔正向更正：
+  - 差额属于手续费的，用 `adjust`（双人）在 `PLATFORM_COST` 与 `PLATFORM_HELD` 之间调整；
+  - 差额属于客户款项的，用 `bank_diff` 经 `SUSPENSE` 处理。
+
+**R21 退款后的结算报表毛额**
+
+- **假设（列为 E-4 必答项）**：KESS 结算批次的毛额，不含在结算前已原路退回的支付。按 6-B.15 R11，原路退只发生在“未结算”阶段，所以与系统中 `kess_payment.amount − refunded_amount` 的合计应当一致。
+- **兜底**：若报表毛额与系统应结金额不一致（例如 KESS 没有剔除已退款项），`channel_settle` 按系统应结金额贷 `CHANNEL_KESS`，差额腿贷或借 `SUSPENSE`，同时：
+  - 写高优先级告警 `ledger.kess_batch_mismatch`；
+  - **自动暂停 KESS 原路退**，直到财务查明；
+  - 整批照常入账，不会因 `CHANNEL_KESS` 不足而被拒。
+- 6-B.13 第 (8) 条“退款扣回方式已不影响设计”一句作废，以本条为准。
+
+**R12 余项**
+
+- 专用账户最低在账额 = 预估一个月手续费。
+- 自动补注资阈值、时限与升级对象见 6-B.15 R12。
+- `source_account_last4` 在 `purpose = 'fee_reserve'` 时用 `CHECK` 强制非空，并用触发器禁止修改。
+
+**R13 被冻结买家的退款**
+
+- 账号被冻结或停用时，退款照常退回钱包；6-B.13 第 (6) 条已豁免账号状态，未结算付款的原路退照常可用。
+- **已结算付款的退款**只能走提现，而冻结账号禁止提现（账务 6.5 规则不变）。这部分由平台售后在后台发起“代客退款出款”：走提现状态机的银行渠道，收款账户为买家原支付信息，需双人复核，附售后单号，不经买家本人操作。
+
+**R15 比例手续费舍入**
+
+按单笔付款计算：`金额 × bps ÷ 10000`，四舍五入（HALF_UP）到 e4；批次预期手续费为各笔之和，不对合计再舍入，与第四章第 4 节一致。
+
+**落点**：R18 的约束与触发器改动、R19 的唯一约束调整，并入 P-02 的账务迁移；R17、R22 并入 R-04。
+
 ### 配套表
 ```sql
 create table ledger.hold (          -- 冻结明细
