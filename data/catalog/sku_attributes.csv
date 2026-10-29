@@ -4,11 +4,11 @@ CAT-TILE,finish,表面,Finish,ផ្ទៃ（待审）,enum,,true,true,亮面|�
 CAT-TILE,thickness,厚度,Thickness,កម្រាស់（待审）,number,mm,true,false,,, ,GPC+prototype
 CAT-FLOOR,material,材质,Material,សម្ភារៈ（待审）,enum,,true,true,SPC|复合木|实木,SPC|Laminate|Solid wood,SPC|ឈើផ្សំ|ឈើរឹង（待审）,GPC+prototype
 CAT-FLOOR,thickness,厚度,Thickness,កម្រាស់（待审）,number,mm,true,false,,,,GPC+prototype
-CAT-FLOOR,color,颜色,Color,ពណ៌（待审）,text,,false,true,,,,Google-spec
+CAT-FLOOR,color,颜色,Color,ពណ៌（待审）,enum,,false,true,白色|灰色|木色,White|Gray|Wood tone,ស|ប្រផេះ|ពណ៌ឈើ（待审）,Google-spec
 CAT-CEMENT,product_type,产品类型,Product Type,ប្រភេទផលិតផល（待审）,enum,,true,true,普通水泥|瓷砖胶|砂浆,Portland cement|Tile adhesive|Mortar,ស៊ីម៉ងត៍ធម្មតា|កាវក្បឿង|បាយអ（待审）,GPC
 CAT-CEMENT,weight,净重,Net Weight,ទម្ងន់សុទ្ធ（待审）,number,kg,true,false,,,,GPC
 CAT-PAINT,paint_type,涂料类型,Paint Type,ប្រភេទថ្នាំលាប（待审）,enum,,true,true,乳胶漆|防水涂料|底漆,Emulsion paint|Waterproof coating|Primer,ថ្នាំលាបទឹក|ថ្នាំទប់ទឹក|ថ្នាំបាត（待审）,GPC+prototype
-CAT-PAINT,color,颜色,Color,ពណ៌（待审）,text,,false,true,,,,Google-spec
+CAT-PAINT,color,颜色,Color,ពណ៌（待审）,enum,,false,true,白色|灰色|蓝色,White|Gray|Blue,ស|ប្រផេះ|ខៀវ（待审）,Google-spec
 CAT-PAINT,volume,容量,Volume,បរិមាណ（待审）,number,L,true,false,,,,GPC
 CAT-DOOR,material,材质,Material,សម្ភារៈ（待审）,enum,,true,true,木质|铝合金|PVC,Wood|Aluminum alloy|PVC,ឈើ|អាលុយមីញ៉ូម|PVC（待审）,GPC+prototype
 CAT-DOOR,opening,开启方式,Opening Type,របៀបបើក（待审）,enum,,true,true,平开|推拉|折叠,Hinged|Sliding|Folding,បើកចំហ|រុញ|បត់（待审）,GPC
@@ -23,32 +23,32 @@ CAT-TOILET,type,类型,Type,ប្រភេទ（待审）,enum,,true,true,连�
 CAT-TOILET,flush_type,冲水方式,Flush Type,របៀបបង្ហូរទឹក（待审）,enum,,true,false,虹吸|直冲,Siphonic|Washdown,ស៊ីផុន|បង្ហូរត្រង់（待审）,GPC
 CAT-TOILET,rough_in,坑距,Rough-in,ចម្ងាយរន្ធ（待审）,number,mm,true,false,,,,GPC
 CAT-SHOWER,product_type,产品类型,Product Type,ប្រភេទផលិតផល（待审）,enum,,true,true,花洒套装|淋浴房|地漏,Shower set|Shower enclosure|Floor drain,ឈុតផ្កាឈូក|បន្ទប់ផ្កាឈូក|រន្ធបង្ហូរទឹក（待审）,GPC+IKEA-nav
-CAT-SHOWER,finish,表面颜色,Finish,ពណ៌ផ្ទៃ（待审）,text,,false,true,,,,Google-spec
+CAT-SHOWER,finish,表面颜色,Finish,ពណ៌ផ្ទៃ（待审）,enum,,false,true,镀铬|黑色|白色,Chrome|Black|White,ក្រូម|ខ្មៅ|ស（待审）,Google-spec
 CAT-SHOWER,connection_size,接口尺寸,Connection Size,ទំហំតំណ（待审）,number,inch,true,false,,,,GPC
 CAT-SOFA,upholstery,面料,Upholstery,ស្រោម（待审）,enum,,true,true,布艺|皮革|仿皮,Fabric|Leather|Faux leather,ក្រណាត់|ស្បែក|ស្បែកសិប្បនិម្មិត（待审）,GPC+prototype
-CAT-SOFA,seats,座位数,Seat Count,ចំនួនកៅអី（待审）,number,位,true,true,,,,GPC
-CAT-SOFA,color,颜色,Color,ពណ៌（待审）,text,,false,true,,,,Google-spec
+CAT-SOFA,seats,座位数,Seat Count,ចំនួនកៅអី（待审）,number,位,true,false,,,,GPC
+CAT-SOFA,color,颜色,Color,ពណ៌（待审）,enum,,false,true,灰色|米色|棕色,Gray|Beige|Brown,ប្រផេះ|បեժ|ត្នោត（待审）,Google-spec
 CAT-TABLE,product_type,产品类型,Product Type,ប្រភេទផលិតផល（待审）,enum,,true,true,餐桌|餐椅|书桌,Dining table|Dining chair|Desk,តុបរិភោគ|កៅអីបរិភោគ|តុធ្វើការ（待审）,GPC
 CAT-TABLE,material,材质,Material,សម្ភារៈ（待审）,enum,,true,true,木质|金属|玻璃,Wood|Metal|Glass,ឈើ|លោហៈ|កញ្ចក់（待审）,GPC
 CAT-TABLE,width,宽度,Width,ទទឹង（待审）,number,cm,false,false,,,,GPC
 CAT-STORAGE,material,材质,Material,សម្ភារៈ（待审）,enum,,true,true,木质|金属|塑料,Wood|Metal|Plastic,ឈើ|លោហៈ|ប្លាស្ទិក（待审）,GPC+IKEA-nav
-CAT-STORAGE,doors,门数,Door Count,ចំនួនទ្វារ（待审）,number,扇,false,true,,,,GPC
-CAT-STORAGE,color,颜色,Color,ពណ៌（待审）,text,,false,true,,,,Google-spec
+CAT-STORAGE,doors,门数,Door Count,ចំនួនទ្វារ（待审）,number,扇,false,false,,,,GPC
+CAT-STORAGE,color,颜色,Color,ពណ៌（待审）,enum,,false,true,白色|木色|灰色,White|Wood tone|Gray,ស|ពណ៌ឈើ|ប្រផេះ（待审）,Google-spec
 CAT-LAMP,fixture_type,灯具类型,Fixture Type,ប្រភេទអំពូល（待审）,enum,,true,true,吊灯|吸顶灯|壁灯,Pendant|Ceiling light|Wall light,ចង្កៀងព្យួរ|ចង្កៀងពិដាន|ចង្កៀងជញ្ជាំង（待审）,GPC+IKEA-nav
 CAT-LAMP,light_color,光色,Light Color,ពណ៌ពន្លឺ（待审）,enum,,true,true,暖白|自然白|冷白,Warm white|Neutral white|Cool white,សក្តៅ|សធម្មជាតិ|សត្រជាក់（待审）,GPC
 CAT-LAMP,power,功率,Power,កម្លាំងភ្លើង（待审）,number,W,true,false,,,,GPC
 CAT-SWITCH,product_type,产品类型,Product Type,ប្រភេទផលិតផល（待审）,enum,,true,true,单控开关|双控开关|插座,Single-pole switch|Two-way switch|Outlet,កុងតាក់តែមួយ|កុងតាក់ពីរទិស|ព្រី（待审）,GPC
-CAT-SWITCH,gangs,位数,Gang Count,ចំនួនប៊ូតុង（待审）,number,位,true,true,,,,GPC
+CAT-SWITCH,gangs,位数,Gang Count,ចំនួនប៊ូតុង（待审）,number,位,true,false,,,,GPC
 CAT-SWITCH,voltage,额定电压,Rated Voltage,វ៉ុលកំណត់（待审）,number,V,true,false,,,,GPC
 CAT-LOCK,lock_type,锁具类型,Lock Type,ប្រភេទសោ（待审）,enum,,true,true,机械锁|智能锁|门吸,Mechanical lock|Smart lock|Door stopper,សោមេកានិច|សោឆ្លាត|ឧបករណ៍ទប់ទ្វារ（待审）,GPC
-CAT-LOCK,finish,表面颜色,Finish,ពណ៌ផ្ទៃ（待审）,text,,false,true,,,,Google-spec
+CAT-LOCK,finish,表面颜色,Finish,ពណ៌ផ្ទៃ（待审）,enum,,false,true,镀铬|黑色|白色,Chrome|Black|White,ក្រូម|ខ្មៅ|ស（待审）,Google-spec
 CAT-LOCK,door_thickness,适用门厚,Door Thickness,កម្រាស់ទ្វារ（待审）,number,mm,true,false,,,,GPC
 CAT-FASTENER,fastener_type,紧固件类型,Fastener Type,ប្រភេទឧបករណ៍ភ្ជាប់（待审）,enum,,true,true,螺丝|螺母|膨胀螺栓,Screw|Nut|Expansion bolt,វីស|គ្រាប់|ប៊ូលពង្រីក（待审）,GPC
 CAT-FASTENER,material,材质,Material,សម្ភារៈ（待审）,enum,,true,true,碳钢|不锈钢|黄铜,Carbon steel|Stainless steel|Brass,ដែកកាបូន|ដែកអ៊ីណុក|លង្ហិន（待审）,GPC
-CAT-FASTENER,diameter,直径,Diameter,អង្កត់ផ្ចិត（待审）,number,mm,true,true,,,,GPC
+CAT-FASTENER,diameter,直径,Diameter,អង្កត់ផ្ចិត（待审）,number,mm,true,false,,,,GPC
 CAT-CLEAN,product_type,产品类型,Product Type,ប្រភេទផលិតផល（待审）,enum,,true,true,清洁剂|拖把|扫把,Cleaner|Mop|Broom,ទឹកសម្អាត|ម៉ុប|អំបោស（待审）,GPC
 CAT-CLEAN,volume,容量,Volume,បរិមាណ（待审）,number,mL,false,false,,,,GPC
-CAT-CLEAN,scent,香型,Scent,ក្លិន（待审）,text,,false,true,,,,GPC
+CAT-CLEAN,scent,香型,Scent,ក្លិន（待审）,enum,,false,true,花香|柠檬|无香,Floral|Lemon|Unscented,ផ្កា|ក្រូចឆ្មា|គ្មានក្លិន（待审）,GPC
 CAT-HOME-STORE,product_type,产品类型,Product Type,ប្រភេទផលិតផល（待审）,enum,,true,true,收纳箱|置物架|衣架,Storage box|Shelf|Hanger,ប្រអប់ផ្ទុក|ធ្នើ|ឧបករណ៍ព្យួរ（待审）,GPC+IKEA-nav
 CAT-HOME-STORE,material,材质,Material,សម្ភារៈ（待审）,enum,,true,true,塑料|金属|布艺,Plastic|Metal|Fabric,ប្លាស្ទិក|លោហៈ|ក្រណាត់（待审）,GPC
 CAT-HOME-STORE,capacity,容量,Capacity,ចំណុះ（待审）,number,L,false,false,,,,GPC
