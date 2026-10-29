@@ -325,7 +325,7 @@ func (s *SessionService) absoluteTTL() time.Duration {
 	if s.AbsoluteTTL > 0 {
 		return s.AbsoluteTTL
 	}
-	return 7 * 24 * time.Hour
+	return defaultSessionAbsoluteTTL
 }
 func (s *SessionService) metric(endpoint, result string) {
 	if s.Metrics != nil {

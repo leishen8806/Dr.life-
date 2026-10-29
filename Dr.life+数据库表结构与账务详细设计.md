@@ -56,6 +56,7 @@
 | `bot` | id, public_id, end (`buyer/merchant/driver`), username unique, role_in_pool (`primary/standby`), status (`active/standby/limited/banned`), token_enc (bytea), token_last4, webhook_secret_enc, priority | **令牌信封加密**，AAD 为 `bot_token:<id>`；`token_last4` 仅用于显示；同一端 `priority` 唯一且最多一个 primary |
 | `account_bot` | account_id, bot_id, bound_at, write_access boolean, unreachable_at | 用户在哪些 Bot 点过开始/允许私信；发送时据此选 Bot（第二章） |
 | `login_event` | id, person_id, bot_id, valid_by_bot_id, tried_count, auth_date, ip, device_id, result, created_at | 登录审计；`result` 含 `ambiguous_account`；`iam_rw` 仅可 SELECT/INSERT，禁止 UPDATE/DELETE/TRUNCATE/TRIGGER/REFERENCES，校验命中的 Bot、尝试次数 |
+| `account_status_log` | id, public_id, account_id, from_status, to_status, reason, actor_type, actor_id, created_at | 账号状态变更只追加日志；冻结、停用及恢复均须填写原因；`iam_rw` 仅可 SELECT/INSERT，拒绝修改、删除和截断；`report_ro` 不可读取 `reason` |
 | `session` | id, account_id, family_id, refresh_token_hash, previous_hash, rotated_at, rotation, refresh_kid, device_id, ip, expires_at, last_used_at, revoked_at, revoked_reason | 刷新令牌只存哈希；旋转使用前一哈希和时间实现宽限期重放，冻结/停用时按 family 批量作废 |
 | `security_event` | account_id, session_family_id, event, reason, created_at | 会话安全事件；不含令牌或哈希 |
 | `merchant` | id, public_id, name jsonb, type, area, svc jsonb, description jsonb, phone_enc, address_enc, contact_enc, kind (`self/verified/pending`), status, owner_account_id | 商户资料；电话、地址、联系人由应用层加密后存放；`kind=verified` 须核验 |
@@ -135,7 +136,8 @@
 | `DELIVERY_ESCROW` | 负债 | 平台（单例）按订单分明细 | DH | 配送费托管 |
 | `AD_BUDGET` | 负债 | 每个商户一个 | ADB | 广告预算（已划扣未消耗） |
 | `PLATFORM_HELD` | 权益 | 平台（单例） | P | **平台自有收入**（仍在专用账户里，待划出）；每条分录带 `category` 区分来源 |
-| `PAYABLE_CARRIER` | 负债 | 平台，按承运方（中通） | ZTO | 应付中通 |
+| `PAYABLE_CARRIER` | 负债 | 平台（单例） | ZTO | ~~应付中通~~ **2026-10-29 起为“应付 Dr.RouteFit”**（仓配整体交给 RouteFit，中通由 RouteFit 对接），见第六章 6-B |
+| `CHANNEL_KESS` | 资产 | 平台（单例） | — | **2026-10-29 新增**：已经 KESS 确认收款、尚未结算到银行专用账户的渠道款，见 6-B |
 | `SUSPENSE` | 过渡 | 平台 | — | 对账差异、未识别入金暂存，**必须人工清零** |
 
 > **平台收入的 `category`：** `storage`（仓储费）、`delivery_margin`（配送留存）、`ads`（广告）、`settle_fee`（结算服务费，第一版为 0）、`member`（AI 会员费）——与原型财务中心的 5 类收入一致，**财务中心、审计 #13 都按它汇总**。
@@ -146,6 +148,7 @@
   + Σ AD_BUDGET + PAYABLE_CARRIER + PLATFORM_HELD + SUSPENSE
   =  BANK_DEDICATED（银行专用账户余额）
 ```
+**2026-10-29 修订（6-B）：** 右边改为 `BANK_DEDICATED + CHANNEL_KESS`。KESS 已确认、尚未结算到银行的渠道款也是客户资金，但不在银行余额里。`CHANNEL_KESS` 另与 KESS 结算报表逐笔核对。
 这等价于原型财务中心的"内部账户合计 = 银行外部净流入"检查。**每天、每次对账文件导入后都要验证；不成立就是"异常"。**
 
 ### 4. 币种与精度
@@ -300,6 +303,336 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 - 冲销交易必须逐条复制原分录的账户、金额、`role`、`category`，并只互换 `DEBIT` / `CREDIT`。延迟约束触发器在提交时比较两个分录多重集合，防止绕过服务直接写入不对称冲销。
 - 同一原交易最多一条冲销；冲销交易本身不能再次冲销。冲销仍执行账户余额非负检查，已花掉的充值不能用冲销强制形成客户负余额。
 - 服务调用必须携带非空原因、操作人及授权人；权限判断由 API 层执行。账务事务写 `ledger.txn.reversed` outbox 事件，审计模块消费事件并追加哈希链审计记录，账务模块不跨 schema 写审计表。
+
+### 6-B 商城与 Dr.RouteFit 分工后的分录修订（2026-10-29，待 LedgerAuditor 复核）
+
+依据：项目负责人 2026-10-29 的决定（《试点上线最小范围清单》第 1、6 节；《Dr.life+与Dr.RouteFit对接契约》v0.2 第 4.5、7、8、10 节）。
+
+- Dr.life+ 只做商城，仓储与配送由 Dr.RouteFit 承担。
+- 入金优先走 KESS。
+- 商户包邮或买家付运费，两种情况下运费都结算给 RouteFit。
+- 货款在 RouteFit 签收复核后满 7 天、且无未结售后时，结算给商户。
+- Dr.life+ 与 RouteFit 同属一家公司，**只记内部往来账，不实际转账**。
+
+本节**取代**下列行的适用范围：6.8（贷方改变）、6.9、6.10、6.11（停用）、6.17（停用，改为 6-B.8）、“货款凭证”行（停用，被 KESS 付款取代）。已合并的迁移不修改，新增类型与科目用新迁移追加 CHECK 取值；停用的类型保留取值，由服务层不再提供入口，审计 #13 继续能汇总历史数据。
+
+#### 6-B.1 新增科目
+
+- **`CHANNEL_KESS`**：资产，平台单例，借方为正，不允许负数。含义见第四章第 2 节。
+- **`PAYABLE_CARRIER`**：语义改为“应付 RouteFit”，结构不变（平台单例，负债）。
+
+#### 6-B.2 新增与改用的分录
+
+| # | 业务 | txn.type | 分录 | 说明与约束 |
+|---|---|---|---|---|
+| 6-B.3 | **KESS 收款入钱包**（充值，或买家为订单付款） | `topup_kess`（新增） | DR `CHANNEL_KESS` / CR `WALLET_AVAIL(A)` | 只在服务端**主动查单**确认 KESS `SUCCESS` 后入账；幂等键 = `topup_kess:<商户支付号>`，同一支付号只入一次。`UNKNOWN` 不入账。金额取支付意向的服务端应收，不取浏览器回传。**订单付款时，6-B.3 与 6-B.5 必须在同一事务内完成**，钱不能在可用余额里停留，否则买家可在两步之间提现 |
+| 6-B.4 | **KESS 结算到银行** | `channel_settle`（新增） | DR `BANK_DEDICATED`（净额）+ DR `PLATFORM_HELD`(category=`channel_fee`，手续费) / CR `CHANNEL_KESS`（毛额） | 按 KESS 结算报表逐批入账；毛额 = 净额 + 手续费；与银行流水逐笔核对。手续费由平台承担（6-B.11 Q1，含余额不足时的处理） |
+| 6-B.5 | **订单付款进托管** | `freeze`（沿用 6.2，`FreezeHold`） | DR `WALLET_AVAIL(buyer)` / CR `WALLET_FROZEN(buyer)` | 6-B.3 入账后，同一事务按子订单建**两个 hold**：`hold(order_goods)`（货款，收款方为商户）；买家付运费时另建 `hold(order_shipping)`（运费，收款方为 RouteFit 与平台加价）。商户包邮的子订单只有货款 hold |
+| 6-B.6 | **货款结算给商户** | `settle`（沿用 6.3，`SettleHold`） | DR `WALLET_FROZEN(buyer)` / CR `WALLET_AVAIL(M)` | 触发条件：RouteFit `delivered_verified` 后满 7 天（后台可调）且无未结售后。佣金为 0，`Fee` 仍必须为 0 |
+| 6-B.7 | **买家运费结算** | `shipping_settle`（新增） | DR `WALLET_FROZEN(buyer)` / CR `PAYABLE_CARRIER`（RouteFit 报价部分）+ CR `PLATFORM_HELD`(category=`delivery_margin`，加价部分) | 触发条件：RouteFit `delivered_verified`，不等 7 天，因为配送服务已完成。金额与拆分取下单时的报价快照：RouteFit 部分 = 报价，加价部分 = 托管额 − 报价（最后一项倒挤）。走 hold 状态机：需新增“按快照拆分结算”的强类型方法，不复用 `SettleHold`（后者只支持单一收款钱包）。加价率为 0 时只有一条贷方分录 |
+| 6-B.8a | **退款**（拒单、取消、售后退款） | `refund`（沿用 6.4，`RefundHold`） | DR `WALLET_FROZEN(buyer)` / CR `WALLET_AVAIL(buyer)` | 先退回买家钱包；买家可一键选择原路退回 KESS，流程见 6-B.11 Q3（`withdraw_req` 加新增的 `payout_kess`）。已结算的运费是否退给买家由售后判定，判定退的由商户承担：从商户钱包扣，类型 `adjust`，需审批 |
+| 6-B.8b | **仓配费用行扣款：仓储类**（storage、inbound、outbound、packing） | `storage_fee`（沿用类型，**贷方改变**） | DR `WALLET_AVAIL(M)` / CR `PAYABLE_CARRIER` | 金额 = RouteFit 费用行金额（美分 × 100 → e4，精确）。幂等键 = `rf_fee:<feeLineId>:v<version>`。余额不足时不扣成负数，费用行记为欠费，充值后按先后顺序补扣（沿用 6.8 的欠费规则），超过宽限期后暂停出库（R-06） |
+| 6-B.8c | **仓配费用行扣款：商户包邮的配送费** | `delivery_fee`（新增） | DR `WALLET_AVAIL(M)` / CR `PAYABLE_CARRIER`（报价部分）+ CR `PLATFORM_HELD`(category=`delivery_margin`，加价部分) | 金额 = 报价 × (1 + 加价率)，取下单时的快照；欠费处理同 6-B.8b |
+| 6-B.8d | **费用行调整** | `reversal`（沿用 6.18）后再按新版本扣款 | 原交易借贷互换，再记新的 6-B.8b 或 8c | RouteFit `fee.adjusted`：先冲销旧版本，再按新版本扣款，两笔同一事务。冲销白名单需加入 `delivery_fee` |
+| 6-B.9 | **与 RouteFit 内部往来核销**（月度） | `intercompany_settle`（新增） | DR `PAYABLE_CARRIER` / CR `PLATFORM_HELD`(category=`routefit`，新增) | 同一公司，不实际转账：每月双方财务核对，确认“应付 RouteFit 余额 = 累计日结单合计 − 已核销”后，把已确认部分从“应付”重分类为公司自有收入（RouteFit 业务线）。双人复核，附月结单编号。之后与其他平台收入一样，只能经银行约定流程 `sweep`（6.16）划出专用账户；**不得因核销减少客户资金** |
+
+#### 6-B.10 恒等式与审计影响
+
+- 第四章第 3 节恒等式右边加 `CHANNEL_KESS`，左边不变（`PAYABLE_CARRIER` 已在左边）。
+- 平台收入 `category` 新增三类，财务中心与审计 #13 按新类别汇总：
+  - `channel_fee`：KESS 手续费，由平台承担，记借方，是负向收入；
+  - `routefit`：RouteFit 业务线收入；
+  - `capital`：公司注资，用于承担手续费，不是收入，财务中心单列。
+- 新增审计检查：
+  - `CHANNEL_KESS` 余额 = KESS 已确认未结算金额（日）；
+  - `PAYABLE_CARRIER` = RouteFit 日结单累计 − 已核销（日）；
+  - 买家付运费的子订单 `delivered_verified` 超过 24 小时仍未 `shipping_settle` 的，列为关注。
+- 停用的 `DELIVERY_ESCROW` 账户应保持余额 0，审计检查改为“非 0 即异常”。
+
+#### 6-B.11 已确认（项目负责人 2026-10-29）
+
+| # | 事项 | 结论与账务落点 |
+|---|---|---|
+| Q1 | KESS 手续费由谁承担 | **平台承担**。买家与商户付多少就到账多少；6-B.4 的手续费记 DR `PLATFORM_HELD`(category=`channel_fee`)，作为平台成本。费率与结算周期以 KESS 合同为准（E-4）。**约束**：`PLATFORM_HELD` 不允许负数，而试点期佣金为 0、加价默认为 0，平台收入可能不足以承担手续费。处理顺序：① 6-B.9 核销后的 `routefit` 收入先承担；② 仍不足时，由公司向专用账户注资，新增交易类型 `capital_in`：DR `BANK_DEDICATED` / CR `PLATFORM_HELD`(category=`capital`)，双人复核并附银行回单。不足时 `channel_settle` 整批挂起并告警，不得部分入账 |
+| Q2 | RouteFit 业务线收入是否划出专用账户 | **每月核销后划出**。6-B.9 `intercompany_settle` 完成后，与其他平台收入一起，按银行约定流程执行 6.16 `sweep`（DR `PLATFORM_HELD` / CR `BANK_DEDICATED`），双人复核。划出金额不得超过当时 `PLATFORM_HELD` 余额，也不得动用 Q1 中为承担手续费预留的部分 |
+| Q3 | 买家退款怎么退 | **默认退回买家钱包，买家可一键选择原路退回**。原路退复用提现状态机，出款渠道为 KESS：申请时沿用 6.5 `withdraw_req`（DR `WALLET_AVAIL(buyer)` / CR `PENDING_PAYOUT`），提现单记录 `channel=kess` 与原商户支付号；财务审核后在 KESS 人工退款，确认后新增 `payout_kess`：DR `PENDING_PAYOUT` / CR `CHANNEL_KESS`；KESS 退款失败或撤销沿用 6.7 `payout_fail`。原路退金额不得超过该支付号已收、未退的金额；KESS 退款手续费（如有）按 Q1 由平台承担 |
+
+#### 6-B.12 实现落点
+
+| 任务 | 落点 |
+|---|---|
+| P-02 | 6-B.3、6-B.4、6-B.11 Q1 的 `capital_in`、Q3 的 `payout_kess` |
+| T-10 | 6-B.5、6-B.6、6-B.7、6-B.8a |
+| R-04 | 6-B.8b、8c、8d、6-B.9 |
+
+所有新增类型、科目与类别，用**同一个新迁移**追加到 `ledger.txn.type`、`ledger.account.kind`、`ledger.posting.category` 的 CHECK 中，由 GoSenior 或 DBEngineer 实现，经代码审查 → SecurityReviewer → LedgerAuditor 三道复核。
+
+#### 6-B.13 账务审计后的修订（2026-10-29，回应 LedgerAuditor 在 CMP-655 的 B1–B3 与 A1–A3；**与上文冲突处以本节为准**）
+
+**(1) 手续费改记独立的借方科目，从结构上消除负数（回应 B1、A1-1、A1-2、A1-4）**
+
+- 新增科目 **`PLATFORM_COST`**：平台单例，`normal_side = DEBIT`，不允许负数，表示平台已发生、尚未用平台资金冲抵的成本。
+- 6-B.4 `channel_settle` 改为：DR `BANK_DEDICATED`（净额）+ DR `PLATFORM_COST`（手续费）/ CR `CHANNEL_KESS`（毛额）。这笔分录不再依赖 `PLATFORM_HELD` 有余额，任何一批都能入账，因此**取消“整批挂起”**，也不存在挂起期间银行流水无人认领的窗口。
+- 恒等式（第四章第 3 节）最终形式：
+  ```
+  Σ WALLET_AVAIL + Σ WALLET_FROZEN + Σ PENDING_PAYOUT + Σ DELIVERY_ESCROW + Σ AD_BUDGET
+    + PAYABLE_CARRIER + PLATFORM_HELD + SUSPENSE
+    = BANK_DEDICATED + CHANNEL_KESS + PLATFORM_COST
+  ```
+- **客户资金不被占用的约束**：平台净头寸 `PLATFORM_HELD − PLATFORM_COST ≥ 0`。
+  - 它小于 0，说明手续费正在由客户资金垫付，必须禁止。
+  - 保证手段（三层）：① **上线前预存手续费备付金**（`capital_in`，见第 (3) 条），金额 ≥ 预估首月手续费的 2 倍；② 新增每日审计项“平台净头寸 ≥ 0”，低于“预估下月手续费”时告警，小于 0 时列为异常；③ `sweep` 强校验（第 (4) 条）。
+- 月度冲抵：`cost_close`（新增）：DR `PLATFORM_HELD`(category=`channel_fee`) / CR `PLATFORM_COST`。双人复核，金额不得使 `PLATFORM_HELD` 为负。冲抵后，财务中心的“平台成本”按 `channel_fee` 类别汇总。
+- RouteFit 业务线收入不再“先承担手续费”。它只在月度核销（6-B.9）后进入 `PLATFORM_HELD`，自然增加平台净头寸。
+
+**(2) 对账程序与财务中心必须同批改造（回应 B2）**
+
+- `checkIdentity`（`backend/internal/ledger/recon.go`）与财务中心 `financialPosition`（`financial_center.go`）必须改成上面的恒等式：右边为 `BANK_DEDICATED + CHANNEL_KESS + PLATFORM_COST`，按科目 `normal_side` 区分左右两边，不再写死“`kind <> 'BANK_DEDICATED'` 合计 = 银行”。
+- 这项改造与 P-02 **同一个 PR 上线**，不得先于或晚于 P-02。6-B.12 落点表新增一行：**L-07/L-10 改造 → 与 P-02 同批**。
+- 新增对账项：
+  - `CHANNEL_KESS` 余额 = KESS 已确认、未结算金额（与 KESS 结算报表逐笔核对）；
+  - `PLATFORM_COST` 余额 = 已入账手续费 − 已冲抵。
+
+**(3) `capital_in` 的完整定义（回应 A1-3）**
+
+- 新表 `ledger.capital_injection(id, bank_ref text NOT NULL UNIQUE, amount bigint CHECK (> 0), purpose text CHECK (purpose IN ('fee_reserve','other')), maker_actor, checker_actor CHECK (checker_actor <> maker_actor), txn_id, created_at)`。同一张银行回单只能注资一次。
+- 分录：DR `BANK_DEDICATED` / CR `PLATFORM_HELD`(category=`capital`)。幂等键 = `capital_in:<bank_ref>`。
+- 新增强类型方法 `InjectCapital`：双人复核，`BankRef` 必填，与 `ConfirmPayout` 同一模式。不经 `Adjust`，因为 `Adjust` 的白名单不含 `BANK_DEDICATED`。
+- **不受出款冻结限制**：注资只增加资金，冻结期间也必须能注资，否则“恒等式失败 → 全局冻结 → 无法注资”会形成死锁。
+- **资金来源（项目负责人 2026-10-29 确认，E-7）**：允许注资。手续费备付金存放在公司另开的**备用金账户**（由一家合作银行开立），不与客户资金专用账户混用。需要时从备用金账户转入专用账户补足手续费，每笔转账对应一张银行回单，即一条 `capital_in`。`ledger.capital_injection` 新增 `source_account_last4`，记录备用金账户尾号，便于对账。备用金账户本身是公司资金，不进平台账务科目，只在注资时留痕。
+- **上线前置**：备用金账户开立，且首笔备付金转入专用账户并入账（`capital_in`）。
+
+**(4) `sweep` 不得动用预留（回应 A2）**
+
+- 预留额 `fee_reserve` = 未结算 `CHANNEL_KESS` 上各笔付款的预期手续费 + 已出报表、未入账批次的手续费 + 预估下月手续费。预期手续费按下面的后台设置计算。
+- **KESS 手续费后台设置**（项目负责人 2026-10-29）：费率不写死在代码里，平台后台提供设置入口（集成配置 N-10 的 KESS 一项，后台页面 U-08）。
+  - 扣费方式二选一：**按订单固定金额**（每笔付款 X 美元，e4 存储）或**按金额比例**（万分比 bps，四舍五入到 e4）。
+  - 每个版本有生效时间，只增不改，修改需“集成配置”编辑权限并写审计。
+  - 每笔付款按付款时生效的版本计算预期手续费，并快照到支付意向上。
+- **用途与边界**：
+  - 后台设置**只用于预期**：计算 `fee_reserve`、在 KESS 结算报表到达时逐笔核对手续费。
+  - **实际入账永远以 KESS 结算报表为准**（6-B.4）。
+  - 报表手续费与预期不一致的，生成对账差异并告警，由财务核对合同或更新设置。不按设置值改写入账金额。
+- `sweep` 服务层强校验：`amount ≤ PLATFORM_HELD − PLATFORM_COST − fee_reserve`。每次 `sweep` 都要把当时的 `PLATFORM_HELD`、`PLATFORM_COST`、`fee_reserve` 及其计算输入落库到划款明细表 `ledger.sweep_detail`，事后可审计。
+- 新增每日审计项：`PLATFORM_HELD − PLATFORM_COST ≥ fee_reserve`，不满足时告警。
+
+**(5) 内部核销的前置条件与跨期调整（回应 B3）**
+
+- 6-B.9 `intercompany_settle` 只能核销同时满足两个条件的费用行：
+  - 已与 RouteFit 日结单逐行对账、无差异；
+  - 已过**费用调整窗口**：服务日期所在月结束后 10 天。窗口天数写入对接契约 7.3，RouteFit 在窗口后不得再发 `fee.adjusted`。
+- 核销金额不得超过 `PAYABLE_CARRIER` 余额；`PAYABLE_CARRIER.allow_negative` 保持 false。
+- 窗口后仍出现的调整，不走 6.18 冲销，走新增的 **`fee_period_adjust`**（跨期调整），双人复核：
+  - 多收商户（退商户）：DR `PLATFORM_HELD`(category=`routefit`) / CR `WALLET_AVAIL(M)`；
+  - 少收商户（补扣）：按 6-B.8b、8c 正常扣款。
+
+**(6) 原路退回 KESS 的两条路径与表结构（回应 A3）**
+
+- **项目负责人 2026-10-29 决定：试点只支持“未结算付款的原路退”。**判定依据是该支付号所在的 KESS 批次**是否已经 `channel_settle` 入账**，由服务层按批次记录判断，不由操作人选择：
+  - **未入账**：可以原路退。`payout_kess` = DR `PENDING_PAYOUT` / CR `CHANNEL_KESS`，金额不得超过该支付号在本批次中的未结算金额。
+  - **已入账**：不提供原路退。退款留在买家钱包，买家可走银行提现（6.5–6.7）。买家端“原路退回”按钮只对未入账的支付显示；按钮显示后批次才入账的，服务层拒绝并提示改为提现。
+- `CHANNEL_KESS` **不允许为负**（`allow_negative = false`，不设例外）。`payout_kess` 因批次已入账而余额不足时，整笔回滚，不会动用其他买家的未结算款，因为金额上限已按该支付号本批次的未结算额限定。
+- 新增对账项：每笔 `payout_kess` 都能追溯到同一批次内的原支付号，且该批次在退款时尚未入账。
+- **表结构**：`ledger.withdrawal` 新增 `channel text NOT NULL DEFAULT 'bank' CHECK (channel IN ('bank','kess'))` 和 `kess_trade_no text`（`channel = kess` 时必填，引用原支付号）。支付号不写进 `payee_account_text`、`payee_account_last4`。
+  - `channel = kess` 不得走 `ConfirmPayout`（它硬编码 CR `BANK_DEDICATED`），只能走 `ConfirmKessRefund`；`channel = bank` 不得走后者。两个方法互相拒绝对方的渠道。
+- **风控**：原路退款把钱退回原支付来源，不经用户提供的新收款账户。
+  - **适用**：大额双人复核（沿用提现阈值）、全局出款冻结（冻结期间暂停，与提现一致）。
+  - **豁免**：账号冻结或停用（买家被冻结也能拿回退款）、二次验证。
+
+**(7) 落点表补充**
+
+| 任务 | 补充落点 |
+|---|---|
+| P-02 | `PLATFORM_COST` 科目、`cost_close`、`capital_in`（`ledger.capital_injection`）、`payout_kess` 两条路径与 `ledger.withdrawal` 新增列、L-07/L-10 恒等式改造（同一 PR） |
+| R-04 | 6-B.9 的前置条件、`fee_period_adjust`、`sweep` 预留校验与 `ledger.sweep_detail` |
+
+**(8) 外部事项**
+
+- **E-4**：KESS 手续费的费率与口径仍需从 KESS 合同取得（决定 `fee_reserve` 的计算）。退款扣回方式已不影响设计，因为试点只做未结算付款的原路退。
+- **E-7**：已确认方向。待办是在一家合作银行开立公司备用金账户，并完成首笔备付金转入；完成前 P-02 不得上线。
+
+#### 6-B.14 第二轮账务复审后的修订（2026-10-29，回应 LedgerAuditor 在 CMP-670 的 R1–R9；**与 6-B.13 冲突处以本节为准**）
+
+说明：CMP-670 复审的对象是 PR #97 的中间提交 `2a4ef0d`。之后合并的版本已改为“试点只做未结算付款的原路退，`CHANNEL_KESS` 不允许为负”，所以 R2 所说的“科目级 `allow_negative` 约束不住”已经不存在：`CHANNEL_KESS`、`PLATFORM_COST` 都保持 `allow_negative = false`，不改 `00004` 的 `ck_account_negative_policy`。R2 建议的 `PAYABLE_KESS` 只有在开放“已结算付款的原路退”时才需要，届时另行设计。
+
+**R1 幂等键**：全部新键遵守 `post.go` 的 `idemKeyPattern`，即 3–4 段，每段只含 `[A-Za-z0-9_-]`。外部编号先规范化：非法字符替换为 `_`，长度超过 80 时取 SHA-256 前 32 位十六进制；原始编号另存业务表，并加唯一约束。
+
+| 交易 | 幂等键 |
+|---|---|
+| `topup_kess` | `topup_kess:kess:<规范化商户支付号>` |
+| `channel_settle` | `channel_settle:kess:<规范化结算批次号>` |
+| `capital_in` | `capital_in:bank:<规范化 bank_ref>` |
+| `cost_close` | `cost_close:period:<YYYYMM>` |
+| `fee_period_adjust` | `fee_period_adjust:feeline:<费用行 ID>` |
+| `payout_kess` | `payout_kess:withdrawal:<提现单 ID>` |
+| `delivery_fee` / `storage_fee`（费用行） | `rf_fee:<费用行 ID>:v<版本>`（原写法，符合规则） |
+| `shipping_settle` | `shipping_settle:hold:<hold ID>` |
+| `intercompany_settle` | `intercompany_settle:period:<YYYYMM>` |
+
+**R3 平台净头寸的强制点**
+
+- 所有借记 `PLATFORM_HELD` 的交易，服务层统一强校验 `amount ≤ PLATFORM_HELD − PLATFORM_COST − fee_reserve`，校验输入与交易同事务落库。涉及的交易包括 `sweep`、`cost_close`、`fee_period_adjust`、`adjust`，以及对平台收入类交易的 `reversal`。
+- `channel_settle` 不能拒绝过账，因为钱已经实际到了银行。但它要在同一事务里计算净头寸；若 `< 0`：
+  - 写 outbox 高优先级告警 `ledger.platform_net_negative`；
+  - 同事务建立“平台资金冻结”：暂停 `sweep`，以及所有借记 `PLATFORM_HELD` 的交易。客户提现不受影响，因为客户资金仍足额。
+  - 解除条件：注资（`capital_in`）后净头寸恢复 ≥ 0。
+  - **补足时限**：1 个工作日。超时升级给财务负责人和项目负责人。
+
+**R4 `cost_close` 与 `fee_period_adjust` 的台账**
+
+- `ledger.cost_close(id, period char(6) UNIQUE, amount, computed_from_posting_max_id, maker_actor, checker_actor CHECK (checker_actor <> maker_actor), txn_id, created_at)`。
+  - 冲抵额**由服务计算、不由人输入**：等于该期间已入账、尚未冲抵的 `channel_settle` 手续费合计。
+  - 同一期间只能冲抵一次。
+- `ledger.fee_period_adjustment(id, fee_line_id UNIQUE, direction, amount, reason, maker_actor, checker_actor CHECK (<>), txn_id, created_at)`：同一费用行只能做一次跨期调整。若需要再次更正，先冲销上一笔调整（见 R6）。
+- 双人复核写进上述表的 `maker_actor`、`checker_actor` 列，可查询；不写在 `txn.note` 里。
+
+**R5 `ledger.withdrawal` 渠道约束**
+
+- `CHECK ((channel = 'bank' AND payee_account_text IS NOT NULL AND kess_trade_no IS NULL) OR (channel = 'kess' AND payee_account_text IS NULL AND kess_trade_no IS NOT NULL))`
+- `CREATE UNIQUE INDEX uq_withdrawal_kess_trade ON ledger.withdrawal (kess_trade_no) WHERE channel = 'kess' AND status <> 'failed'`：同一支付号同时只能有一张有效的原路退单。
+- 原路退金额上限：同一支付号已成功原路退的合计 + 本次 ≤ 该支付号在本批次中的未结算金额。服务层在同一事务内锁定该支付意向行后校验。
+- `channel = kess` 的 `payout_fail`：与银行渠道相同，DR `PENDING_PAYOUT` / CR `WALLET_AVAIL(buyer)`，钱回到买家钱包；买家改走银行提现。
+
+**R6 新类型的冲销策略**（新迁移扩展 `00009` 的冲销白名单）
+
+| 类型 | 能否用 6.18 冲销 | 更正方式 |
+|---|---|---|
+| `delivery_fee`、`capital_in` | 能（双人，附原因与银行回单） | 冲销后重记 |
+| `channel_settle` | 能（仅限导入错误，双人，附 KESS 报表） | 冲销后按正确报表重记 |
+| `topup_kess` | 不能 | 走退款流程 |
+| `shipping_settle` | 不能 | hold 状态机，结算前取消 |
+| `payout_kess` | 不能 | 提现状态机，失败用 `payout_fail` |
+| `cost_close`、`intercompany_settle` | 不能 | 下一期间调整 |
+| `fee_period_adjust` | 能（双人），且只能冲销一次 | 冲销后可再做一次新的调整，台账唯一约束改为“未冲销的唯一” |
+
+**R7**：`PAYABLE_CARRIER` 当前只代表 RouteFit，且不实际转账。服务层禁用 `carrier_pay`；将来引入第三方承运方再拆科目。
+
+**R8 新对账项的口径**
+
+| 对账项 | 左边 | 右边 | 不一致时 |
+|---|---|---|---|
+| `CHANNEL_KESS` | `ledger.balance` | “已入账 `topup_kess`、所在批次尚未 `channel_settle`”的支付意向合计，减去已确认 `payout_kess` 合计（来自支付意向表与批次表，不取 `balance`） | 写 `recon_issue`（`CHANNEL_KESS`），告警并暂停 `sweep`；不建全局出款冻结，因为不影响客户资金是否足额 |
+| `PLATFORM_COST` | `ledger.balance` | `channel_settle` 手续费分录合计 − `cost_close` 合计（取 `posting`） | 同上 |
+
+- 修正后的恒等式本身只剩下验证余额缓存的作用，真正的闸门是这两项对账，加上 R3 的净头寸检查。
+- 银行流水逐行核对仍是缺口，另开 L 系列卡，P-02 上线前完成。
+
+**R9**：v1 中 `PLATFORM_COST` 只承载 KESS 手续费一种成本，所以不需要按类别归集。新增第二种平台成本时，必须先新增科目或给借方分录支持 `category`，不得直接复用 `PLATFORM_COST`。
+
+**落点补充**：P-02 增加 R1、R3、R5、R6、R8 中与 KESS 相关的部分；R-04 增加 R4、R7。新增的表、约束和白名单扩展放进同一个账务迁移，三道审查。
+
+#### 6-B.15 第三轮账务复审后的修订（2026-10-29，回应 LedgerAuditor 在 CMP-670 第 2 轮结论中的 R10、R11、R12、R14、R16；**与 6-B.13、6-B.14 冲突处以本节为准**）
+
+**R16**：KESS 手续费后台设置（6-B.13 第 (4) 条的补充）原先没进入 main，本 PR 一并补上（提交 `a5a24ba`）。今后手续费口径只有一套：按后台设置的生效版本计算预期，实际入账以 KESS 报表为准。
+
+**R11 KESS 批次与支付明细表、锁顺序**
+
+- 新表 `ledger.kess_batch(id, batch_no text NOT NULL UNIQUE, status text CHECK (status IN ('open','settled')), gross, fee, net, statement_ref, settled_txn_id, created_at, settled_at)`。
+- 新表 `ledger.kess_payment(id, trade_no text NOT NULL UNIQUE, intent_ref, amount bigint CHECK (> 0), topup_txn_id, batch_id NULL REFERENCES ledger.kess_batch, refunded_amount bigint NOT NULL DEFAULT 0 CHECK (refunded_amount BETWEEN 0 AND amount), created_at)`。
+  - `topup_kess` 入账时同事务插入一行，`batch_id` 为空。
+  - KESS 结算报表到达时，`channel_settle` 把报表列出的支付号挂到批次上。
+- **“未结算”的定义**：`batch_id IS NULL`，或所属批次 `status = 'open'`。
+- **原路退（`ConfirmKessRefund` → `payout_kess`）**：
+  - 同一事务内，先 `SELECT … FOR UPDATE` 锁该支付号的 `kess_payment` 行；若已挂批次，再锁批次行。
+  - 校验“未结算”，且 `refunded_amount + 本次 ≤ amount`，然后更新 `refunded_amount`，再调用 `Post`。
+  - 幂等键 `payout_kess:withdrawal:<提现单 ID>`，加上 6-B.14 R5 的 `kess_trade_no` 部分唯一索引，两者共同防止同一单确认两次。
+- **`channel_settle`**：同一事务内，先锁批次行，再按 `trade_no` 升序锁报表中的全部 `kess_payment` 行，把批次置为 `settled`，然后调用 `Post`。
+- **统一锁顺序**（防死锁）：`kess_batch` → `kess_payment`（按 `trade_no` 升序）→ `Post` 内部按 `account_id` 升序锁余额行。两个方法都严格按这个顺序加锁。
+- **竞态处理**：原路退与结算并发时，后拿到锁的一方会看到前者的结果。退款先完成，结算按扣除退款后的金额核对；结算先完成，退款因“已结算”被拒，钱留在买家钱包，买家改走提现。
+- 6-B.13 第 (6) 条“不会动用其他买家的未结算款，因为金额上限已按本批次未结算额限定”一句，改为：**由上述行锁与 `refunded_amount ≤ amount` 约束保证，`CHANNEL_KESS` 的非负约束只是最后一道防线。**
+- 6-B.14 R8 中 `CHANNEL_KESS` 对账项的右边，数据源明确为：`kess_payment` 中未结算行的 `amount − refunded_amount` 合计。
+
+**R10 结算报表里有未入账的付款**
+
+`channel_settle` 先把报表逐行与 `kess_payment` 匹配：
+- **匹配上的行**：贷 `CHANNEL_KESS`。
+- **报表有、系统没有的行**（例如回调丢失、主动查单还没确认）：先对每笔调用一次主动查单补记 `topup_kess`；仍无法确认的金额，贷 **`SUSPENSE`**，同时：
+  - 写 outbox 高优先级告警 `ledger.kess_unmatched`；
+  - 对应的银行流水视为“已认领到悬挂”，不再是无人认领；
+  - 由财务在 **3 个工作日**内查明后，用 `bank_diff` 从 `SUSPENSE` 转出：属于买家付款的，补记到该买家钱包；属于 KESS 差错的，由 KESS 退回；
+  - 超时升级给财务负责人和项目负责人（沿用 6.19“`SUSPENSE` 必须限期清零”）。
+
+因此 `channel_settle` 永远不会因 `CHANNEL_KESS` 不足而整批被拒，也就不存在“钱到了银行却没人认领”的窗口。
+
+**R14 手续费设置是资金闸门的输入，改设置要双人复核**
+
+- 手续费配置表每个版本落 `maker_actor`、`checker_actor`，并加 `CHECK (checker_actor <> maker_actor)`；未经复核的版本不生效。
+- **无生效版本时**：拒绝 `sweep` 以及一切借记 `PLATFORM_HELD` 的交易，并告警。设成 0 也需要双人复核。
+- `fee_reserve` 中的“预估下月手续费”与 6-B.13 第 (4) 条的预期手续费，**同源于同一个生效版本**，取值时一并记录版本号。
+
+**R12 备付金金额与补足**
+
+- **上线前置**：首笔备付金 ≥ 预估首月手续费的 2 倍（按生效的手续费设置与预估首月交易额计算，财务确认后入账），不是“任意金额的首笔转入”。
+- **日常**：每日审计计算平台净头寸。低于“预估一个月手续费”时，告警财务从备用金账户转入补足；跨行转账可能 T+1，**补足时限 2 个工作日**，超时升级给财务负责人和项目负责人。净头寸 < 0 时，按 6-B.14 R3 冻结平台资金。
+- `ledger.capital_injection.source_account_last4`：`purpose = 'fee_reserve'` 时必须非空，写入后不可修改（触发器保护）。
+
+**落点**：R10、R11、R14 并入 P-02；R12 的每日审计并入 L-07/L-10 改造，与 P-02 同一 PR。
+
+#### 6-B.16 第四轮账务复审后的修订（2026-10-29，回应 LedgerAuditor 在 CMP-670 第 3 轮结论中的 R17–R22 及 R12、R13、R15 余项；**与 6-B.13～6-B.15 冲突处以本节为准**）
+
+说明：第 3 轮复审基于 main `10f99ea`，当时 6-B.15 尚未合并。R14、R16、R20 已在 6-B.15（main `ecb9197`）中处理。其中 R16 的提交 `a5a24ba` 已在 main 上；R20 的 `kess_batch`、`kess_payment` 表与锁顺序见 6-B.15 R11。
+
+**R17 `cost_close` 不走净头寸闸门**
+
+- `cost_close` 同时减少 `PLATFORM_HELD` 与 `PLATFORM_COST` 同一金额，平台净头寸不变。因此它**不适用** 6-B.14 R3 的 `amount ≤ PLATFORM_HELD − PLATFORM_COST − fee_reserve` 校验，只校验 `amount ≤ PLATFORM_COST`（`PLATFORM_HELD ≥ 0` 由数据库保证）。
+- 6-B.14 R3 的“平台资金冻结”同样**不冻结 `cost_close`**。
+
+**R22 `cost_close` 按水位计算**
+
+- 冲抵额 = `channel_settle` 中手续费分录 `posting.id` 大于上次冲抵水位、小于等于本次水位的合计。
+- `ledger.cost_close` 改为 `(id, watermark_from_posting_id, watermark_to_posting_id UNIQUE, amount, period char(6), maker_actor, checker_actor, txn_id, created_at)`，并加 `CHECK (watermark_to_posting_id > watermark_from_posting_id)`。
+- 本次的 `watermark_from_posting_id` 必须等于上一行的 `watermark_to_posting_id`，服务层同一事务内锁表校验，保证区间首尾相接、不重不漏。
+- `period` 只作报表标签，不再唯一。幂等键改为 `cost_close:wm:<watermark_to_posting_id>`。
+
+**R18 `ledger.withdrawal` 的 KESS 渠道（新迁移修改 00004、00007 的约束与触发器）**
+
+1. `payee_account_text` 去掉 `NOT NULL`，改由 6-B.14 R5 的渠道 CHECK 约束：银行渠道非空，KESS 渠道为空。
+2. 提现状态机触发器增加 KESS 分支：
+   - **银行渠道**保持原规则：`paid` 要求 `bank_ref` 非空，`paid_txn_id` 的交易类型为 `payout`。
+   - **KESS 渠道**的 `paid` 要求：`bank_ref IS NULL`；新增列 `kess_refund_ref`（KESS 退款单号）非空，并加部分唯一索引 `WHERE channel = 'kess'`；`paid_txn_id` 的交易类型为 `payout_kess`，金额、`ref_type`、`ref_id` 的核对与银行渠道相同。
+   - 其余状态迁移两渠道共用。
+3. 6-B.14 R5 的部分唯一索引改为 `WHERE channel = 'kess' AND status NOT IN ('failed','cancelled')`，买家撤单后可以对同一支付号重新发起。
+4. `channel`、`kess_trade_no`、`kess_refund_ref`（一旦写入）加入 00007 的不可变列：任何状态迁移都不得修改。
+
+**R19 冲销后重记：幂等键加版本段**
+
+- 允许冲销后重记的类型（`channel_settle`、`capital_in`、`fee_period_adjust`，见 6-B.14 R6），幂等键都加第 4 段 `v<n>`：
+  - `channel_settle:kess:<批次号>:v<n>`
+  - `capital_in:bank:<bank_ref>:v<n>`
+  - `fee_period_adjust:feeline:<费用行 ID>:v<n>`
+  - 首次记账为 `v1`，每次冲销后重记 n+1。
+- 对应台账的唯一约束都改为“未冲销的唯一”：
+  - `ledger.capital_injection` 用 `UNIQUE (bank_ref) WHERE reversed_txn_id IS NULL` 代替 `bank_ref UNIQUE`；
+  - `kess_batch` 按批次号 + 当前版本唯一。
+- **`channel_settle` 的冲销条件**：只能在其手续费分录尚未被 `cost_close` 水位覆盖时冲销（服务层校验：手续费分录的 `posting.id` 大于最新 `watermark_to_posting_id`）。已被冲抵的批次如发现导入错误，**不冲销**，改用两笔正向更正：
+  - 差额属于手续费的，用 `adjust`（双人）在 `PLATFORM_COST` 与 `PLATFORM_HELD` 之间调整；
+  - 差额属于客户款项的，用 `bank_diff` 经 `SUSPENSE` 处理。
+
+**R21 退款后的结算报表毛额**
+
+- **假设（列为 E-4 必答项）**：KESS 结算批次的毛额，不含在结算前已原路退回的支付。按 6-B.15 R11，原路退只发生在“未结算”阶段，所以与系统中 `kess_payment.amount − refunded_amount` 的合计应当一致。
+- **兜底**：若报表毛额与系统应结金额不一致（例如 KESS 没有剔除已退款项），`channel_settle` 按系统应结金额贷 `CHANNEL_KESS`，差额腿贷或借 `SUSPENSE`，同时：
+  - 写高优先级告警 `ledger.kess_batch_mismatch`；
+  - **自动暂停 KESS 原路退**，直到财务查明；
+  - 整批照常入账，不会因 `CHANNEL_KESS` 不足而被拒。
+- 6-B.13 第 (8) 条“退款扣回方式已不影响设计”一句作废，以本条为准。
+
+**R12 余项**
+
+- 专用账户最低在账额 = 预估一个月手续费。
+- 自动补注资阈值、时限与升级对象见 6-B.15 R12。
+- `source_account_last4` 在 `purpose = 'fee_reserve'` 时用 `CHECK` 强制非空，并用触发器禁止修改。
+
+**R13 被冻结买家的退款**
+
+- 账号被冻结或停用时，退款照常退回钱包；6-B.13 第 (6) 条已豁免账号状态，未结算付款的原路退照常可用。
+- **已结算付款的退款**只能走提现，而冻结账号禁止提现（账务 6.5 规则不变）。这部分由平台售后在后台发起“代客退款出款”：走提现状态机的银行渠道，收款账户为买家原支付信息，需双人复核，附售后单号，不经买家本人操作。
+
+**R15 比例手续费舍入**
+
+按单笔付款计算：`金额 × bps ÷ 10000`，四舍五入（HALF_UP）到 e4；批次预期手续费为各笔之和，不对合计再舍入，与第四章第 4 节一致。
+
+**落点**：R18 的约束与触发器改动、R19 的唯一约束调整，并入 P-02 的账务迁移；R17、R22 并入 R-04。
 
 ### 配套表
 ```sql
