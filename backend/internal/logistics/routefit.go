@@ -14,6 +14,17 @@ import (
 	"time"
 )
 
+func RouteFitSecrets(raw string) [][]byte {
+	values := strings.Split(raw, ",")
+	secrets := make([][]byte, 0, len(values))
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			secrets = append(secrets, []byte(value))
+		}
+	}
+	return secrets
+}
+
 var ErrInvalidRouteFitWebhook = errors.New("invalid RouteFit webhook")
 
 var ErrInvalidRouteFitEvent = errors.New("invalid RouteFit event")

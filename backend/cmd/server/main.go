@@ -16,6 +16,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
+	"github.com/leishen8806/Dr.life-/backend/internal/logistics"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/cache"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
@@ -138,6 +139,12 @@ func main() {
 	go brownout.Run(ctx, cfg.BrownoutSampleInterval)
 	directory := catalogDirectory{db: database}
 	catalogService := catalog.New(catalog.NewPgStore(database), catalog.Options{Merchants: directory})
+	routeFitReceiver := logistics.RouteFitReceiver{
+		Verifier: logistics.RouteFitWebhookVerifier{Secrets: logistics.RouteFitSecrets(os.Getenv("ROUTEFIT_EVENT_SECRETS"))},
+		Record: func(r *http.Request, event logistics.RouteFitEvent, body []byte) error {
+			return (logistics.RouteFitEventRecorder{DB: database}).Record(r.Context(), event, body)
+		},
+	}
 	var auditStore *platformaudit.Store
 	var auditReadiness server.ReadinessCheck
 	if cfg.AuditDatabaseURL != "" {
@@ -302,7 +309,11 @@ func main() {
 			WMS: cfg.CORSWMSOrigins, Admin: cfg.CORSAdminOrigins, Public: cfg.CORSPublicOrigins,
 			CredentialPaths: cfg.CORSCredentialPaths,
 		},
-		WebhookPrefix:  cfg.WebhookPrefix,
+		WebhookPrefix: cfg.WebhookPrefix,
+		WebhookBindings: map[string]gateway.WebhookVerifier{
+			"/v1/integrations/routefit/events": routeFitReceiver.Verifier,
+		},
+		RouteFit:       routeFitReceiver,
 		WebhookMaxBody: cfg.WebhookMaxBodyBytes,
 		ClientIP:       clientIP,
 		AdminAccess:    adminAccess,

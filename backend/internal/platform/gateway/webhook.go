@@ -27,11 +27,12 @@ func VerifyWebhooks(prefix string, maxBody int64, bindings map[string]WebhookVer
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if prefix == "" || r.URL.Path != prefix && !strings.HasPrefix(r.URL.Path, strings.TrimSuffix(prefix, "/")+"/") {
+			verifier := bindings[r.URL.Path]
+			underPrefix := prefix != "" && (r.URL.Path == prefix || strings.HasPrefix(r.URL.Path, strings.TrimSuffix(prefix, "/")+"/"))
+			if !underPrefix && verifier == nil {
 				next.ServeHTTP(w, r)
 				return
 			}
-			verifier := bindings[r.URL.Path]
 			if verifier == nil {
 				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
 				return

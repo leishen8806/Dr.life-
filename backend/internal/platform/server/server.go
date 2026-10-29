@@ -34,6 +34,7 @@ type GatewayOptions struct {
 	OriginGroups      gateway.OriginGroups
 	WebhookPrefix     string
 	WebhookBindings   map[string]gateway.WebhookVerifier
+	RouteFit          http.Handler
 	WebhookMaxBody    int64
 	ClientIP          gateway.ClientIPResolver
 	AdminAccess       gateway.AdminAccess
@@ -101,6 +102,9 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeMethodNotAllowed))
 	})
 	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, Sessions: options.Sessions, AccountProfiles: options.AccountProfiles, AccountLinks: options.AccountLinks, ClientIP: options.ClientIP, Audit: options.Audit, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions}, router)
+	if options.RouteFit != nil {
+		router.Post("/v1/integrations/routefit/events", options.RouteFit.ServeHTTP)
+	}
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
