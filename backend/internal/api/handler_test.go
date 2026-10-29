@@ -649,14 +649,16 @@ type fakeAdminManagement struct {
 	users    []iam.AdminUser
 	created  iam.AdminCreateResult
 	createIn iam.AdminCreateInput
+	auditIn  iam.AdminAuditInput
 }
 
 func (f fakeAdminManagement) List(context.Context, string, int) ([]iam.AdminUser, string, error) {
 	return f.users, "", nil
 }
 
-func (f *fakeAdminManagement) Create(_ context.Context, input iam.AdminCreateInput) (iam.AdminCreateResult, error) {
+func (f *fakeAdminManagement) CreateWithAudit(_ context.Context, input iam.AdminCreateInput, auditInput iam.AdminAuditInput) (iam.AdminCreateResult, error) {
 	f.createIn = input
+	f.auditIn = auditInput
 	return f.created, nil
 }
 
@@ -754,7 +756,7 @@ func TestAdminManagementCreateRequiresEditStepUpAndIdempotency(t *testing.T) {
 		t.Fatalf("without idempotency key status=%d body=%s", got.Code, got.Body.String())
 	}
 	got := serve(t, newHandler(true), request("valid", "create-success"))
-	if got.Code != http.StatusCreated || !strings.Contains(got.Body.String(), "bootstrap-password-only") || !strings.Contains(got.Body.String(), "otpauth://") || manager.createIn.Role != iam.RoleSupport {
+	if got.Code != http.StatusCreated || !strings.Contains(got.Body.String(), "bootstrap-password-only") || !strings.Contains(got.Body.String(), "otpauth://") || manager.createIn.Role != iam.RoleSupport || manager.auditIn.ActorPublicID != "admin" || manager.auditIn.RequestID == "" {
 		t.Fatalf("create status=%d input=%+v body=%s", got.Code, manager.createIn, got.Body.String())
 	}
 }

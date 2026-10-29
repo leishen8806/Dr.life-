@@ -214,6 +214,7 @@ func (f *loginFixture) testAdminManagementCreate(t *testing.T) {
 	service := &AdminManagementService{DB: f.pool, Cipher: f.envelope, Audit: audit, Now: func() time.Time { return f.now }}
 	actor, err := service.Create(ctx, AdminCreateInput{
 		Name: "Audit Actor", Email: "audit-actor@example.test", Role: RoleSuper,
+		DataScope: []string{},
 	})
 	if err != nil {
 		t.Fatal(err)

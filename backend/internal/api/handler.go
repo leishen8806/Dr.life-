@@ -92,7 +92,7 @@ type AdminPermissionChecker interface {
 // It deliberately has no method that returns hashes or encrypted TOTP values.
 type AdminManagement interface {
 	List(context.Context, string, int) ([]iam.AdminUser, string, error)
-	Create(context.Context, iam.AdminCreateInput) (iam.AdminCreateResult, error)
+	CreateWithAudit(context.Context, iam.AdminCreateInput, iam.AdminAuditInput) (iam.AdminCreateResult, error)
 }
 
 type LedgerReader interface {
@@ -352,9 +352,10 @@ func (h Handler) CreateAdminUser(w http.ResponseWriter, r *http.Request, _ gen.C
 	if !ok {
 		return
 	}
-	created, err := h.AdminManagement.Create(r.Context(), iam.AdminCreateInput{
+	identity, _ := gateway.IdentityFromContext(r.Context())
+	created, err := h.AdminManagement.CreateWithAudit(r.Context(), iam.AdminCreateInput{
 		Name: body.Name, Email: string(body.Email), Role: iam.Role(body.Role), DataScope: body.DataScope,
-	})
+	}, iam.AdminAuditInput{ActorPublicID: identity.AccountID, IP: h.ClientIP.Resolve(r), RequestID: httpx.RequestIDFromContext(r.Context())})
 	if err != nil {
 		h.writeError(w, r, err)
 		return

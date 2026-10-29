@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 	"github.com/pquerna/otp/totp"
 )
@@ -41,6 +42,14 @@ type AdminCreateResult struct {
 	TOTPProvisioningURI string
 }
 
+// AdminAuditInput identifies the authenticated administrator and request that
+// caused a management write. It deliberately contains no credentials.
+type AdminAuditInput struct {
+	ActorPublicID string
+	IP            string
+	RequestID     string
+}
+
 type adminListCursor struct {
 	CreatedAt time.Time `json:"created_at"`
 	ID        int64     `json:"id"`
@@ -52,6 +61,7 @@ type adminListCursor struct {
 type AdminManagementService struct {
 	DB     *pgxpool.Pool
 	Cipher TOTPSecretCipher
+	Audit  platformaudit.Writer
 	Now    func() time.Time
 }
 
@@ -104,6 +114,54 @@ func (s *AdminManagementService) Create(ctx context.Context, input AdminCreateIn
 		return AdminCreateResult{}, err
 	}
 	return AdminCreateResult{Admin: user, InitialPassword: password, TOTPProvisioningURI: key.URL()}, nil
+}
+
+// CreateWithAudit creates an administrator and records the permitted metadata
+// for the management write. Bootstrap credentials remain only in the result.
+func (s *AdminManagementService) CreateWithAudit(ctx context.Context, input AdminCreateInput, auditInput AdminAuditInput) (AdminCreateResult, error) {
+	if s == nil || s.DB == nil || s.Audit == nil {
+		return AdminCreateResult{}, errors.New("iam: administrator creation audit unavailable")
+	}
+	actorPublicID := strings.TrimSpace(auditInput.ActorPublicID)
+	if actorPublicID == "" || strings.TrimSpace(auditInput.RequestID) == "" {
+		return AdminCreateResult{}, errors.New("iam: administrator creation audit context is required")
+	}
+	var actorID int64
+	if err := s.DB.QueryRow(ctx, `SELECT id FROM iam.admin_user WHERE public_id=$1 AND status='active'`, actorPublicID).Scan(&actorID); err != nil {
+		return AdminCreateResult{}, err
+	}
+
+	created, err := s.Create(ctx, input)
+	if err != nil {
+		return AdminCreateResult{}, err
+	}
+	detail, err := json.Marshal(struct {
+		ActorPublicID  string `json:"actor_public_id"`
+		TargetPublicID string `json:"target_public_id"`
+		Before         any    `json:"before"`
+		After          struct {
+			Role      Role        `json:"role"`
+			Status    AdminStatus `json:"status"`
+			DataScope []string    `json:"data_scope"`
+		} `json:"after"`
+	}{
+		ActorPublicID: actorPublicID, TargetPublicID: created.Admin.PublicID,
+		After: struct {
+			Role      Role        `json:"role"`
+			Status    AdminStatus `json:"status"`
+			DataScope []string    `json:"data_scope"`
+		}{Role: created.Admin.Role, Status: created.Admin.Status, DataScope: created.Admin.DataScope},
+	})
+	if err != nil {
+		return AdminCreateResult{}, err
+	}
+	if _, err := s.Audit.Append(ctx, platformaudit.Entry{
+		Time: s.now(), ActorID: actorID, ActorRole: "admin", Action: platformaudit.ActionPermissionChanged,
+		Target: "admin:" + created.Admin.PublicID, Detail: detail, IP: auditInput.IP, RequestID: auditInput.RequestID,
+	}); err != nil {
+		return AdminCreateResult{}, err
+	}
+	return created, nil
 }
 
 // List returns credential-safe administrator records using the (created_at,id)
