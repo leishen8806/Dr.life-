@@ -40,6 +40,13 @@ func TestRouteFitWebhookVerifierAcceptsRotatedSignature(t *testing.T) {
 	}
 }
 
+func TestRouteFitReconciliationConfigDefaults(t *testing.T) {
+	config := (RouteFitReconciliationConfig{}).normalized()
+	if config.ScanEvery != 10*time.Minute || config.NoEventFor != 30*time.Minute {
+		t.Fatalf("defaults = %+v", config)
+	}
+}
+
 func TestRouteFitWebhookVerifierRejectsExpiredAndWrongSignature(t *testing.T) {
 	body := []byte(`{}`)
 	now := time.Unix(1_793_260_800, 0).UTC()
