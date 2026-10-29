@@ -3,6 +3,7 @@ package api_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -644,10 +645,28 @@ func (f fakeAdminPermissions) HasDataScope(context.Context, string) (bool, error
 	return f.scoped, nil
 }
 
-type fakeAdminManagement struct{ users []iam.AdminUser }
+type fakeAdminManagement struct {
+	users    []iam.AdminUser
+	created  iam.AdminCreateResult
+	createIn iam.AdminCreateInput
+}
 
 func (f fakeAdminManagement) List(context.Context, string, int) ([]iam.AdminUser, string, error) {
 	return f.users, "", nil
+}
+
+func (f *fakeAdminManagement) Create(_ context.Context, input iam.AdminCreateInput) (iam.AdminCreateResult, error) {
+	f.createIn = input
+	return f.created, nil
+}
+
+type fakeStepUpVerifier struct{ scope string }
+
+func (f fakeStepUpVerifier) Verify(_ context.Context, _ string, scope, _ string) (string, error) {
+	if scope != f.scope {
+		return "", errors.New("unexpected scope")
+	}
+	return "stepup-jti-test", nil
 }
 
 func ledgerHandler(auth gateway.Authenticator, reader api.LedgerReader, directory api.AccountDirectory, permissions api.AdminPermissionChecker) http.Handler {
@@ -698,6 +717,45 @@ func TestAdminManagementListRequiresRBACViewAndOmitsCredentials(t *testing.T) {
 	got := serve(t, allowed, httptest.NewRequest(http.MethodGet, "/v1/admin/admins?limit=50", nil))
 	if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), "admin@example.test") || strings.Contains(got.Body.String(), "password_hash") || strings.Contains(got.Body.String(), "totp_secret_enc") {
 		t.Fatalf("list response status=%d body=%s", got.Code, got.Body.String())
+	}
+}
+
+func TestAdminManagementCreateRequiresEditStepUpAndIdempotency(t *testing.T) {
+	manager := &fakeAdminManagement{created: iam.AdminCreateResult{
+		Admin:           iam.AdminUser{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAB", Name: "Created", Email: "created@example.test", Role: iam.RoleSupport, Status: iam.AdminStatusActive, CreatedAt: time.Unix(1_800_000_000, 0)},
+		InitialPassword: "bootstrap-password-only", TOTPProvisioningURI: "otpauth://totp/Dr.life%2B:created@example.test?secret=ABC",
+	}}
+	newHandler := func(allowed bool) http.Handler {
+		return server.NewHandlerWithGateway(nil, server.GatewayOptions{
+			AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+			Authenticator:    stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}},
+			AdminPermissions: fakeAdminPermissions{allowed: allowed}, AdminManagement: manager,
+			AdminStepUpVerifier: fakeStepUpVerifier{scope: "permission_change"}, AdminStepUpJTIStore: gateway.NewMemoryJTIStore(),
+		})
+	}
+	request := func(stepUp, idem string) *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/v1/admin/admins", strings.NewReader(`{"name":"Created","email":"created@example.test","role":"cs","data_scope":["KH-PP"]}`))
+		r.Header.Set("Content-Type", "application/json")
+		if stepUp != "" {
+			r.Header.Set("X-Step-Up-Token", stepUp)
+		}
+		if idem != "" {
+			r.Header.Set("Idempotency-Key", idem)
+		}
+		return r
+	}
+	if got := serve(t, newHandler(false), request("valid", "create-denied")); got.Code != http.StatusForbidden {
+		t.Fatalf("without rbac edit status=%d body=%s", got.Code, got.Body.String())
+	}
+	if got := serve(t, newHandler(true), request("", "create-missing-stepup")); got.Code != http.StatusForbidden {
+		t.Fatalf("without step-up status=%d body=%s", got.Code, got.Body.String())
+	}
+	if got := serve(t, newHandler(true), request("valid", "")); got.Code != http.StatusBadRequest {
+		t.Fatalf("without idempotency key status=%d body=%s", got.Code, got.Body.String())
+	}
+	got := serve(t, newHandler(true), request("valid", "create-success"))
+	if got.Code != http.StatusCreated || !strings.Contains(got.Body.String(), "bootstrap-password-only") || !strings.Contains(got.Body.String(), "otpauth://") || manager.createIn.Role != iam.RoleSupport {
+		t.Fatalf("create status=%d input=%+v body=%s", got.Code, manager.createIn, got.Body.String())
 	}
 }
 
