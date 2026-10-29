@@ -30,10 +30,11 @@ type AccountStatusChange struct {
 }
 
 type AccountStatusService struct {
-	DB    *pgxpool.Pool
-	Cache SessionCache
-	Now   func() time.Time
-	NewID func() string
+	DB          *pgxpool.Pool
+	Cache       SessionCache
+	AbsoluteTTL time.Duration
+	Now         func() time.Time
+	NewID       func() string
 }
 
 func (s *AccountStatusService) SetAccountStatus(ctx context.Context, accountPublicID, to, reason string, actor StatusActor) (AccountStatusChange, error) {
@@ -83,7 +84,7 @@ func (s *AccountStatusService) SetAccountStatus(ctx context.Context, accountPubl
 		return AccountStatusChange{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 	if to != "active" && s.Cache != nil {
-		_ = s.Cache.SetAccountEpoch(ctx, accountPublicID, epoch, 7*24*time.Hour)
+		_ = s.Cache.SetAccountEpoch(ctx, accountPublicID, epoch, s.absoluteTTL())
 	}
 	return change, nil
 }
@@ -130,6 +131,12 @@ func (s *AccountStatusService) now() time.Time {
 		return s.Now()
 	}
 	return time.Now()
+}
+func (s *AccountStatusService) absoluteTTL() time.Duration {
+	if s.AbsoluteTTL > 0 {
+		return s.AbsoluteTTL
+	}
+	return defaultSessionAbsoluteTTL
 }
 func (s *AccountStatusService) newID() string {
 	if s.NewID != nil {
