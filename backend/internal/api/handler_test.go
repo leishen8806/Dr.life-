@@ -254,6 +254,7 @@ type stubStore struct {
 	plan     catalog.Plan
 	filter   catalog.ProductFilter
 	lists    int
+	search   catalog.SearchQuery
 }
 
 func (s *stubStore) ListCategories(_ context.Context, plan catalog.Plan) (catalog.CategoryPage, error) {
@@ -297,6 +298,17 @@ func (s *stubStore) UpdateProduct(_ context.Context, _ int64, _ string, patch ca
 func (s *stubStore) PublishProduct(context.Context, int64, string) (catalog.Product, error) {
 	return s.created, nil
 }
+
+func (s *stubStore) SearchProducts(_ context.Context, filter catalog.ProductFilter, query catalog.SearchQuery) (catalog.SearchPage, error) {
+	s.filter, s.search = filter, query
+	return catalog.SearchPage{Items: s.products, Recommendations: []catalog.Product{}}, nil
+}
+
+func (s *stubStore) SuggestProducts(context.Context, catalog.ProductFilter, string) ([]catalog.SearchSuggestion, error) {
+	return []catalog.SearchSuggestion{}, nil
+}
+
+func (s *stubStore) LogSearch(context.Context, string, int) error { return nil }
 
 type stubAuth struct {
 	identity gateway.Identity
@@ -711,6 +723,22 @@ func TestPublicProductListIsOpen(t *testing.T) {
 	}
 	if store.filter.Status != catalog.StatusOn || store.plan.Category != "c1" {
 		t.Fatalf("filter/plan = %+v/%+v", store.filter, store.plan)
+	}
+}
+
+func TestPublicSearchIsOpenAndPassesFilters(t *testing.T) {
+	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, Status: catalog.StatusOn, Name: completeName}}}
+	handler := catalogHandler(store, activeDirectory(), nil)
+
+	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/search/products?q=tile&category=c1&min_price_e4=100&max_price_e4=200&sort=price_asc&page_size=12", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if store.search.Query != "tile" || store.search.Category != "c1" || store.search.MinPriceE4 != 100 || store.search.MaxPriceE4 != 200 || store.search.Sort != catalog.SearchSortPriceAsc || store.search.PageSize != 12 {
+		t.Fatalf("search query = %+v", store.search)
+	}
+	if store.filter.Status != catalog.StatusOn {
+		t.Fatalf("filter = %+v, want on-sale filter", store.filter)
 	}
 }
 
