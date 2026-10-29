@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
@@ -49,6 +50,15 @@ type AdminAuditInput struct {
 	IP            string
 	RequestID     string
 }
+
+var (
+	// ErrAdminNotFound is returned when the selected administrator does not exist.
+	ErrAdminNotFound = errors.New("iam: administrator not found")
+	// ErrAdminSelfMutation prevents an administrator from changing their own role or status.
+	ErrAdminSelfMutation = errors.New("iam: administrator cannot change own role or status")
+	// ErrLastActiveSuper protects against removing the final enabled super administrator.
+	ErrLastActiveSuper = errors.New("iam: cannot remove last active super administrator")
+)
 
 type adminListCursor struct {
 	CreatedAt time.Time `json:"created_at"`
@@ -91,7 +101,7 @@ func (s *AdminManagementService) changeStatusWithAudit(ctx context.Context, publ
 		return AdminUser{}, err
 	}
 	if actorPublicID == strings.TrimSpace(publicID) {
-		return AdminUser{}, errors.New("iam: administrator cannot change own status")
+		return AdminUser{}, ErrAdminSelfMutation
 	}
 	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -100,11 +110,14 @@ func (s *AdminManagementService) changeStatusWithAudit(ctx context.Context, publ
 	defer func() { _ = tx.Rollback(ctx) }()
 	before, err := scanAdminUser(tx.QueryRow(ctx, `SELECT public_id,name,email,role,data_scope,status,last_login_at,created_at FROM iam.admin_user WHERE public_id=$1 FOR UPDATE`, strings.TrimSpace(publicID)))
 	if err != nil {
+		return AdminUser{}, adminMutationError(err)
+	}
+	if err := ensureActiveSuperRemains(ctx, tx, before, before.Role, status); err != nil {
 		return AdminUser{}, err
 	}
 	after, err := scanAdminUser(tx.QueryRow(ctx, `UPDATE iam.admin_user SET status=$1,updated_at=$2 WHERE public_id=$3 RETURNING public_id,name,email,role,data_scope,status,last_login_at,created_at`, status, s.now(), before.PublicID))
 	if err != nil {
-		return AdminUser{}, err
+		return AdminUser{}, adminMutationError(err)
 	}
 	var revoked []adminSession
 	if status != AdminStatusActive {
@@ -147,7 +160,7 @@ func (s *AdminManagementService) UpdateRoleWithAudit(ctx context.Context, public
 		return AdminUser{}, err
 	}
 	if actorPublicID == strings.TrimSpace(publicID) {
-		return AdminUser{}, errors.New("iam: administrator cannot change own role")
+		return AdminUser{}, ErrAdminSelfMutation
 	}
 	if dataScope == nil {
 		dataScope = []string{}
@@ -159,11 +172,14 @@ func (s *AdminManagementService) UpdateRoleWithAudit(ctx context.Context, public
 	defer func() { _ = tx.Rollback(ctx) }()
 	before, err := scanAdminUser(tx.QueryRow(ctx, `SELECT public_id,name,email,role,data_scope,status,last_login_at,created_at FROM iam.admin_user WHERE public_id=$1 FOR UPDATE`, strings.TrimSpace(publicID)))
 	if err != nil {
+		return AdminUser{}, adminMutationError(err)
+	}
+	if err := ensureActiveSuperRemains(ctx, tx, before, role, before.Status); err != nil {
 		return AdminUser{}, err
 	}
 	after, err := scanAdminUser(tx.QueryRow(ctx, `UPDATE iam.admin_user SET role=$1,data_scope=$2,updated_at=$3 WHERE public_id=$4 RETURNING public_id,name,email,role,data_scope,status,last_login_at,created_at`, role, dataScope, s.now(), before.PublicID))
 	if err != nil {
-		return AdminUser{}, err
+		return AdminUser{}, adminMutationError(err)
 	}
 	rows, err := tx.Query(ctx, `UPDATE iam.session SET revoked_at=$1,revoked_reason='admin_role_changed',updated_at=$1 WHERE admin_user_id=(SELECT id FROM iam.admin_user WHERE public_id=$2) AND revoked_at IS NULL RETURNING public_id,expires_at`, s.now(), before.PublicID)
 	if err != nil {
@@ -191,6 +207,31 @@ func (s *AdminManagementService) UpdateRoleWithAudit(ctx context.Context, public
 		return AdminUser{}, err
 	}
 	return after, nil
+}
+
+func ensureActiveSuperRemains(ctx context.Context, tx pgx.Tx, before AdminUser, nextRole Role, nextStatus AdminStatus) error {
+	if before.Role != RoleSuper || before.Status != AdminStatusActive || (nextRole == RoleSuper && nextStatus == AdminStatusActive) {
+		return nil
+	}
+	var activeSuperCount int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM iam.admin_user WHERE role='super' AND status='active'`).Scan(&activeSuperCount); err != nil {
+		return err
+	}
+	if activeSuperCount <= 1 {
+		return ErrLastActiveSuper
+	}
+	return nil
+}
+
+func adminMutationError(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrAdminNotFound
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "P0001" {
+		return ErrLastActiveSuper
+	}
+	return err
 }
 
 type adminSession struct {

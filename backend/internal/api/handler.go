@@ -1306,6 +1306,10 @@ func (h Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	code := httpx.CodeInternalError
 	var invalid *catalog.ValidationError
 	switch {
+	case errors.Is(err, iam.ErrAdminNotFound):
+		code = httpx.CodeResourceNotFound
+	case errors.Is(err, iam.ErrAdminSelfMutation), errors.Is(err, iam.ErrLastActiveSuper):
+		code = httpx.CodeAlreadyProcessed
 	case errors.Is(err, iam.ErrAccountLinkNotFound):
 		code = httpx.CodeResourceNotFound
 	case errors.Is(err, iam.ErrAccountLinkForbidden):
