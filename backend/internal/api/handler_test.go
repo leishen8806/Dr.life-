@@ -761,6 +761,47 @@ func TestAdminManagementCreateRequiresEditStepUpAndIdempotency(t *testing.T) {
 	}
 }
 
+func TestAdminManagementMutationRoutesRequireRBACAndStepUp(t *testing.T) {
+	manager := &fakeAdminManagement{users: []iam.AdminUser{{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAB", Name: "Target", Email: "target@example.test", Role: iam.RoleSupport, Status: iam.AdminStatusActive, CreatedAt: time.Unix(1_800_000_000, 0)}}}
+	newHandler := func(allowed bool) http.Handler {
+		return server.NewHandlerWithGateway(nil, server.GatewayOptions{
+			AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+			Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}},
+			AdminPermissions: fakeAdminPermissions{allowed: allowed}, AdminManagement: manager,
+			AdminStepUpVerifier: fakeStepUpVerifier{scope: "permission_change"}, AdminStepUpJTIStore: gateway.NewMemoryJTIStore(),
+		})
+	}
+	request := func(method, path, body, stepUp, idem string) *http.Request {
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		if stepUp != "" {
+			r.Header.Set("X-Step-Up-Token", stepUp)
+		}
+		if idem != "" {
+			r.Header.Set("Idempotency-Key", idem)
+		}
+		return r
+	}
+
+	if got := serve(t, newHandler(false), request(http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`, "valid", "disable-denied")); got.Code != http.StatusForbidden {
+		t.Fatalf("without rbac edit status=%d body=%s", got.Code, got.Body.String())
+	}
+	if got := serve(t, newHandler(true), request(http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`, "", "disable-stepup")); got.Code != http.StatusForbidden {
+		t.Fatalf("without step-up status=%d body=%s", got.Code, got.Body.String())
+	}
+	for _, tc := range []struct {
+		method, path, body string
+	}{
+		{http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`},
+		{http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/enable", ``},
+		{http.MethodPatch, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/role", `{"role":"ops","data_scope":["KH-PP"]}`},
+	} {
+		if got := serve(t, newHandler(true), request(tc.method, tc.path, tc.body, "valid", "mutation-success")); got.Code != http.StatusOK {
+			t.Fatalf("%s %s status=%d body=%s", tc.method, tc.path, got.Code, got.Body.String())
+		}
+	}
+}
+
 // 验收：列表接口分页与排序透传，并且只返回当前商户的商品。
 func TestMerchantListPaginatesAndForwardsSorting(t *testing.T) {
 	store := &stubStore{products: []catalog.Product{
