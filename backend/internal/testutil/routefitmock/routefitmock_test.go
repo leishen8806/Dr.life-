@@ -296,3 +296,46 @@ func TestReviewFixesCancelEventTimingAndInventoryVersion(t *testing.T) {
 		t.Fatalf("inventory version reset: %s", items.Body.String())
 	}
 }
+
+func TestPickedCancellationCompletesAfterReturn(t *testing.T) {
+	m := newMock(t)
+	w := request(t, m.Handler(), http.MethodPost, "/api/platform/v1/fulfillments", "picked-cancel", fulfillmentBody())
+	var created struct {
+		FulfillmentID string `json:"fulfillmentId"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.AdvanceFulfillment(created.FulfillmentID, "picked"); err != nil {
+		t.Fatal(err)
+	}
+	cancelReq := httptest.NewRequest(http.MethodPost, "/api/platform/v1/fulfillments/"+created.FulfillmentID+"/actions/cancel", strings.NewReader(`{}`))
+	cancelReq.Header.Set("Idempotency-Key", "0123456789abcdef-picked-cancel")
+	cancelReq.Header.Set("If-Match", `"2"`)
+	cancelW := httptest.NewRecorder()
+	m.Handler().ServeHTTP(cancelW, cancelReq)
+	if cancelW.Code != http.StatusOK {
+		t.Fatalf("cancel: %d %s", cancelW.Code, cancelW.Body.String())
+	}
+	if _, err := m.AdvanceFulfillment(created.FulfillmentID, "returned"); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, e := range m.Events() {
+		if e.Type != "fulfillment.cancelled" {
+			continue
+		}
+		var payload struct {
+			FulfillmentState string `json:"fulfillmentState"`
+			InventoryReleased bool   `json:"inventoryReleased"`
+		}
+		if err := json.Unmarshal(e.Payload, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.FulfillmentState != "cancelled" || !payload.InventoryReleased {
+			t.Fatalf("unexpected cancellation payload: %s", e.Payload)
+		}
+		return
+	}
+	t.Fatal("missing fulfillment.cancelled after return")
+}
