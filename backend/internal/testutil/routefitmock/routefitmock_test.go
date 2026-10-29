@@ -264,3 +264,35 @@ func TestStandaloneScenarioAndAdminEndpoints(t *testing.T) {
 		t.Fatalf("embedded admin should be unavailable: %d", w.Code)
 	}
 }
+
+func TestReviewFixesCancelEventTimingAndInventoryVersion(t *testing.T) {
+	m := newMock(t)
+	w := request(t, m.Handler(), http.MethodPost, "/api/platform/v1/fulfillments", "review", fulfillmentBody())
+	var created struct {
+		FulfillmentID string `json:"fulfillmentId"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.AdvanceFulfillment(created.FulfillmentID, "picked"); err != nil {
+		t.Fatal(err)
+	}
+	cancelReq := httptest.NewRequest(http.MethodPost, "/api/platform/v1/fulfillments/"+created.FulfillmentID+"/actions/cancel", strings.NewReader(`{}`))
+	cancelReq.Header.Set("Idempotency-Key", "0123456789abcdef-review-cancel")
+	cancelReq.Header.Set("If-Match", `"2"`)
+	cancelW := httptest.NewRecorder()
+	m.Handler().ServeHTTP(cancelW, cancelReq)
+	if w := cancelW; w.Code != http.StatusOK {
+		t.Fatalf("cancel: %d %s", w.Code, w.Body.String())
+	}
+	for _, e := range m.Events() {
+		if e.Type == "fulfillment.cancelled" {
+			t.Fatalf("cancelled event emitted before cancellation completed: %#v", e)
+		}
+	}
+	m.AddSKU("merchant-1", SKU{ID: "sku-1", State: "active"}, "wh-1", 20)
+	items := request(t, m.Handler(), http.MethodGet, "/api/platform/v1/owners/merchant-1/inventory?skuIds=sku-1", "", nil)
+	if !strings.Contains(items.Body.String(), `"sourceVersion":2`) {
+		t.Fatalf("inventory version reset: %s", items.Body.String())
+	}
+}
