@@ -92,6 +92,7 @@ type AdminPermissionChecker interface {
 // It deliberately has no method that returns hashes or encrypted TOTP values.
 type AdminManagement interface {
 	List(context.Context, string, int) ([]iam.AdminUser, string, error)
+	Create(context.Context, iam.AdminCreateInput) (iam.AdminCreateResult, error)
 }
 
 type LedgerReader interface {
@@ -327,19 +328,60 @@ func (h Handler) ListAdminUsers(w http.ResponseWriter, r *http.Request, params g
 		h.writeError(w, r, err)
 		return
 	}
-	result := make([]gen.AdminUser, 0, len(items))
-	for _, user := range items {
-		result = append(result, gen.AdminUser{
-			PublicId: user.PublicID, Name: user.Name, Email: openapi_types.Email(user.Email),
-			Role: gen.AdminUserRole(user.Role), DataScope: user.DataScope,
-			Status: gen.AdminUserStatus(user.Status), LastLoginAt: user.LastLoginAt, CreatedAt: user.CreatedAt,
-		})
-	}
+	result := adminUsers(items)
 	data := gen.AdminUserListData{Items: result}
 	if next != "" {
 		data.NextCursor = &next
 	}
 	httpx.WriteOK(w, r, data)
+}
+
+func (h Handler) CreateAdminUser(w http.ResponseWriter, r *http.Request, _ gen.CreateAdminUserParams) {
+	if !h.adminRBACAccess(w, r, "edit") {
+		return
+	}
+	if !gateway.StepUpVerified(r.Context()) {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeStepUpInvalid))
+		return
+	}
+	if h.AdminManagement == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	body, ok := decodeJSON[gen.CreateAdminUserJSONRequestBody](w, r)
+	if !ok {
+		return
+	}
+	created, err := h.AdminManagement.Create(r.Context(), iam.AdminCreateInput{
+		Name: body.Name, Email: string(body.Email), Role: iam.Role(body.Role), DataScope: body.DataScope,
+	})
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(gen.AdminUserCreatedSuccessResponse{
+		Ok:        gen.AdminUserCreatedSuccessResponseOkTrue,
+		Data:      gen.AdminUserCreatedData{Admin: adminUser(created.Admin), InitialPassword: created.InitialPassword, TotpProvisioningUri: created.TOTPProvisioningURI},
+		RequestId: httpx.RequestIDFromContext(r.Context()),
+	})
+}
+
+func adminUsers(users []iam.AdminUser) []gen.AdminUser {
+	result := make([]gen.AdminUser, 0, len(users))
+	for _, user := range users {
+		result = append(result, adminUser(user))
+	}
+	return result
+}
+
+func adminUser(user iam.AdminUser) gen.AdminUser {
+	return gen.AdminUser{
+		PublicId: user.PublicID, Name: user.Name, Email: openapi_types.Email(user.Email),
+		Role: gen.AdminUserRole(user.Role), DataScope: user.DataScope,
+		Status: gen.AdminUserStatus(user.Status), LastLoginAt: user.LastLoginAt, CreatedAt: user.CreatedAt,
+	}
 }
 
 func (h Handler) adminRBACAccess(w http.ResponseWriter, r *http.Request, required string) bool {

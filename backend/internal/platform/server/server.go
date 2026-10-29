@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"log/slog"
@@ -31,40 +32,43 @@ func NewHTTPServer(addr string, handler http.Handler, readHeaderTimeout, readTim
 }
 
 type GatewayOptions struct {
-	AppEnv            string
-	OriginGroups      gateway.OriginGroups
-	WebhookPrefix     string
-	WebhookBindings   map[string]gateway.WebhookVerifier
-	RouteFit          http.Handler
-	WebhookMaxBody    int64
-	ClientIP          gateway.ClientIPResolver
-	AdminAccess       gateway.AdminAccess
-	Limiter           gateway.Limiter
-	Authenticator     gateway.Authenticator
-	IPRules           gateway.RuleSet
-	AccountRules      gateway.RuleSet
-	IdempotencyExempt func(*http.Request) bool
-	Idempotency       gateway.IdempotencyOptions
-	BodyPolicy        gateway.BodyPolicy
-	Metrics           *observability.Metrics
-	ErrorReporter     *observability.ErrorReporter
-	Bulkhead          *overload.Bulkhead
-	Catalog           *catalog.Service
-	Merchants         api.MerchantResolver
-	Logger            *slog.Logger
-	Login             api.TelegramLogin
-	AdminLogin        api.AdminLogin
-	AdminStepUp       api.AdminStepUp
-	Audit             *platformaudit.Store
-	AuditWriter       platformaudit.Writer
-	Sessions          api.SessionManagement
-	AccountLinks      api.AccountLinkManagement
-	Consents          *iam.ConsentService
-	Ledger            api.LedgerReader
-	Directory         api.AccountDirectory
-	AdminPermissions  api.AdminPermissionChecker
-	Files             api.FileManagement
-	AdminManagement   api.AdminManagement
+	AppEnv              string
+	OriginGroups        gateway.OriginGroups
+	WebhookPrefix       string
+	WebhookBindings     map[string]gateway.WebhookVerifier
+	RouteFit            http.Handler
+	WebhookMaxBody      int64
+	ClientIP            gateway.ClientIPResolver
+	AdminAccess         gateway.AdminAccess
+	Limiter             gateway.Limiter
+	Authenticator       gateway.Authenticator
+	IPRules             gateway.RuleSet
+	AccountRules        gateway.RuleSet
+	IdempotencyExempt   func(*http.Request) bool
+	Idempotency         gateway.IdempotencyOptions
+	BodyPolicy          gateway.BodyPolicy
+	Metrics             *observability.Metrics
+	ErrorReporter       *observability.ErrorReporter
+	Bulkhead            *overload.Bulkhead
+	Catalog             *catalog.Service
+	Merchants           api.MerchantResolver
+	Logger              *slog.Logger
+	Login               api.TelegramLogin
+	AdminLogin          api.AdminLogin
+	AdminStepUp         api.AdminStepUp
+	Audit               *platformaudit.Store
+	AuditWriter         platformaudit.Writer
+	Sessions            api.SessionManagement
+	AccountProfiles     api.AccountProfileManagement
+	AccountLinks        api.AccountLinkManagement
+	Consents            *iam.ConsentService
+	Ledger              api.LedgerReader
+	Directory           api.AccountDirectory
+	AdminPermissions    api.AdminPermissionChecker
+	AdminManagement     api.AdminManagement
+	Files               api.FileManagement
+	AdminStepUpVerifier gateway.StepUpVerifier
+	AdminStepUpJTIStore gateway.JTIStore
 }
 
 func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
@@ -117,6 +121,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.Use(gateway.LimitByAccount(options.Limiter, options.AccountRules))
 	router.Use(gateway.RequireIdempotency(options.IdempotencyExempt))
 	router.Use(gateway.BindIdempotency(options.Idempotency))
+	router.Use(requireAdminManagementStepUp(options.AdminStepUpVerifier, options.AdminStepUpJTIStore))
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
 	})
@@ -153,6 +158,21 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 		httpx.WriteOK(w, r, map[string]bool{"ready": true})
 	})
 	return router
+}
+
+func requireAdminManagementStepUp(verifier gateway.StepUpVerifier, used gateway.JTIStore) func(http.Handler) http.Handler {
+	require := gateway.RequireStepUp("permission_change", verifier, used)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && r.URL.Path == "/v1/admin/admins" ||
+				r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/v1/admin/admins/") && (strings.HasSuffix(r.URL.Path, "/disable") || strings.HasSuffix(r.URL.Path, "/enable")) ||
+				r.Method == http.MethodPatch && strings.HasPrefix(r.URL.Path, "/v1/admin/admins/") && strings.HasSuffix(r.URL.Path, "/role") {
+				require(next).ServeHTTP(w, r)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 type Drainer interface{ BeginDraining() }

@@ -32,6 +32,12 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 )
 
+type adminStepUpVerifier struct{ tokens iam.TokenManager }
+
+func (v adminStepUpVerifier) Verify(ctx context.Context, raw, scope, adminID string) (string, error) {
+	return v.tokens.VerifyStepUp(ctx, raw, scope, adminID)
+}
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -261,12 +267,15 @@ func main() {
 	var loginService *iam.Service
 	var adminLoginService *iam.AdminLoginService
 	var adminStepUpService *iam.AdminStepUpService
+	var adminManagementService *iam.AdminManagementService
 	var sessionService *iam.SessionService
 	var accountProfileService *iam.AccountProfileService
 	var accountLinkService *iam.AccountLinkService
 	var consentService *iam.ConsentService
 	var accountDirectory *iam.AccountDirectory
 	var adminPermissions *iam.AdminPermissionStore
+	var stepUpVerifier gateway.StepUpVerifier
+	var adminStepUpJTIStore gateway.JTIStore
 	var authenticator gateway.Authenticator
 	checks := []server.ReadinessCheck{database.Ping}
 	if reportReadiness != nil {
@@ -335,6 +344,19 @@ func main() {
 		adminFailures := &iam.AdminFailureGuard{}
 		adminLoginService = &iam.AdminLoginService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Audit: auditStore, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: sessionCache, Failures: adminFailures}
 		adminStepUpService = &iam.AdminStepUpService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Permissions: *adminPermissions, Audit: auditStore, Failures: adminFailures}
+		adminManagementService = &iam.AdminManagementService{DB: iamDatabase, Cipher: envelope}
+		stepUpVerifier = adminStepUpVerifier{tokens: adminTokens}
+		if cfg.RedisURL != "" {
+			jtiStore, redisErr := gateway.NewRedisJTIStore(cfg.RedisURL)
+			if redisErr != nil {
+				logger.Error("Redis step-up state configuration failed", "error", redisErr)
+				os.Exit(1)
+			}
+			defer jtiStore.Close()
+			adminStepUpJTIStore = jtiStore
+		} else if cfg.AppEnv != "prod" {
+			adminStepUpJTIStore = gateway.NewMemoryJTIStore()
+		}
 		authenticator = iam.Authenticator{Tokens: tokens}
 	}
 
@@ -371,24 +393,27 @@ func main() {
 		IdempotencyExempt: func(r *http.Request) bool {
 			return r.Method == http.MethodPost && (r.URL.Path == "/v1/public/auth/telegram" || r.URL.Path == "/v1/public/auth/refresh")
 		},
-		Metrics:         metrics,
-		ErrorReporter:   reporter,
-		Catalog:         catalogService,
-		Merchants:       directory,
-		Logger:          logger,
-		Login:           loginService,
-		AdminLogin:      adminLoginService,
-		AdminStepUp:     adminStepUpService,
-		Audit:           auditStore,
-		Sessions:        sessionService,
-		AccountProfiles: accountProfileService,
-		AccountLinks:    accountLinkService,
-		Consents:        consentService,
-		Ledger:          ledgerReader,
-		Directory:        accountDirectory,
-		AdminPermissions: adminPermissions,
-		Files:            fileService,
-		Bulkhead:         bulkhead,
+		Metrics:             metrics,
+		ErrorReporter:       reporter,
+		Catalog:             catalogService,
+		Merchants:           directory,
+		Logger:              logger,
+		Login:               loginService,
+		AdminLogin:          adminLoginService,
+		AdminStepUp:         adminStepUpService,
+		AdminStepUpVerifier: stepUpVerifier,
+		AdminStepUpJTIStore: adminStepUpJTIStore,
+		Audit:               auditStore,
+		Sessions:            sessionService,
+		AccountProfiles:     accountProfileService,
+		AccountLinks:        accountLinkService,
+		Consents:            consentService,
+		Ledger:              ledgerReader,
+		Directory:           accountDirectory,
+		AdminPermissions:    adminPermissions,
+		AdminManagement:     adminManagementService,
+		Files:               fileService,
+		Bulkhead:            bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)
 	// WriteTimeout stays unset so future real-time streams can remain open.

@@ -709,11 +709,11 @@ func TestFinancialCenterUsesAuthorizedLedgerReader(t *testing.T) {
 
 func TestAdminManagementListRequiresRBACViewAndOmitsCredentials(t *testing.T) {
 	manager := fakeAdminManagement{users: []iam.AdminUser{{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAA", Name: "Admin", Email: "admin@example.test", Role: iam.RoleSupport, Status: iam.AdminStatusActive, CreatedAt: time.Unix(1_800_000_000, 0)}}}
-	denied := server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, AdminPermissions: fakeAdminPermissions{allowed: false}, AdminManagement: manager})
+	denied := server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, AdminPermissions: fakeAdminPermissions{allowed: false}, AdminManagement: &manager})
 	if got := serve(t, denied, httptest.NewRequest(http.MethodGet, "/v1/admin/admins", nil)); got.Code != http.StatusForbidden {
 		t.Fatalf("without rbac view status=%d body=%s", got.Code, got.Body.String())
 	}
-	allowed := server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, AdminPermissions: fakeAdminPermissions{allowed: true}, AdminManagement: manager})
+	allowed := server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, AdminPermissions: fakeAdminPermissions{allowed: true}, AdminManagement: &manager})
 	got := serve(t, allowed, httptest.NewRequest(http.MethodGet, "/v1/admin/admins?limit=50", nil))
 	if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), "admin@example.test") || strings.Contains(got.Body.String(), "password_hash") || strings.Contains(got.Body.String(), "totp_secret_enc") {
 		t.Fatalf("list response status=%d body=%s", got.Code, got.Body.String())
@@ -747,7 +747,7 @@ func TestAdminManagementCreateRequiresEditStepUpAndIdempotency(t *testing.T) {
 	if got := serve(t, newHandler(false), request("valid", "create-denied")); got.Code != http.StatusForbidden {
 		t.Fatalf("without rbac edit status=%d body=%s", got.Code, got.Body.String())
 	}
-	if got := serve(t, newHandler(true), request("", "create-missing-stepup")); got.Code != http.StatusForbidden {
+	if got := serve(t, newHandler(true), request("", "create-missing-stepup")); got.Code != http.StatusUnauthorized {
 		t.Fatalf("without step-up status=%d body=%s", got.Code, got.Body.String())
 	}
 	if got := serve(t, newHandler(true), request("valid", "")); got.Code != http.StatusBadRequest {
