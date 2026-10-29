@@ -616,6 +616,24 @@ func (e RevenueByCategoryCategory) Valid() bool {
 	}
 }
 
+// Defines values for SearchProductDataReason.
+const (
+	RecentAll        SearchProductDataReason = "recent_all"
+	RecentInCategory SearchProductDataReason = "recent_in_category"
+)
+
+// Valid indicates whether the value is a known member of the SearchProductDataReason enum.
+func (e SearchProductDataReason) Valid() bool {
+	switch e {
+	case RecentAll:
+		return true
+	case RecentInCategory:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SearchProductSuccessResponseOk.
 const (
 	SearchProductSuccessResponseOkTrue SearchProductSuccessResponseOk = true
@@ -1319,10 +1337,14 @@ type RevenueByCategoryCategory string
 
 // SearchProductData defines model for SearchProductData.
 type SearchProductData struct {
-	Items           []Product `json:"items"`
-	NextCursor      *string   `json:"next_cursor,omitempty"`
-	Recommendations []Product `json:"recommendations"`
+	Items           []Product                `json:"items"`
+	NextCursor      *string                  `json:"next_cursor,omitempty"`
+	Reason          *SearchProductDataReason `json:"reason,omitempty"`
+	Recommendations []Product                `json:"recommendations"`
 }
+
+// SearchProductDataReason defines model for SearchProductData.Reason.
+type SearchProductDataReason string
 
 // SearchProductSuccessResponse defines model for SearchProductSuccessResponse.
 type SearchProductSuccessResponse struct {

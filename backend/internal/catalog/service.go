@@ -30,17 +30,23 @@ type MerchantDirectory interface {
 
 // Options 是 Service 的依赖注入项。
 type Options struct {
-	Merchants MerchantDirectory
+	Merchants           MerchantDirectory
+	RecommendationLimit int
 }
 
 // Service 实现商品目录的用例层：服务端范围、状态机与三语校验都在这里。
 type Service struct {
-	store     Store
-	merchants MerchantDirectory
+	store               Store
+	merchants           MerchantDirectory
+	recommendationLimit int
 }
 
 func New(store Store, options Options) *Service {
-	return &Service{store: store, merchants: options.Merchants}
+	limit := options.RecommendationLimit
+	if limit <= 0 {
+		limit = 8
+	}
+	return &Service{store: store, merchants: options.Merchants, recommendationLimit: limit}
 }
 
 // allowedSorts 是排序白名单；列名永不由客户端直接拼接进 SQL。
@@ -143,6 +149,19 @@ func (s *Service) PublicSearch(ctx context.Context, query SearchQuery) (SearchPa
 	page, err := s.store.SearchProducts(ctx, ProductFilter{MerchantIDs: sellable, Status: StatusOn}, query)
 	if err != nil {
 		return SearchPage{}, err
+	}
+	if len(page.Items) == 0 {
+		plan := Plan{Page: DefaultPage, PageSize: s.recommendationLimit, Sort: "-updated_at", Category: query.Category}
+		recommended, err := s.store.ListProducts(ctx, ProductFilter{MerchantIDs: sellable, Status: StatusOn}, plan)
+		if err != nil {
+			return SearchPage{}, err
+		}
+		page.Recommendations = recommended.Items
+		if query.Category == "" {
+			page.RecommendationReason = RecommendationRecentAll
+		} else {
+			page.RecommendationReason = RecommendationRecentInCategory
+		}
 	}
 	_ = s.store.LogSearch(ctx, query.Query, len(page.Items))
 	return page, nil

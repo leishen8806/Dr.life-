@@ -1629,6 +1629,10 @@ components:
         recommendations:
           type: array
           items: {$ref: "#/components/schemas/Product"}
+        reason:
+          type: string
+          nullable: true
+          enum: [recent_in_category, recent_all]
     SearchProductSuccessResponse:
       type: object
       additionalProperties: false

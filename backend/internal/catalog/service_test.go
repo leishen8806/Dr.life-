@@ -55,11 +55,12 @@ type stubStore struct {
 		Filter catalog.ProductFilter
 		Query  catalog.SearchQuery
 	}
+	searchResult catalog.SearchPage
 }
 
 func (s *stubStore) SearchProducts(_ context.Context, filter catalog.ProductFilter, query catalog.SearchQuery) (catalog.SearchPage, error) {
 	s.search.Filter, s.search.Query = filter, query
-	return catalog.SearchPage{Items: []catalog.Product{}}, nil
+	return s.searchResult, nil
 }
 func (s *stubStore) SuggestProducts(context.Context, catalog.ProductFilter, string) ([]catalog.SearchSuggestion, error) {
 	return []catalog.SearchSuggestion{}, nil
@@ -82,6 +83,9 @@ func (s *stubStore) ListProducts(_ context.Context, filter catalog.ProductFilter
 			continue
 		}
 		if filter.Status != "" && product.Status != filter.Status {
+			continue
+		}
+		if plan.Category != "" && product.CategoryCode != plan.Category {
 			continue
 		}
 		items = append(items, product)
@@ -202,6 +206,34 @@ func TestPublicSearchRejectsInvalidPriceAndSort(t *testing.T) {
 		if _, err := service.PublicSearch(context.Background(), query); err == nil {
 			t.Fatalf("query %+v must fail", query)
 		}
+	}
+}
+
+func TestPublicSearchRecommendsRecentOnSaleProductsWhenNoMatch(t *testing.T) {
+	store := &stubStore{products: []catalog.Product{
+		{PublicID: productULID, MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOn},
+		{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAX", MerchantID: merchantID, CategoryCode: "c2", Status: catalog.StatusOn},
+		{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAY", MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOff},
+	}}
+	service := serviceWith(t, store, activeMerchant())
+
+	categoryPage, err := service.PublicSearch(context.Background(), catalog.SearchQuery{Query: "none", Category: "c1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if categoryPage.RecommendationReason != catalog.RecommendationRecentInCategory || len(categoryPage.Recommendations) != 1 || categoryPage.Recommendations[0].CategoryCode != "c1" {
+		t.Fatalf("category recommendations = %+v", categoryPage)
+	}
+	if store.plan.Sort != "-updated_at" || store.plan.PageSize != 8 || store.plan.Category != "c1" || store.filter.Status != catalog.StatusOn {
+		t.Fatalf("recommendation plan/filter = %+v/%+v", store.plan, store.filter)
+	}
+
+	allPage, err := service.PublicSearch(context.Background(), catalog.SearchQuery{Query: "none"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allPage.RecommendationReason != catalog.RecommendationRecentAll || len(allPage.Recommendations) != 2 {
+		t.Fatalf("all recommendations = %+v", allPage)
 	}
 }
 

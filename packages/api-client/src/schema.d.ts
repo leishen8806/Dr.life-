@@ -1053,6 +1053,8 @@ export interface components {
             items: components["schemas"]["Product"][];
             next_cursor?: string | null;
             recommendations: components["schemas"]["Product"][];
+            /** @enum {string|null} */
+            reason?: "recent_in_category" | "recent_all" | null;
         };
         SearchProductSuccessResponse: {
             /** @enum {boolean} */

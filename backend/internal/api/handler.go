@@ -967,7 +967,12 @@ func publicProductListData(page catalog.ProductPage) gen.ProductListData {
 func publicSearchData(page catalog.SearchPage) gen.SearchProductData {
 	items := publicSearchProducts(page.Items)
 	recommendations := publicSearchProducts(page.Recommendations)
-	return gen.SearchProductData{Items: items, NextCursor: optionalString(page.NextCursor), Recommendations: recommendations}
+	data := gen.SearchProductData{Items: items, NextCursor: optionalString(page.NextCursor), Recommendations: recommendations}
+	if page.RecommendationReason != "" {
+		reason := gen.SearchProductDataReason(page.RecommendationReason)
+		data.Reason = &reason
+	}
+	return data
 }
 
 func publicSearchProducts(products []catalog.Product) []gen.Product {

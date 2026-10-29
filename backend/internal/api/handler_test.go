@@ -246,15 +246,16 @@ func (d stubDirectory) MerchantID(_ context.Context, account string) (int64, boo
 
 // stubStore 只实现 catalog.Store，用于断言接口层透传的分页/排序/过滤参数。
 type stubStore struct {
-	products []catalog.Product
-	product  catalog.Product
-	created  catalog.Product
-	patch    catalog.ProductPatch
-	patched  bool
-	plan     catalog.Plan
-	filter   catalog.ProductFilter
-	lists    int
-	search   catalog.SearchQuery
+	products     []catalog.Product
+	product      catalog.Product
+	created      catalog.Product
+	patch        catalog.ProductPatch
+	patched      bool
+	plan         catalog.Plan
+	filter       catalog.ProductFilter
+	lists        int
+	search       catalog.SearchQuery
+	searchResult *catalog.SearchPage
 }
 
 func (s *stubStore) ListCategories(_ context.Context, plan catalog.Plan) (catalog.CategoryPage, error) {
@@ -272,6 +273,9 @@ func (s *stubStore) ListProducts(_ context.Context, filter catalog.ProductFilter
 			continue
 		}
 		if filter.Status != "" && product.Status != filter.Status {
+			continue
+		}
+		if plan.Category != "" && product.CategoryCode != plan.Category {
 			continue
 		}
 		items = append(items, product)
@@ -301,6 +305,9 @@ func (s *stubStore) PublishProduct(context.Context, int64, string) (catalog.Prod
 
 func (s *stubStore) SearchProducts(_ context.Context, filter catalog.ProductFilter, query catalog.SearchQuery) (catalog.SearchPage, error) {
 	s.filter, s.search = filter, query
+	if s.searchResult != nil {
+		return *s.searchResult, nil
+	}
 	return catalog.SearchPage{Items: s.products, Recommendations: []catalog.Product{}}, nil
 }
 
@@ -714,7 +721,7 @@ func TestCreateProductReturnsCreatedEnvelope(t *testing.T) {
 
 // 验收：公开浏览接口无需登录即可访问。
 func TestPublicProductListIsOpen(t *testing.T) {
-	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, Status: catalog.StatusOn, Name: completeName}}}
+	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOn, Name: completeName}}}
 	handler := catalogHandler(store, activeDirectory(), nil)
 
 	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/products?category=c1", nil))
@@ -727,7 +734,7 @@ func TestPublicProductListIsOpen(t *testing.T) {
 }
 
 func TestPublicSearchIsOpenAndPassesFilters(t *testing.T) {
-	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, Status: catalog.StatusOn, Name: completeName}}}
+	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOn, Name: completeName}}, searchResult: &catalog.SearchPage{}}
 	handler := catalogHandler(store, activeDirectory(), nil)
 
 	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/search/products?q=tile&category=c1&min_price_e4=100&max_price_e4=200&sort=price_asc&page_size=12", nil))
@@ -739,6 +746,9 @@ func TestPublicSearchIsOpenAndPassesFilters(t *testing.T) {
 	}
 	if store.filter.Status != catalog.StatusOn {
 		t.Fatalf("filter = %+v, want on-sale filter", store.filter)
+	}
+	if !strings.Contains(recorder.Body.String(), `"reason":"recent_in_category"`) {
+		t.Fatalf("search response missing recommendation reason: %s", recorder.Body.String())
 	}
 }
 

@@ -193,10 +193,18 @@ type SearchQuery struct {
 }
 
 type SearchPage struct {
-	Items           []Product
-	NextCursor      string
-	Recommendations []Product
+	Items                []Product
+	NextCursor           string
+	Recommendations      []Product
+	RecommendationReason RecommendationReason
 }
+
+type RecommendationReason string
+
+const (
+	RecommendationRecentInCategory RecommendationReason = "recent_in_category"
+	RecommendationRecentAll        RecommendationReason = "recent_all"
+)
 
 type SearchSuggestion struct {
 	Text string
