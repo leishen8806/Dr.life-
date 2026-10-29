@@ -399,7 +399,8 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 - 分录：DR `BANK_DEDICATED` / CR `PLATFORM_HELD`(category=`capital`)。幂等键 = `capital_in:<bank_ref>`。
 - 新增强类型方法 `InjectCapital`：双人复核，`BankRef` 必填，与 `ConfirmPayout` 同一模式。不经 `Adjust`，因为 `Adjust` 的白名单不含 `BANK_DEDICATED`。
 - **不受出款冻结限制**：注资只增加资金，冻结期间也必须能注资，否则“恒等式失败 → 全局冻结 → 无法注资”会形成死锁。
-- **外部前提**：银行专用账户协议是否允许注入公司自有资金，需银行书面确认（清单外部依赖新增 **E-7**）。确认前，备付金方案只能停在设计阶段。
+- **资金来源（项目负责人 2026-10-29 确认，E-7）**：允许注资。手续费备付金存放在公司另开的**备用金账户**（由一家合作银行开立），不与客户资金专用账户混用。需要时从备用金账户转入专用账户补足手续费，每笔转账对应一张银行回单，即一条 `capital_in`。`ledger.capital_injection` 新增 `source_account_last4`，记录备用金账户尾号，便于对账。备用金账户本身是公司资金，不进平台账务科目，只在注资时留痕。
+- **上线前置**：备用金账户开立，且首笔备付金转入专用账户并入账（`capital_in`）。
 
 **(4) `sweep` 不得动用预留（回应 A2）**
 
@@ -419,11 +420,11 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 
 **(6) 原路退回 KESS 的两条路径与表结构（回应 A3）**
 
-- 两条路径，判定依据是该支付号所在的 KESS 批次**是否已经 `channel_settle` 入账**，由服务层按批次记录判断，不由操作人选择：
-  - **未入账**：`payout_kess` = DR `PENDING_PAYOUT` / CR `CHANNEL_KESS`。金额不得超过该支付号在本批次中的未结算金额。
-  - **已入账**：KESS 从后续批次净额扣回退款。此时 `payout_kess` 记 CR `CHANNEL_KESS`，并**仅对这种情况允许 `CHANNEL_KESS` 暂时为负**（表示 KESS 欠我们的退款抵扣），下一批 `channel_settle` 按 KESS 报表的扣回额冲回。
-- 新增对账项：`CHANNEL_KESS` 为负的金额 = 已退款、待 KESS 扣回的金额，逐笔可追溯到支付号。
-- **前提（E-4 必须确认）**：KESS 结算报表是否按净额扣回退款。若 KESS 不扣回，已入账的支付不提供原路退，只能退回钱包后走银行提现（6.5–6.7）。在确认之前，P-02 只实现“未入账”这条路径，买家端按钮只对未入账的支付显示。
+- **项目负责人 2026-10-29 决定：试点只支持“未结算付款的原路退”。**判定依据是该支付号所在的 KESS 批次**是否已经 `channel_settle` 入账**，由服务层按批次记录判断，不由操作人选择：
+  - **未入账**：可以原路退。`payout_kess` = DR `PENDING_PAYOUT` / CR `CHANNEL_KESS`，金额不得超过该支付号在本批次中的未结算金额。
+  - **已入账**：不提供原路退。退款留在买家钱包，买家可走银行提现（6.5–6.7）。买家端“原路退回”按钮只对未入账的支付显示；按钮显示后批次才入账的，服务层拒绝并提示改为提现。
+- `CHANNEL_KESS` **不允许为负**（`allow_negative = false`，不设例外）。`payout_kess` 因批次已入账而余额不足时，整笔回滚，不会动用其他买家的未结算款，因为金额上限已按该支付号本批次的未结算额限定。
+- 新增对账项：每笔 `payout_kess` 都能追溯到同一批次内的原支付号，且该批次在退款时尚未入账。
 - **表结构**：`ledger.withdrawal` 新增 `channel text NOT NULL DEFAULT 'bank' CHECK (channel IN ('bank','kess'))` 和 `kess_trade_no text`（`channel = kess` 时必填，引用原支付号）。支付号不写进 `payee_account_text`、`payee_account_last4`。
   - `channel = kess` 不得走 `ConfirmPayout`（它硬编码 CR `BANK_DEDICATED`），只能走 `ConfirmKessRefund`；`channel = bank` 不得走后者。两个方法互相拒绝对方的渠道。
 - **风控**：原路退款把钱退回原支付来源，不经用户提供的新收款账户。
@@ -437,12 +438,10 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 | P-02 | `PLATFORM_COST` 科目、`cost_close`、`capital_in`（`ledger.capital_injection`）、`payout_kess` 两条路径与 `ledger.withdrawal` 新增列、L-07/L-10 恒等式改造（同一 PR） |
 | R-04 | 6-B.9 的前置条件、`fee_period_adjust`、`sweep` 预留校验与 `ledger.sweep_detail` |
 
-**(8) 外部确认**
+**(8) 外部事项**
 
-- **E-4**：KESS 退款的扣回方式、手续费口径与费率。
-- **E-7**（新增）：银行是否允许向客户资金专用账户注入公司自有资金。
-
-两项确认前，对应分录只能停在设计阶段，不得上线。
+- **E-4**：KESS 手续费的费率与口径仍需从 KESS 合同取得（决定 `fee_reserve` 的计算）。退款扣回方式已不影响设计，因为试点只做未结算付款的原路退。
+- **E-7**：已确认方向。待办是在一家合作银行开立公司备用金账户，并完成首笔备付金转入；完成前 P-02 不得上线。
 
 ### 配套表
 ```sql
