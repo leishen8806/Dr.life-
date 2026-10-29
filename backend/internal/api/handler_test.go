@@ -16,6 +16,8 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/audit/audittest"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
@@ -224,6 +226,29 @@ func TestFilePresignUsesGatewayAccountAndReturnsSignedMetadata(t *testing.T) {
 	h.ServeHTTP(w, req)
 	if w.Code != http.StatusOK || fake.owner != 42 || fake.input.Purpose != "product_image" || !strings.Contains(w.Body.String(), "https://storage.test/put") {
 		t.Fatalf("status=%d owner=%d input=%+v body=%s", w.Code, fake.owner, fake.input, w.Body.String())
+	}
+}
+
+func TestFileWritesAppendAuditRecords(t *testing.T) {
+	filesService := &fakeFiles{presign: files.PresignResult{File: files.File{PublicID: "file-1", Purpose: "product_image", ContentType: "image/jpeg", Size: 12, Status: files.StatusPending, CreatedAt: time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)}, Upload: storage.SignedURL{URL: "https://storage.test/put"}}}
+	auditWriter := &audittest.Writer{}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: filesService, AuditWriter: auditWriter})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/files/presign", strings.NewReader(`{"purpose":"product_image","content_type":"image/jpeg","size":12,"sha256":"sum"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "file-audit-1")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(auditWriter.Records) != 1 {
+		t.Fatalf("audit records=%d, want 1", len(auditWriter.Records))
+	}
+	record := auditWriter.Records[0]
+	if record.Action != platformaudit.ActionFilePresigned || record.ActorID != 42 || record.ActorRole != "buyer" || record.Target != "file:file-1" || record.RequestID == "" {
+		t.Fatalf("audit record=%+v", record)
 	}
 }
 
