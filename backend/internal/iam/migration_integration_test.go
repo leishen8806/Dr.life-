@@ -367,7 +367,11 @@ func TestIAMMigration(t *testing.T) {
 		if _, err := reportLogin.Exec(ctx, `SELECT public_id,username,token_last4 FROM iam.bot`); err != nil {
 			t.Fatalf("report safe bot columns: %v", err)
 		}
-		if _, err := reportLogin.Exec(ctx, `SELECT id,public_id,person_id,role,merchant_id,status,lang,lang_registered_at,kyc_status,created_at,updated_at FROM iam.account`); err != nil {
+		var reportAccountColumns string
+		if err := admin.QueryRow(ctx, `SELECT string_agg(quote_ident(column_name), ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema='iam' AND table_name='account' AND column_name <> 'status_reason'`).Scan(&reportAccountColumns); err != nil {
+			t.Fatalf("list report-safe account columns: %v", err)
+		}
+		if _, err := reportLogin.Exec(ctx, `SELECT `+reportAccountColumns+` FROM iam.account`); err != nil {
 			t.Fatalf("report safe account columns: %v", err)
 		}
 		for _, statement := range []string{
