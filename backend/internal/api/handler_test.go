@@ -33,11 +33,12 @@ type fakeFiles struct {
 	presign files.PresignResult
 	input   files.PresignInput
 	owner   int64
+	err     error
 }
 
 func (f *fakeFiles) Presign(_ context.Context, owner int64, in files.PresignInput) (files.PresignResult, error) {
 	f.owner, f.input = owner, in
-	return f.presign, nil
+	return f.presign, f.err
 }
 func (*fakeFiles) Complete(context.Context, int64, string) (files.File, error) {
 	return files.File{}, nil
@@ -249,6 +250,19 @@ func TestFileWritesAppendAuditRecords(t *testing.T) {
 	record := auditWriter.Records[0]
 	if record.Action != platformaudit.ActionFilePresigned || record.ActorID != 42 || record.ActorRole != "buyer" || record.Target != "file:file-1" || record.RequestID == "" {
 		t.Fatalf("audit record=%+v", record)
+	}
+}
+
+func TestFilePresignMapsQuotaToRetryable429(t *testing.T) {
+	fake := &fakeFiles{err: files.ErrQuotaExceeded}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake, AuditWriter: &audittest.Writer{}})
+	req := httptest.NewRequest(http.MethodPost, "/v1/files/presign", strings.NewReader(`{"purpose":"product_image","content_type":"image/jpeg","size":12,"sha256":"sum"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "file-quota-1")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusTooManyRequests || w.Header().Get("Retry-After") != "86400" {
+		t.Fatalf("status=%d retry-after=%q body=%s", w.Code, w.Header().Get("Retry-After"), w.Body.String())
 	}
 }
 

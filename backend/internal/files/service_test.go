@@ -36,6 +36,30 @@ func TestPresignCreatesPendingFileAndSignsExactMetadata(t *testing.T) {
 	}
 }
 
+func TestPresignRejectsDailyUploadCountAndByteQuota(t *testing.T) {
+	checksum := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	for _, test := range []struct {
+		name    string
+		usage   Usage
+		options Options
+		input   PresignInput
+	}{
+		{name: "count", usage: Usage{Count: 2}, options: Options{MaxDailyUploads: 2}, input: PresignInput{Purpose: "product_image", ContentType: "image/jpeg", Size: 1, SHA256: checksum}},
+		{name: "bytes", usage: Usage{Bytes: 9}, options: Options{MaxDailyBytes: 10}, input: PresignInput{Purpose: "product_image", ContentType: "image/jpeg", Size: 2, SHA256: checksum}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			objects := &fakeObjects{}
+			service := New(&memoryStore{usage: test.usage}, objects, test.options)
+			if _, err := service.Presign(context.Background(), 7, test.input); !errors.Is(err, ErrQuotaExceeded) {
+				t.Fatalf("Presign() error=%v, want %v", err, ErrQuotaExceeded)
+			}
+			if objects.in.ContentType != "" {
+				t.Fatal("quota rejection must not issue an upload URL")
+			}
+		})
+	}
+}
+
 func TestCompleteMovesOnlyOwnedPendingFileToVerifying(t *testing.T) {
 	store := &memoryStore{file: File{PublicID: "file-1", OwnerAccount: 7, Status: StatusPending}}
 	verify := &fakeVerifier{}
@@ -79,7 +103,10 @@ func TestDownloadURLRequiresOwnedReadyFile(t *testing.T) {
 	}
 }
 
-type memoryStore struct{ file File }
+type memoryStore struct {
+	file  File
+	usage Usage
+}
 
 func (s *memoryStore) Create(_ context.Context, file File) error { s.file = file; return nil }
 func (s *memoryStore) GetOwned(_ context.Context, owner int64, publicID string) (File, error) {
@@ -96,7 +123,7 @@ func (s *memoryStore) MarkVerifying(_ context.Context, owner int64, publicID str
 	return s.file, nil
 }
 func (s *memoryStore) DailyUsage(context.Context, int64, time.Time) (Usage, error) {
-	return Usage{}, nil
+	return s.usage, nil
 }
 
 type fakeObjects struct {
