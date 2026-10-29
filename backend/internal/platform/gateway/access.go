@@ -68,6 +68,10 @@ func Authorize(publicWebhookPrefix string) func(http.Handler) http.Handler {
 				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
 				return
 			}
+			if identity.PasswordChangeOnly && r.URL.Path != "/v1/admin/auth/password" {
+				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+				return
+			}
 			next.ServeHTTP(w, r)
 		})
 	}

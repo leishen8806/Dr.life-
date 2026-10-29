@@ -32,8 +32,9 @@ type PassSessionChecker struct{}
 func (PassSessionChecker) Active(context.Context, string, string) (bool, error) { return true, nil }
 
 type AccessClaims struct {
-	Role string `json:"role"`
-	SID  string `json:"sid"`
+	Role               string `json:"role"`
+	SID                string `json:"sid"`
+	PasswordChangeOnly bool   `json:"password_change_only,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -69,6 +70,28 @@ func (m TokenManager) IssueAccess(ctx context.Context, accountPublicID, role, se
 		return "", err
 	}
 	return m.signAccess(accountPublicID, role, sessionPublicID, kid, key, now, jti)
+}
+
+// IssueRestrictedAdminAccess issues an administrator token that the gateway
+// permits only for the first-password-change endpoint.
+func (m TokenManager) IssueRestrictedAdminAccess(ctx context.Context, adminPublicID, sessionPublicID string) (string, error) {
+	if m.Keys == nil || m.AccessTTL <= 0 || adminPublicID == "" || sessionPublicID == "" {
+		return "", ErrInvalidToken
+	}
+	now := time.Now()
+	if m.Now != nil {
+		now = m.Now()
+	}
+	kid, key, err := m.Keys.ActiveKey(ctx)
+	if err != nil {
+		return "", ErrInvalidToken
+	}
+	defer wipe(key)
+	jti, err := randomToken(16)
+	if err != nil {
+		return "", err
+	}
+	return m.signAccessWithRestriction(adminPublicID, "admin", sessionPublicID, kid, key, now, jti, true)
 }
 
 func (m TokenManager) IssueStepUp(ctx context.Context, adminPublicID, scope string) (string, time.Time, error) {
@@ -149,11 +172,15 @@ func (m TokenManager) IssueRotatedAccess(ctx context.Context, accountPublicID, r
 }
 
 func (m TokenManager) signAccess(accountPublicID, role, sessionPublicID, kid string, key []byte, issuedAt time.Time, jti string) (string, error) {
+	return m.signAccessWithRestriction(accountPublicID, role, sessionPublicID, kid, key, issuedAt, jti, false)
+}
+
+func (m TokenManager) signAccessWithRestriction(accountPublicID, role, sessionPublicID, kid string, key []byte, issuedAt time.Time, jti string, passwordChangeOnly bool) (string, error) {
 	issuer := m.Issuer
 	if issuer == "" {
 		issuer = "drlife"
 	}
-	claims := AccessClaims{Role: role, SID: sessionPublicID, RegisteredClaims: jwt.RegisteredClaims{
+	claims := AccessClaims{Role: role, SID: sessionPublicID, PasswordChangeOnly: passwordChangeOnly, RegisteredClaims: jwt.RegisteredClaims{
 		Issuer: issuer, Subject: accountPublicID, Audience: jwt.ClaimStrings{audienceForRole(role)},
 		IssuedAt: jwt.NewNumericDate(issuedAt), ExpiresAt: jwt.NewNumericDate(issuedAt.Add(m.AccessTTL)), ID: jti,
 	}}
@@ -223,7 +250,7 @@ func (m TokenManager) parseAccess(ctx context.Context, raw, expectedAudience str
 	if err != nil && !(allowUnavailable && errors.Is(err, ErrSessionStoreUnavailable)) || err == nil && !active {
 		return gateway.Identity{}, "", ErrInvalidToken
 	}
-	return gateway.Identity{AccountID: claims.Subject, Role: gateway.Role(claims.Role), SessionID: claims.SID}, claims.SID, nil
+	return gateway.Identity{AccountID: claims.Subject, Role: gateway.Role(claims.Role), SessionID: claims.SID, PasswordChangeOnly: claims.PasswordChangeOnly}, claims.SID, nil
 }
 
 type Authenticator struct{ Tokens TokenManager }
