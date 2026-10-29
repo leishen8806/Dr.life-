@@ -69,7 +69,7 @@ func TestIAMMigration(t *testing.T) {
 	}
 
 	t.Run("up down up is reversible", func(t *testing.T) {
-		assertIAMTableCount(t, database, 17)
+		assertIAMTableCount(t, database, 18)
 		if err := goose.DownTo(database, migrationsDir, 2); err != nil {
 			t.Fatal(err)
 		}
@@ -77,7 +77,7 @@ func TestIAMMigration(t *testing.T) {
 		if err := goose.Up(database, migrationsDir); err != nil {
 			t.Fatal(err)
 		}
-		assertIAMTableCount(t, database, 17)
+		assertIAMTableCount(t, database, 18)
 	})
 
 	admin, err := pgx.Connect(ctx, dsn)
@@ -96,7 +96,7 @@ func TestIAMMigration(t *testing.T) {
 			FROM information_schema.columns c WHERE c.table_schema = 'iam'`).Scan(&identityCount, &publicIDCount, &badTimestamp); err != nil {
 			t.Fatal(err)
 		}
-		if identityCount != 14 || publicIDCount != 14 || badTimestamp != 0 {
+		if identityCount != 15 || publicIDCount != 15 || badTimestamp != 0 {
 			t.Fatalf("identity columns=%d, public IDs=%d, bad timestamps=%d", identityCount, publicIDCount, badTimestamp)
 		}
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.person (public_id, tg_user_id) VALUES ('bad-ulid', 1)`)
@@ -338,6 +338,15 @@ func TestIAMMigration(t *testing.T) {
 		}
 	})
 
+	t.Run("account status log is append-only", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.account_status_log(public_id,account_id,from_status,to_status,reason,actor_type,actor_id) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FAY',id,'active','frozen','test','system','migration-test' FROM iam.account WHERE public_id=$1`, buyerPublicID); err != nil {
+			t.Fatal(err)
+		}
+		assertSQLState(t, ctx, admin, "55000", `UPDATE iam.account_status_log SET reason='changed'`)
+		assertSQLState(t, ctx, admin, "55000", `DELETE FROM iam.account_status_log`)
+		assertSQLState(t, ctx, admin, "55000", `TRUNCATE iam.account_status_log`)
+	})
+
 	t.Run("permission seeds match approved matrices", func(t *testing.T) {
 		assertAdminMatrix(t, ctx, admin)
 		assertMerchantTemplate(t, ctx, admin)
@@ -379,6 +388,13 @@ func TestIAMMigration(t *testing.T) {
 			assertSQLState(t, ctx, reportLogin, "42501", statement)
 		}
 		assertSQLState(t, ctx, reportLogin, "42501", `UPDATE iam.account SET status='disabled'`)
+		if _, err := reportLogin.Exec(ctx, `SELECT public_id,account_id,from_status,to_status,actor_type,actor_id,created_at FROM iam.account_status_log`); err != nil {
+			t.Fatalf("report safe status log columns: %v", err)
+		}
+		assertSQLState(t, ctx, reportLogin, "42501", `SELECT reason FROM iam.account_status_log`)
+		assertSQLState(t, ctx, iamLogin, "42501", `UPDATE iam.account_status_log SET reason='changed'`)
+		assertSQLState(t, ctx, iamLogin, "42501", `DELETE FROM iam.account_status_log`)
+		assertSQLState(t, ctx, iamLogin, "42501", `TRUNCATE iam.account_status_log`)
 	})
 }
 

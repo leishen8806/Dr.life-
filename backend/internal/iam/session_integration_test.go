@@ -24,6 +24,7 @@ type testSessionCache struct {
 	mu          sync.Mutex
 	sessions    map[string]cachedTestSession
 	epochs      map[string]int64
+	epochTTL    time.Duration
 	unavailable bool
 }
 
@@ -63,13 +64,14 @@ func (c *testSessionCache) Revoke(_ context.Context, sessionID string, _ time.Du
 	c.sessions[sessionID] = item
 	return nil
 }
-func (c *testSessionCache) SetAccountEpoch(_ context.Context, accountID string, epoch int64, _ time.Duration) error {
+func (c *testSessionCache) SetAccountEpoch(_ context.Context, accountID string, epoch int64, ttl time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.unavailable {
 		return ErrSessionStoreUnavailable
 	}
 	c.epochs[accountID] = epoch
+	c.epochTTL = ttl
 	return nil
 }
 

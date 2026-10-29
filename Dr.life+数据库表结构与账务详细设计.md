@@ -56,6 +56,7 @@
 | `bot` | id, public_id, end (`buyer/merchant/driver`), username unique, role_in_pool (`primary/standby`), status (`active/standby/limited/banned`), token_enc (bytea), token_last4, webhook_secret_enc, priority | **令牌信封加密**，AAD 为 `bot_token:<id>`；`token_last4` 仅用于显示；同一端 `priority` 唯一且最多一个 primary |
 | `account_bot` | account_id, bot_id, bound_at, write_access boolean, unreachable_at | 用户在哪些 Bot 点过开始/允许私信；发送时据此选 Bot（第二章） |
 | `login_event` | id, person_id, bot_id, valid_by_bot_id, tried_count, auth_date, ip, device_id, result, created_at | 登录审计；`result` 含 `ambiguous_account`；`iam_rw` 仅可 SELECT/INSERT，禁止 UPDATE/DELETE/TRUNCATE/TRIGGER/REFERENCES，校验命中的 Bot、尝试次数 |
+| `account_status_log` | id, public_id, account_id, from_status, to_status, reason, actor_type, actor_id, created_at | 账号状态变更只追加日志；冻结、停用及恢复均须填写原因；`iam_rw` 仅可 SELECT/INSERT，拒绝修改、删除和截断；`report_ro` 不可读取 `reason` |
 | `session` | id, account_id, family_id, refresh_token_hash, previous_hash, rotated_at, rotation, refresh_kid, device_id, ip, expires_at, last_used_at, revoked_at, revoked_reason | 刷新令牌只存哈希；旋转使用前一哈希和时间实现宽限期重放，冻结/停用时按 family 批量作废 |
 | `security_event` | account_id, session_family_id, event, reason, created_at | 会话安全事件；不含令牌或哈希 |
 | `merchant` | id, public_id, name jsonb, type, area, svc jsonb, description jsonb, phone_enc, address_enc, contact_enc, kind (`self/verified/pending`), status, owner_account_id | 商户资料；电话、地址、联系人由应用层加密后存放；`kind=verified` 须核验 |
