@@ -15,7 +15,7 @@ import (
 // ones allowed to be cached; everything else keeps the gateway's no-store
 // default. Install it inside gateway.SecurityHeaders and httpx.ETag so this
 // value wins and the validator sees the declaration.
-func CacheControl(public bool, maxAge, staleWhileRevalidate time.Duration) func(http.Handler) http.Handler {
+func CacheControl(public bool, maxAge, staleWhileRevalidate time.Duration, vary ...string) func(http.Handler) http.Handler {
 	publicValue := ""
 	if public {
 		publicValue = "public, max-age=" + seconds(maxAge) + ", stale-while-revalidate=" + seconds(staleWhileRevalidate)
@@ -25,6 +25,11 @@ func CacheControl(public bool, maxAge, staleWhileRevalidate time.Duration) func(
 			value := "no-store"
 			if publicValue != "" && r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v1/public/") {
 				value = publicValue
+				for _, header := range vary {
+					if header = strings.TrimSpace(header); header != "" {
+						w.Header().Add("Vary", header)
+					}
+				}
 			}
 			w.Header().Set("Cache-Control", value)
 			next.ServeHTTP(w, r)
@@ -66,13 +71,13 @@ func ETag(next http.Handler) http.Handler {
 			return
 		}
 
-		etag := contentETag(stableBody(buffered.body.Bytes()))
 		if !isPublic(buffered.header.Get("Cache-Control")) {
 			w.Header().Set("Content-Length", strconv.Itoa(buffered.body.Len()))
 			w.WriteHeader(status)
 			_, _ = w.Write(buffered.body.Bytes())
 			return
 		}
+		etag := contentETag(stableBody(buffered.body.Bytes()))
 		w.Header().Set("ETag", etag)
 		if etagMatches(r.Header.Get("If-None-Match"), etag) {
 			w.Header().Del("Content-Length")
