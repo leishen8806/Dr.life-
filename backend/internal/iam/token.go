@@ -159,6 +159,17 @@ func (m TokenManager) VerifyStepUp(ctx context.Context, raw, expectedScope, expe
 }
 
 func (m TokenManager) IssueRotatedAccess(ctx context.Context, accountPublicID, role, sessionPublicID, kid string, rotation int64, issuedAt time.Time) (string, error) {
+	return m.issueRotatedAccess(ctx, accountPublicID, role, sessionPublicID, kid, rotation, issuedAt, false)
+}
+
+// IssueRotatedRestrictedAdminAccess reissues a restricted administrator token
+// during refresh. The restriction must survive refresh until the administrator
+// completes the required password change.
+func (m TokenManager) IssueRotatedRestrictedAdminAccess(ctx context.Context, accountPublicID, sessionPublicID, kid string, rotation int64, issuedAt time.Time) (string, error) {
+	return m.issueRotatedAccess(ctx, accountPublicID, "admin", sessionPublicID, kid, rotation, issuedAt, true)
+}
+
+func (m TokenManager) issueRotatedAccess(ctx context.Context, accountPublicID, role, sessionPublicID, kid string, rotation int64, issuedAt time.Time, passwordChangeOnly bool) (string, error) {
 	if m.Keys == nil || m.AccessTTL <= 0 || accountPublicID == "" || sessionPublicID == "" || kid == "" || !validRole(role) {
 		return "", ErrInvalidToken
 	}
@@ -168,7 +179,7 @@ func (m TokenManager) IssueRotatedAccess(ctx context.Context, accountPublicID, r
 	}
 	defer wipe(key)
 	jti := derivedToken(key, "access", sessionPublicID, rotation)
-	return m.signAccess(accountPublicID, role, sessionPublicID, kid, key, issuedAt, jti)
+	return m.signAccessWithRestriction(accountPublicID, role, sessionPublicID, kid, key, issuedAt, jti, passwordChangeOnly)
 }
 
 func (m TokenManager) signAccess(accountPublicID, role, sessionPublicID, kid string, key []byte, issuedAt time.Time, jti string) (string, error) {

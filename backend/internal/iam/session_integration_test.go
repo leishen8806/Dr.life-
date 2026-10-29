@@ -177,7 +177,9 @@ func (f *loginFixture) testAdminSessionRefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := f.now
-	sessions := &SessionService{DB: f.pool, Tokens: f.service.Tokens, Cache: f.cache, Grace: 10 * time.Second, IdleTTL: 24 * time.Hour, AbsoluteTTL: 7 * 24 * time.Hour, Now: func() time.Time { return now }}
+	adminTokens := f.service.Tokens
+	adminTokens.AccessTTL = 10 * time.Minute
+	sessions := &SessionService{DB: f.pool, Tokens: f.service.Tokens, AdminTokens: adminTokens, Cache: f.cache, Grace: 10 * time.Second, IdleTTL: 24 * time.Hour, AbsoluteTTL: 7 * 24 * time.Hour, Now: func() time.Time { return now }}
 	result, err := sessions.Refresh(ctx, refresh, "203.0.113.50")
 	if err != nil {
 		t.Fatalf("refresh admin session: %v", err)

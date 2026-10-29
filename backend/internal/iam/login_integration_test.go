@@ -445,9 +445,10 @@ func (f *loginFixture) testAdminFirstPasswordLogin(t *testing.T) {
 	// must never turn a cookie obtained at restricted login into a normal admin
 	// token, even though the shared mobile-session manager has a longer TTL.
 	refreshService := &SessionService{
-		DB: f.pool,
-		Tokens: TokenManager{Keys: f.keys, AccessTTL: 15 * time.Minute, Now: func() time.Time { return f.now }},
-		Cache: f.cache, IdleTTL: 15 * time.Minute, AbsoluteTTL: 8 * time.Hour,
+		DB:          f.pool,
+		Tokens:      TokenManager{Keys: f.keys, AccessTTL: 15 * time.Minute, Now: func() time.Time { return f.now }},
+		AdminTokens: tokens,
+		Cache:       f.cache, IdleTTL: 15 * time.Minute, AbsoluteTTL: 8 * time.Hour,
 		Now: func() time.Time { return f.now },
 	}
 	refreshed, err := refreshService.Refresh(ctx, result.RefreshToken, "198.51.100.6")

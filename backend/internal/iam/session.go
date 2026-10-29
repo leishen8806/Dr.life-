@@ -46,6 +46,7 @@ type SessionInfo struct {
 type SessionService struct {
 	DB          *pgxpool.Pool
 	Tokens      TokenManager
+	AdminTokens TokenManager
 	Cache       SessionCache
 	Grace       time.Duration
 	IdleTTL     time.Duration
@@ -107,6 +108,7 @@ type refreshRow struct {
 	ExpiresAt, LastUsedAt                                         time.Time
 	DeviceID                                                      *string
 	Admin                                                         bool
+	PasswordChangeRequired                                        bool
 }
 
 func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (RefreshResult, error) {
@@ -123,13 +125,13 @@ func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (
 	var row refreshRow
 	err = tx.QueryRow(ctx, `
 		SELECT s.id,s.public_id,s.family_id,s.refresh_token_hash,s.previous_hash,s.rotated_at,s.expires_at,s.last_used_at,s.rotation,COALESCE(s.refresh_kid,''),s.device_id,
-			COALESCE(a.id,u.id),COALESCE(a.public_id,u.public_id),COALESCE(a.role,'admin'),COALESCE(a.status,u.status),COALESCE(a.token_epoch,0),s.admin_user_id IS NOT NULL
+			COALESCE(a.id,u.id),COALESCE(a.public_id,u.public_id),COALESCE(a.role,'admin'),COALESCE(a.status,u.status),COALESCE(a.token_epoch,0),s.admin_user_id IS NOT NULL,COALESCE(u.password_change_required,false)
 		FROM iam.session s
 		LEFT JOIN iam.account a ON a.id=s.account_id
 		LEFT JOIN iam.admin_user u ON u.id=s.admin_user_id
 		WHERE s.revoked_at IS NULL AND (s.refresh_token_hash=$1 OR s.previous_hash=$1)
 		ORDER BY CASE WHEN s.refresh_token_hash=$1 THEN 0 ELSE 1 END
-		LIMIT 1 FOR UPDATE OF s`, hash[:]).Scan(&row.ID, &row.PublicID, &row.FamilyID, &row.CurrentHash, &row.PreviousHash, &row.RotatedAt, &row.ExpiresAt, &row.LastUsedAt, &row.Rotation, &row.RefreshKID, &row.DeviceID, &row.AccountID, &row.AccountPublicID, &row.Role, &row.Status, &row.Epoch, &row.Admin)
+		LIMIT 1 FOR UPDATE OF s`, hash[:]).Scan(&row.ID, &row.PublicID, &row.FamilyID, &row.CurrentHash, &row.PreviousHash, &row.RotatedAt, &row.ExpiresAt, &row.LastUsedAt, &row.Rotation, &row.RefreshKID, &row.DeviceID, &row.AccountID, &row.AccountPublicID, &row.Role, &row.Status, &row.Epoch, &row.Admin, &row.PasswordChangeRequired)
 	if err != nil {
 		s.metric("unknown", "invalid")
 		return RefreshResult{}, httpx.NewAppError(httpx.CodeUnauthenticated)
@@ -177,7 +179,7 @@ func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (
 	if err != nil {
 		return RefreshResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
-	access, err := s.Tokens.IssueRotatedAccess(ctx, row.AccountPublicID, endpoint, row.PublicID, kid, newRotation, now)
+	access, accessTTL, err := s.issueRotatedAccess(ctx, row, kid, newRotation, now)
 	if err != nil {
 		return RefreshResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
@@ -196,7 +198,7 @@ func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (
 		_ = s.Cache.Put(ctx, row.AccountPublicID, row.PublicID, row.Epoch, cacheTTL(now, row.ExpiresAt, now.Add(s.idleTTL())))
 	}
 	s.metric(endpoint, "success")
-	return RefreshResult{AccessToken: access, AccessExpiresIn: int64(s.Tokens.AccessTTL / time.Second), RefreshToken: refresh, RefreshExpiresIn: int64(row.ExpiresAt.Sub(now) / time.Second)}, nil
+	return RefreshResult{AccessToken: access, AccessExpiresIn: int64(accessTTL / time.Second), RefreshToken: refresh, RefreshExpiresIn: int64(row.ExpiresAt.Sub(now) / time.Second)}, nil
 }
 
 func (s *SessionService) replay(ctx context.Context, row refreshRow) (RefreshResult, error) {
@@ -204,8 +206,21 @@ func (s *SessionService) replay(ctx context.Context, row refreshRow) (RefreshRes
 	if err != nil || !equalHash(hash, row.CurrentHash) || row.RotatedAt == nil {
 		return RefreshResult{}, ErrInvalidToken
 	}
-	access, err := s.Tokens.IssueRotatedAccess(ctx, row.AccountPublicID, gatewayRole(row.Role), row.PublicID, row.RefreshKID, row.Rotation, *row.RotatedAt)
-	return RefreshResult{AccessToken: access, AccessExpiresIn: int64(s.Tokens.AccessTTL / time.Second), RefreshToken: refresh, RefreshExpiresIn: int64(row.ExpiresAt.Sub(s.now()) / time.Second)}, err
+	access, accessTTL, err := s.issueRotatedAccess(ctx, row, row.RefreshKID, row.Rotation, *row.RotatedAt)
+	return RefreshResult{AccessToken: access, AccessExpiresIn: int64(accessTTL / time.Second), RefreshToken: refresh, RefreshExpiresIn: int64(row.ExpiresAt.Sub(s.now()) / time.Second)}, err
+}
+
+func (s *SessionService) issueRotatedAccess(ctx context.Context, row refreshRow, kid string, rotation int64, issuedAt time.Time) (string, time.Duration, error) {
+	if !row.Admin {
+		access, err := s.Tokens.IssueRotatedAccess(ctx, row.AccountPublicID, gatewayRole(row.Role), row.PublicID, kid, rotation, issuedAt)
+		return access, s.Tokens.AccessTTL, err
+	}
+	if row.PasswordChangeRequired {
+		access, err := s.AdminTokens.IssueRotatedRestrictedAdminAccess(ctx, row.AccountPublicID, row.PublicID, kid, rotation, issuedAt)
+		return access, s.AdminTokens.AccessTTL, err
+	}
+	access, err := s.AdminTokens.IssueRotatedAccess(ctx, row.AccountPublicID, "admin", row.PublicID, kid, rotation, issuedAt)
+	return access, s.AdminTokens.AccessTTL, err
 }
 
 func (s *SessionService) revokeFamilyForReuse(ctx context.Context, tx pgx.Tx, row refreshRow, now time.Time) error {
