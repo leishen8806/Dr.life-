@@ -652,6 +652,16 @@ type fakeAdminManagement struct {
 	auditIn  iam.AdminAuditInput
 }
 
+type fakeAdminPassword struct {
+	input iam.AdminPasswordChangeInput
+	err   error
+}
+
+func (f *fakeAdminPassword) Change(_ context.Context, input iam.AdminPasswordChangeInput) error {
+	f.input = input
+	return f.err
+}
+
 func (f fakeAdminManagement) List(context.Context, string, int) ([]iam.AdminUser, string, error) {
 	return f.users, "", nil
 }
@@ -855,6 +865,30 @@ func TestAdminManagementMutationRoutesRequireRBACAndStepUp(t *testing.T) {
 		if got := serve(t, newHandler(true), request(tc.method, tc.path, tc.body, tc.token, "mutation-success")); got.Code != http.StatusOK {
 			t.Fatalf("%s %s status=%d body=%s", tc.method, tc.path, got.Code, got.Body.String())
 		}
+	}
+}
+
+func TestChangeAdminPasswordUsesAuthenticatedRestrictedSession(t *testing.T) {
+	passwords := &fakeAdminPassword{}
+	newHandler := func(identity gateway.Identity) http.Handler {
+		return server.NewHandlerWithGateway(nil, server.GatewayOptions{
+			AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+			Authenticator: stubAuth{identity: identity}, AdminPassword: passwords,
+		})
+	}
+	request := func() *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/password", strings.NewReader(`{"current_password":"old-password","new_password":"a-very-long-new-password","totp_code":"123456"}`))
+		r.Header.Set("Content-Type", "application/json")
+		return r
+	}
+	if got := serve(t, newHandler(gateway.Identity{AccountID: "admin-1", Role: gateway.RoleAdmin, SessionID: "session-1", PasswordChangeOnly: true}), request()); got.Code != http.StatusOK || passwords.input.AdminPublicID != "admin-1" || passwords.input.SessionPublicID != "session-1" || passwords.input.RequestID == "" {
+		t.Fatalf("restricted password change status=%d input=%+v body=%s", got.Code, passwords.input, got.Body.String())
+	}
+	if got := serve(t, newHandler(gateway.Identity{AccountID: "admin-1", Role: gateway.RoleAdmin, SessionID: "session-1"}), request()); got.Code != http.StatusOK {
+		t.Fatalf("normal admin password change status=%d body=%s", got.Code, got.Body.String())
+	}
+	if got := serve(t, newHandler(gateway.Identity{AccountID: "buyer-1", Role: gateway.RoleBuyer, SessionID: "session-1"}), request()); got.Code != http.StatusForbidden {
+		t.Fatalf("non-admin password change status=%d body=%s", got.Code, got.Body.String())
 	}
 }
 
