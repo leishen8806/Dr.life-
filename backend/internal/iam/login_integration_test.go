@@ -133,6 +133,7 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	t.Run("refresh rotation concurrency reuse and revocation", f.testSessionLifecycle)
 	t.Run("admin refresh rotation uses the shared session storage", f.testAdminSessionRefresh)
 	t.Run("admin password TOTP login locks per account and IP", f.testAdminPasswordLogin)
+	t.Run("admin creation returns bootstrap credentials only once", f.testAdminManagementCreate)
 	t.Run("admin step-up rejects replay and unauthorized scopes", f.testAdminStepUp)
 	t.Run("session ownership cache rebuild and fail policy", f.testSessionAccess)
 	t.Run("account language profile and safe devices", f.testAccountLanguageProfileAndSafeDevices)
@@ -204,6 +205,33 @@ func (f *loginFixture) testAccountLanguageProfileAndSafeDevices(t *testing.T) {
 	devices, err = profiles.Devices(ctx, first.Account.PublicID, noDeviceSession)
 	if err != nil || len(devices) != 2 || devices[0].IsCurrent || devices[1].IsCurrent {
 		t.Fatalf("no-device session devices=%+v err=%v", devices, err)
+	}
+}
+
+func (f *loginFixture) testAdminManagementCreate(t *testing.T) {
+	ctx := context.Background()
+	service := &AdminManagementService{DB: f.pool, Cipher: f.envelope, Now: func() time.Time { return f.now }}
+	created, err := service.Create(ctx, AdminCreateInput{
+		Name: "Created Admin", Email: "created-admin@example.test", Role: RoleSupport,
+		DataScope: []string{"KH-PP"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Admin.PublicID == "" || created.InitialPassword == "" || len(created.InitialPassword) < 20 || created.TOTPProvisioningURI == "" {
+		t.Fatalf("unexpected creation result: %+v", created)
+	}
+	if !strings.HasPrefix(created.TOTPProvisioningURI, "otpauth://totp/") {
+		t.Fatalf("unexpected provisioning URI: %q", created.TOTPProvisioningURI)
+	}
+	var passwordHash string
+	var secret []byte
+	var required bool
+	if err := f.pool.QueryRow(ctx, `SELECT password_hash,totp_secret_enc,password_change_required FROM iam.admin_user WHERE public_id=$1`, created.Admin.PublicID).Scan(&passwordHash, &secret, &required); err != nil {
+		t.Fatal(err)
+	}
+	if !required || !VerifyPassword(passwordHash, created.InitialPassword) || len(secret) == 0 || bytes.Contains(secret, []byte(created.InitialPassword)) {
+		t.Fatalf("bootstrap credentials were not safely stored: required=%v hash=%q secret=%x", required, passwordHash, secret)
 	}
 }
 
