@@ -26,6 +26,7 @@ const (
 	StatusPending   Status = "pending"
 	StatusVerifying Status = "verifying"
 	StatusReady     Status = "ready"
+	StatusRejected  Status = "rejected"
 )
 
 type File struct {

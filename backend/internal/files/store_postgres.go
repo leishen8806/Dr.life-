@@ -59,6 +59,40 @@ func (s PostgresStore) DailyUsage(ctx context.Context, ownerAccount int64, now t
 	return usage, err
 }
 
+func (s PostgresStore) GetVerifying(ctx context.Context, publicID string) (File, error) {
+	if s.DB == nil {
+		return File{}, ErrNotConfigured
+	}
+	file, err := scanFile(s.DB.QueryRow(ctx, `SELECT public_id, owner_account, purpose, object_key, content_type, size, sha256, status, created_at
+        FROM ops.file WHERE public_id=$1 AND status='verifying'`, publicID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return File{}, ErrNotFound
+	}
+	return file, err
+}
+
+func (s PostgresStore) MarkReady(ctx context.Context, publicID string) error {
+	return s.markVerificationStatus(ctx, publicID, StatusReady)
+}
+
+func (s PostgresStore) MarkRejected(ctx context.Context, publicID string) error {
+	return s.markVerificationStatus(ctx, publicID, StatusRejected)
+}
+
+func (s PostgresStore) markVerificationStatus(ctx context.Context, publicID string, status Status) error {
+	if s.DB == nil {
+		return ErrNotConfigured
+	}
+	result, err := s.DB.Exec(ctx, `UPDATE ops.file SET status=$2, updated_at=now() WHERE public_id=$1 AND status='verifying'`, publicID, status)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 type rowScanner interface{ Scan(...any) error }
 
 func scanFile(row rowScanner) (File, error) {
