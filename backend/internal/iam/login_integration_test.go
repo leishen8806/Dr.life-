@@ -298,6 +298,22 @@ func (f *loginFixture) testAdminManagementStatusAndRole(t *testing.T) {
 	if len(audit.entries) != 3 || strings.Contains(string(audit.entries[0].Detail), "security review") {
 		t.Fatalf("unexpected status/role audit: %#v", audit.entries)
 	}
+	if _, err := service.DisableWithAudit(ctx, actor.Admin.PublicID, "self", input); !errors.Is(err, ErrAdminSelfMutation) {
+		t.Fatalf("self disable error=%v, want ErrAdminSelfMutation", err)
+	}
+	if _, err := service.EnableWithAudit(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FZZ", input); !errors.Is(err, ErrAdminNotFound) {
+		t.Fatalf("missing administrator error=%v, want ErrAdminNotFound", err)
+	}
+	lastSuper, err := service.Create(ctx, AdminCreateInput{Name: "Last Super", Email: "last-super@example.test", Role: RoleSuper, DataScope: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `UPDATE iam.admin_user SET role='ops' WHERE public_id=$1`, actor.Admin.PublicID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.DisableWithAudit(ctx, lastSuper.Admin.PublicID, "guard", input); !errors.Is(err, ErrLastActiveSuper) {
+		t.Fatalf("last super disable error=%v, want ErrLastActiveSuper", err)
+	}
 }
 
 func (f *loginFixture) testAdminStepUp(t *testing.T) {
