@@ -101,6 +101,15 @@ func TestDatabaseFramework(t *testing.T) {
 		} {
 			assertPermissionDenied(t, ctx, admin, statement)
 		}
+		for _, privilege := range []string{"REFERENCES", "TRIGGER"} {
+			var granted bool
+			if err := admin.QueryRow(ctx, `SELECT has_table_privilege('ops_rw', 'ops.file', $1)`, privilege).Scan(&granted); err != nil {
+				t.Fatalf("check %s privilege: %v", privilege, err)
+			}
+			if granted {
+				t.Fatalf("ops_rw unexpectedly has %s on ops.file", privilege)
+			}
+		}
 	})
 
 	createPermissionFixtures(t, ctx, admin)
