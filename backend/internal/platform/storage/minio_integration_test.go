@@ -99,6 +99,34 @@ func TestMinIOPresignedURLs(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("PUT status = %d", response.StatusCode)
 	}
+	readyKey, err := verifier.Promote(ctx, put.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The upload URL remains valid, but it can only rewrite its original key;
+	// callers download the promoted key that was never exposed for PUT.
+	rewrite, err := http.NewRequestWithContext(ctx, http.MethodPut, put.URL, bytes.NewReader([]byte("bad")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewrite.Header.Set("Content-Type", "image/jpeg")
+	response, err = http.DefaultClient.Do(rewrite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	ready, err := verifier.Open(ctx, readyKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	readyBytes, err := io.ReadAll(ready)
+	ready.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(readyBytes) != "jpg" {
+		t.Fatalf("promoted object = %q, want original content", readyBytes)
+	}
 	wrong, err := store.PresignPut(ctx, PutRequest{ContentType: "image/jpeg", ContentLength: 3, ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:])})
 	if err != nil {
 		t.Fatal(err)
