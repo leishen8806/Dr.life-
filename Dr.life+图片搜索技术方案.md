@@ -46,7 +46,7 @@
 - 兜底顺序（每一级都要有明确文案，不能白屏）：
   1. 有结果但全部低于门槛 → 返回空列表 + `fallback: "category"`，附带检测到的主体类别关键词，引导用户点一下转成文字搜索。
   2. 检测不到主体 → 用整图检索，并提示"没识别到主体，已按整张图搜索，可手动框选"。
-  3. 推理服务不可用 → 返回错误码 `2008 ImageSearchUnavailable`，三语文案"图片搜索暂时不可用，请用文字搜索"。**文字搜索路径完全不受影响**（§2.4）。
+  3. 推理服务不可用 → 返回错误码 `2009 ImageSearchUnavailable`，三语文案"图片搜索暂时不可用，请用文字搜索"。**文字搜索路径完全不受影响**（§2.4）。
 
 ---
 
@@ -128,15 +128,15 @@ Go 侧调用参数（全部可配置，给出推荐默认值）：
 
 | 配置项 | 默认 | 说明 |
 | --- | --- | --- |
-| `IMGVEC_BASE_URL` | 空 | 空 = 图片搜索整体关闭（接口直接返回 2008），不影响其它功能 |
+| `IMGVEC_BASE_URL` | 空 | 空 = 图片搜索整体关闭（接口直接返回 2009），不影响其它功能 |
 | `IMGVEC_TIMEOUT_QUERY` | 1500ms | 买家查询路径，超时即降级 |
 | `IMGVEC_TIMEOUT_INDEX` | 10s | 队列入库路径，可以慢 |
 | `IMGVEC_MAX_CONCURRENT` | 4 | 与 asynq `ai` 队列并发 4 对齐，避免推理机被打满 |
-| `IMGVEC_BREAKER_FAILS` / `_WINDOW` / `_COOLDOWN` | 5 / 30s / 60s | 熔断：窗口内 5 次失败 → 冷却 60s，期间查询直接返回 2008，不再打推理机 |
+| `IMGVEC_BREAKER_FAILS` / `_WINDOW` / `_COOLDOWN` | 5 / 30s / 60s | 熔断：窗口内 5 次失败 → 冷却 60s，期间查询直接返回 2009，不再打推理机 |
 
 降级与隔离（必须成立的性质，写成测试）：
 
-1. 推理不可用时 `POST /v1/public/search/image` 返回 2008，**文字搜索 `GET /v1/public/products` 的成功率与延迟不受影响**；
+1. 推理不可用时 `POST /v1/public/search/image` 返回 2009，**文字搜索 `GET /v1/public/products` 的成功率与延迟不受影响**；
 2. 推理慢时不占用 `read`/`critical` 并发桶——图片搜索路由归类为 `heavy`（见 §6.3），brownout 降级时 `heavy` 并发自动减半，`critical` 一律不受影响（已有 `overload.Brownout` 行为）；
 3. 入库失败只影响该图的向量，不影响商品上架。
 
@@ -351,7 +351,7 @@ CREATE INDEX product_image_vector_hnsw_idx
         '400': { $ref: '#/components/responses/ErrorResponse' }  # 1002 / 1008
         '413': { $ref: '#/components/responses/ErrorResponse' }  # 1007
         '429': { $ref: '#/components/responses/ErrorResponse' }  # 1004
-        '503': { $ref: '#/components/responses/ErrorResponse' }  # 2008 ImageSearchUnavailable
+        '503': { $ref: '#/components/responses/ErrorResponse' }  # 2009 ImageSearchUnavailable
 
 components:
   schemas:
@@ -440,7 +440,26 @@ components:
 
 ### 6.3 契约层面的配套改动
 
-1. **新增错误码 `2008 ImageSearchUnavailable`**（`x-enum-varnames: ImageSearchUnavailable`）。现有 `1005 ServiceUnavailable` 太泛，前端无法据此只降级图片搜索一项。其它情形复用既有码：`1002 InvalidArgument`、`1003 ResourceNotFound`、`1004 TooManyRequests`、`1007 RequestTooLarge`、`1008 UnsupportedMedia`。
+1. **新增错误码 `2009 ImageSearchUnavailable`**（`x-enum-varnames: ImageSearchUnavailable`）。现有 `1005 ServiceUnavailable` 太泛，前端无法据此只降级图片搜索一项。其它情形复用既有码：`1002 InvalidArgument`、`1003 ResourceNotFound`、`1004 TooManyRequests`、`1007 RequestTooLarge`、`1008 UnsupportedMedia`。
+
+   > **为什么是 2009 而不是 2008**（董事会 2026-10-29 审阅指出）：`main` 的身份段只用到 `2001…2007`，但 `2008` 已被尚未合并的 A-09（CMP-634，分支 `CMP-634-a-09`）用作 `CodeConsentRequired`（"未同意协议"），同分支的 `openapi.yaml` 枚举也已含 2008。只看 `main` 会误判成空闲。
+   >
+   > **规则：分配任何新错误码前，必须 grep 所有未合并分支的 `backend/internal/platform/httpx`，不能只看 `main`。** 本次核实用的命令（已执行）：
+   >
+   > ```powershell
+   > # 1) 列出所有未合并分支
+   > git branch -a --no-merged origin/main
+   > # 2) 扫所有分支（本地 + 远端）里 httpx 定义的身份段错误码，确认候选码没被占用
+   > foreach ($b in (git for-each-ref --format='%(refname)' refs/heads refs/remotes)) {
+   >   git grep -n -E 'ErrorCode = 20(0[89]|[1-9][0-9])' $b -- backend/internal/platform/httpx
+   > }
+   > # 3) 候选码还要在全仓库（含 openapi.yaml 枚举）确认未使用
+   > foreach ($b in (git for-each-ref --format='%(refname)' refs/heads refs/remotes)) {
+   >   git grep -n -E '\b2009\b' $b -- backend docs '*.yaml' '*.go'
+   > }
+   > ```
+   >
+   > 结果：第 2 步只命中 `CMP-634-a-09` 的 `CodeConsentRequired = 2008`；第 3 步无命中，故 `2009` 可用。I-4 开工时须重跑一遍 —— 届时可能又有新分支占号。
 2. **路由分类**：`/v1/public/search/image` 的路径里有 `search` 段，现有 `hasHeavySegment` 会自动归入 `heavy`，无需配置。但 `/v1/public/products/{public_id}/similar` 会落到默认的 `read`，必须显式配置（`Bulkhead.Classify` 的规则匹配支持 `{}` 模板）：
    `BULKHEAD_ROUTE_CLASSES=/v1/public/products/{public_id}/similar=heavy`
 3. OpenAPI 改动后必须用**固定版本**的 oapi-codegen 重新生成 `internal/api/gen/openapi.gen.go`，并以"重跑生成后 diff 为空"证明规格与实现一致。
@@ -476,7 +495,7 @@ components:
 | `/v1/public/search/image` P95（含上传后到返回，不含客户端上传耗时） | ≤ 1500 ms（CPU 推理）/ ≤ 600 ms（GPU） |
 | `/v1/public/products/{id}/similar` P95 | ≤ 150 ms |
 | 图片搜索并发 | 持续 5 QPS 不超时；20 QPS 冲击下 `heavy` 桶拒绝但 **`critical`/`read` 零影响**（这是必须验证的隔离性，不只是性能数字） |
-| 推理不可用演练 | 停掉 imgvec：图片搜索 100% 返回 2008，文字搜索成功率 ≥ 99.9% |
+| 推理不可用演练 | 停掉 imgvec：图片搜索 100% 返回 2009，文字搜索成功率 ≥ 99.9% |
 | 入库吞吐 | ≥ 3 图/秒（CPU，batch 队列），1 万图全量重建 ≤ 1 小时 |
 | 向量查询 | 10 万向量下单次 KNN（LIMIT 200）P95 ≤ 50 ms |
 
@@ -488,11 +507,11 @@ components:
 
 | 卡 | 标题 | 依赖 | 负责岗位（建议） | 审查链 | 关键交付 |
 | --- | --- | --- | --- | --- | --- |
-| **I-0** | 图片搜索 PoC：样本集 + 模型选型实测 | 本方案获批 | Go 高级 或 数据/算法 | 代码审查员 | 200 组样本、SigLIP2 与 DINOv2 实测 top-1/top-5、CPU 单图延迟实测、选型结论。**不达标则后续卡不开工** |
+| **I-0** | 图片搜索 PoC：样本集 + 模型选型实测 | 本方案获批；**另需下方第 3、5 项审批**（下载权重、样本集） | Go 高级 或 数据/算法 | 代码审查员 | 200 组样本、SigLIP2 与 DINOv2 实测 top-1/top-5、CPU 单图延迟实测、选型结论。**不达标则后续卡不开工** |
 | **I-1** | pgvector 引入与向量表迁移 | I-0 通过；**依赖审批**（扩展 + 镜像） | 数据库工程师 | 代码审查员 → 安全审查员 | 扩展迁移（superuser 拆分）、`catalog.product_image_vector`、HNSW 索引、迁移编号与未合并分支核对、dev compose 换镜像、回滚脚本 |
 | **I-2** | `imgvec` 推理服务 | I-0 通过；**依赖审批**（Python 服务 + onnxruntime + 模型权重下载） | Go 高级（服务骨架）+ 运维（部署） | 代码审查员 → 安全审查员 | FastAPI + ONNX 服务、`/embed` `/healthz` `/readyz`、token 鉴权、内网防火墙规则、模型权重与许可证登记、Dockerfile、ONNX 导出脚本与 `model_rev` 约定 |
 | **I-3** | 向量入库流水线 | I-1、I-2、F-14b(CMP-584) | Go 高级 | 代码审查员 → 安全审查员 | outbox 事件、asynq `catalog:image_embed:v1` / `image_vector_purge:v1` / `image_reindex:v1`、幂等与重试、`queuectl` 子命令、worker 测试 |
-| **I-4** | 检索接口（OpenAPI + handler） | I-1、I-2 | Go 高级 | 代码审查员 | `POST /v1/public/search/image`、`GET /v1/public/products/{id}/similar`、错误码 2008、`BULKHEAD_ROUTE_CLASSES` 配置、熔断与降级测试、重跑 oapi-codegen 零 diff |
+| **I-4** | 检索接口（OpenAPI + handler） | I-1、I-2 | Go 高级 | 代码审查员 | `POST /v1/public/search/image`、`GET /v1/public/products/{id}/similar`、错误码 2009、`BULKHEAD_ROUTE_CLASSES` 配置、熔断与降级测试、重跑 oapi-codegen 零 diff |
 | **I-5** | 买家端前端（相机入口 / 取景框 / 结果页 / 找相似按钮） | I-4 | 前端 | 代码审查员 → 安全审查员（上传路径） | 相机与相册入口、客户端压缩、预签名直传、框选交互、三档结果展示、三语文案、四种兜底 UI、浏览器实测（含窗口尺寸） |
 | **I-6** | 恶意文件扫描接入（补 F-14a 缺口） | — | 运维 + Go 高级 | 代码审查员 → 安全审查员 | 扫描服务接入、未扫描文件不可被消费、告警。**图片搜索上线前必须完成** |
 | **I-7** | 压测与上线演练 | I-3、I-4、I-5 | 运维 + QA | 代码审查员 | §7.3 全部指标的真实输出、停推理演练、runbook（REINDEX、全量重建、熔断处置） |
@@ -506,6 +525,8 @@ components:
 3. 下载外部文件：`google/siglip2-base-patch16-224`、`facebook/dinov2-base`（备选）、`PekingU/rtdetr_r50vd` 模型权重，合计约 3 GB；需登记来源、版本号（pin revision）与许可证。
 4. 许可证确认：三者均 Apache-2.0；**明确排除** jina-clip-v2（CC-BY-NC-4.0）与 Ultralytics YOLO（AGPL-3.0）。
 5. 样本集拍摄与存放（含实拍商品照，不进 Git）。
+
+**开工闸门（董事会 2026-10-29 审阅决定）**：上列 5 项与 §10 的 4 个问题已交项目负责人决定。**结论出来前，除 I-0 外的任何卡都不得开工**；**I-0 本身也必须等第 3 项（下载模型权重）与第 5 项（样本集）获批后才能开始**。
 
 ---
 
