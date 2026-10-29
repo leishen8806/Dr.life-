@@ -12,9 +12,9 @@ import (
 )
 
 func TestPublicCacheAndETagOnDeclaredRoute(t *testing.T) {
-	handler := httpx.ETag(httpx.RequestID(gateway.SecurityHeaders("test")(httpx.CacheControl(true, time.Minute, 5*time.Minute)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := httpx.ETag(gateway.GroupedCORS(gateway.OriginGroups{})(httpx.RequestID(gateway.SecurityHeaders("test")(httpx.CacheControl(true, time.Minute, 5*time.Minute, "Accept-Language")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteOK(w, r, map[string]bool{"pong": true})
-	})))))
+	}))))))
 
 	first := httptest.NewRecorder()
 	firstRequest := httptest.NewRequest(http.MethodGet, "/v1/public/products", nil)
@@ -28,6 +28,9 @@ func TestPublicCacheAndETagOnDeclaredRoute(t *testing.T) {
 	}
 	if got := first.Header().Get("Cache-Control"); got != "public, max-age=60, stale-while-revalidate=300" {
 		t.Fatalf("cache-control = %q", got)
+	}
+	if !hasHeaderValue(first.Header().Values("Vary"), "Origin") || !hasHeaderValue(first.Header().Values("Vary"), "Accept-Language") {
+		t.Fatalf("Vary = %q, want Origin and Accept-Language", first.Header().Values("Vary"))
 	}
 	etag := first.Header().Get("ETag")
 	if etag == "" {
@@ -53,6 +56,30 @@ func TestPublicCacheAndETagOnDeclaredRoute(t *testing.T) {
 	}
 }
 
+func TestPublicCacheETagVariesByAcceptLanguage(t *testing.T) {
+	handler := httpx.ETag(httpx.CacheControl(true, time.Minute, time.Minute, "Accept-Language")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.Header.Get("Accept-Language")))
+	})))
+
+	english := httptest.NewRecorder()
+	englishRequest := httptest.NewRequest(http.MethodGet, "/v1/public/products", nil)
+	englishRequest.Header.Set("Accept-Language", "en")
+	handler.ServeHTTP(english, englishRequest)
+
+	chinese := httptest.NewRecorder()
+	chineseRequest := httptest.NewRequest(http.MethodGet, "/v1/public/products", nil)
+	chineseRequest.Header.Set("Accept-Language", "zh")
+	chineseRequest.Header.Set("If-None-Match", english.Header().Get("ETag"))
+	handler.ServeHTTP(chinese, chineseRequest)
+
+	if english.Header().Get("ETag") == chinese.Header().Get("ETag") {
+		t.Fatalf("ETag = %q for distinct language responses", chinese.Header().Get("ETag"))
+	}
+	if chinese.Code != http.StatusOK {
+		t.Fatalf("language variant status = %d, want 200", chinese.Code)
+	}
+}
+
 func TestUndeclaredPublicRouteKeepsNoStore(t *testing.T) {
 	handler := httpx.ETag(httpx.RequestID(gateway.SecurityHeaders("test")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteOK(w, r, map[string]bool{"pong": true})
@@ -68,6 +95,18 @@ func TestUndeclaredPublicRouteKeepsNoStore(t *testing.T) {
 	if got := response.Header().Get("ETag"); got != "" {
 		t.Fatalf("undeclared route etag = %q", got)
 	}
+	if got := response.Header().Values("Vary"); len(got) != 0 {
+		t.Fatalf("undeclared route Vary = %q", got)
+	}
+}
+
+func hasHeaderValue(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestETagIgnoresNonGET(t *testing.T) {
