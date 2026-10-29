@@ -40,6 +40,16 @@ func TestVerificationWorkerRejectsAndDeletesChecksumMismatch(t *testing.T) {
 	}
 }
 
+func TestRegisterVerificationHandler(t *testing.T) {
+	worker := &recordingWorker{}
+	if err := RegisterVerificationHandler(worker, &verificationMemoryStore{}, &verificationObjects{}); err != nil {
+		t.Fatal(err)
+	}
+	if worker.name != TaskVerify || worker.handler == nil {
+		t.Fatalf("registered = %#v", worker)
+	}
+}
+
 type verificationMemoryStore struct{ file File }
 
 func (s *verificationMemoryStore) GetVerifying(_ context.Context, publicID string) (File, error) {
@@ -76,3 +86,13 @@ func (s *verificationObjects) Open(context.Context, string) (io.ReadCloser, erro
 	return io.NopCloser(bytes.NewReader(s.body)), nil
 }
 func (s *verificationObjects) Delete(context.Context, string) error { s.deleted = true; return nil }
+
+type recordingWorker struct {
+	name    string
+	handler func(context.Context, *asynq.Task) error
+}
+
+func (w *recordingWorker) Register(name string, handler func(context.Context, *asynq.Task) error) error {
+	w.name, w.handler = name, handler
+	return nil
+}
