@@ -175,6 +175,22 @@ func TestAdminAccessTokenHasAdminAudienceAndTenMinuteLifetime(t *testing.T) {
 	}
 }
 
+func TestRestrictedAdminAccessTokenCarriesPasswordChangeOnlyClaim(t *testing.T) {
+	now := time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+	ring, _ := secrets.NewKeyring(map[string][]byte{"active": key}, "active")
+	manager := TokenManager{Keys: ring, AccessTTL: 10 * time.Minute, Now: func() time.Time { return now }}
+	raw, err := manager.IssueRestrictedAdminAccess(context.Background(), "admin-user", "admin-session")
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, _, err := manager.ParseAccess(context.Background(), raw)
+	if err != nil || !identity.PasswordChangeOnly || identity.Role != gateway.RoleAdmin || identity.AccountID != "admin-user" {
+		t.Fatalf("identity=%+v err=%v", identity, err)
+	}
+}
+
 func TestWrongAudienceIsUnauthenticatedBeforeRoleAuthorization(t *testing.T) {
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
