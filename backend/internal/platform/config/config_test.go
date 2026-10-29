@@ -2,9 +2,29 @@ package config
 
 import (
 	"log/slog"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestEnvExampleDocumentsFileQuotaDefaults(t *testing.T) {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("cannot locate .env.example")
+	}
+	contents, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "..", ".env.example"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"FILE_MAX_DAILY_UPLOADS=100", "FILE_MAX_DAILY_BYTES="} {
+		if !strings.Contains(string(contents), want) {
+			t.Fatalf(".env.example missing %q", want)
+		}
+	}
+}
 
 func TestLoadRequiresAndValidatesAppEnv(t *testing.T) {
 	for _, tc := range []struct {
