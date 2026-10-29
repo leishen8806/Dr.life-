@@ -134,6 +134,7 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	t.Run("admin refresh rotation uses the shared session storage", f.testAdminSessionRefresh)
 	t.Run("admin password TOTP login locks per account and IP", f.testAdminPasswordLogin)
 	t.Run("admin creation returns bootstrap credentials only once", f.testAdminManagementCreate)
+	t.Run("admin status and role changes revoke sessions and audit", f.testAdminManagementStatusAndRole)
 	t.Run("admin step-up rejects replay and unauthorized scopes", f.testAdminStepUp)
 	t.Run("session ownership cache rebuild and fail policy", f.testSessionAccess)
 	t.Run("account language profile and safe devices", f.testAccountLanguageProfileAndSafeDevices)
@@ -247,6 +248,55 @@ func (f *loginFixture) testAdminManagementCreate(t *testing.T) {
 	detail := string(audit.entries[0].Detail)
 	if !strings.Contains(detail, actor.Admin.PublicID) || !strings.Contains(detail, created.Admin.PublicID) || strings.Contains(detail, created.InitialPassword) || strings.Contains(detail, created.TOTPProvisioningURI) || strings.Contains(detail, "password_hash") || strings.Contains(detail, "totp_secret") {
 		t.Fatalf("administrator creation audit leaked credentials or omitted identities: %s", detail)
+	}
+}
+
+func (f *loginFixture) testAdminManagementStatusAndRole(t *testing.T) {
+	ctx := context.Background()
+	audit := &stepUpAuditWriter{}
+	service := &AdminManagementService{DB: f.pool, Cipher: f.envelope, Audit: audit, SessionCache: f.cache, Now: func() time.Time { return f.now }}
+	actor, err := service.Create(ctx, AdminCreateInput{Name: "Status Actor", Email: "status-actor@example.test", Role: RoleSuper, DataScope: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := service.Create(ctx, AdminCreateInput{Name: "Status Target", Email: "status-target@example.test", Role: RoleSupport, DataScope: []string{"KH-PP"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	insertSession := func(sessionID string) {
+		if _, err := f.pool.Exec(ctx, `INSERT INTO iam.session(public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES($1,(SELECT id FROM iam.admin_user WHERE public_id=$2),$1,decode('01','hex'),'test-kid',$3,$4)`, sessionID, target.Admin.PublicID, f.now.Add(time.Hour), f.now); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.cache.Put(ctx, target.Admin.PublicID, sessionID, 0, time.Hour); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insertSession("01ARZ3NDEKTSV4RRFFQ69G5FD1")
+	input := AdminAuditInput{ActorPublicID: actor.Admin.PublicID, IP: "198.51.100.21", RequestID: "admin-status-change"}
+	disabled, err := service.DisableWithAudit(ctx, target.Admin.PublicID, "security review", input)
+	if err != nil || disabled.Status != AdminStatusDisabled {
+		t.Fatalf("disable result=%+v err=%v", disabled, err)
+	}
+	var revokedAt *time.Time
+	if err := f.pool.QueryRow(ctx, `SELECT revoked_at FROM iam.session WHERE public_id=$1`, "01ARZ3NDEKTSV4RRFFQ69G5FD1").Scan(&revokedAt); err != nil || revokedAt == nil {
+		t.Fatalf("disabled admin session remained active: revoked_at=%v err=%v", revokedAt, err)
+	}
+	if active, found, err := f.cache.Get(ctx, target.Admin.PublicID, "01ARZ3NDEKTSV4RRFFQ69G5FD1"); err != nil || !found || active {
+		t.Fatalf("disabled admin cache active=%v found=%v err=%v", active, found, err)
+	}
+	if _, err := service.EnableWithAudit(ctx, target.Admin.PublicID, input); err != nil {
+		t.Fatal(err)
+	}
+	insertSession("01ARZ3NDEKTSV4RRFFQ69G5FD2")
+	changed, err := service.UpdateRoleWithAudit(ctx, target.Admin.PublicID, RoleFinance, []string{}, input)
+	if err != nil || changed.Role != RoleFinance || changed.Status != AdminStatusActive {
+		t.Fatalf("role result=%+v err=%v", changed, err)
+	}
+	if err := f.pool.QueryRow(ctx, `SELECT revoked_at FROM iam.session WHERE public_id=$1`, "01ARZ3NDEKTSV4RRFFQ69G5FD2").Scan(&revokedAt); err != nil || revokedAt == nil {
+		t.Fatalf("role changed admin session remained active: revoked_at=%v err=%v", revokedAt, err)
+	}
+	if len(audit.entries) != 3 || strings.Contains(string(audit.entries[0].Detail), "security review") {
+		t.Fatalf("unexpected status/role audit: %#v", audit.entries)
 	}
 }
 
