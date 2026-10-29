@@ -634,6 +634,45 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 
 **落点**：R18 的约束与触发器改动、R19 的唯一约束调整，并入 P-02 的账务迁移；R17、R22 并入 R-04。
 
+#### 6-B.17 第五轮账务复审后的修订（2026-10-29，回应 LedgerAuditor 在 CMP-670 第 4 轮结论中的 R23–R28 及对 R17、R19 的补充；**与 6-B.13～6-B.16 冲突处以本节为准**）
+
+说明：第 4 轮复审对象为 6-B.14 + 6-B.15，当时 6-B.16（回应 R17、R18、R19、R22）尚未合并，现已在 main。本节只处理第 4 轮的新增项，以及对 6-B.16 的两处补充。
+
+**R23 全局锁顺序（取代 6-B.15 R11 中两段互相矛盾的描述）**
+
+- 全局顺序：`kess_batch` → `kess_payment`（按 `trade_no` 升序）→ `Post` 内部的余额行（按 `account_id` 升序）→ `ledger.hold` / `ledger.withdrawal`。
+- 所有方法都按这个顺序加锁，不得逆序。
+- **原路退（`ConfirmKessRefund`）的加锁步骤**：
+  1. 不加锁读取该支付号当前的 `batch_id`；
+  2. 若非空，先 `FOR UPDATE` 锁该批次行，再锁该 `kess_payment` 行；
+  3. 锁后重新读取 `batch_id`。若与第 1 步不同（读取与加锁之间被挂到了批次上），释放锁并从第 1 步重试，最多 3 次；
+  4. 校验“未结算”、`refunded_amount + 本次 ≤ amount`；
+  5. 调用 `Post`。
+- **`channel_settle`**：锁批次行 → 按 `trade_no` 升序锁报表内全部支付行 → `Post`。
+- 6-B.15 R11 中“同一事务内，先锁该支付号的 `kess_payment` 行；若已挂批次，再锁批次行”一句作废，以本条为准。
+
+**R24 `channel_settle` 中匹配行的入账金额**
+
+- 每个匹配行贷 `CHANNEL_KESS` 的金额 = 该支付的 `amount − refunded_amount`，不是报表上的毛额。
+- 报表毛额与系统应结金额之间的差额，按 6-B.16 R21 进 `SUSPENSE` 并告警。
+- 6-B.15 R10 的“`channel_settle` 永远不会因 `CHANNEL_KESS` 不足而整批被拒”一句，收窄为：在 E-4 假设成立（毛额已剔除原路退款项）时成立；对“报表有、系统没有”的行，任何情况下都成立。
+- **E-4 的分叉**：
+  - KESS 汇出金额若**已扣除**原路退款，按本条执行；
+  - 若**未扣除**（KESS 先全额汇出，之后再另行扣回），需要新增贷方科目 `PAYABLE_KESS`（平台单例、不允许负数），差额记它而不是记 `SUSPENSE`。
+  - 届时另行修订，**在 E-4 有书面答复前，P-02 不实现原路退**，买家退款一律先退回钱包。
+
+**R17 补充**：6-B.15 R14 中“无生效版本时拒绝一切借记 `PLATFORM_HELD` 的交易”，以及 6-B.14 R3 的“平台资金冻结”，都**不包括 `cost_close`**，因为它不改变净头寸。
+
+**R19 补充**：`kess_batch` 被冲销（仅限 6-B.16 R19 允许的情形）时，同一事务把批次状态从 `settled` 改回 `open`，清空 `settled_txn_id`，并把版本号 +1，供重记使用；`kess_payment.batch_id` 保持不变。
+
+**R25 补足时限**：净头寸 < 0（6-B.14 R3）时，1 个工作日内补足；净头寸 ≥ 0 但低于“预估一个月手续费”（6-B.15 R12）时，2 个工作日内补足。两者升级对象相同。
+
+**R26 预期手续费快照**：`kess_payment` 新增 `expected_fee bigint NOT NULL` 与 `fee_config_version bigint NOT NULL`，在 `topup_kess` 的同一事务写入，之后不可修改（触发器保护）。
+
+**R27 `SUSPENSE` 补记款**：经 `bank_diff` 从 `SUSPENSE` 认定为某买家付款时，同一事务补插 `kess_payment` 行（标记 `source = 'suspense_recovery'`，`batch_id` 指向原批次，状态视为已结算），使 6-B.14 R8 对账的右边与之相符。
+
+**R28 原路退在 KESS 侧失败**：`payout_kess` 只在确认 KESS 退款成功后过账（`ConfirmKessRefund` 以 KESS 退款单号 `kess_refund_ref` 为凭据），所以不存在“已过账但 KESS 失败”的正常路径。若事后 KESS 冲回退款（罕见），用 `bank_diff` 经 `SUSPENSE` 处理，并人工回退 `refunded_amount`，须双人复核并写审计。
+
 ### 配套表
 ```sql
 create table ledger.hold (          -- 冻结明细
