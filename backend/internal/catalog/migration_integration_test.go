@@ -145,6 +145,27 @@ func TestCatalogMigration(t *testing.T) {
 		if len(published.SKUs) != 1 || published.SKUs[0].Status != catalog.StatusOn {
 			t.Fatalf("published SKU = %+v, want one on SKU", published.SKUs)
 		}
+		if _, err := admin.Exec(ctx, `UPDATE catalog.sku SET status = 'off' WHERE product_id = (SELECT id FROM catalog.product WHERE public_id = $1)`, created.PublicID); err != nil {
+			t.Fatal(err)
+		}
+		publicPage, err := store.ListProducts(ctx, catalog.ProductFilter{MerchantIDs: []int64{42}, Status: catalog.StatusOn}, catalog.Plan{Page: 1, PageSize: 100})
+		if err != nil {
+			t.Fatalf("ListProducts public projection: %v", err)
+		}
+		for _, product := range publicPage.Items {
+			if product.PublicID == created.PublicID && len(product.SKUs) != 0 {
+				t.Fatalf("public product exposed off SKU: %+v", product.SKUs)
+			}
+		}
+
+		off := catalog.StatusOff
+		unpublished, err := store.UpdateProduct(ctx, 42, created.PublicID, catalog.ProductPatch{Status: &off})
+		if err != nil {
+			t.Fatalf("UpdateProduct off: %v", err)
+		}
+		if len(unpublished.SKUs) != 1 || unpublished.SKUs[0].Status != catalog.StatusOff {
+			t.Fatalf("unpublished SKU = %+v, want one off SKU", unpublished.SKUs)
+		}
 
 		if _, err := admin.Exec(ctx, `
 			INSERT INTO catalog.category_attribute (category_id, key, name, type, is_sku_dimension, value_json)
