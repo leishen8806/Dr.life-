@@ -19,7 +19,7 @@ func (f *loginFixture) testAccountStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := &AccountStatusService{DB: f.pool, Cache: f.cache, Now: func() time.Time { return f.now }}
+	service := &AccountStatusService{DB: f.pool, Cache: f.cache, AbsoluteTTL: 48 * time.Hour, Now: func() time.Time { return f.now }}
 	actor := StatusActor{Type: "admin", ID: "admin-status-test"}
 	if _, err := service.SetAccountStatus(ctx, login.Account.PublicID, "frozen", "  ", actor); err == nil {
 		t.Fatal("blank freeze reason accepted")
@@ -45,6 +45,12 @@ func (f *loginFixture) testAccountStatus(t *testing.T) {
 	}
 	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.session s JOIN iam.account a ON a.id=s.account_id WHERE a.public_id=$1 AND s.revoked_reason='account_frozen'`, login.Account.PublicID).Scan(&revoked); err != nil || revoked != 1 {
 		t.Fatalf("revoked sessions=%d err=%v", revoked, err)
+	}
+	f.cache.mu.Lock()
+	epochTTL := f.cache.epochTTL
+	f.cache.mu.Unlock()
+	if epochTTL != 48*time.Hour {
+		t.Fatalf("epoch cache TTL=%v, want %v", epochTTL, 48*time.Hour)
 	}
 	checker := DBSessionChecker{DB: f.pool, Cache: f.cache, IdleTTL: 24 * time.Hour, Now: func() time.Time { return f.now }}
 	manager := f.service.Tokens
