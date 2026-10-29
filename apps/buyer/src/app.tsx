@@ -61,57 +61,70 @@ function useBuyerClient(language: Language): BuyerApiClient {
   );
 }
 
+type FeedLoader = (signal: AbortSignal) => Promise<ProductFeed>;
+
+/** The pages appended after the first, tied to the loader that produced them. */
+interface MorePages {
+  loader: FeedLoader;
+  feed: ProductFeed;
+  loading: boolean;
+  messageKey?: TranslationKey;
+}
+
 /**
- * One category list, page by page: the first page replaces the list, the next
- * ones are appended. A failed next page keeps the rows already on screen.
+ * One category list, page by page: the first page comes from the loader above,
+ * the next ones are appended. A failed next page keeps the rows on screen.
+ * Pages of a previous category or language are ignored rather than cleared, so
+ * nothing has to be reset from an effect.
  */
 function useProductFeed(client: BuyerApiClient, code?: string) {
-  const [resource, setResource] = useState<Resource<ProductFeed>>({
-    status: "loading"
-  });
-  const [attempt, setAttempt] = useState(0);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [moreMessageKey, setMoreMessageKey] = useState<TranslationKey>();
+  const loader = useCallback<FeedLoader>(
+    (signal) =>
+      loadProducts(client, { category: code }, signal).then(firstFeed),
+    [client, code]
+  );
+  const [first, retryFirst] = useLoaded(loader);
+  const [more, setMore] = useState<MorePages>();
+  const current = more?.loader === loader ? more : undefined;
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setResource({ status: "loading" });
-    setLoadingMore(false);
-    setMoreMessageKey(undefined);
-    loadProducts(client, { category: code }, controller.signal).then(
-      (page) => {
-        if (!controller.signal.aborted)
-          setResource({ status: "ready", value: firstFeed(page) });
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted)
-          setResource({ status: "error", messageKey: errorMessageKey(error) });
-      }
-    );
-    return () => controller.abort();
-  }, [client, code, attempt]);
+  const resource = useMemo<Resource<ProductFeed>>(
+    () =>
+      current && first.status === "ready"
+        ? { status: "ready", value: current.feed }
+        : first,
+    [current, first]
+  );
 
-  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+  const retry = useCallback(() => {
+    setMore(undefined);
+    retryFirst();
+  }, [retryFirst]);
 
   const loadMore = useCallback(() => {
-    if (resource.status !== "ready" || !resource.value.hasMore || loadingMore)
-      return;
-    const current = resource.value;
-    setLoadingMore(true);
-    setMoreMessageKey(undefined);
-    loadProducts(client, { category: code, page: current.page + 1 }).then(
-      (page) => {
-        setResource({ status: "ready", value: appendFeed(current, page) });
-        setLoadingMore(false);
-      },
-      (error: unknown) => {
-        setMoreMessageKey(errorMessageKey(error));
-        setLoadingMore(false);
-      }
+    if (resource.status !== "ready" || !resource.value.hasMore) return;
+    if (current?.loading) return;
+    const feed = resource.value;
+    setMore({ loader, feed, loading: true });
+    loadProducts(client, { category: code, page: feed.page + 1 }).then(
+      (page) =>
+        setMore({ loader, feed: appendFeed(feed, page), loading: false }),
+      (error: unknown) =>
+        setMore({
+          loader,
+          feed,
+          loading: false,
+          messageKey: errorMessageKey(error)
+        })
     );
-  }, [client, code, loadingMore, resource]);
+  }, [client, code, current?.loading, loader, resource]);
 
-  return { resource, retry, loadMore, loadingMore, moreMessageKey };
+  return {
+    resource,
+    retry,
+    loadMore,
+    loadingMore: current?.loading ?? false,
+    moreMessageKey: current?.messageKey
+  };
 }
 
 function CategoryPage({
