@@ -21,6 +21,8 @@ var protectedAudiences = []struct {
 	{"/v1/wms", RoleWMS}, {"/v1/admin", RoleAdmin},
 }
 
+const routeFitEventPath = "/v1/integrations/routefit/events"
+
 func Authenticate(auth Authenticator, publicWebhookPrefix string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +78,12 @@ func writeUnauthenticated(w http.ResponseWriter, r *http.Request) {
 }
 
 func classifyPath(path, publicWebhookPrefix string) audience {
+	// RouteFit has one public, signature-verified callback. Do not widen this
+	// exception to the integrations prefix: all other integration paths fail
+	// closed at the gateway.
+	if path == routeFitEventPath {
+		return audience{public: true, known: true}
+	}
 	if path == "/healthz" || path == "/readyz" || path == "/v1/public" || strings.HasPrefix(path, "/v1/public/") {
 		return audience{public: true, known: true}
 	}
