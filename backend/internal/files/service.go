@@ -48,8 +48,14 @@ type Store interface {
 type Options struct {
 	NewPublicID     func() string
 	Now             func() time.Time
+	Verifier        Verifier
 	MaxDailyUploads int
 	MaxDailyBytes   int64
+}
+
+// Verifier is the queue-facing port. The worker alone reads object bytes.
+type Verifier interface {
+	EnqueueVerification(context.Context, File) error
 }
 type PresignInput struct {
 	Purpose, ContentType, SHA256 string
@@ -60,9 +66,10 @@ type PresignResult struct {
 	Upload storage.SignedURL
 }
 type Service struct {
-	store   Store
-	objects storage.Storage
-	options Options
+	store    Store
+	objects  storage.Storage
+	verifier Verifier
+	options  Options
 }
 
 func New(store Store, objects storage.Storage, options Options) *Service {
@@ -72,7 +79,7 @@ func New(store Store, objects storage.Storage, options Options) *Service {
 	if options.Now == nil {
 		options.Now = time.Now
 	}
-	return &Service{store: store, objects: objects, options: options}
+	return &Service{store: store, objects: objects, verifier: options.Verifier, options: options}
 }
 
 func (s *Service) Presign(ctx context.Context, ownerAccount int64, in PresignInput) (PresignResult, error) {
@@ -110,10 +117,17 @@ func (s *Service) Presign(ctx context.Context, ownerAccount int64, in PresignInp
 // Complete makes a pending upload visible to the verification worker. It does
 // not inspect object bytes in the API process.
 func (s *Service) Complete(ctx context.Context, ownerAccount int64, publicID string) (File, error) {
-	if s == nil || s.store == nil || ownerAccount <= 0 || publicID == "" {
+	if s == nil || s.store == nil || s.verifier == nil || ownerAccount <= 0 || publicID == "" {
 		return File{}, ErrNotConfigured
 	}
-	return s.store.MarkVerifying(ctx, ownerAccount, publicID)
+	file, err := s.store.MarkVerifying(ctx, ownerAccount, publicID)
+	if err != nil {
+		return File{}, err
+	}
+	if err := s.verifier.EnqueueVerification(ctx, file); err != nil {
+		return File{}, err
+	}
+	return file, nil
 }
 
 func (s *Service) DownloadURL(ctx context.Context, ownerAccount int64, publicID string) (storage.SignedURL, error) {
