@@ -618,25 +618,16 @@ func (e RevenueByCategoryCategory) Valid() bool {
 
 // Defines values for SKUStatus.
 const (
-	SKUStatusDraft    SKUStatus = "draft"
-	SKUStatusOff      SKUStatus = "off"
-	SKUStatusOn       SKUStatus = "on"
-	SKUStatusRejected SKUStatus = "rejected"
-	SKUStatusReview   SKUStatus = "review"
+	SKUStatusOff SKUStatus = "off"
+	SKUStatusOn  SKUStatus = "on"
 )
 
 // Valid indicates whether the value is a known member of the SKUStatus enum.
 func (e SKUStatus) Valid() bool {
 	switch e {
-	case SKUStatusDraft:
-		return true
 	case SKUStatusOff:
 		return true
 	case SKUStatusOn:
-		return true
-	case SKUStatusRejected:
-		return true
-	case SKUStatusReview:
 		return true
 	default:
 		return false
@@ -1165,7 +1156,7 @@ type ProductSource string
 // ProductStatus defines model for Product.Status.
 type ProductStatus string
 
-// ProductCreateRequest defines model for ProductCreateRequest.
+// ProductCreateRequest Exactly one of tiers or skus is required.
 type ProductCreateRequest struct {
 	CategoryCode string `json:"category_code"`
 	LeadDays     *int   `json:"lead_days,omitempty"`
@@ -1232,7 +1223,7 @@ type ProductTier struct {
 // ProductTierList At least two tiers, each with a unique minimum order quantity.
 type ProductTierList = []ProductTier
 
-// ProductUpdateRequest defines model for ProductUpdateRequest.
+// ProductUpdateRequest When changing price data, provide exactly one of tiers or skus.
 type ProductUpdateRequest struct {
 	CategoryCode *string `json:"category_code,omitempty"`
 	LeadDays     *int    `json:"lead_days,omitempty"`

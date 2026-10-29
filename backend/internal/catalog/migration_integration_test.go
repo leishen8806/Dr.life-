@@ -118,6 +118,73 @@ func TestCatalogMigration(t *testing.T) {
 	t.Cleanup(pool.Close)
 	store := catalog.NewPgStore(pool)
 
+	t.Run("PgStore SKU write paths return complete products", func(t *testing.T) {
+		input := catalog.ProductInput{
+			CategoryCode: scratchCategoryCode,
+			Name: catalog.LocalizedText{
+				catalog.LangZH: "tiles",
+				catalog.LangEN: "tiles",
+				catalog.LangKM: "tiles",
+			},
+			Unit:   "pcs",
+			Origin: catalog.OriginCN,
+			Tiers:  []catalog.Tier{{MinQty: "1", UnitPriceE4: 200}, {MinQty: "10", UnitPriceE4: 180}},
+		}
+		created, err := store.CreateProduct(ctx, 42, input)
+		if err != nil {
+			t.Fatalf("CreateProduct tiers path: %v", err)
+		}
+		if len(created.SKUs) != 1 || created.SKUs[0].Status != catalog.StatusOff {
+			t.Fatalf("created SKU = %+v, want one off default SKU", created.SKUs)
+		}
+
+		published, err := store.PublishProduct(ctx, 42, created.PublicID)
+		if err != nil {
+			t.Fatalf("PublishProduct: %v", err)
+		}
+		if len(published.SKUs) != 1 || published.SKUs[0].Status != catalog.StatusOn {
+			t.Fatalf("published SKU = %+v, want one on SKU", published.SKUs)
+		}
+
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.category_attribute (category_id, key, name, type, is_sku_dimension, value_json)
+			SELECT id, 'color', '{"zh":"color","en":"color","km":"color"}'::jsonb, 'enum', true,
+			       '[{"code":"red","zh":"red","en":"red","km":"red"}]'::jsonb
+			FROM catalog.category WHERE code = $1`, scratchCategoryCode); err != nil {
+			t.Fatal(err)
+		}
+		skuInput := input
+		skuInput.Tiers = nil
+		skuInput.SKUs = []catalog.SKUInput{{
+			AttributeValues: map[string]string{"color": "red"},
+			Tiers:           []catalog.Tier{{MinQty: "1", UnitPriceE4: 300}, {MinQty: "10", UnitPriceE4: 250}},
+		}}
+		skuProduct, err := store.CreateProduct(ctx, 42, skuInput)
+		if err != nil {
+			t.Fatalf("CreateProduct skus path: %v", err)
+		}
+		if len(skuProduct.SKUs) != 1 {
+			t.Fatalf("sku product SKUs = %+v, want one", skuProduct.SKUs)
+		}
+		originalSKU := skuProduct.SKUs[0].PublicID
+
+		updated, err := store.UpdateProduct(ctx, 42, skuProduct.PublicID, catalog.ProductPatch{Tiers: []catalog.Tier{{MinQty: "1", UnitPriceE4: 290}, {MinQty: "10", UnitPriceE4: 240}}})
+		if err != nil {
+			t.Fatalf("UpdateProduct tiers-only after skus: %v", err)
+		}
+		if len(updated.SKUs) != 2 {
+			t.Fatalf("updated SKUs = %+v, want existing SKU plus default SKU", updated.SKUs)
+		}
+
+		updated, err = store.UpdateProduct(ctx, 42, skuProduct.PublicID, catalog.ProductPatch{SKUs: &skuInput.SKUs})
+		if err != nil {
+			t.Fatalf("UpdateProduct skus: %v", err)
+		}
+		if len(updated.SKUs) != 1 || updated.SKUs[0].PublicID != originalSKU {
+			t.Fatalf("updated SKU = %+v, want stable public_id %q", updated.SKUs, originalSKU)
+		}
+	})
+
 	t.Run("publish revalidates the locked row", func(t *testing.T) {
 		const publicID = "01ARZ3NDEKTSV4RRFFQ69G5FC0"
 		if _, err := admin.Exec(ctx, `

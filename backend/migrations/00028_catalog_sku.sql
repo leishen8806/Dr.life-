@@ -35,7 +35,7 @@ CREATE TABLE catalog.sku (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ux_sku_product_attribute_values UNIQUE (product_id, attribute_values),
-    CONSTRAINT ux_sku_product_merchant_sku_code UNIQUE NULLS NOT DISTINCT (product_id, merchant_sku_code)
+    CONSTRAINT ux_sku_product_merchant_sku_code UNIQUE (product_id, merchant_sku_code)
 );
 CREATE INDEX ix_sku_product_status ON catalog.sku (product_id, status);
 COMMENT ON COLUMN catalog.sku.unit IS 'NULL inherits catalog.product.unit; unit ratios belong to logistics.sku_map in R-05.';

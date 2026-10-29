@@ -939,7 +939,7 @@ export interface components {
             };
             merchant_sku_code?: string;
             /** @enum {string} */
-            status: "draft" | "review" | "on" | "off" | "rejected";
+            status: "on" | "off";
             unit?: string | null;
             tiers: components["schemas"]["ProductTierList"];
         };
@@ -984,6 +984,7 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        /** @description Exactly one of tiers or skus is required. */
         ProductCreateRequest: {
             category_code: string;
             name: components["schemas"]["LocalizedText"];
@@ -999,6 +1000,7 @@ export interface components {
             tiers?: components["schemas"]["ProductTierList"];
             skus?: components["schemas"]["SkuCreateList"];
         };
+        /** @description When changing price data, provide exactly one of tiers or skus. */
         ProductUpdateRequest: {
             category_code?: string;
             name?: components["schemas"]["LocalizedText"];

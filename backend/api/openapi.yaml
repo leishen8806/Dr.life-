@@ -1374,7 +1374,7 @@ components:
           type: string
         status:
           type: string
-          enum: [draft, review, on, off, rejected]
+          enum: [on, off]
         unit:
           type: string
           nullable: true
@@ -1489,6 +1489,7 @@ components:
       type: object
       additionalProperties: false
       required: [category_code, name, unit, origin]
+      description: Exactly one of tiers or skus is required.
       properties:
         category_code:
           type: string
@@ -1523,6 +1524,7 @@ components:
     ProductUpdateRequest:
       type: object
       additionalProperties: false
+      description: When changing price data, provide exactly one of tiers or skus.
       properties:
         category_code:
           type: string
