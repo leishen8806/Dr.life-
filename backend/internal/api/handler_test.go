@@ -266,6 +266,30 @@ func TestFilePresignMapsQuotaToRetryable429(t *testing.T) {
 	}
 }
 
+func TestFileCompleteAndDownloadHideCrossOwnerFiles(t *testing.T) {
+	fake := &fakeFiles{completeErr: files.ErrNotFound, downloadErr: files.ErrNotFound}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake, AuditWriter: &audittest.Writer{}})
+	for _, test := range []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodPost, path: "/v1/files/file-1/complete"},
+		{method: http.MethodGet, path: "/v1/files/file-1/download-url"},
+	} {
+		t.Run(test.method, func(t *testing.T) {
+			req := httptest.NewRequest(test.method, test.path, nil)
+			if test.method == http.MethodPost {
+				req.Header.Set("Idempotency-Key", "file-cross-owner-1")
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, req)
+			if w.Code != http.StatusNotFound || decodeErrorCode(t, w) != 1003 {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestTelegramAuthHandlerRejectsInvalidAndUnifiesErrors(t *testing.T) {
 	for _, body := range []string{`{}`, `{"end":"admin","init_data":"x"}`, `{"end":"buyer","init_data":"x","extra":true}`, `{"end":"buyer","init_data":"` + strings.Repeat("x", telegram.MaxInitDataBytes+1) + `"}`} {
 		w := httptest.NewRecorder()
