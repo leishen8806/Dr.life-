@@ -50,6 +50,7 @@ type ObjectStat struct {
 	Size           int64
 	ContentType    string
 	ChecksumSHA256 string
+	ETag           string
 }
 
 type Storage interface {
@@ -63,7 +64,7 @@ type Storage interface {
 type ObjectVerifier interface {
 	Stat(context.Context, string) (ObjectStat, error)
 	Open(context.Context, string) (io.ReadCloser, error)
-	Promote(context.Context, string) (string, error)
+	Promote(context.Context, string, string) (string, error)
 	Delete(context.Context, string) error
 }
 

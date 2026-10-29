@@ -80,7 +80,7 @@ func (s *s3Storage) Stat(ctx context.Context, key string) (ObjectStat, error) {
 	if err != nil {
 		return ObjectStat{}, err
 	}
-	return ObjectStat{Size: aws.ToInt64(object.ContentLength), ContentType: aws.ToString(object.ContentType), ChecksumSHA256: aws.ToString(object.ChecksumSHA256)}, nil
+	return ObjectStat{Size: aws.ToInt64(object.ContentLength), ContentType: aws.ToString(object.ContentType), ChecksumSHA256: aws.ToString(object.ChecksumSHA256), ETag: aws.ToString(object.ETag)}, nil
 }
 
 func (s *s3Storage) Open(ctx context.Context, key string) (io.ReadCloser, error) {
@@ -102,12 +102,15 @@ func (s *s3Storage) Delete(ctx context.Context, key string) error {
 	return err
 }
 
-func (s *s3Storage) Promote(ctx context.Context, key string) (string, error) {
+func (s *s3Storage) Promote(ctx context.Context, key, etag string) (string, error) {
 	if !validRandomKey(key) {
 		return "", ErrInvalidObjectKey
 	}
+	if etag == "" {
+		return "", ErrInvalidObjectKey
+	}
 	destination := randomKey()
-	_, err := s.objects.CopyObject(ctx, &awss3.CopyObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(destination), CopySource: aws.String(url.PathEscape(s.bucket + "/" + key)), MetadataDirective: types.MetadataDirectiveCopy})
+	_, err := s.objects.CopyObject(ctx, &awss3.CopyObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(destination), CopySource: aws.String(url.PathEscape(s.bucket + "/" + key)), CopySourceIfMatch: aws.String(etag), MetadataDirective: types.MetadataDirectiveCopy})
 	return destination, err
 }
 

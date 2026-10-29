@@ -70,7 +70,8 @@ func (s *localStorage) Stat(_ context.Context, key string) (ObjectStat, error) {
 		return ObjectStat{}, err
 	}
 	sum := sha256.Sum256(contents)
-	return ObjectStat{Size: int64(len(contents)), ContentType: in.ContentType, ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:])}, nil
+	checksum := base64.StdEncoding.EncodeToString(sum[:])
+	return ObjectStat{Size: int64(len(contents)), ContentType: in.ContentType, ChecksumSHA256: checksum, ETag: checksum}, nil
 }
 
 func (s *localStorage) Open(_ context.Context, key string) (io.ReadCloser, error) {
@@ -87,7 +88,7 @@ func (s *localStorage) Delete(_ context.Context, key string) error {
 	return os.Remove(filepath.Join(s.rootDir, filepath.FromSlash(key)))
 }
 
-func (s *localStorage) Promote(_ context.Context, key string) (string, error) {
+func (s *localStorage) Promote(_ context.Context, key, etag string) (string, error) {
 	if !validRandomKey(key) || s.rootDir == "" {
 		return "", os.ErrNotExist
 	}
@@ -106,7 +107,15 @@ func (s *localStorage) Promote(_ context.Context, key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	_, copyErr := io.Copy(target, source)
+	contents, readErr := io.ReadAll(source)
+	if readErr != nil {
+		return "", readErr
+	}
+	sum := sha256.Sum256(contents)
+	if base64.StdEncoding.EncodeToString(sum[:]) != etag {
+		return "", ErrInvalidSignature
+	}
+	_, copyErr := target.Write(contents)
 	closeErr := target.Close()
 	if copyErr != nil {
 		return "", copyErr

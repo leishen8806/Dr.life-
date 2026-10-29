@@ -99,7 +99,43 @@ func TestMinIOPresignedURLs(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("PUT status = %d", response.StatusCode)
 	}
-	readyKey, err := verifier.Promote(ctx, put.Key)
+	stat, err := verifier.Stat(ctx, put.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	racedWrite, err := http.NewRequestWithContext(ctx, http.MethodPut, put.URL, bytes.NewReader([]byte("bad")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	racedWrite.Header.Set("Content-Type", "image/jpeg")
+	response, err = http.DefaultClient.Do(racedWrite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if racedKey, err := verifier.Promote(ctx, put.Key, stat.ETag); err == nil {
+		// RustFS may not enforce CopySourceIfMatch. The worker therefore re-hashes
+		// the private promoted object before marking the file ready.
+		if err := verifier.Delete(ctx, racedKey); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Restore the verified bytes, then promote using a fresh conditional ETag.
+	restore, err := http.NewRequestWithContext(ctx, http.MethodPut, put.URL, bytes.NewReader([]byte("jpg")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	restore.Header.Set("Content-Type", "image/jpeg")
+	response, err = http.DefaultClient.Do(restore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	stat, err = verifier.Stat(ctx, put.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	readyKey, err := verifier.Promote(ctx, put.Key, stat.ETag)
 	if err != nil {
 		t.Fatal(err)
 	}

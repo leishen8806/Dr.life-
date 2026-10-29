@@ -17,7 +17,7 @@ func TestVerificationWorkerMarksMatchingObjectReady(t *testing.T) {
 	body := []byte("verified file")
 	sum := sha256.Sum256(body)
 	store := &verificationMemoryStore{file: File{PublicID: "file-1", ObjectKey: "objects/file-1", ContentType: "image/jpeg", Size: int64(len(body)), SHA256: sum[:], Status: StatusVerifying}}
-	objects := &verificationObjects{body: body, stat: storage.ObjectStat{Size: int64(len(body)), ContentType: "image/jpeg", ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:])}}
+	objects := &verificationObjects{body: body, stat: storage.ObjectStat{Size: int64(len(body)), ContentType: "image/jpeg", ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:]), ETag: "etag"}}
 
 	if err := NewVerificationWorker(store, objects).Handle(context.Background(), asynq.NewTask(TaskVerify, []byte(`{"public_id":"file-1"}`))); err != nil {
 		t.Fatal(err)
@@ -96,7 +96,7 @@ func (s *verificationObjects) Stat(context.Context, string) (storage.ObjectStat,
 func (s *verificationObjects) Open(context.Context, string) (io.ReadCloser, error) {
 	return io.NopCloser(bytes.NewReader(s.body)), nil
 }
-func (s *verificationObjects) Promote(context.Context, string) (string, error) {
+func (s *verificationObjects) Promote(context.Context, string, string) (string, error) {
 	return "objects/ready-file-1", nil
 }
 func (s *verificationObjects) Delete(context.Context, string) error { s.deleted = true; return nil }

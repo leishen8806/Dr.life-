@@ -81,9 +81,26 @@ func (w *VerificationWorker) Handle(ctx context.Context, task *asynq.Task) error
 	if subtle.ConstantTimeCompare(hash.Sum(nil), file.SHA256) != 1 {
 		return w.reject(ctx, file)
 	}
-	readyKey, err := w.objects.Promote(ctx, file.ObjectKey)
+	readyKey, err := w.objects.Promote(ctx, file.ObjectKey, stat.ETag)
 	if err != nil {
-		return err
+		return w.reject(ctx, file)
+	}
+	readyStat, err := w.objects.Stat(ctx, readyKey)
+	if err != nil || !matchesMetadata(file, readyStat) {
+		_ = w.objects.Delete(ctx, readyKey)
+		return w.reject(ctx, file)
+	}
+	readyBody, err := w.objects.Open(ctx, readyKey)
+	if err != nil {
+		_ = w.objects.Delete(ctx, readyKey)
+		return w.reject(ctx, file)
+	}
+	readyHash := sha256.New()
+	_, readyCopyErr := io.Copy(readyHash, readyBody)
+	readyCloseErr := readyBody.Close()
+	if readyCopyErr != nil || readyCloseErr != nil || subtle.ConstantTimeCompare(readyHash.Sum(nil), file.SHA256) != 1 {
+		_ = w.objects.Delete(ctx, readyKey)
+		return w.reject(ctx, file)
 	}
 	if err := w.store.MarkReady(ctx, file.PublicID, readyKey); err != nil {
 		_ = w.objects.Delete(ctx, readyKey)
