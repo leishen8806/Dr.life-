@@ -22,6 +22,8 @@ import (
 type Config struct {
 	CallbackSecret string
 	QuoteTTL       time.Duration
+	// Admin enables /__mock endpoints for the standalone executable only.
+	Admin bool
 }
 type Money struct {
 	AmountMinor int64  `json:"amountMinor"`
@@ -92,13 +94,17 @@ type Fault struct {
 	Count  int
 	Delay  time.Duration
 }
-type apiError struct {
+type apiErrorBody struct {
 	Code           string `json:"code"`
 	Message        string `json:"message"`
-	Details        any    `json:"details,omitempty"`
+	MessageKey     string `json:"messageKey"`
 	Retryable      bool   `json:"retryable"`
 	RequestID      string `json:"requestId"`
-	CurrentVersion int64  `json:"currentVersion,omitempty"`
+	Fields         any    `json:"fields,omitempty"`
+	CurrentVersion *int64 `json:"currentVersion,omitempty"`
+}
+type apiError struct {
+	Error apiErrorBody `json:"error"`
 }
 type line struct {
 	Ref      string `json:"lineRef"`
@@ -191,7 +197,9 @@ func (m *Mock) AddSKU(ownerRef string, sku SKU, warehouseID string, qty int64) {
 		m.skus[ownerRef] = map[string]SKU{}
 	}
 	m.skus[ownerRef][sku.ID] = sku
-	m.stocks[stockKey(ownerRef, warehouseID, sku.ID)] = stock{Quantity: qty, Version: 1}
+	s := stock{Quantity: qty, Version: 1}
+	m.stocks[stockKey(ownerRef, warehouseID, sku.ID)] = s
+	m.recordInventoryChanged(ownerRef, warehouseID, sku.ID, s)
 }
 func (m *Mock) AddEvidence(id string, e Evidence) {
 	m.mu.Lock()
@@ -208,8 +216,25 @@ func (m *Mock) AddFeeLine(f FeeLine) {
 	defer m.mu.Unlock()
 	old, ok := m.feeLines[f.ID]
 	if !ok || f.Version >= old.Version {
+		if f.Version == 0 {
+			f.Version = 1
+		}
 		m.feeLines[f.ID] = f
+		m.recordFee("fee.posted", f)
 	}
+}
+func (m *Mock) AdjustFeeLine(id string, amount Money) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	f, ok := m.feeLines[id]
+	if !ok {
+		return fmt.Errorf("fee line %q not found", id)
+	}
+	f.Version++
+	f.Amount = amount
+	m.feeLines[id] = f
+	m.recordFee("fee.adjusted", f)
+	return nil
 }
 func (m *Mock) SetFault(f Fault)      { m.mu.Lock(); defer m.mu.Unlock(); m.fault = f }
 func (m *Mock) Handler() http.Handler { return http.HandlerFunc(m.serveHTTP) }
@@ -227,7 +252,7 @@ func (m *Mock) AdvanceFulfillment(id, state string) (Event, error) {
 	if f == nil {
 		return Event{}, fmt.Errorf("fulfillment %q not found", id)
 	}
-	eventType, ok := map[string]string{"accepted": "fulfillment.accepted", "picked": "fulfillment.picked", "packed": "fulfillment.packed", "shipped": "fulfillment.shipped", "delivery_reported": "fulfillment.delivery_reported", "delivered_verified": "fulfillment.delivered_verified", "delivery_failed": "fulfillment.delivery_failed", "returned": "fulfillment.returned"}[state]
+	eventType, ok := map[string]string{"accepted": "fulfillment.accepted", "rejected": "fulfillment.rejected", "picked": "fulfillment.picked", "packed": "fulfillment.packed", "shipped": "fulfillment.shipped", "delivery_reported": "fulfillment.delivery_reported", "delivered_verified": "fulfillment.delivered_verified", "delivery_failed": "fulfillment.delivery_failed", "returned": "fulfillment.returned"}[state]
 	if !ok {
 		return Event{}, fmt.Errorf("unsupported fulfillment state %q", state)
 	}
@@ -237,7 +262,9 @@ func (m *Mock) AdvanceFulfillment(id, state string) (Event, error) {
 		f.StartedPicking = true
 	}
 	payload, _ := json.Marshal(map[string]any{"fulfillmentId": f.ID, "externalOrderId": f.Request.ExternalOrderID, "fulfillmentState": state, "evidenceSummaries": evidenceList(f.Evidence)})
-	return Event{ID: m.id("event"), Type: eventType, SchemaVersion: "v1", OccurredAt: time.Now().UTC(), Aggregate: Aggregate{Type: "fulfillment", ID: f.ID, Version: f.Version}, Payload: payload}, nil
+	e := Event{ID: m.id("event"), Type: eventType, SchemaVersion: "v1", OccurredAt: time.Now().UTC(), Aggregate: Aggregate{Type: "fulfillment", ID: f.ID, Version: f.Version}, Payload: payload}
+	m.events = append(m.events, e)
+	return e, nil
 }
 
 func (m *Mock) serveHTTP(w http.ResponseWriter, r *http.Request) {
@@ -260,6 +287,8 @@ func (m *Mock) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	p := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/platform/v1/"), "/")
 	parts := strings.Split(p, "/")
 	switch {
+	case m.config.Admin && strings.HasPrefix(r.URL.Path, "/__mock/"):
+		m.admin(w, r)
 	case r.Method == http.MethodGet && len(parts) == 2 && parts[0] == "owners":
 		m.owner(w, parts[1])
 	case r.Method == http.MethodGet && len(parts) == 3 && parts[0] == "owners" && parts[2] == "skus":
@@ -285,6 +314,55 @@ func (m *Mock) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "route not found", nil)
 	}
+}
+
+func (m *Mock) admin(w http.ResponseWriter, r *http.Request) {
+	p := strings.Trim(strings.TrimPrefix(r.URL.Path, "/__mock/"), "/")
+	if r.Method == http.MethodPost && strings.HasPrefix(p, "fulfillments/") && strings.HasSuffix(p, "/advance") {
+		id := strings.TrimSuffix(strings.TrimPrefix(p, "fulfillments/"), "/advance")
+		var body struct {
+			State string `json:"state"`
+		}
+		if decode(r, &body) != nil {
+			writeError(w, 400, "INVALID_REQUEST", "invalid advance request", nil)
+			return
+		}
+		e, err := m.AdvanceFulfillment(id, body.State)
+		if err != nil {
+			writeError(w, 404, "FULFILLMENT_NOT_FOUND", err.Error(), nil)
+			return
+		}
+		writeJSON(w, 200, e)
+		return
+	}
+	if r.Method == http.MethodPost && p == "fault" {
+		var f Fault
+		if decode(r, &f) != nil {
+			writeError(w, 400, "INVALID_REQUEST", "invalid fault", nil)
+			return
+		}
+		m.SetFault(f)
+		writeJSON(w, 200, f)
+		return
+	}
+	if r.Method == http.MethodPost && p == "deliver" {
+		var body struct {
+			Callback string          `json:"callback"`
+			Event    Event           `json:"event"`
+			Options  DeliveryOptions `json:"options"`
+		}
+		if decode(r, &body) != nil || body.Callback == "" {
+			writeError(w, 400, "INVALID_REQUEST", "invalid delivery request", nil)
+			return
+		}
+		if err := m.Deliver(r.Context(), body.Callback, body.Event, body.Options); err != nil {
+			writeError(w, 503, "CALLBACK_DELIVERY_FAILED", err.Error(), nil)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeError(w, 404, "NOT_FOUND", "mock admin route not found", nil)
 }
 
 func (m *Mock) owner(w http.ResponseWriter, ref string) {
@@ -342,9 +420,8 @@ func (m *Mock) hold(w http.ResponseWriter, r *http.Request, ref string) {
 	m.mu.Lock()
 	owner := m.owners[ref]
 	if owner != nil {
-		if r.Header.Get("If-Match") != strconv.FormatInt(owner.Version, 10) {
+		if !matchVersion(w, r, owner.Version) {
 			m.mu.Unlock()
-			writeError(w, 412, "VERSION_CONFLICT", "If-Match does not match", map[string]any{"currentVersion": owner.Version})
 			return
 		}
 		owner.OutboundHold = body.State
@@ -357,7 +434,7 @@ func (m *Mock) hold(w http.ResponseWriter, r *http.Request, ref string) {
 		writeError(w, 404, "OWNER_NOT_FOUND", "owner not found", nil)
 		return
 	}
-	writeJSON(w, 200, map[string]any{"ownerRef": ref, "state": body.State, "reasonCode": body.ReasonCode})
+	writeVersionJSON(w, 200, owner.Version, map[string]any{"ownerRef": ref, "state": body.State, "reasonCode": body.ReasonCode})
 }
 func (m *Mock) createQuote(w http.ResponseWriter, r *http.Request) {
 	var q struct {
@@ -396,7 +473,7 @@ func (m *Mock) createFulfillment(w http.ResponseWriter, r *http.Request) {
 	}
 	key := r.Header.Get("Idempotency-Key")
 	if key == "" {
-		writeError(w, 400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required", nil)
+		writeError(w, http.StatusPreconditionRequired, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required", nil)
 		return
 	}
 	m.mu.Lock()
@@ -408,10 +485,11 @@ func (m *Mock) createFulfillment(w http.ResponseWriter, r *http.Request) {
 	}
 	if id := m.idempotency[key]; id != "" {
 		if m.idempotencyBody[key] != string(bodyHash) {
-			writeError(w, 409, "IDEMPOTENCY_KEY_CONFLICT", "key already used with different content", nil)
+			writeError(w, 409, "IDEMPOTENCY_KEY_REUSED", "key already used with different content", nil)
 			return
 		}
 		f := m.fulfillments[id]
+		w.Header().Set("Idempotent-Replayed", "true")
 		writeFulfillment(w, f, true)
 		return
 	}
@@ -434,6 +512,7 @@ func (m *Mock) createFulfillment(w http.ResponseWriter, r *http.Request) {
 		if req.ExternalRevision == old.Request.ExternalRevision && string(oldHash) == string(bodyHash) {
 			m.idempotency[key] = old.ID
 			m.idempotencyBody[key] = string(bodyHash)
+			w.Header().Set("Idempotent-Replayed", "true")
 			writeFulfillment(w, old, true)
 			return
 		}
@@ -471,6 +550,7 @@ func (m *Mock) createFulfillment(w http.ResponseWriter, r *http.Request) {
 		s.Quantity -= l.Quantity
 		s.Version++
 		m.stocks[k] = s
+		m.recordInventoryChanged(req.OwnerRef, req.WarehouseID, l.SKU, s)
 	}
 	f := &fulfillment{ID: m.id("fulfillment"), Request: req, Version: 1, State: "accepted", Evidence: map[string]Evidence{}}
 	m.fulfillments[f.ID] = f
@@ -490,12 +570,12 @@ func (m *Mock) getFulfillment(w http.ResponseWriter, r *http.Request, id string)
 		writeError(w, 404, "FULFILLMENT_NOT_FOUND", "fulfillment not found", nil)
 		return
 	}
-	writeJSON(w, 200, fulfillmentResponse(f, false))
+	writeVersionJSON(w, 200, f.Version, fulfillmentResponse(f, false))
 }
 func (m *Mock) cancel(w http.ResponseWriter, r *http.Request, id string) {
 	key := r.Header.Get("Idempotency-Key")
 	if key == "" {
-		writeError(w, 400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required", nil)
+		writeError(w, http.StatusPreconditionRequired, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required", nil)
 		return
 	}
 	m.mu.Lock()
@@ -505,8 +585,7 @@ func (m *Mock) cancel(w http.ResponseWriter, r *http.Request, id string) {
 		writeError(w, 404, "FULFILLMENT_NOT_FOUND", "fulfillment not found", nil)
 		return
 	}
-	if r.Header.Get("If-Match") != strconv.FormatInt(f.Version, 10) {
-		writeError(w, 412, "VERSION_CONFLICT", "If-Match does not match", map[string]any{"currentVersion": f.Version})
+	if !matchVersion(w, r, f.Version) {
 		return
 	}
 	if cached := m.cancelIdempotency[key]; cached != nil {
@@ -527,9 +606,12 @@ func (m *Mock) cancel(w http.ResponseWriter, r *http.Request, id string) {
 			s.Quantity += l.Quantity
 			s.Version++
 			m.stocks[k] = s
+			m.recordInventoryChanged(f.Request.OwnerRef, f.Request.WarehouseID, l.SKU, s)
 		}
 	}
 	f.Version++
+	payload, _ := json.Marshal(map[string]any{"fulfillmentId": f.ID, "externalOrderId": f.Request.ExternalOrderID, "fulfillmentState": f.State})
+	m.events = append(m.events, Event{ID: m.id("event"), Type: "fulfillment.cancelled", SchemaVersion: "v1", OccurredAt: time.Now().UTC(), Aggregate: Aggregate{Type: "fulfillment", ID: f.ID, Version: f.Version}, Payload: payload})
 	result := fulfillmentResponse(f, false)
 	m.cancelIdempotency[key] = result
 	writeJSON(w, 200, result)
@@ -682,14 +764,68 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }
+func writeVersionJSON(w http.ResponseWriter, status int, version int64, v any) {
+	w.Header().Set("ETag", strongETag(version))
+	writeJSON(w, status, v)
+}
 func writeError(w http.ResponseWriter, status int, code, message string, details any) {
-	current := int64(0)
+	var current *int64
 	if d, ok := details.(map[string]any); ok {
 		if v, ok := d["currentVersion"].(int64); ok {
-			current = v
+			current = &v
 		}
 	}
-	writeJSON(w, status, apiError{Code: code, Message: message, Details: details, Retryable: status >= 500, RequestID: "routefitmock", CurrentVersion: current})
+	retryable := status == http.StatusTooManyRequests || status == http.StatusServiceUnavailable
+	writeJSON(w, status, apiError{Error: apiErrorBody{Code: code, Message: message, MessageKey: code, Retryable: retryable, RequestID: "routefitmock", Fields: details, CurrentVersion: current}})
+}
+func strongETag(version int64) string { return `"` + strconv.FormatInt(version, 10) + `"` }
+func matchVersion(w http.ResponseWriter, r *http.Request, version int64) bool {
+	g := r.Header.Get("If-Match")
+	if g == "" {
+		writeError(w, http.StatusPreconditionRequired, "PRECONDITION_REQUIRED", "If-Match is required", map[string]any{"currentVersion": version})
+		return false
+	}
+	if g != strongETag(version) {
+		writeError(w, http.StatusPreconditionFailed, "VERSION_CONFLICT", "If-Match does not match", map[string]any{"currentVersion": version})
+		return false
+	}
+	return true
+}
+func (m *Mock) recordInventoryChanged(owner, warehouse, sku string, s stock) {
+	payload, _ := json.Marshal(map[string]any{"ownerRef": owner, "warehouseId": warehouse, "skuId": sku, "requestableQty": s.Quantity, "sourceVersion": s.Version})
+	m.events = append(m.events, Event{ID: m.id("event"), Type: "inventory.changed", SchemaVersion: "v1", OccurredAt: time.Now().UTC(), Aggregate: Aggregate{Type: "inventory", ID: stockKey(owner, warehouse, sku), Version: s.Version}, Payload: payload})
+}
+func (m *Mock) recordFee(kind string, f FeeLine) {
+	payload, _ := json.Marshal(f)
+	m.events = append(m.events, Event{ID: m.id("event"), Type: kind, SchemaVersion: "v1", OccurredAt: time.Now().UTC(), Aggregate: Aggregate{Type: "fee_line", ID: f.ID, Version: f.Version}, Payload: payload})
+}
+
+// LoadScenario initializes the documented standalone-mode JSON fixture shape.
+// It deliberately accepts only test data, never credentials or network targets.
+func (m *Mock) LoadScenario(r io.Reader) error {
+	var s struct {
+		Owners []Owner `json:"owners"`
+		SKUs   []struct {
+			OwnerRef    string `json:"ownerRef"`
+			SKU         SKU    `json:"sku"`
+			WarehouseID string `json:"warehouseId"`
+			Quantity    int64  `json:"quantity"`
+		} `json:"skus"`
+		FeeLines []FeeLine `json:"feeLines"`
+	}
+	if err := json.NewDecoder(r).Decode(&s); err != nil {
+		return err
+	}
+	for _, o := range s.Owners {
+		m.AddOwner(o)
+	}
+	for _, item := range s.SKUs {
+		m.AddSKU(item.OwnerRef, item.SKU, item.WarehouseID, item.Quantity)
+	}
+	for _, f := range s.FeeLines {
+		m.AddFeeLine(f)
+	}
+	return nil
 }
 func sameLines(a, b []line) bool {
 	if len(a) != len(b) {
@@ -706,5 +842,5 @@ func fulfillmentResponse(f *fulfillment, duplicate bool) map[string]any {
 	return map[string]any{"fulfillmentId": f.ID, "version": f.Version, "externalOrderId": f.Request.ExternalOrderID, "state": f.State, "duplicate": duplicate, "packages": []any{}, "trackingNumber": "", "latestEventId": ""}
 }
 func writeFulfillment(w http.ResponseWriter, f *fulfillment, duplicate bool) {
-	writeJSON(w, http.StatusCreated, fulfillmentResponse(f, duplicate))
+	writeVersionJSON(w, http.StatusCreated, f.Version, fulfillmentResponse(f, duplicate))
 }

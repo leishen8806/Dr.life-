@@ -24,6 +24,8 @@ defer server.Close()
 | 6 | `GET inventory` | `requestableQty`、`sourceVersion` |
 | 7.3 | `GET statements/{serviceDate}` | `feeLines`、按货主/费目摘要、`statementVersion` |
 
-所有错误响应为 `{"code":"...","message":"...","details":...}`，对应契约的 `ApiError` 结构。金额字段只使用 `int64 AmountMinor`，不使用浮点数。
+所有错误响应为 `{"error":{"code":"...","message":"...","messageKey":"...","retryable":false,"requestId":"routefitmock","fields":[]}}`；版本冲突另带 `currentVersion`。金额字段只使用 `int64 AmountMinor`，不使用浮点数。
 
-也可独立启动：`go run ./cmd/routefitmock -listen 127.0.0.1:18080`。独立模式初始为空，联调脚本可先通过嵌入 API 创建和填充测试场景；它只应在本地或测试环境运行。
+也可独立启动：`go run ./cmd/routefitmock -listen 127.0.0.1:18080 -scenario scenario.json`。独立模式初始为空；`-scenario` accepts `owners`, `skus` (`ownerRef`, `sku`, `warehouseId`, `quantity`) and `feeLines`.
+
+Standalone mode alone enables these scenario-control endpoints: `POST /__mock/fulfillments/{id}/advance` (`{"state":"picked"}`), `POST /__mock/deliver` (`callback`, `event`, `options`), and `POST /__mock/fault` (`status`, `count`, `delay`). They are unavailable from the embedded test handler. It only runs locally or in test environments.

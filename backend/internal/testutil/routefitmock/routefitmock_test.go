@@ -35,7 +35,7 @@ func request(t *testing.T, h http.Handler, method, path, key string, body any) *
 	if key != "" {
 		r.Header.Set("Idempotency-Key", "0123456789abcdef-"+key)
 	}
-	r.Header.Set("If-Match", "1")
+	r.Header.Set("If-Match", `"1"`)
 	r.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -227,14 +227,40 @@ func TestRouteFitErrorETagAndIdempotencyContract(t *testing.T) {
 func TestRouteFitEventsForCancelInventoryAndFees(t *testing.T) {
 	m := newMock(t)
 	w := request(t, m.Handler(), http.MethodPost, "/api/platform/v1/fulfillments", "event", fulfillmentBody())
-	var created struct{ FulfillmentID string `json:"fulfillmentId"` }
-	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil { t.Fatal(err) }
+	var created struct {
+		FulfillmentID string `json:"fulfillmentId"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
 	_ = request(t, m.Handler(), http.MethodPost, "/api/platform/v1/fulfillments/"+created.FulfillmentID+"/actions/cancel", "event-cancel", map[string]any{})
-	m.AddFeeLine(FeeLine{ID:"fee-1", OwnerRef:"merchant-1", FeeCode:"base", Amount:Money{AmountMinor:1,Currency:"USD"}})
-	if err := m.AdjustFeeLine("fee-1", Money{AmountMinor:2,Currency:"USD"}); err != nil { t.Fatal(err) }
+	m.AddFeeLine(FeeLine{ID: "fee-1", OwnerRef: "merchant-1", FeeCode: "base", Amount: Money{AmountMinor: 1, Currency: "USD"}})
+	if err := m.AdjustFeeLine("fee-1", Money{AmountMinor: 2, Currency: "USD"}); err != nil {
+		t.Fatal(err)
+	}
 	got := map[string]bool{}
-	for _, e := range m.Events() { got[e.Type] = true }
+	for _, e := range m.Events() {
+		got[e.Type] = true
+	}
 	for _, want := range []string{"fulfillment.cancelled", "inventory.changed", "fee.posted", "fee.adjusted"} {
-		if !got[want] { t.Errorf("missing event %s: %#v", want, got) }
+		if !got[want] {
+			t.Errorf("missing event %s: %#v", want, got)
+		}
+	}
+}
+
+func TestStandaloneScenarioAndAdminEndpoints(t *testing.T) {
+	m := New(Config{Admin: true})
+	if err := m.LoadScenario(strings.NewReader(`{"owners":[{"ownerRef":"o","warehouseIds":["w"]}],"skus":[{"ownerRef":"o","warehouseId":"w","quantity":3,"sku":{"skuId":"s"}}]}`)); err != nil {
+		t.Fatal(err)
+	}
+	if w := request(t, m.Handler(), http.MethodGet, "/api/platform/v1/owners/o/inventory", "", nil); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"requestableQty":3`) {
+		t.Fatalf("scenario inventory: %d %s", w.Code, w.Body.String())
+	}
+	if w := request(t, m.Handler(), http.MethodPost, "/__mock/fault", "", map[string]any{"status": 503, "count": 1}); w.Code != http.StatusOK {
+		t.Fatalf("admin fault: %d %s", w.Code, w.Body.String())
+	}
+	if w := request(t, New(Config{}).Handler(), http.MethodPost, "/__mock/fault", "", map[string]any{}); w.Code != http.StatusNotFound {
+		t.Fatalf("embedded admin should be unavailable: %d", w.Code)
 	}
 }
