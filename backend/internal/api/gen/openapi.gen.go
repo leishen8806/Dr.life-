@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for AccountDeviceListSuccessResponseOk.
@@ -190,6 +191,216 @@ const (
 func (e ActionSuccessResponseOk) Valid() bool {
 	switch e {
 	case ActionSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminLoginSuccessResponseOk.
+const (
+	AdminLoginSuccessResponseOkTrue AdminLoginSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the AdminLoginSuccessResponseOk enum.
+func (e AdminLoginSuccessResponseOk) Valid() bool {
+	switch e {
+	case AdminLoginSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminStepUpRequestScope.
+const (
+	AccountFreeze        AdminStepUpRequestScope = "account_freeze"
+	MerchantStatusChange AdminStepUpRequestScope = "merchant_status_change"
+	PermissionChange     AdminStepUpRequestScope = "permission_change"
+	WithdrawalPaid       AdminStepUpRequestScope = "withdrawal_paid"
+	WithdrawalReview     AdminStepUpRequestScope = "withdrawal_review"
+)
+
+// Valid indicates whether the value is a known member of the AdminStepUpRequestScope enum.
+func (e AdminStepUpRequestScope) Valid() bool {
+	switch e {
+	case AccountFreeze:
+		return true
+	case MerchantStatusChange:
+		return true
+	case PermissionChange:
+		return true
+	case WithdrawalPaid:
+		return true
+	case WithdrawalReview:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminStepUpSuccessResponseOk.
+const (
+	AdminStepUpSuccessResponseOkTrue AdminStepUpSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the AdminStepUpSuccessResponseOk enum.
+func (e AdminStepUpSuccessResponseOk) Valid() bool {
+	switch e {
+	case AdminStepUpSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminUserRole.
+const (
+	AdminUserRoleAuditor AdminUserRole = "auditor"
+	AdminUserRoleCs      AdminUserRole = "cs"
+	AdminUserRoleFinance AdminUserRole = "finance"
+	AdminUserRoleLogi    AdminUserRole = "logi"
+	AdminUserRoleOps     AdminUserRole = "ops"
+	AdminUserRoleSuper   AdminUserRole = "super"
+)
+
+// Valid indicates whether the value is a known member of the AdminUserRole enum.
+func (e AdminUserRole) Valid() bool {
+	switch e {
+	case AdminUserRoleAuditor:
+		return true
+	case AdminUserRoleCs:
+		return true
+	case AdminUserRoleFinance:
+		return true
+	case AdminUserRoleLogi:
+		return true
+	case AdminUserRoleOps:
+		return true
+	case AdminUserRoleSuper:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminUserStatus.
+const (
+	AdminUserStatusActive   AdminUserStatus = "active"
+	AdminUserStatusDisabled AdminUserStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the AdminUserStatus enum.
+func (e AdminUserStatus) Valid() bool {
+	switch e {
+	case AdminUserStatusActive:
+		return true
+	case AdminUserStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminUserCreateRequestRole.
+const (
+	AdminUserCreateRequestRoleAuditor AdminUserCreateRequestRole = "auditor"
+	AdminUserCreateRequestRoleCs      AdminUserCreateRequestRole = "cs"
+	AdminUserCreateRequestRoleFinance AdminUserCreateRequestRole = "finance"
+	AdminUserCreateRequestRoleLogi    AdminUserCreateRequestRole = "logi"
+	AdminUserCreateRequestRoleOps     AdminUserCreateRequestRole = "ops"
+	AdminUserCreateRequestRoleSuper   AdminUserCreateRequestRole = "super"
+)
+
+// Valid indicates whether the value is a known member of the AdminUserCreateRequestRole enum.
+func (e AdminUserCreateRequestRole) Valid() bool {
+	switch e {
+	case AdminUserCreateRequestRoleAuditor:
+		return true
+	case AdminUserCreateRequestRoleCs:
+		return true
+	case AdminUserCreateRequestRoleFinance:
+		return true
+	case AdminUserCreateRequestRoleLogi:
+		return true
+	case AdminUserCreateRequestRoleOps:
+		return true
+	case AdminUserCreateRequestRoleSuper:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminUserCreatedSuccessResponseOk.
+const (
+	AdminUserCreatedSuccessResponseOkTrue AdminUserCreatedSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the AdminUserCreatedSuccessResponseOk enum.
+func (e AdminUserCreatedSuccessResponseOk) Valid() bool {
+	switch e {
+	case AdminUserCreatedSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminUserListSuccessResponseOk.
+const (
+	AdminUserListSuccessResponseOkTrue AdminUserListSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the AdminUserListSuccessResponseOk enum.
+func (e AdminUserListSuccessResponseOk) Valid() bool {
+	switch e {
+	case AdminUserListSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminUserRoleUpdateRequestRole.
+const (
+	AdminUserRoleUpdateRequestRoleAuditor AdminUserRoleUpdateRequestRole = "auditor"
+	AdminUserRoleUpdateRequestRoleCs      AdminUserRoleUpdateRequestRole = "cs"
+	AdminUserRoleUpdateRequestRoleFinance AdminUserRoleUpdateRequestRole = "finance"
+	AdminUserRoleUpdateRequestRoleLogi    AdminUserRoleUpdateRequestRole = "logi"
+	AdminUserRoleUpdateRequestRoleOps     AdminUserRoleUpdateRequestRole = "ops"
+	AdminUserRoleUpdateRequestRoleSuper   AdminUserRoleUpdateRequestRole = "super"
+)
+
+// Valid indicates whether the value is a known member of the AdminUserRoleUpdateRequestRole enum.
+func (e AdminUserRoleUpdateRequestRole) Valid() bool {
+	switch e {
+	case AdminUserRoleUpdateRequestRoleAuditor:
+		return true
+	case AdminUserRoleUpdateRequestRoleCs:
+		return true
+	case AdminUserRoleUpdateRequestRoleFinance:
+		return true
+	case AdminUserRoleUpdateRequestRoleLogi:
+		return true
+	case AdminUserRoleUpdateRequestRoleOps:
+		return true
+	case AdminUserRoleUpdateRequestRoleSuper:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdminUserSuccessResponseOk.
+const (
+	AdminUserSuccessResponseOkTrue AdminUserSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the AdminUserSuccessResponseOk enum.
+func (e AdminUserSuccessResponseOk) Valid() bool {
+	switch e {
+	case AdminUserSuccessResponseOkTrue:
 		return true
 	default:
 		return false
@@ -1012,6 +1223,21 @@ func (e LegalDocumentSucceededOk) Valid() bool {
 	}
 }
 
+// Defines values for PostAdminAuthRefreshParamsXRequestedWith.
+const (
+	Drlife PostAdminAuthRefreshParamsXRequestedWith = "drlife"
+)
+
+// Valid indicates whether the value is a known member of the PostAdminAuthRefreshParamsXRequestedWith enum.
+func (e PostAdminAuthRefreshParamsXRequestedWith) Valid() bool {
+	switch e {
+	case Drlife:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetBuyerMeConsents200JSONResponseBodyOk.
 const (
 	GetBuyerMeConsents200JSONResponseBodyOkTrue GetBuyerMeConsents200JSONResponseBodyOk = true
@@ -1254,6 +1480,154 @@ type ActionSuccessResponse struct {
 
 // ActionSuccessResponseOk defines model for ActionSuccessResponse.Ok.
 type ActionSuccessResponseOk bool
+
+// AdminLoginData defines model for AdminLoginData.
+type AdminLoginData struct {
+	AccessExpiresIn int64  `json:"access_expires_in"`
+	AccessToken     string `json:"access_token"`
+}
+
+// AdminLoginRequest defines model for AdminLoginRequest.
+type AdminLoginRequest struct {
+	DeviceId *string             `json:"device_id,omitempty"`
+	Email    openapi_types.Email `json:"email"`
+	Password string              `json:"password"`
+	TotpCode string              `json:"totp_code"`
+}
+
+// AdminLoginSuccessResponse defines model for AdminLoginSuccessResponse.
+type AdminLoginSuccessResponse struct {
+	Data      AdminLoginData              `json:"data"`
+	Ok        AdminLoginSuccessResponseOk `json:"ok"`
+	RequestId string                      `json:"request_id"`
+}
+
+// AdminLoginSuccessResponseOk defines model for AdminLoginSuccessResponse.Ok.
+type AdminLoginSuccessResponseOk bool
+
+// AdminPasswordChangeRequest defines model for AdminPasswordChangeRequest.
+type AdminPasswordChangeRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+	TotpCode        string `json:"totp_code"`
+}
+
+// AdminStepUpData defines model for AdminStepUpData.
+type AdminStepUpData struct {
+	ExpiresAt   time.Time `json:"expires_at"`
+	Scope       string    `json:"scope"`
+	StepUpToken string    `json:"step_up_token"`
+}
+
+// AdminStepUpRequest defines model for AdminStepUpRequest.
+type AdminStepUpRequest struct {
+	Scope    AdminStepUpRequestScope `json:"scope"`
+	TotpCode string                  `json:"totp_code"`
+}
+
+// AdminStepUpRequestScope defines model for AdminStepUpRequest.Scope.
+type AdminStepUpRequestScope string
+
+// AdminStepUpSuccessResponse defines model for AdminStepUpSuccessResponse.
+type AdminStepUpSuccessResponse struct {
+	Data      AdminStepUpData              `json:"data"`
+	Ok        AdminStepUpSuccessResponseOk `json:"ok"`
+	RequestId string                       `json:"request_id"`
+}
+
+// AdminStepUpSuccessResponseOk defines model for AdminStepUpSuccessResponse.Ok.
+type AdminStepUpSuccessResponseOk bool
+
+// AdminUser defines model for AdminUser.
+type AdminUser struct {
+	CreatedAt   time.Time           `json:"created_at"`
+	DataScope   []string            `json:"data_scope"`
+	Email       openapi_types.Email `json:"email"`
+	LastLoginAt *time.Time          `json:"last_login_at"`
+	Name        string              `json:"name"`
+	PublicId    string              `json:"public_id"`
+	Role        AdminUserRole       `json:"role"`
+	Status      AdminUserStatus     `json:"status"`
+}
+
+// AdminUserRole defines model for AdminUser.Role.
+type AdminUserRole string
+
+// AdminUserStatus defines model for AdminUser.Status.
+type AdminUserStatus string
+
+// AdminUserCreateRequest defines model for AdminUserCreateRequest.
+type AdminUserCreateRequest struct {
+	DataScope []string                   `json:"data_scope"`
+	Email     openapi_types.Email        `json:"email"`
+	Name      string                     `json:"name"`
+	Role      AdminUserCreateRequestRole `json:"role"`
+}
+
+// AdminUserCreateRequestRole defines model for AdminUserCreateRequest.Role.
+type AdminUserCreateRequestRole string
+
+// AdminUserCreatedData defines model for AdminUserCreatedData.
+type AdminUserCreatedData struct {
+	Admin               AdminUser `json:"admin"`
+	InitialPassword     string    `json:"initial_password"`
+	TotpProvisioningUri string    `json:"totp_provisioning_uri"`
+}
+
+// AdminUserCreatedSuccessResponse defines model for AdminUserCreatedSuccessResponse.
+type AdminUserCreatedSuccessResponse struct {
+	Data      AdminUserCreatedData              `json:"data"`
+	Ok        AdminUserCreatedSuccessResponseOk `json:"ok"`
+	RequestId string                            `json:"request_id"`
+}
+
+// AdminUserCreatedSuccessResponseOk defines model for AdminUserCreatedSuccessResponse.Ok.
+type AdminUserCreatedSuccessResponseOk bool
+
+// AdminUserData defines model for AdminUserData.
+type AdminUserData struct {
+	Admin AdminUser `json:"admin"`
+}
+
+// AdminUserDisableRequest defines model for AdminUserDisableRequest.
+type AdminUserDisableRequest struct {
+	Reason string `json:"reason"`
+}
+
+// AdminUserListData defines model for AdminUserListData.
+type AdminUserListData struct {
+	Items      []AdminUser `json:"items"`
+	NextCursor *string     `json:"next_cursor,omitempty"`
+}
+
+// AdminUserListSuccessResponse defines model for AdminUserListSuccessResponse.
+type AdminUserListSuccessResponse struct {
+	Data      AdminUserListData              `json:"data"`
+	Ok        AdminUserListSuccessResponseOk `json:"ok"`
+	RequestId string                         `json:"request_id"`
+}
+
+// AdminUserListSuccessResponseOk defines model for AdminUserListSuccessResponse.Ok.
+type AdminUserListSuccessResponseOk bool
+
+// AdminUserRoleUpdateRequest defines model for AdminUserRoleUpdateRequest.
+type AdminUserRoleUpdateRequest struct {
+	DataScope []string                       `json:"data_scope"`
+	Role      AdminUserRoleUpdateRequestRole `json:"role"`
+}
+
+// AdminUserRoleUpdateRequestRole defines model for AdminUserRoleUpdateRequest.Role.
+type AdminUserRoleUpdateRequestRole string
+
+// AdminUserSuccessResponse defines model for AdminUserSuccessResponse.
+type AdminUserSuccessResponse struct {
+	Data      AdminUserData              `json:"data"`
+	Ok        AdminUserSuccessResponseOk `json:"ok"`
+	RequestId string                     `json:"request_id"`
+}
+
+// AdminUserSuccessResponseOk defines model for AdminUserSuccessResponse.Ok.
+type AdminUserSuccessResponseOk bool
 
 // AuditListData defines model for AuditListData.
 type AuditListData struct {
@@ -1874,6 +2248,9 @@ type WithdrawalSummary struct {
 // AccountLinkID defines model for AccountLinkID.
 type AccountLinkID = string
 
+// AdminPublicID defines model for AdminPublicID.
+type AdminPublicID = string
+
 // CategoryCode defines model for CategoryCode.
 type CategoryCode = string
 
@@ -1918,6 +2295,12 @@ type AccountProfileSucceeded = AccountProfileSuccessResponse
 
 // ActionSucceeded defines model for ActionSucceeded.
 type ActionSucceeded = ActionSuccessResponse
+
+// AdminRefreshSucceeded defines model for AdminRefreshSucceeded.
+type AdminRefreshSucceeded = AdminLoginSuccessResponse
+
+// AdminUserSucceeded defines model for AdminUserSucceeded.
+type AdminUserSucceeded = AdminUserSuccessResponse
 
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorEnvelope
@@ -1990,6 +2373,48 @@ type UnprocessableEntity = ErrorEnvelope
 // UnsupportedMediaType defines model for UnsupportedMediaType.
 type UnsupportedMediaType = ErrorEnvelope
 
+// ListAdminUsersParams defines parameters for ListAdminUsers.
+type ListAdminUsersParams struct {
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// CreateAdminUserParams defines parameters for CreateAdminUser.
+type CreateAdminUserParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XStepUpToken Single-use token scoped to a declared high-risk action and account.
+	XStepUpToken XStepUpToken `json:"X-Step-Up-Token"`
+}
+
+// DisableAdminUserParams defines parameters for DisableAdminUser.
+type DisableAdminUserParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XStepUpToken Single-use token scoped to a declared high-risk action and account.
+	XStepUpToken XStepUpToken `json:"X-Step-Up-Token"`
+}
+
+// EnableAdminUserParams defines parameters for EnableAdminUser.
+type EnableAdminUserParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XStepUpToken Single-use token scoped to a declared high-risk action and account.
+	XStepUpToken XStepUpToken `json:"X-Step-Up-Token"`
+}
+
+// UpdateAdminUserRoleParams defines parameters for UpdateAdminUserRole.
+type UpdateAdminUserRoleParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XStepUpToken Single-use token scoped to a declared high-risk action and account.
+	XStepUpToken XStepUpToken `json:"X-Step-Up-Token"`
+}
+
 // ListAdminAuditParams defines parameters for ListAdminAudit.
 type ListAdminAuditParams struct {
 	From    *time.Time `form:"from,omitempty" json:"from,omitempty"`
@@ -2002,6 +2427,14 @@ type ListAdminAuditParams struct {
 	BeforeId *int64 `form:"before_id,omitempty" json:"before_id,omitempty"`
 	PageSize *int   `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
+
+// PostAdminAuthRefreshParams defines parameters for PostAdminAuthRefresh.
+type PostAdminAuthRefreshParams struct {
+	XRequestedWith PostAdminAuthRefreshParamsXRequestedWith `json:"X-Requested-With"`
+}
+
+// PostAdminAuthRefreshParamsXRequestedWith defines parameters for PostAdminAuthRefresh.
+type PostAdminAuthRefreshParamsXRequestedWith string
 
 // GetAdminFinancialCenterParams defines parameters for GetAdminFinancialCenter.
 type GetAdminFinancialCenterParams struct {
@@ -2227,6 +2660,24 @@ type SuggestPublicProductsParams struct {
 	Q string `form:"q" json:"q"`
 }
 
+// CreateAdminUserJSONRequestBody defines body for CreateAdminUser for application/json ContentType.
+type CreateAdminUserJSONRequestBody = AdminUserCreateRequest
+
+// DisableAdminUserJSONRequestBody defines body for DisableAdminUser for application/json ContentType.
+type DisableAdminUserJSONRequestBody = AdminUserDisableRequest
+
+// UpdateAdminUserRoleJSONRequestBody defines body for UpdateAdminUserRole for application/json ContentType.
+type UpdateAdminUserRoleJSONRequestBody = AdminUserRoleUpdateRequest
+
+// PostAdminAuthLoginJSONRequestBody defines body for PostAdminAuthLogin for application/json ContentType.
+type PostAdminAuthLoginJSONRequestBody = AdminLoginRequest
+
+// ChangeAdminPasswordJSONRequestBody defines body for ChangeAdminPassword for application/json ContentType.
+type ChangeAdminPasswordJSONRequestBody = AdminPasswordChangeRequest
+
+// PostAdminAuthStepUpJSONRequestBody defines body for PostAdminAuthStepUp for application/json ContentType.
+type PostAdminAuthStepUpJSONRequestBody = AdminStepUpRequest
+
 // PostBuyerMeConsentsJSONRequestBody defines body for PostBuyerMeConsents for application/json ContentType.
 type PostBuyerMeConsentsJSONRequestBody = ConsentAcceptRequest
 
@@ -2274,9 +2725,39 @@ type PostTelegramAuthJSONRequestBody = TelegramAuthRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListAdminUsers List administrator accounts
+	// (GET /v1/admin/admins)
+	ListAdminUsers(w http.ResponseWriter, r *http.Request, params ListAdminUsersParams)
+	// CreateAdminUser Create an administrator account
+	// (POST /v1/admin/admins)
+	CreateAdminUser(w http.ResponseWriter, r *http.Request, params CreateAdminUserParams)
+	// GetAdminUser Get an administrator account
+	// (GET /v1/admin/admins/{public_id})
+	GetAdminUser(w http.ResponseWriter, r *http.Request, publicId AdminPublicID)
+	// DisableAdminUser Disable an administrator account
+	// (POST /v1/admin/admins/{public_id}/disable)
+	DisableAdminUser(w http.ResponseWriter, r *http.Request, publicId AdminPublicID, params DisableAdminUserParams)
+	// EnableAdminUser Enable an administrator account
+	// (POST /v1/admin/admins/{public_id}/enable)
+	EnableAdminUser(w http.ResponseWriter, r *http.Request, publicId AdminPublicID, params EnableAdminUserParams)
+	// UpdateAdminUserRole Change an administrator role and data scope
+	// (PATCH /v1/admin/admins/{public_id}/role)
+	UpdateAdminUserRole(w http.ResponseWriter, r *http.Request, publicId AdminPublicID, params UpdateAdminUserRoleParams)
 	// ListAdminAudit Query immutable audit records
 	// (GET /v1/admin/audit)
 	ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams)
+	// PostAdminAuthLogin Sign in to the administration web application
+	// (POST /v1/admin/auth/login)
+	PostAdminAuthLogin(w http.ResponseWriter, r *http.Request)
+	// ChangeAdminPassword Change an administrator password and clear first-login restriction
+	// (POST /v1/admin/auth/password)
+	ChangeAdminPassword(w http.ResponseWriter, r *http.Request)
+	// PostAdminAuthRefresh Rotate the administration refresh cookie
+	// (POST /v1/admin/auth/refresh)
+	PostAdminAuthRefresh(w http.ResponseWriter, r *http.Request, params PostAdminAuthRefreshParams)
+	// PostAdminAuthStepUp Exchange a fresh administrator TOTP for a scoped step-up token
+	// (POST /v1/admin/auth/step-up)
+	PostAdminAuthStepUp(w http.ResponseWriter, r *http.Request)
 	// GetAdminFinancialCenter Get ledger-derived financial-center reporting
 	// (GET /v1/admin/financial-center)
 	GetAdminFinancialCenter(w http.ResponseWriter, r *http.Request, params GetAdminFinancialCenterParams)
@@ -2454,9 +2935,69 @@ type ServerInterface interface {
 
 type Unimplemented struct{}
 
+// ListAdminUsers List administrator accounts
+// (GET /v1/admin/admins)
+func (_ Unimplemented) ListAdminUsers(w http.ResponseWriter, r *http.Request, params ListAdminUsersParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateAdminUser Create an administrator account
+// (POST /v1/admin/admins)
+func (_ Unimplemented) CreateAdminUser(w http.ResponseWriter, r *http.Request, params CreateAdminUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAdminUser Get an administrator account
+// (GET /v1/admin/admins/{public_id})
+func (_ Unimplemented) GetAdminUser(w http.ResponseWriter, r *http.Request, publicId AdminPublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DisableAdminUser Disable an administrator account
+// (POST /v1/admin/admins/{public_id}/disable)
+func (_ Unimplemented) DisableAdminUser(w http.ResponseWriter, r *http.Request, publicId AdminPublicID, params DisableAdminUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// EnableAdminUser Enable an administrator account
+// (POST /v1/admin/admins/{public_id}/enable)
+func (_ Unimplemented) EnableAdminUser(w http.ResponseWriter, r *http.Request, publicId AdminPublicID, params EnableAdminUserParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateAdminUserRole Change an administrator role and data scope
+// (PATCH /v1/admin/admins/{public_id}/role)
+func (_ Unimplemented) UpdateAdminUserRole(w http.ResponseWriter, r *http.Request, publicId AdminPublicID, params UpdateAdminUserRoleParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ListAdminAudit Query immutable audit records
 // (GET /v1/admin/audit)
 func (_ Unimplemented) ListAdminAudit(w http.ResponseWriter, r *http.Request, params ListAdminAuditParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostAdminAuthLogin Sign in to the administration web application
+// (POST /v1/admin/auth/login)
+func (_ Unimplemented) PostAdminAuthLogin(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ChangeAdminPassword Change an administrator password and clear first-login restriction
+// (POST /v1/admin/auth/password)
+func (_ Unimplemented) ChangeAdminPassword(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostAdminAuthRefresh Rotate the administration refresh cookie
+// (POST /v1/admin/auth/refresh)
+func (_ Unimplemented) PostAdminAuthRefresh(w http.ResponseWriter, r *http.Request, params PostAdminAuthRefreshParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostAdminAuthStepUp Exchange a fresh administrator TOTP for a scoped step-up token
+// (POST /v1/admin/auth/step-up)
+func (_ Unimplemented) PostAdminAuthStepUp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2811,6 +3352,377 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// ListAdminUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminUsersParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminUsers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) CreateAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateAdminUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Step-Up-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Step-Up-Token")]; found {
+		var XStepUpToken XStepUpToken
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Step-Up-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Step-Up-Token", valueList[0], &XStepUpToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Step-Up-Token", Err: err})
+			return
+		}
+
+		params.XStepUpToken = XStepUpToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Step-Up-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Step-Up-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAdminUser(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId AdminPublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminUser(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisableAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) DisableAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId AdminPublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DisableAdminUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Step-Up-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Step-Up-Token")]; found {
+		var XStepUpToken XStepUpToken
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Step-Up-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Step-Up-Token", valueList[0], &XStepUpToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Step-Up-Token", Err: err})
+			return
+		}
+
+		params.XStepUpToken = XStepUpToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Step-Up-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Step-Up-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisableAdminUser(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EnableAdminUser operation middleware
+func (siw *ServerInterfaceWrapper) EnableAdminUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId AdminPublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params EnableAdminUserParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Step-Up-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Step-Up-Token")]; found {
+		var XStepUpToken XStepUpToken
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Step-Up-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Step-Up-Token", valueList[0], &XStepUpToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Step-Up-Token", Err: err})
+			return
+		}
+
+		params.XStepUpToken = XStepUpToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Step-Up-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Step-Up-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EnableAdminUser(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateAdminUserRole operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAdminUserRole(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId AdminPublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateAdminUserRoleParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Step-Up-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Step-Up-Token")]; found {
+		var XStepUpToken XStepUpToken
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Step-Up-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Step-Up-Token", valueList[0], &XStepUpToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Step-Up-Token", Err: err})
+			return
+		}
+
+		params.XStepUpToken = XStepUpToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Step-Up-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Step-Up-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAdminUserRole(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListAdminAudit operation middleware
 func (siw *ServerInterfaceWrapper) ListAdminAudit(w http.ResponseWriter, r *http.Request) {
 
@@ -2913,6 +3825,93 @@ func (siw *ServerInterfaceWrapper) ListAdminAudit(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListAdminAudit(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAdminAuthLogin operation middleware
+func (siw *ServerInterfaceWrapper) PostAdminAuthLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAdminAuthLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangeAdminPassword operation middleware
+func (siw *ServerInterfaceWrapper) ChangeAdminPassword(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangeAdminPassword(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAdminAuthRefresh operation middleware
+func (siw *ServerInterfaceWrapper) PostAdminAuthRefresh(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostAdminAuthRefreshParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "X-Requested-With" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Requested-With")]; found {
+		var XRequestedWith PostAdminAuthRefreshParamsXRequestedWith
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Requested-With", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Requested-With", valueList[0], &XRequestedWith, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Requested-With", Err: err})
+			return
+		}
+
+		params.XRequestedWith = XRequestedWith
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Requested-With is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Requested-With", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAdminAuthRefresh(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAdminAuthStepUp operation middleware
+func (siw *ServerInterfaceWrapper) PostAdminAuthStepUp(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAdminAuthStepUp(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4996,6 +5995,36 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/admin/auth/login", wrapper.PostAdminAuthLogin)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/admin/auth/refresh", wrapper.PostAdminAuthRefresh)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/admin/auth/step-up", wrapper.PostAdminAuthStepUp)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/admin/auth/password", wrapper.ChangeAdminPassword)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/admins", wrapper.ListAdminUsers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/admin/admins", wrapper.CreateAdminUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/admins/{public_id}", wrapper.GetAdminUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/admin/admins/{public_id}/disable", wrapper.DisableAdminUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/admin/admins/{public_id}/enable", wrapper.EnableAdminUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/v1/admin/admins/{public_id}/role", wrapper.UpdateAdminUserRole)
+	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/admin/financial-center", wrapper.GetAdminFinancialCenter)
 	})
