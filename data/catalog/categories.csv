@@ -1,0 +1,27 @@
+id,parent_id,level,zh,en,km,sort,source
+CAT-HOME,,1,家居建材,Home & Building,ផ្ទះ និងសំណង់（待审）,1,GPC+prototype
+CAT-BUILD,CAT-HOME,2,基础建材,Building Materials,សម្ភារៈសំណង់មូលដ្ឋាន（待审）,10,GPC+prototype
+CAT-TILE,CAT-BUILD,3,瓷砖,Wall & Floor Tile,ក្បឿង（待审）,10,GPC+prototype
+CAT-FLOOR,CAT-BUILD,3,地板,Flooring,កម្រាលឥដ្ឋ（待审）,20,GPC+prototype
+CAT-CEMENT,CAT-BUILD,3,水泥砂浆,Cement & Mortar,ស៊ីម៉ងត៍ និងបាយអ（待审）,30,GPC
+CAT-PAINT,CAT-BUILD,3,墙饰涂料,Paint & Wall Finishes,ថ្នាំលាប និងតុបតែងជញ្ជាំង（待审）,40,GPC+prototype
+CAT-DOOR,CAT-BUILD,3,门窗,Doors & Windows,ទ្វារ និងបង្អួច（待审）,50,GPC+prototype
+CAT-KITCHEN,CAT-HOME,2,厨房,Kitchen,ផ្ទះបាយ（待审）,20,GPC+IKEA-nav+prototype
+CAT-CABINET,CAT-KITCHEN,3,橱柜,Kitchen Cabinets,ទូផ្ទះបាយ（待审）,10,GPC+IKEA-nav+prototype
+CAT-SINK,CAT-KITCHEN,3,水槽龙头,Sinks & Taps,អាងលាង និងក្បាលទឹក（待审）,20,GPC+IKEA-nav
+CAT-BATH,CAT-HOME,2,厨卫,Kitchen & Bathroom,ផ្ទះបាយ និងបន្ទប់ទឹក（待审）,30,GPC+IKEA-nav+prototype
+CAT-TOILET,CAT-BATH,3,卫浴洁具,Toilets & Sanitaryware,ឧបករណ៍អនាម័យ（待审）,10,GPC+prototype
+CAT-SHOWER,CAT-BATH,3,淋浴配件,Showers & Bathroom Fittings,ផ្កាឈូក និងគ្រឿងបន្ទប់ទឹក（待审）,20,GPC+IKEA-nav
+CAT-FURN,CAT-HOME,2,家具,Furniture,គ្រឿងសង្ហារិម（待审）,40,GPC+prototype
+CAT-SOFA,CAT-FURN,3,沙发,Seating & Sofas,សាឡុង និងកៅអី（待审）,10,GPC+prototype
+CAT-TABLE,CAT-FURN,3,桌椅,Tables & Dining Chairs,តុ និងកៅអីបរិភោគ（待审）,20,GPC
+CAT-STORAGE,CAT-FURN,3,收纳柜,Storage Cabinets,ទូស្តុក（待审）,30,GPC+IKEA-nav
+CAT-LIGHT,CAT-HOME,2,灯具电工,Lighting & Electrical,ភ្លើង និងអគ្គិសនី（待审）,50,GPC
+CAT-LAMP,CAT-LIGHT,3,灯具,Lighting Fixtures,ឧបករណ៍បំភ្លឺ（待审）,10,GPC+IKEA-nav
+CAT-SWITCH,CAT-LIGHT,3,开关插座,Switches & Outlets,កុងតាក់ និងព្រី（待审）,20,GPC
+CAT-HARDWARE,CAT-HOME,2,五金工具,Hardware & Tools,គ្រឿងដែក និងឧបករណ៍（待审）,60,GPC
+CAT-LOCK,CAT-HARDWARE,3,锁具门控,Locks & Door Hardware,សោ និងគ្រឿងទ្វារ（待审）,10,GPC
+CAT-FASTENER,CAT-HARDWARE,3,紧固件,Fasteners,ឧបករណ៍ភ្ជាប់（待审）,20,GPC
+CAT-DAILY,CAT-HOME,2,日用家居,Everyday Home,របស់ប្រើប្រាស់ក្នុងផ្ទះ（待审）,70,GPC+IKEA-nav
+CAT-CLEAN,CAT-DAILY,3,清洁用品,Cleaning Supplies,សម្ភារៈសម្អាត（待审）,10,GPC
+CAT-HOME-STORE,CAT-DAILY,3,家居收纳,Home Storage,ការផ្ទុកក្នុងផ្ទះ（待审）,20,GPC+IKEA-nav
