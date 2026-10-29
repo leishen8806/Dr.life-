@@ -143,6 +143,28 @@ describe("createMerchantProductApi", () => {
     });
   });
 
+  it("asks for the full category page the gateway allows", async () => {
+    const { api, calls } = one({
+      items: [
+        {
+          public_id: "01HZY0000000000000000CATEG",
+          code: "rice",
+          name: { zh: "米", en: "Rice", km: "អង្ករ" },
+          enabled: true,
+          sort: 1
+        }
+      ],
+      page: 1,
+      page_size: 100,
+      total: 1
+    });
+
+    await expect(api.listCategories()).resolves.toMatchObject([{ code: "rice" }]);
+    expect(calls[0]?.url).toBe(
+      "http://api.test/v1/public/categories?page_size=100"
+    );
+  });
+
   it("refuses to invent data when the server answers without an envelope", async () => {
     const { api } = stub("<html>gateway</html>", 502);
 
