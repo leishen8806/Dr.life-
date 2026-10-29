@@ -56,6 +56,12 @@ type Storage interface {
 	PresignPut(context.Context, PutRequest) (SignedURL, error)
 	PresignGet(context.Context, string) (SignedURL, error)
 	Stat(context.Context, string) (ObjectStat, error)
+}
+
+// ObjectVerifier is available only to the verification worker that streams
+// object contents and deletes rejected uploads.
+type ObjectVerifier interface {
+	Stat(context.Context, string) (ObjectStat, error)
 	Open(context.Context, string) (io.ReadCloser, error)
 	Delete(context.Context, string) error
 }

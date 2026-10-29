@@ -60,11 +60,16 @@ func main() {
 		os.Exit(1)
 	}
 	var fileStore files.PostgresStore
-	var fileObjects storage.Storage
+	var fileObjects storage.ObjectVerifier
 	if cfg.StorageDriver != "" {
-		fileObjects, err = files.NewObjectStore(cfg)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "file storage configuration error:", err)
+		objects, objectErr := files.NewObjectStore(cfg)
+		if objectErr != nil {
+			fmt.Fprintln(os.Stderr, "file storage configuration error:", objectErr)
+			os.Exit(1)
+		}
+		fileObjects, _ = objects.(storage.ObjectVerifier)
+		if fileObjects == nil {
+			fmt.Fprintln(os.Stderr, "file storage configuration error: verification access unavailable")
 			os.Exit(1)
 		}
 		fileStore = files.PostgresStore{DB: database}

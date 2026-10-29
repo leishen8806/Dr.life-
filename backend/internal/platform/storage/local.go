@@ -31,6 +31,9 @@ type localStorage struct {
 	puts    map[string]PutRequest
 }
 
+var _ Storage = (*localStorage)(nil)
+var _ ObjectVerifier = (*localStorage)(nil)
+
 func NewLocal(config LocalConfig, policy Policy) (Storage, error) {
 	if len(config.Secret) == 0 {
 		return nil, ErrSecretRequired

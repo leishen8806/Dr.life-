@@ -53,6 +53,10 @@ func TestVerificationWorkerRejectsTamperedRustFSUpload(t *testing.T) {
 	}
 
 	objects := storage.NewMinIO(storage.MinIOConfig{Bucket: "files", Endpoint: endpoint, AccessKey: "testaccess", SecretKey: "testsecret"}, storage.Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100})
+	verifier, ok := objects.(storage.ObjectVerifier)
+	if !ok {
+		t.Fatal("storage adapter does not expose worker verification access")
+	}
 	expected := sha256.Sum256([]byte("jpg"))
 	put, err := objects.PresignPut(ctx, storage.PutRequest{ContentType: "image/jpeg", ContentLength: 3, ChecksumSHA256: base64.StdEncoding.EncodeToString(expected[:])})
 	if err != nil {
@@ -73,13 +77,13 @@ func TestVerificationWorkerRejectsTamperedRustFSUpload(t *testing.T) {
 	}
 
 	store := &verificationMemoryStore{file: File{PublicID: "file-1", ObjectKey: put.Key, ContentType: "image/jpeg", Size: 3, SHA256: expected[:], Status: StatusVerifying}}
-	if err := NewVerificationWorker(store, objects).Handle(ctx, asynq.NewTask(TaskVerify, []byte(`{"public_id":"file-1"}`))); err != nil {
+	if err := NewVerificationWorker(store, verifier).Handle(ctx, asynq.NewTask(TaskVerify, []byte(`{"public_id":"file-1"}`))); err != nil {
 		t.Fatal(err)
 	}
 	if store.file.Status != StatusRejected {
 		t.Fatalf("status=%q, want rejected", store.file.Status)
 	}
-	contents, err := objects.Open(ctx, put.Key)
+	contents, err := verifier.Open(ctx, put.Key)
 	if err == nil {
 		_, _ = io.Copy(io.Discard, contents)
 		contents.Close()

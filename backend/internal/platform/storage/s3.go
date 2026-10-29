@@ -29,6 +29,9 @@ type s3Storage struct {
 	getExpires time.Duration
 }
 
+var _ Storage = (*s3Storage)(nil)
+var _ ObjectVerifier = (*s3Storage)(nil)
+
 func NewS3(config S3Config, policy Policy) Storage {
 	return newS3(config, policy, putTTL, getTTL)
 }

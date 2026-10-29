@@ -71,6 +71,10 @@ func TestMinIOPresignedURLs(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := NewMinIO(MinIOConfig{Bucket: "files", Endpoint: endpoint, AccessKey: "testaccess", SecretKey: "testsecret"}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100})
+	verifier, ok := store.(ObjectVerifier)
+	if !ok {
+		t.Fatal("storage adapter does not expose worker verification access")
+	}
 
 	sum := sha256.Sum256([]byte("jpg"))
 	put, err := store.PresignPut(ctx, PutRequest{ContentType: "image/jpeg", ContentLength: 3, ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:])})
@@ -112,7 +116,7 @@ func TestMinIOPresignedURLs(t *testing.T) {
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("tampered upload status = %d, RustFS should expose it for worker verification", response.StatusCode)
 	}
-	contents, err := store.Open(ctx, wrong.Key)
+	contents, err := verifier.Open(ctx, wrong.Key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,10 +128,10 @@ func TestMinIOPresignedURLs(t *testing.T) {
 	if string(data) != "bad" {
 		t.Fatalf("Open() = %q, want tampered content", data)
 	}
-	if err := store.Delete(ctx, wrong.Key); err != nil {
+	if err := verifier.Delete(ctx, wrong.Key); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Open(ctx, wrong.Key); err == nil {
+	if _, err := verifier.Open(ctx, wrong.Key); err == nil {
 		t.Fatal("deleted object remained readable")
 	}
 

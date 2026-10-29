@@ -23,18 +23,18 @@ type VerificationStore interface {
 
 type VerificationWorker struct {
 	store   VerificationStore
-	objects storage.Storage
+	objects storage.ObjectVerifier
 }
 
 type workerRegistrar interface {
 	Register(string, queue.Handler) error
 }
 
-func NewVerificationWorker(store VerificationStore, objects storage.Storage) *VerificationWorker {
+func NewVerificationWorker(store VerificationStore, objects storage.ObjectVerifier) *VerificationWorker {
 	return &VerificationWorker{store: store, objects: objects}
 }
 
-func RegisterVerificationHandler(worker workerRegistrar, store VerificationStore, objects storage.Storage) error {
+func RegisterVerificationHandler(worker workerRegistrar, store VerificationStore, objects storage.ObjectVerifier) error {
 	if worker == nil {
 		return ErrNotConfigured
 	}
