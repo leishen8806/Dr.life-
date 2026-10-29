@@ -308,6 +308,21 @@ func TestLoadOperationsAlertConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadRouteFitReconciliationConfiguration(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{
+		"APP_ENV": "test", "ROUTEFIT_RECONCILIATION_SCHEDULE": "*/7 * * * *", "ROUTEFIT_RECONCILIATION_NO_EVENT_FOR": "45m",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RouteFitReconciliationSchedule != "*/7 * * * *" || cfg.RouteFitReconciliationNoEventFor != 45*time.Minute {
+		t.Fatalf("unexpected RouteFit reconciliation config: %+v", cfg)
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "ROUTEFIT_RECONCILIATION_NO_EVENT_FOR": "0s"})); err == nil {
+		t.Fatal("invalid RouteFit reconciliation duration accepted")
+	}
+}
+
 func lookup(values map[string]string) func(string) string {
 	return func(key string) string { return values[key] }
 }

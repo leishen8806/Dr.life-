@@ -176,8 +176,15 @@ func main() {
 		}
 		queueClient := asynq.NewClient(queueRedis)
 		defer queueClient.Close()
-		// The registry is empty until business modules register scheduled task types.
-		scheduler, queueErr := queue.NewScheduler(queue.NewEnqueuer(queueClient, queue.NewRegistry(), queue.EnqueueOptions{}), nil)
+		registry := queue.NewRegistry()
+		if queueErr := logistics.RegisterRouteFitReconciliationTask(registry); queueErr != nil {
+			logger.Error("RouteFit reconciliation queue registration failed", "error", queueErr)
+			os.Exit(1)
+		}
+		reconciliation := logistics.RouteFitReconciliationConfig{
+			Schedule: cfg.RouteFitReconciliationSchedule, NoEventFor: cfg.RouteFitReconciliationNoEventFor,
+		}
+		scheduler, queueErr := queue.NewScheduler(queue.NewEnqueuer(queueClient, registry, queue.EnqueueOptions{}), []queue.ScheduledTask{logistics.RouteFitReconciliationScheduledTask(reconciliation)})
 		if queueErr != nil {
 			logger.Error("queue scheduler configuration failed", "error", queueErr)
 			os.Exit(1)

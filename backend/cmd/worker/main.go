@@ -13,6 +13,7 @@ import (
 	"github.com/hibiken/asynq"
 	commsTelegram "github.com/leishen8806/Dr.life-/backend/internal/comms/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
+	"github.com/leishen8806/Dr.life-/backend/internal/logistics"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
@@ -57,6 +58,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "queue registry error:", err)
 		os.Exit(1)
 	}
+	if err := logistics.RegisterRouteFitReconciliationTask(registry); err != nil {
+		fmt.Fprintln(os.Stderr, "RouteFit reconciliation queue registration error:", err)
+		os.Exit(1)
+	}
 	worker, err := queue.NewWorker(cfg.QueueRedisURL, registry, queue.WorkerOptions{ShutdownTimeout: cfg.ShutdownTimeout, Logger: logger, Observer: queueMetrics})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "worker configuration error:", err)
@@ -83,6 +88,12 @@ func main() {
 	}
 	if err := worker.Register(opsalert.TaskFlush, alerts.Flush); err != nil {
 		fmt.Fprintln(os.Stderr, "queue handler error:", err)
+		os.Exit(1)
+	}
+	// R-02 installs the RouteFit client runner. Until then the scheduled task is
+	// deliberately a no-op after the queue payload is validated by its contract.
+	if err := worker.Register(logistics.RouteFitReconciliationTaskType, logistics.NewRouteFitReconciliationHandler(nil)); err != nil {
+		fmt.Fprintln(os.Stderr, "RouteFit reconciliation handler error:", err)
 		os.Exit(1)
 	}
 	relay, err := outbox.New(ledger.New(database, ledger.Options{}), client, outbox.Options{
