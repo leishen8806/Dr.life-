@@ -1497,6 +1497,7 @@ components:
           $ref: "#/components/schemas/LocalizedText"
         spec:
           $ref: "#/components/schemas/LocalizedText"
+          nullable: true
         unit:
           type: string
           minLength: 1

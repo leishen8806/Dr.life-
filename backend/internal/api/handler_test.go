@@ -757,9 +757,9 @@ func TestUpdateDistinguishesEmptySpecFromAbsentSpec(t *testing.T) {
 		return recorder
 	}
 
-	patch("test-patch-empty-spec", `{"spec":{}}`)
+	patch("test-patch-null-spec", `{"spec":null}`)
 	if store.patch.Spec == nil {
-		t.Fatal("an explicit empty spec must be a clear signal, not an absent field")
+		t.Fatal("an explicit null spec must be a clear signal, not an absent field")
 	}
 	if len(store.patch.Spec) != 0 {
 		t.Fatalf("spec patch = %+v, want an empty map so the store writes NULL", store.patch.Spec)

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -717,11 +718,11 @@ func (h Handler) UpdateMerchantProduct(w http.ResponseWriter, r *http.Request, p
 	if !ok {
 		return
 	}
-	body, ok := decodeJSON[gen.UpdateMerchantProductJSONRequestBody](w, r)
+	body, clearSpec, ok := decodeProductUpdateJSON(w, r)
 	if !ok {
 		return
 	}
-	product, err := service.UpdateProduct(r.Context(), merchantID, publicIDFromPath(publicID), productPatch(body))
+	product, err := service.UpdateProduct(r.Context(), merchantID, publicIDFromPath(publicID), productPatch(body, clearSpec))
 	if err != nil {
 		h.writeError(w, r, err)
 		return
@@ -835,6 +836,30 @@ func decodeJSON[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 	return body, true
 }
 
+// decodeProductUpdateJSON preserves the distinction between an omitted spec and
+// an explicit JSON null. The generated optional pointer represents both as nil,
+// but catalog uses an empty LocalizedText as the durable clear signal.
+func decodeProductUpdateJSON(w http.ResponseWriter, r *http.Request) (gen.ProductUpdateRequest, bool, bool) {
+	var body gen.ProductUpdateRequest
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+	if err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return body, false, false
+	}
+	if err := json.Unmarshal(payload, &body); err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return body, false, false
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return body, false, false
+	}
+	spec, supplied := raw["spec"]
+	return body, supplied && bytes.Equal(bytes.TrimSpace(spec), []byte("null")), true
+}
+
 func listQuery(page, pageSize *int, sort *string, status, category string) catalog.ListQuery {
 	query := catalog.ListQuery{Status: status, Category: category}
 	if page != nil {
@@ -869,7 +894,7 @@ func productInput(body gen.ProductCreateRequest) catalog.ProductInput {
 	return input
 }
 
-func productPatch(body gen.ProductUpdateRequest) catalog.ProductPatch {
+func productPatch(body gen.ProductUpdateRequest, clearSpec bool) catalog.ProductPatch {
 	patch := catalog.ProductPatch{
 		CategoryCode: body.CategoryCode,
 		Unit:         body.Unit,
@@ -891,7 +916,9 @@ func productPatch(body gen.ProductUpdateRequest) catalog.ProductPatch {
 	if body.Name != nil {
 		patch.Name = fromGenLocalized(*body.Name)
 	}
-	if body.Spec != nil {
+	if clearSpec {
+		patch.Spec = catalog.LocalizedText{}
+	} else if body.Spec != nil {
 		patch.Spec = localizedPatch(*body.Spec)
 	}
 	if body.Tiers != nil {
