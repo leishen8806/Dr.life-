@@ -69,6 +69,12 @@ func (f *loginFixture) testAccountStatus(t *testing.T) {
 	if err := f.pool.QueryRow(ctx, `SELECT status_reason FROM iam.account WHERE public_id=$1`, login.Account.PublicID).Scan(&reason); err != nil || reason != nil {
 		t.Fatalf("restored reason=%v err=%v", reason, err)
 	}
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.account_status_log WHERE account_id=(SELECT id FROM iam.account WHERE public_id=$1)`, login.Account.PublicID).Scan(&logs); err != nil || logs != 2 {
+		t.Fatalf("restored account logs=%d err=%v", logs, err)
+	}
+	if _, err := (&SessionService{DB: f.pool, Tokens: f.service.Tokens, Cache: f.cache, Now: func() time.Time { return f.now }}).Refresh(ctx, login.RefreshToken, ""); err == nil {
+		t.Fatal("restored account revived the old refresh token")
+	}
 	if _, err := service.SetAccountStatus(ctx, login.Account.PublicID, "active", "again", actor); !errors.Is(err, ErrNoStatusChange) {
 		t.Fatalf("same status error=%v", err)
 	}
@@ -103,6 +109,9 @@ func (f *loginFixture) testAccountStatus(t *testing.T) {
 	}
 	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.session s JOIN iam.account a ON a.id=s.account_id WHERE a.public_id=$1 AND s.revoked_reason='account_disabled'`, concurrent.Account.PublicID).Scan(&revoked); err != nil || revoked != 1 {
 		t.Fatalf("disabled revoked sessions=%d err=%v", revoked, err)
+	}
+	if err := f.pool.QueryRow(ctx, `SELECT token_epoch FROM iam.account WHERE public_id=$1`, concurrent.Account.PublicID).Scan(&epoch); err != nil || epoch != 1 {
+		t.Fatalf("disabled account epoch=%d err=%v", epoch, err)
 	}
 	if _, err := service.StatusHistory(ctx, concurrent.Account.PublicID, 101); err == nil {
 		t.Fatal("history accepted a limit above 100")
