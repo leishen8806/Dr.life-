@@ -25,6 +25,9 @@ func TestVerificationWorkerMarksMatchingObjectReady(t *testing.T) {
 	if store.file.Status != StatusReady || objects.deleted {
 		t.Fatalf("status=%q deleted=%t", store.file.Status, objects.deleted)
 	}
+	if store.file.ObjectKey == "objects/file-1" {
+		t.Fatal("ready file retained the key exposed by the upload URL")
+	}
 }
 
 func TestVerificationWorkerRejectsAndDeletesChecksumMismatch(t *testing.T) {
