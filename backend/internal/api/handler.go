@@ -620,6 +620,19 @@ func profileData(profile iam.AccountProfile) gen.AccountProfileData {
 	return data
 }
 
+// File endpoints remain fail-closed until the files service is wired into the server.
+func (Handler) PostFilePresign(w http.ResponseWriter, r *http.Request, _ gen.PostFilePresignParams) {
+	httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+}
+
+func (Handler) PostFileComplete(w http.ResponseWriter, r *http.Request, _ gen.PublicID, _ gen.PostFileCompleteParams) {
+	httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+}
+
+func (Handler) GetFileDownloadUrl(w http.ResponseWriter, r *http.Request, _ gen.PublicID) {
+	httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+}
+
 func (h Handler) ListPublicCategories(w http.ResponseWriter, r *http.Request, params gen.ListPublicCategoriesParams) {
 	service, ok := h.catalogService(w, r)
 	if !ok {
