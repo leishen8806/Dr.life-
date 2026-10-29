@@ -163,6 +163,7 @@ type ProductInput struct {
 	Source       string
 	SourceRef    string
 	Tiers        []Tier
+	SKUs         []SKUInput
 }
 
 // ProductPatch 是商家修改自己商品的增量输入；指针字段为 nil 表示不改。
@@ -177,6 +178,7 @@ type ProductPatch struct {
 	SourceRef    *string
 	Status       *ProductStatus
 	Tiers        []Tier
+	SKUs         *[]SKUInput
 }
 
 // ListQuery 是列表接口的分页、排序与白名单过滤参数。

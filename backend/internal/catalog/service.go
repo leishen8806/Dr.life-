@@ -3,11 +3,13 @@ package catalog
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 )
 
 // Store 是 catalog 自己 schema 的持久化边界。
 type Store interface {
+	CategoryAttributes(ctx context.Context, categoryCode string) ([]CategoryAttribute, error)
 	ListCategories(ctx context.Context, plan Plan) (CategoryPage, error)
 	ListProducts(ctx context.Context, filter ProductFilter, plan Plan) (ProductPage, error)
 	Product(ctx context.Context, publicID string) (Product, error)
@@ -154,10 +156,35 @@ func (s *Service) CreateProduct(ctx context.Context, merchantID int64, input Pro
 	if err := validateVolume(input.VolumeM3); err != nil {
 		return Product{}, err
 	}
-	if err := ValidateTiers(input.Tiers); err != nil {
+	if err := s.validatePriceShape(ctx, input.CategoryCode, input.Tiers, input.SKUs); err != nil {
 		return Product{}, err
 	}
 	return s.store.CreateProduct(ctx, merchantID, input)
+}
+
+func (s *Service) validatePriceShape(ctx context.Context, categoryCode string, tiers []Tier, skus []SKUInput) error {
+	if (tiers == nil) == (skus == nil) {
+		return invalid("tiers", "exactly one of tiers or skus is required")
+	}
+	if tiers != nil {
+		return ValidateTiers(tiers)
+	}
+	attributes, err := s.store.CategoryAttributes(ctx, categoryCode)
+	if err != nil {
+		return err
+	}
+	seen := map[string]struct{}{}
+	for i, sku := range skus {
+		if err := ValidateSKU(attributes, sku); err != nil {
+			return err
+		}
+		key := skuCombinationKey(sku.AttributeValues)
+		if _, ok := seen[key]; ok {
+			return invalid(fmt.Sprintf("skus[%d].attribute_values", i), "duplicate SKU combination")
+		}
+		seen[key] = struct{}{}
+	}
+	return nil
 }
 
 // UpdateProduct 实现验收标准③，并保证在售商品改动后仍可发布（三语齐全、至少两档）。
@@ -174,6 +201,15 @@ func (s *Service) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 	}
 	if err := s.requireActiveMerchant(ctx, merchantID); err != nil {
 		return Product{}, err
+	}
+	if patch.SKUs != nil || patch.Tiers != nil {
+		category := product.CategoryCode
+		if patch.CategoryCode != nil {
+			category = *patch.CategoryCode
+		}
+		if err := s.validatePriceShape(ctx, category, patch.Tiers, derefSKUs(patch.SKUs)); err != nil {
+			return Product{}, err
+		}
 	}
 	if patch.Origin != nil {
 		if err := validateOrigin(*patch.Origin); err != nil {

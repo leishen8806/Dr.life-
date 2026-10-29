@@ -36,6 +36,32 @@ func NewPgStore(db pool) *PgStore {
 	return &PgStore{db: db}
 }
 
+func (s *PgStore) CategoryAttributes(ctx context.Context, categoryCode string) ([]CategoryAttribute, error) {
+	rows, err := s.db.Query(ctx, `SELECT a.key, a.name, a.type, coalesce(a.unit,''), a.required, a.is_sku_dimension, a.value_json, a.sort FROM catalog.category_attribute a JOIN catalog.category c ON c.id=a.category_id WHERE c.code=$1 ORDER BY a.sort,a.id`, categoryCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	attributes := []CategoryAttribute{}
+	for rows.Next() {
+		var a CategoryAttribute
+		var name, values []byte
+		if err := rows.Scan(&a.Key, &name, &a.Type, &a.Unit, &a.Required, &a.IsSKUDimension, &values, &a.Sort); err != nil {
+			return nil, err
+		}
+		if err := decodeLocalized(name, &a.Name); err != nil {
+			return nil, err
+		}
+		if len(values) != 0 {
+			if err := json.Unmarshal(values, &a.Values); err != nil {
+				return nil, fmt.Errorf("catalog: decode attribute values: %w", err)
+			}
+		}
+		attributes = append(attributes, a)
+	}
+	return attributes, rows.Err()
+}
+
 // productColumns 是列表与单条读取共用的投影。
 // numeric 一律用 trim_scale 转 text 出库，金额/体积永不经由 float64。
 const productColumns = `p.id, p.public_id, p.merchant_id, p.category_id, c.code, p.name, p.spec, p.unit,
@@ -153,10 +179,14 @@ func (s *PgStore) CreateProduct(ctx context.Context, merchantID int64, input Pro
 	).Scan(&productID); err != nil {
 		return Product{}, err
 	}
-	if err := replaceTiers(ctx, tx, productID, input.Tiers); err != nil {
-		return Product{}, err
-	}
-	if err := createDefaultSKU(ctx, tx, productID, input.Tiers); err != nil {
+	if input.SKUs == nil {
+		if err := replaceTiers(ctx, tx, productID, input.Tiers); err != nil {
+			return Product{}, err
+		}
+		if err := createDefaultSKU(ctx, tx, productID, input.Tiers); err != nil {
+			return Product{}, err
+		}
+	} else if err := replaceSKUs(ctx, tx, productID, input.SKUs); err != nil {
 		return Product{}, err
 	}
 	product, err := productByID(ctx, tx, productID)
@@ -258,6 +288,10 @@ func (s *PgStore) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 			return Product{}, err
 		}
 		if err := replaceDefaultSKUTiers(ctx, tx, productID, patch.Tiers); err != nil {
+			return Product{}, err
+		}
+	} else if patch.SKUs != nil {
+		if err := replaceSKUs(ctx, tx, productID, *patch.SKUs); err != nil {
 			return Product{}, err
 		}
 	}
@@ -577,6 +611,30 @@ func replaceSKUTiers(ctx context.Context, tx pgx.Tx, skuID int64, tiers []Tier) 
 			return err
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO catalog.sku_tier (sku_id, min_qty, unit_price_e4) VALUES ($1, $2::text::numeric, $3)`, skuID, quantity, tier.UnitPriceE4); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func replaceSKUs(ctx context.Context, tx pgx.Tx, productID int64, skus []SKUInput) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM catalog.sku WHERE product_id=$1`, productID); err != nil {
+		return err
+	}
+	for _, sku := range skus {
+		publicID, err := ids.NewULID()
+		if err != nil {
+			return err
+		}
+		values, err := json.Marshal(sku.AttributeValues)
+		if err != nil {
+			return err
+		}
+		var skuID int64
+		if err := tx.QueryRow(ctx, `INSERT INTO catalog.sku (public_id,product_id,attribute_values,merchant_sku_code,unit,status) VALUES ($1,$2,$3::jsonb,NULLIF($4,''),NULLIF($5,''),'on') RETURNING id`, publicID, productID, string(values), sku.MerchantSKUCode, sku.Unit).Scan(&skuID); err != nil {
+			return err
+		}
+		if err := replaceSKUTiers(ctx, tx, skuID, sku.Tiers); err != nil {
 			return err
 		}
 	}

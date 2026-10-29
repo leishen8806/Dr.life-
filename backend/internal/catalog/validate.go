@@ -1,9 +1,21 @@
 package catalog
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
+
+func skuCombinationKey(values map[string]string) string {
+	raw, _ := json.Marshal(values)
+	return string(raw)
+}
+func derefSKUs(value *[]SKUInput) []SKUInput {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
 
 func ValidateSKU(attributes []CategoryAttribute, input SKUInput) error {
 	byKey := make(map[string]CategoryAttribute, len(attributes))

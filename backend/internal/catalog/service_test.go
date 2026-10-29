@@ -38,6 +38,7 @@ func (d stubDirectory) MerchantStatus(_ context.Context, id int64) (catalog.Merc
 }
 
 type stubStore struct {
+	attributes   []catalog.CategoryAttribute
 	products     []catalog.Product
 	product      catalog.Product
 	created      catalog.Product
@@ -51,6 +52,10 @@ type stubStore struct {
 	listCalls    int
 	filter       catalog.ProductFilter
 	plan         catalog.Plan
+}
+
+func (s *stubStore) CategoryAttributes(context.Context, string) ([]catalog.CategoryAttribute, error) {
+	return s.attributes, nil
 }
 
 func (s *stubStore) ListCategories(context.Context, catalog.Plan) (catalog.CategoryPage, error) {
@@ -107,6 +112,23 @@ func serviceWith(t *testing.T, store catalog.Store, directory catalog.MerchantDi
 
 func activeMerchant() stubDirectory {
 	return stubDirectory{sellable: []int64{merchantID}, statuses: map[int64]catalog.MerchantStatus{merchantID: catalog.MerchantActive, otherMerchantID: catalog.MerchantFrozen}}
+}
+
+func TestCreateProductRequiresExactlyOnePriceShape(t *testing.T) {
+	store := &stubStore{attributes: []catalog.CategoryAttribute{{Key: "color", Type: catalog.AttributeTypeEnum, IsSKUDimension: true, Values: []catalog.AttributeValue{{Code: "red"}}}}}
+	service := serviceWith(t, store, activeMerchant())
+	base := catalog.ProductInput{CategoryCode: "c1", Name: completeName, Unit: "pcs", Origin: "cn"}
+	if _, err := service.CreateProduct(context.Background(), merchantID, base); err == nil {
+		t.Fatal("missing both tiers and skus was accepted")
+	}
+	base.Tiers, base.SKUs = validTiers, []catalog.SKUInput{{AttributeValues: map[string]string{"color": "red"}, Tiers: validTiers}}
+	if _, err := service.CreateProduct(context.Background(), merchantID, base); err == nil {
+		t.Fatal("tiers and skus together were accepted")
+	}
+	base.Tiers = nil
+	if _, err := service.CreateProduct(context.Background(), merchantID, base); err != nil {
+		t.Fatalf("valid skus rejected: %v", err)
+	}
 }
 
 func assertValidationField(t *testing.T, err error, want string) {

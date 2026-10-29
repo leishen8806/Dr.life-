@@ -256,6 +256,10 @@ type stubStore struct {
 	lists    int
 }
 
+func (s *stubStore) CategoryAttributes(context.Context, string) ([]catalog.CategoryAttribute, error) {
+	return nil, nil
+}
+
 func (s *stubStore) ListCategories(_ context.Context, plan catalog.Plan) (catalog.CategoryPage, error) {
 	s.plan = plan
 	items := []catalog.Category{{PublicID: otherULID, Code: "c1", Name: completeName, Enabled: true, Sort: 1}}
