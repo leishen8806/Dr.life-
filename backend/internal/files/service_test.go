@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"io"
 	"testing"
 	"time"
 
@@ -174,5 +173,3 @@ func (s *fakeObjects) PresignGet(_ context.Context, key string) (storage.SignedU
 func (*fakeObjects) Stat(context.Context, string) (storage.ObjectStat, error) {
 	return storage.ObjectStat{}, nil
 }
-func (*fakeObjects) Open(context.Context, string) (io.ReadCloser, error) { return nil, nil }
-func (*fakeObjects) Delete(context.Context, string) error                { return nil }
