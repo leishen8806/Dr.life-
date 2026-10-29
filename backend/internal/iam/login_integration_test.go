@@ -210,11 +210,18 @@ func (f *loginFixture) testAccountLanguageProfileAndSafeDevices(t *testing.T) {
 
 func (f *loginFixture) testAdminManagementCreate(t *testing.T) {
 	ctx := context.Background()
-	service := &AdminManagementService{DB: f.pool, Cipher: f.envelope, Now: func() time.Time { return f.now }}
-	created, err := service.Create(ctx, AdminCreateInput{
+	audit := &stepUpAuditWriter{}
+	service := &AdminManagementService{DB: f.pool, Cipher: f.envelope, Audit: audit, Now: func() time.Time { return f.now }}
+	actor, err := service.Create(ctx, AdminCreateInput{
+		Name: "Audit Actor", Email: "audit-actor@example.test", Role: RoleSuper,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := service.CreateWithAudit(ctx, AdminCreateInput{
 		Name: "Created Admin", Email: "created-admin@example.test", Role: RoleSupport,
 		DataScope: []string{"KH-PP"},
-	})
+	}, AdminAuditInput{ActorPublicID: actor.Admin.PublicID, IP: "198.51.100.20", RequestID: "admin-create-audit"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,6 +239,13 @@ func (f *loginFixture) testAdminManagementCreate(t *testing.T) {
 	}
 	if !required || !VerifyPassword(passwordHash, created.InitialPassword) || len(secret) == 0 || bytes.Contains(secret, []byte(created.InitialPassword)) {
 		t.Fatalf("bootstrap credentials were not safely stored: required=%v hash=%q secret=%x", required, passwordHash, secret)
+	}
+	if len(audit.entries) != 1 || audit.entries[0].Action != platformaudit.ActionPermissionChanged || audit.entries[0].Target != "admin:"+created.Admin.PublicID || audit.entries[0].RequestID != "admin-create-audit" {
+		t.Fatalf("unexpected administrator creation audit entries: %#v", audit.entries)
+	}
+	detail := string(audit.entries[0].Detail)
+	if !strings.Contains(detail, actor.Admin.PublicID) || !strings.Contains(detail, created.Admin.PublicID) || strings.Contains(detail, created.InitialPassword) || strings.Contains(detail, created.TOTPProvisioningURI) || strings.Contains(detail, "password_hash") || strings.Contains(detail, "totp_secret") {
+		t.Fatalf("administrator creation audit leaked credentials or omitted identities: %s", detail)
 	}
 }
 
