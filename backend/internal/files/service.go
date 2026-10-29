@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
@@ -44,6 +45,7 @@ type Store interface {
 	Create(context.Context, File) error
 	GetOwned(context.Context, int64, string) (File, error)
 	MarkVerifying(context.Context, int64, string) (File, error)
+	MarkPending(context.Context, int64, string) error
 	DailyUsage(context.Context, int64, time.Time) (Usage, error)
 }
 type Options struct {
@@ -126,6 +128,9 @@ func (s *Service) Complete(ctx context.Context, ownerAccount int64, publicID str
 		return File{}, err
 	}
 	if err := s.verifier.EnqueueVerification(ctx, file); err != nil {
+		if restoreErr := s.store.MarkPending(ctx, ownerAccount, publicID); restoreErr != nil {
+			return File{}, fmt.Errorf("enqueue verification: %w; restore pending: %v", err, restoreErr)
+		}
 		return File{}, err
 	}
 	return file, nil

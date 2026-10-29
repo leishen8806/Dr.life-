@@ -133,6 +133,13 @@ func (s *memoryStore) MarkVerifying(_ context.Context, owner int64, publicID str
 	s.file.Status = StatusVerifying
 	return s.file, nil
 }
+func (s *memoryStore) MarkPending(_ context.Context, owner int64, publicID string) error {
+	if s.file.OwnerAccount != owner || s.file.PublicID != publicID || s.file.Status != StatusVerifying {
+		return ErrNotFound
+	}
+	s.file.Status = StatusPending
+	return nil
+}
 func (s *memoryStore) DailyUsage(context.Context, int64, time.Time) (Usage, error) {
 	return s.usage, nil
 }

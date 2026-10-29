@@ -48,6 +48,21 @@ func (s PostgresStore) MarkVerifying(ctx context.Context, ownerAccount int64, pu
 	return file, err
 }
 
+func (s PostgresStore) MarkPending(ctx context.Context, ownerAccount int64, publicID string) error {
+	if s.DB == nil {
+		return ErrNotConfigured
+	}
+	result, err := s.DB.Exec(ctx, `UPDATE ops.file SET status='pending', updated_at=now()
+        WHERE owner_account=$1 AND public_id=$2 AND status='verifying'`, ownerAccount, publicID)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s PostgresStore) DailyUsage(ctx context.Context, ownerAccount int64, now time.Time) (Usage, error) {
 	if s.DB == nil {
 		return Usage{}, ErrNotConfigured
