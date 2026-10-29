@@ -19,7 +19,7 @@ func TestEnvExampleDocumentsFileQuotaDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"FILE_MAX_DAILY_UPLOADS=100", "FILE_MAX_DAILY_BYTES="} {
+	for _, want := range []string{"FILE_WORKER_DATABASE_URL=postgres://app_file_worker:CHANGE_ME@127.0.0.1:55432/drlife?sslmode=disable", "FILE_MAX_DAILY_UPLOADS=100", "FILE_MAX_DAILY_BYTES="} {
 		if !strings.Contains(string(contents), want) {
 			t.Fatalf(".env.example missing %q", want)
 		}
@@ -183,6 +183,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 		"READ_TIMEOUT_SECONDS":            "35",
 		"IDLE_TIMEOUT_SECONDS":            "75",
 		"DATABASE_URL":                    "postgres://placeholder",
+		"FILE_WORKER_DATABASE_URL":        "postgres://file-worker-placeholder",
 		"IAM_DATABASE_URL":                "postgres://iam-placeholder",
 		"AUDIT_DATABASE_URL":              "postgres://audit-placeholder",
 		"REPORT_DATABASE_URL":             "postgres://report-placeholder",
@@ -233,7 +234,7 @@ func TestLoadParsesValuesAndRejectsInvalidTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.IAMDatabaseURL != "postgres://iam-placeholder" || cfg.AuditDatabaseURL != "postgres://audit-placeholder" || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.CacheRedisURL != "redis://cache-placeholder" || cfg.QueueRedisURL != "redis://queue-placeholder" || !cfg.QueueAllowEviction || cfg.DBMaxConns != 20 || cfg.DBReportMaxConns != 6 || cfg.DBWorkerMaxConns != 5 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBAcquireTimeout != 150*time.Millisecond || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" || cfg.TelegramInitDataMaxAge != 12*time.Hour || cfg.AccessTokenTTL != 10*time.Minute || cfg.RefreshTokenTTL != 240*time.Hour || cfg.RefreshTokenGrace != 12*time.Second || cfg.SessionIdleTTL != 12*time.Hour || cfg.SessionMaxPerAccount != 3 || cfg.TokenIssuer != "drlife-staging" || !cfg.TokenLegacyAcceptUntil.Equal(time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC)) || cfg.LoginFailureLimit != 8 || cfg.LoginFailureWindow != 3*time.Minute || cfg.BotTokenCacheTTL != 2*time.Minute {
+	if cfg.AppEnv != "staging" || cfg.AppRelease != "test-release" || cfg.HTTPAddr != "127.0.0.1:9090" || cfg.MetricsAddr != "127.0.0.1:9200" || cfg.SentryDSN == "" || cfg.LogLevel != slog.LevelDebug || cfg.ShutdownTimeout != 8*time.Second || cfg.ReadHeaderTimeout != 12*time.Second || cfg.ReadTimeout != 35*time.Second || cfg.IdleTimeout != 75*time.Second || cfg.FileWorkerDatabaseURL != "postgres://file-worker-placeholder" || cfg.IAMDatabaseURL != "postgres://iam-placeholder" || cfg.AuditDatabaseURL != "postgres://audit-placeholder" || cfg.ReportDatabaseURL != "postgres://report-placeholder" || cfg.CacheRedisURL != "redis://cache-placeholder" || cfg.QueueRedisURL != "redis://queue-placeholder" || !cfg.QueueAllowEviction || cfg.DBMaxConns != 20 || cfg.DBReportMaxConns != 6 || cfg.DBWorkerMaxConns != 5 || cfg.DBMinConns != 4 || cfg.DBConnectTimeout != 6*time.Second || cfg.DBAcquireTimeout != 150*time.Millisecond || cfg.DBSlowQuery != 250*time.Millisecond || len(cfg.CORSBuyerOrigins) != 1 || len(cfg.CORSCredentialPaths) != 1 || cfg.WebhookPrefix != "/webhooks/telegram" || cfg.TrustedProxyHeader != "CF-Connecting-IP" || len(cfg.TrustedProxyCIDRs) != 2 || len(cfg.AdminAllowedCIDRs) != 1 || cfg.RequestBodyMaxBytes != 4096 || cfg.RequestBodyOverrides["/v1/admin/import"] != 8192 || len(cfg.ContentTypeExemptPaths) != 2 || cfg.WebhookMaxBodyBytes != 2048 || cfg.IdempotencyTTL != 12*time.Hour || cfg.IdempotencyMaxBytes != 8192 || len(cfg.FinancialPrefixes) != 1 || cfg.RateLimitIP != 100 || cfg.RateLimitAccount != 200 || cfg.RateLimitLogin != 9 || cfg.RateLimitWithdraw != 4 || cfg.RateLimitAI != 20 || cfg.RateLimitAdmin != 40 || cfg.LedgerReconTimezone != "UTC" || cfg.TelegramInitDataMaxAge != 12*time.Hour || cfg.AccessTokenTTL != 10*time.Minute || cfg.RefreshTokenTTL != 240*time.Hour || cfg.RefreshTokenGrace != 12*time.Second || cfg.SessionIdleTTL != 12*time.Hour || cfg.SessionMaxPerAccount != 3 || cfg.TokenIssuer != "drlife-staging" || !cfg.TokenLegacyAcceptUntil.Equal(time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC)) || cfg.LoginFailureLimit != 8 || cfg.LoginFailureWindow != 3*time.Minute || cfg.BotTokenCacheTTL != 2*time.Minute {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	for _, raw := range []string{"0", "-1", "abc"} {
@@ -332,12 +333,12 @@ func TestLoadFileStorageAndQuotaConfiguration(t *testing.T) {
 	cfg, err := load(lookup(map[string]string{
 		"APP_ENV": "test", "STORAGE_DRIVER": "minio", "STORAGE_BUCKET": "files", "STORAGE_ENDPOINT": "http://storage.test",
 		"STORAGE_ACCESS_KEY": "access", "STORAGE_SECRET_KEY": "secret", "STORAGE_ALLOWED_CONTENT_TYPES": "image/jpeg,image/png",
-		"STORAGE_MAX_CONTENT_LENGTH": "10485760", "FILE_MAX_DAILY_UPLOADS": "20", "FILE_MAX_DAILY_BYTES": "20971520",
+		"STORAGE_MAX_CONTENT_LENGTH": "10485760", "FILE_WORKER_DATABASE_URL": "postgres://file-worker", "FILE_MAX_DAILY_UPLOADS": "20", "FILE_MAX_DAILY_BYTES": "20971520",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.StorageDriver != "minio" || cfg.StorageBucket != "files" || len(cfg.StorageAllowedContentTypes) != 2 || cfg.FileMaxDailyUploads != 20 || cfg.FileMaxDailyBytes != 20971520 {
+	if cfg.StorageDriver != "minio" || cfg.StorageBucket != "files" || cfg.FileWorkerDatabaseURL != "postgres://file-worker" || len(cfg.StorageAllowedContentTypes) != 2 || cfg.FileMaxDailyUploads != 20 || cfg.FileMaxDailyBytes != 20971520 {
 		t.Fatalf("unexpected file config: %+v", cfg)
 	}
 }

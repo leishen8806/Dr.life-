@@ -15,6 +15,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
+	platformdb "github.com/leishen8806/Dr.life-/backend/internal/platform/db"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/opsalert"
@@ -62,6 +63,10 @@ func main() {
 	var fileStore files.PostgresStore
 	var fileObjects storage.ObjectVerifier
 	if cfg.StorageDriver != "" {
+		if cfg.FileWorkerDatabaseURL == "" {
+			fmt.Fprintln(os.Stderr, "file storage configuration error: FILE_WORKER_DATABASE_URL is required")
+			os.Exit(1)
+		}
 		objects, objectErr := files.NewObjectStore(cfg)
 		if objectErr != nil {
 			fmt.Fprintln(os.Stderr, "file storage configuration error:", objectErr)
@@ -72,7 +77,13 @@ func main() {
 			fmt.Fprintln(os.Stderr, "file storage configuration error: verification access unavailable")
 			os.Exit(1)
 		}
-		fileStore = files.PostgresStore{DB: database}
+		fileDatabase, fileDatabaseErr := platformdb.NewFileWorkerPool(ctx, cfg)
+		if fileDatabaseErr != nil {
+			fmt.Fprintln(os.Stderr, "file worker database configuration error:", fileDatabaseErr)
+			os.Exit(1)
+		}
+		defer fileDatabase.Close()
+		fileStore = files.PostgresStore{DB: fileDatabase}
 		if err := files.RegisterTasks(registry); err != nil {
 			fmt.Fprintln(os.Stderr, "file queue registry error:", err)
 			os.Exit(1)
