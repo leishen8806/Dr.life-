@@ -176,7 +176,7 @@ describe("home view", () => {
       })
     );
     expect(text).toContain("No categories yet");
-    expect(text).toContain("No products on sale in this category");
+    expect(text).toContain("No products on sale");
     expect(text.filter((line) => line === "Refresh")).toHaveLength(2);
   });
 
@@ -213,7 +213,7 @@ describe("category view", () => {
     );
     expect(
       visibleText(category("en", { products: { status: "ready", value: [] } }))
-    ).toContain("No products on sale in this category");
+    ).toContain("No products on sale");
     const failed = category("en", {
       products: { status: "error", messageKey: "common.networkError" }
     });

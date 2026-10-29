@@ -97,6 +97,6 @@
 ,"mall.tierQuantity": "{quantity} 起"
 ,"mall.supplier": "供应商"
 ,"mall.categoriesEmpty": "暂无商品分类"
-,"mall.productsEmpty": "该分类暂无在售商品"
+,"mall.productsEmpty": "暂无在售商品"
 ,"mall.loadError": "加载失败"
 }

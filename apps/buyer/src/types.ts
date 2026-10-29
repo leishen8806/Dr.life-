@@ -1,0 +1,7 @@
+import type { components } from "@drlife/api-client";
+
+/** Catalogue shapes come from the generated OpenAPI schema; never hand-write them. */
+export type Category = components["schemas"]["Category"];
+export type Product = components["schemas"]["Product"];
+export type ProductTier = components["schemas"]["ProductTier"];
+export type LocalizedText = components["schemas"]["LocalizedText"];

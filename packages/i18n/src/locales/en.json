@@ -97,6 +97,6 @@
 ,"mall.tierQuantity": "{quantity} and up"
 ,"mall.supplier": "Supplier"
 ,"mall.categoriesEmpty": "No categories yet"
-,"mall.productsEmpty": "No products on sale in this category"
+,"mall.productsEmpty": "No products on sale"
 ,"mall.loadError": "Could not load"
 }

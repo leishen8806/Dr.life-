@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
 
 function ruleFor(selector: string): string {
-  const start = styles.indexOf(selector);
+  const start = styles.indexOf(`${selector} {`);
   expect(start, `missing rule for ${selector}`).toBeGreaterThanOrEqual(0);
   return styles.slice(start, styles.indexOf("}", start));
 }
