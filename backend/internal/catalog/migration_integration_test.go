@@ -118,6 +118,18 @@ func TestCatalogMigration(t *testing.T) {
 	t.Cleanup(pool.Close)
 	store := catalog.NewPgStore(pool)
 
+	t.Run("trilingual public search matches the same product", func(t *testing.T) {
+		for _, query := range []string{"瓷砖", "tile", "ក្បឿង"} {
+			page, err := store.SearchProducts(ctx, catalog.ProductFilter{}, catalog.SearchQuery{Query: query, PageSize: 10})
+			if err != nil {
+				t.Fatalf("SearchProducts(%q): %v", query, err)
+			}
+			if len(page.Items) != 1 || page.Items[0].PublicID != firstProductPublicID {
+				t.Fatalf("SearchProducts(%q) items=%+v, want %s", query, page.Items, firstProductPublicID)
+			}
+		}
+	})
+
 	t.Run("publish revalidates the locked row", func(t *testing.T) {
 		const publicID = "01ARZ3NDEKTSV4RRFFQ69G5FC0"
 		if _, err := admin.Exec(ctx, `

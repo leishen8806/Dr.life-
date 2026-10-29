@@ -73,6 +73,9 @@ const searchMatchesSQL = `
  FROM catalog.product p
  WHERE p.search_text @@ plainto_tsquery('simple', $1)
     OR (coalesce(p.name->>'zh','') || ' ' || coalesce(p.name->>'en','') || ' ' || coalesce(p.name->>'km','')) % $1
+	OR coalesce(p.name->>'zh','') ILIKE $1 || '%'
+	OR coalesce(p.name->>'en','') ILIKE $1 || '%'
+	OR coalesce(p.name->>'km','') ILIKE $1 || '%'
     OR EXISTS (SELECT 1 FROM catalog.search_synonym s, unnest(s.terms) term WHERE lower(term)=lower($1) AND EXISTS (SELECT 1 FROM unnest(s.terms) synonym WHERE lower(coalesce(p.name->>'zh','') || ' ' || coalesce(p.name->>'en','') || ' ' || coalesce(p.name->>'km','')) LIKE '%' || lower(synonym) || '%'))`
 
 func searchWhere(filter ProductFilter, query SearchQuery) (string, []any) {
