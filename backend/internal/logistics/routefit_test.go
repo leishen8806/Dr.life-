@@ -23,9 +23,26 @@ func TestRouteFitReceiverRejectsMalformedEventAfterVerification(t *testing.T) {
 	request.Header.Set("X-RouteFit-Timestamp", "1793260800")
 	request.Header.Set("X-RouteFit-Signature", "v1="+routeFitSignature("secret", "1793260800", body))
 
-	receiver := RouteFitReceiver{Verifier: RouteFitWebhookVerifier{Secrets: [][]byte{[]byte("secret")}, Now: func() time.Time { return time.Unix(1_793_260_800, 0).UTC() }}}
+	receiver := RouteFitReceiver{
+		Verifier: RouteFitWebhookVerifier{Secrets: [][]byte{[]byte("secret")}, Now: func() time.Time { return time.Unix(1_793_260_800, 0).UTC() }},
+		Record:   func(*http.Request, RouteFitEvent, []byte) error { return nil },
+	}
 	response := httptest.NewRecorder()
 	receiver.ServeHTTP(response, request.WithContext(context.Background()))
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+}
+
+func TestRouteFitReceiverRejectsTrailingJSONAfterVerification(t *testing.T) {
+	body := []byte(`{"eventId":"evt_01","eventType":"fulfillment.shipped","schemaVersion":1,"occurredAt":"2026-10-29T08:00:00Z","aggregate":{"type":"fulfillment","id":"ful_01","version":2},"payload":{}}{}`)
+	request := httptest.NewRequest(http.MethodPost, "/v1/integrations/routefit/events", bytes.NewReader(body))
+	request.Header.Set("X-RouteFit-Timestamp", "1793260800")
+	request.Header.Set("X-RouteFit-Signature", "v1="+routeFitSignature("secret", "1793260800", body))
+
+	receiver := RouteFitReceiver{Verifier: RouteFitWebhookVerifier{Secrets: [][]byte{[]byte("secret")}, Now: func() time.Time { return time.Unix(1_793_260_800, 0).UTC() }}}
+	response := httptest.NewRecorder()
+	receiver.ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}

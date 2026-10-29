@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -80,6 +81,80 @@ func TestRouteFitEventRecorderCommitsInboxAndDedupAtomically(t *testing.T) {
 	}
 	assertRouteFitCount(t, ctx, pool, `SELECT count(*) FROM ops.processed_event WHERE event_id='evt-3'`, 0)
 	assertRouteFitCount(t, ctx, pool, `SELECT count(*) FROM logistics.shipment_event WHERE event_id='evt-3'`, 0)
+}
+
+func TestRouteFitEventRecorderAcceptsOnlyOneConcurrentFirstAggregateVersion(t *testing.T) {
+	e := newRouteFitIntegrationEnvironment(t)
+	var handled atomic.Int32
+	started := make(chan struct{})
+	release := make(chan struct{})
+	recorder := RouteFitEventRecorder{DB: e.pool, Handlers: map[string]RouteFitEventHandler{"fulfillment.shipped": func(context.Context, pgx.Tx, RouteFitEvent) error {
+		if handled.Add(1) == 1 {
+			close(started)
+		}
+		<-release
+		return nil
+	}}}
+
+	errs := make(chan error, 2)
+	for _, eventID := range []string{"evt-first-a", "evt-first-b"} {
+		event := routeFitIntegrationEvent(eventID, 1)
+		event.Aggregate.ID = "first-concurrent"
+		go func() { errs <- recorder.Record(e.ctx, event, []byte(`{"concurrent":true}`)) }()
+	}
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("no concurrent handler started")
+	}
+	close(release)
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Fatalf("Record() error = %v", err)
+		}
+	}
+	if got := handled.Load(); got != 1 {
+		t.Fatalf("handled = %d, want 1", got)
+	}
+	assertRouteFitCount(t, e.ctx, e.pool, `SELECT count(*) FROM logistics.shipment_event WHERE aggregate_id='first-concurrent'`, 2)
+	assertRouteFitCount(t, e.ctx, e.pool, `SELECT count(*) FROM logistics.shipment_event WHERE aggregate_id='first-concurrent' AND processing_state='accepted'`, 1)
+}
+
+type routeFitIntegrationEnvironment struct {
+	ctx  context.Context
+	pool *pgxpool.Pool
+}
+
+func newRouteFitIntegrationEnvironment(t *testing.T) routeFitIntegrationEnvironment {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	t.Cleanup(cancel)
+	container, err := postgres.Run(ctx, "postgres:16-alpine", postgres.WithDatabase("routefit_test"), postgres.WithUsername("test_admin"), postgres.WithPassword("test-only"), postgres.BasicWaitStrategies())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = testcontainers.TerminateContainer(container) })
+	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	database, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatal(err)
+	}
+	if err := goose.Up(database, routeFitMigrationDirectory(t)); err != nil {
+		t.Fatal(err)
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	return routeFitIntegrationEnvironment{ctx: ctx, pool: pool}
 }
 
 func routeFitIntegrationEvent(eventID string, version int64) RouteFitEvent {
