@@ -308,6 +308,20 @@ func TestLoadOperationsAlertConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadFileStorageAndQuotaConfiguration(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{
+		"APP_ENV": "test", "STORAGE_DRIVER": "minio", "STORAGE_BUCKET": "files", "STORAGE_ENDPOINT": "http://storage.test",
+		"STORAGE_ACCESS_KEY": "access", "STORAGE_SECRET_KEY": "secret", "STORAGE_ALLOWED_CONTENT_TYPES": "image/jpeg,image/png",
+		"STORAGE_MAX_CONTENT_LENGTH": "10485760", "FILE_MAX_DAILY_UPLOADS": "20", "FILE_MAX_DAILY_BYTES": "20971520",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.StorageDriver != "minio" || cfg.StorageBucket != "files" || len(cfg.StorageAllowedContentTypes) != 2 || cfg.FileMaxDailyUploads != 20 || cfg.FileMaxDailyBytes != 20971520 {
+		t.Fatalf("unexpected file config: %+v", cfg)
+	}
+}
+
 func lookup(values map[string]string) func(string) string {
 	return func(key string) string { return values[key] }
 }
