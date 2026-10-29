@@ -189,3 +189,52 @@ func TestEventOrderingRetryTimeoutAndScenarioAPI(t *testing.T) {
 		t.Fatal("timeout injection unexpectedly succeeded")
 	}
 }
+
+// These cases intentionally pin the RouteFit shared-contract details which are
+// easy for an in-memory substitute to accidentally simplify away.
+func TestRouteFitErrorETagAndIdempotencyContract(t *testing.T) {
+	m := newMock(t)
+	h := m.Handler()
+	missing := request(t, h, http.MethodPost, "/api/platform/v1/fulfillments", "", fulfillmentBody())
+	if missing.Code != http.StatusPreconditionRequired || !strings.Contains(missing.Body.String(), `"error"`) || !strings.Contains(missing.Body.String(), "IDEMPOTENCY_KEY_REQUIRED") {
+		t.Fatalf("missing idempotency: %d %s", missing.Code, missing.Body.String())
+	}
+	first := request(t, h, http.MethodPost, "/api/platform/v1/fulfillments", "same", fulfillmentBody())
+	if first.Code != http.StatusCreated {
+		t.Fatal(first.Body.String())
+	}
+	replay := request(t, h, http.MethodPost, "/api/platform/v1/fulfillments", "same", fulfillmentBody())
+	if replay.Header().Get("Idempotent-Replayed") != "true" {
+		t.Fatalf("missing replay header: %v", replay.Header())
+	}
+	changed := fulfillmentBody()
+	changed["externalOrderId"] = "DRL-other"
+	if w := request(t, h, http.MethodPost, "/api/platform/v1/fulfillments", "same", changed); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "IDEMPOTENCY_KEY_REUSED") {
+		t.Fatalf("reused key: %d %s", w.Code, w.Body.String())
+	}
+	noETag := httptest.NewRequest(http.MethodPut, "/api/platform/v1/owners/merchant-1/outbound-hold", strings.NewReader(`{"state":"held"}`))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, noETag)
+	if w.Code != http.StatusPreconditionRequired {
+		t.Fatalf("missing etag: %d %s", w.Code, w.Body.String())
+	}
+	good := request(t, h, http.MethodPut, "/api/platform/v1/owners/merchant-1/outbound-hold", "", map[string]any{"state": "held"})
+	if good.Code != http.StatusOK || good.Header().Get("ETag") != `"2"` {
+		t.Fatalf("etag response: %d %v", good.Code, good.Header())
+	}
+}
+
+func TestRouteFitEventsForCancelInventoryAndFees(t *testing.T) {
+	m := newMock(t)
+	w := request(t, m.Handler(), http.MethodPost, "/api/platform/v1/fulfillments", "event", fulfillmentBody())
+	var created struct{ FulfillmentID string `json:"fulfillmentId"` }
+	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil { t.Fatal(err) }
+	_ = request(t, m.Handler(), http.MethodPost, "/api/platform/v1/fulfillments/"+created.FulfillmentID+"/actions/cancel", "event-cancel", map[string]any{})
+	m.AddFeeLine(FeeLine{ID:"fee-1", OwnerRef:"merchant-1", FeeCode:"base", Amount:Money{AmountMinor:1,Currency:"USD"}})
+	if err := m.AdjustFeeLine("fee-1", Money{AmountMinor:2,Currency:"USD"}); err != nil { t.Fatal(err) }
+	got := map[string]bool{}
+	for _, e := range m.Events() { got[e.Type] = true }
+	for _, want := range []string{"fulfillment.cancelled", "inventory.changed", "fee.posted", "fee.adjusted"} {
+		if !got[want] { t.Errorf("missing event %s: %#v", want, got) }
+	}
+}
