@@ -1,5 +1,8 @@
 -- +goose Up
 -- SKU 是 catalog.product 的销售变体；product_tier 保留为旧读模型，后续版本再移除。
+ALTER TABLE catalog.category
+    ADD COLUMN km_pending_review boolean NOT NULL DEFAULT false;
+
 CREATE TABLE catalog.category_attribute (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     category_id bigint NOT NULL REFERENCES catalog.category(id) ON DELETE CASCADE,
@@ -10,6 +13,7 @@ CREATE TABLE catalog.category_attribute (
     required boolean NOT NULL DEFAULT false,
     is_sku_dimension boolean NOT NULL DEFAULT false,
     value_json jsonb,
+    km_pending_review boolean NOT NULL DEFAULT false,
     sort integer NOT NULL DEFAULT 0,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -26,7 +30,7 @@ CREATE TABLE catalog.sku (
     product_id bigint NOT NULL REFERENCES catalog.product(id) ON DELETE CASCADE,
     attribute_values jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(attribute_values) = 'object'),
     merchant_sku_code text,
-    status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'review', 'on', 'off', 'rejected')),
+    status text NOT NULL DEFAULT 'off' CHECK (status IN ('on', 'off')),
     unit text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -48,7 +52,8 @@ CREATE TABLE catalog.sku_tier (
 
 -- Existing products receive an empty-attribute default SKU.  The fixed prefix and identity suffix form a valid 26-char ULID-shaped public id.
 INSERT INTO catalog.sku (public_id, product_id, attribute_values, status)
-SELECT '01H5K0' || lpad(p.id::text, 20, '0'), p.id, '{}'::jsonb, p.status
+SELECT '01H5K0' || lpad(p.id::text, 20, '0'), p.id, '{}'::jsonb,
+       CASE WHEN p.status = 'on' THEN 'on' ELSE 'off' END
 FROM catalog.product p;
 
 INSERT INTO catalog.sku_tier (sku_id, min_qty, unit_price_e4, created_at, updated_at)
@@ -60,3 +65,4 @@ JOIN catalog.sku s ON s.product_id = pt.product_id AND s.attribute_values = '{}'
 DROP TABLE catalog.sku_tier;
 DROP TABLE catalog.sku;
 DROP TABLE catalog.category_attribute;
+ALTER TABLE catalog.category DROP COLUMN km_pending_review;

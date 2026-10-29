@@ -552,7 +552,7 @@ func createDefaultSKU(ctx context.Context, tx pgx.Tx, productID int64, tiers []T
 		return err
 	}
 	var skuID int64
-	if err := tx.QueryRow(ctx, `INSERT INTO catalog.sku (public_id, product_id, attribute_values) VALUES ($1, $2, '{}'::jsonb) RETURNING id`, publicID, productID).Scan(&skuID); err != nil {
+	if err := tx.QueryRow(ctx, `INSERT INTO catalog.sku (public_id, product_id, attribute_values, status) VALUES ($1, $2, '{}'::jsonb, 'off') RETURNING id`, publicID, productID).Scan(&skuID); err != nil {
 		return err
 	}
 	return replaceSKUTiers(ctx, tx, skuID, tiers)

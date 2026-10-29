@@ -230,6 +230,14 @@ func TestCatalogMigration(t *testing.T) {
 	})
 
 	t.Run("sku backfill and constraints", func(t *testing.T) {
+		var categoryPendingReview bool
+		if err := admin.QueryRow(ctx, `SELECT km_pending_review FROM catalog.category WHERE code = $1`, scratchCategoryCode).Scan(&categoryPendingReview); err != nil {
+			t.Fatalf("catalog.category must retain Khmer review state: %v", err)
+		}
+		if categoryPendingReview {
+			t.Fatal("fixture category must not be marked pending Khmer review")
+		}
+
 		var skuID int64
 		if err := admin.QueryRow(ctx, `INSERT INTO catalog.sku (public_id, product_id, attribute_values) SELECT '01H5K000000000000000000001', id, '{}'::jsonb FROM catalog.product WHERE public_id = $1 RETURNING id`, firstProductPublicID).Scan(&skuID); err != nil {
 			t.Fatal(err)
@@ -239,6 +247,13 @@ func TestCatalogMigration(t *testing.T) {
 		}
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO catalog.category_attribute (category_id, key, name, type, is_sku_dimension) SELECT id, 'length', '{"zh":"长","en":"Length","km":"ប្រវែង"}'::jsonb, 'number', true FROM catalog.category LIMIT 1`)
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO catalog.category_attribute (category_id, key, name, type, value_json) SELECT id, 'color', '{"zh":"颜色","en":"Color","km":"ពណ៌"}'::jsonb, 'enum', '[]'::jsonb FROM catalog.category LIMIT 1`)
+		var attributePendingReview bool
+		if err := admin.QueryRow(ctx, `INSERT INTO catalog.category_attribute (category_id, key, name, type, value_json, km_pending_review) SELECT id, 'color_pending', '{"zh":"color","en":"color","km":"color"}'::jsonb, 'enum', '[{"code":"red","zh":"red","en":"red","km":"red"}]'::jsonb, true FROM catalog.category WHERE code = $1 RETURNING km_pending_review`, scratchCategoryCode).Scan(&attributePendingReview); err != nil {
+			t.Fatalf("catalog.category_attribute must retain Khmer review state: %v", err)
+		}
+		if !attributePendingReview {
+			t.Fatal("explicit category attribute Khmer review marker was not persisted")
+		}
 		assertSQLState(t, ctx, admin, "23503", `INSERT INTO catalog.sku_tier (sku_id, min_qty, unit_price_e4) VALUES (999999, 1, 1)`)
 	})
 
