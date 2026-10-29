@@ -46,6 +46,10 @@ type AdminStepUp interface {
 	Issue(context.Context, string, string, string, string, string) (iam.AdminStepUpResult, error)
 }
 
+type AdminPassword interface {
+	Change(context.Context, iam.AdminPasswordChangeInput) error
+}
+
 type SessionManagement interface {
 	Refresh(context.Context, string, string) (iam.RefreshResult, error)
 	ListSessions(context.Context, string) ([]iam.SessionInfo, error)
@@ -126,6 +130,7 @@ type Handler struct {
 	Login            TelegramLogin
 	AdminLogin       AdminLogin
 	AdminStepUp      AdminStepUp
+	AdminPassword    AdminPassword
 	Sessions         SessionManagement
 	AccountProfiles  AccountProfileManagement
 	AccountLinks     AccountLinkManagement
@@ -696,6 +701,35 @@ func (h Handler) PostAdminAuthStepUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteOK(w, r, result)
+}
+
+func (h Handler) ChangeAdminPassword(w http.ResponseWriter, r *http.Request) {
+	identity, authenticated := gateway.IdentityFromContext(r.Context())
+	if !authenticated || identity.Role != gateway.RoleAdmin {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return
+	}
+	if h.AdminPassword == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	body, ok := decodeJSON[gen.ChangeAdminPasswordJSONRequestBody](w, r)
+	if !ok || body.CurrentPassword == "" || body.NewPassword == "" || body.TotpCode == "" {
+		if ok {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	err := h.AdminPassword.Change(r.Context(), iam.AdminPasswordChangeInput{
+		AdminPublicID: identity.AccountID, SessionPublicID: identity.SessionID,
+		CurrentPassword: body.CurrentPassword, NewPassword: body.NewPassword, TOTPCode: body.TotpCode,
+		IP: h.ClientIP.Resolve(r), RequestID: httpx.RequestIDFromContext(r.Context()),
+	})
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, map[string]bool{"changed": true})
 }
 
 func (h Handler) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {

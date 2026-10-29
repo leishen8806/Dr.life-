@@ -267,6 +267,7 @@ func main() {
 	var loginService *iam.Service
 	var adminLoginService *iam.AdminLoginService
 	var adminStepUpService *iam.AdminStepUpService
+	var adminPasswordService *iam.AdminPasswordService
 	var adminManagementService *iam.AdminManagementService
 	var sessionService *iam.SessionService
 	var accountProfileService *iam.AccountProfileService
@@ -344,6 +345,7 @@ func main() {
 		adminFailures := &iam.AdminFailureGuard{}
 		adminLoginService = &iam.AdminLoginService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Audit: auditStore, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: sessionCache, Failures: adminFailures}
 		adminStepUpService = &iam.AdminStepUpService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Permissions: *adminPermissions, Audit: auditStore, Failures: adminFailures}
+		adminPasswordService = &iam.AdminPasswordService{DB: iamDatabase, Cipher: envelope, Audit: auditStore, SessionCache: sessionCache}
 		adminManagementService = &iam.AdminManagementService{DB: iamDatabase, Cipher: envelope, Audit: auditStore, SessionCache: sessionCache}
 		stepUpVerifier = adminStepUpVerifier{tokens: adminTokens}
 		if cfg.RedisURL != "" {
@@ -391,7 +393,7 @@ func main() {
 			FinancialPrefixes: cfg.FinancialPrefixes,
 		},
 		IdempotencyExempt: func(r *http.Request) bool {
-			return r.Method == http.MethodPost && (r.URL.Path == "/v1/public/auth/telegram" || r.URL.Path == "/v1/public/auth/refresh")
+			return r.Method == http.MethodPost && (r.URL.Path == "/v1/public/auth/telegram" || r.URL.Path == "/v1/public/auth/refresh" || r.URL.Path == "/v1/admin/auth/login" || r.URL.Path == "/v1/admin/auth/refresh" || r.URL.Path == "/v1/admin/auth/step-up" || r.URL.Path == "/v1/admin/auth/password")
 		},
 		Metrics:             metrics,
 		ErrorReporter:       reporter,
@@ -401,6 +403,7 @@ func main() {
 		Login:               loginService,
 		AdminLogin:          adminLoginService,
 		AdminStepUp:         adminStepUpService,
+		AdminPassword:       adminPasswordService,
 		AdminStepUpVerifier: stepUpVerifier,
 		AdminStepUpJTIStore: adminStepUpJTIStore,
 		Audit:               auditStore,

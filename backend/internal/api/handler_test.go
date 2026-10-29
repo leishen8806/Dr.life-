@@ -874,6 +874,7 @@ func TestChangeAdminPasswordUsesAuthenticatedRestrictedSession(t *testing.T) {
 		return server.NewHandlerWithGateway(nil, server.GatewayOptions{
 			AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
 			Authenticator: stubAuth{identity: identity}, AdminPassword: passwords,
+			IdempotencyExempt: func(r *http.Request) bool { return r.URL.Path == "/v1/admin/auth/password" },
 		})
 	}
 	request := func() *http.Request {
