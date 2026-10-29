@@ -123,6 +123,75 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	t.Run("refresh plaintext is absent", f.testRefreshNotStored)
 	t.Run("refresh rotation concurrency reuse and revocation", f.testSessionLifecycle)
 	t.Run("session ownership cache rebuild and fail policy", f.testSessionAccess)
+	t.Run("account language profile and safe devices", f.testAccountLanguageProfileAndSafeDevices)
+}
+
+func (f *loginFixture) testAccountLanguageProfileAndSafeDevices(t *testing.T) {
+	ctx := context.Background()
+	first, err := f.service.Login(ctx, LoginInput{End: telegram.Buyer, InitData: signInit(f.now, 9101, "buyer-standby-token", ""), DeviceID: "device_one", IP: "198.51.100.21"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	profiles := AccountProfileService{DB: f.pool}
+	for _, language := range []string{"fr", "", "ZH"} {
+		if err := profiles.SetLanguage(ctx, first.Account.PublicID, language); err == nil {
+			t.Fatalf("SetLanguage(%q) succeeded", language)
+		}
+	}
+	before, err := profiles.Me(ctx, first.Account.PublicID)
+	if err != nil || !before.NeedsLanguage || before.Lang != nil || before.Role != "buyer" || before.Status != "active" {
+		t.Fatalf("unregistered profile=%+v err=%v", before, err)
+	}
+	if err := profiles.SetLanguage(ctx, first.Account.PublicID, "zh"); err != nil {
+		t.Fatal(err)
+	}
+	registered, err := profiles.Me(ctx, first.Account.PublicID)
+	if err != nil || registered.NeedsLanguage || registered.Lang == nil || *registered.Lang != "zh" || registered.LangRegisteredAt == nil {
+		t.Fatalf("registered profile=%+v err=%v", registered, err)
+	}
+	registeredAt := *registered.LangRegisteredAt
+	if err := profiles.SetLanguage(ctx, first.Account.PublicID, "en"); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := profiles.Me(ctx, first.Account.PublicID)
+	if err != nil || changed.Lang == nil || *changed.Lang != "en" || changed.LangRegisteredAt == nil || !changed.LangRegisteredAt.Equal(registeredAt) {
+		t.Fatalf("changed profile=%+v err=%v registered_at=%v", changed, err, registeredAt)
+	}
+	lang, isRegistered, err := profiles.GetAccountLanguage(ctx, first.Account.PublicID)
+	if err != nil || !isRegistered || lang != "en" {
+		t.Fatalf("GetAccountLanguage=%q/%t/%v", lang, isRegistered, err)
+	}
+
+	if _, err := f.service.Login(ctx, LoginInput{End: telegram.Buyer, InitData: signInit(f.now, 9101, "buyer-standby-token", ""), DeviceID: "device_two", IP: "198.51.100.22"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `UPDATE iam.account_device SET last_seen_at=CASE WHEN device_id='device_one' THEN clock_timestamp()-interval '1 hour' ELSE clock_timestamp() END WHERE account_id=(SELECT id FROM iam.account WHERE public_id=$1)`, first.Account.PublicID); err != nil {
+		t.Fatal(err)
+	}
+	var currentSession string
+	if err := f.pool.QueryRow(ctx, `SELECT s.public_id FROM iam.session s JOIN iam.account a ON a.id=s.account_id WHERE a.public_id=$1 AND s.device_id='device_two' ORDER BY s.created_at DESC LIMIT 1`, first.Account.PublicID).Scan(&currentSession); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.service.Login(ctx, LoginInput{End: telegram.Buyer, InitData: signInit(f.now, 9102, "buyer-standby-token", ""), DeviceID: "other_account_device", IP: "198.51.100.23"}); err != nil {
+		t.Fatal(err)
+	}
+	devices, err := profiles.Devices(ctx, first.Account.PublicID, currentSession)
+	if err != nil || len(devices) != 2 || devices[0].PublicID == "" || !devices[0].IsCurrent || devices[1].IsCurrent || !devices[0].LastSeenAt.After(devices[1].LastSeenAt) {
+		t.Fatalf("devices=%+v err=%v", devices, err)
+	}
+	noDeviceLogin, err := f.service.Login(ctx, LoginInput{End: telegram.Buyer, InitData: signInit(f.now, 9101, "buyer-standby-token", ""), IP: "198.51.100.24"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var noDeviceSession string
+	if err := f.pool.QueryRow(ctx, `SELECT s.public_id FROM iam.session s JOIN iam.account a ON a.id=s.account_id WHERE a.public_id=$1 AND s.public_id<>$2 AND s.device_id IS NULL ORDER BY s.created_at DESC LIMIT 1`, noDeviceLogin.Account.PublicID, currentSession).Scan(&noDeviceSession); err != nil {
+		t.Fatal(err)
+	}
+	devices, err = profiles.Devices(ctx, first.Account.PublicID, noDeviceSession)
+	if err != nil || len(devices) != 2 || devices[0].IsCurrent || devices[1].IsCurrent {
+		t.Fatalf("no-device session devices=%+v err=%v", devices, err)
+	}
 }
 
 func (f *loginFixture) testMerchantOwnerReuseAndAmbiguity(t *testing.T) {

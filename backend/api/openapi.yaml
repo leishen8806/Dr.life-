@@ -244,6 +244,120 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/me:
+    get:
+      tags: [buyer]
+      operationId: getBuyerMe
+      summary: Get the current buyer account profile
+      x-roles: [buyer]
+      responses:
+        "200": { $ref: "#/components/responses/AccountProfileSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me:
+    get:
+      tags: [merchant]
+      operationId: getMerchantMe
+      summary: Get the current merchant account profile
+      x-roles: [merchant]
+      responses:
+        "200": { $ref: "#/components/responses/AccountProfileSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/me:
+    get:
+      tags: [driver]
+      operationId: getDriverMe
+      summary: Get the current driver account profile
+      x-roles: [driver]
+      responses:
+        "200": { $ref: "#/components/responses/AccountProfileSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/me/language:
+    put:
+      tags: [buyer]
+      operationId: putBuyerMeLanguage
+      summary: Register or change the current buyer language
+      x-roles: [buyer]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/LanguageUpdateRequest"}}}
+      responses:
+        "200": { $ref: "#/components/responses/AccountProfileSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/language:
+    put:
+      tags: [merchant]
+      operationId: putMerchantMeLanguage
+      summary: Register or change the current merchant language
+      x-roles: [merchant]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/LanguageUpdateRequest"}}}
+      responses:
+        "200": { $ref: "#/components/responses/AccountProfileSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/me/language:
+    put:
+      tags: [driver]
+      operationId: putDriverMeLanguage
+      summary: Register or change the current driver language
+      x-roles: [driver]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/LanguageUpdateRequest"}}}
+      responses:
+        "200": { $ref: "#/components/responses/AccountProfileSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/me/devices:
+    get:
+      tags: [buyer]
+      operationId: getBuyerMeDevices
+      summary: List the current buyer account devices
+      x-roles: [buyer]
+      responses:
+        "200": { $ref: "#/components/responses/AccountDeviceListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/devices:
+    get:
+      tags: [merchant]
+      operationId: getMerchantMeDevices
+      summary: List the current merchant account devices
+      x-roles: [merchant]
+      responses:
+        "200": { $ref: "#/components/responses/AccountDeviceListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/driver/me/devices:
+    get:
+      tags: [driver]
+      operationId: getDriverMeDevices
+      summary: List the current driver account devices
+      x-roles: [driver]
+      responses:
+        "200": { $ref: "#/components/responses/AccountDeviceListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /v1/buyer/me/sessions/{id}:
     delete:
       tags: [buyer]
@@ -1033,6 +1147,70 @@ components:
         ok: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/RefreshData" }
         request_id: { type: string, minLength: 1 }
+    LanguageUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [lang]
+      properties:
+        lang:
+          type: string
+          enum: [zh, en, km]
+    AccountProfileData:
+      type: object
+      additionalProperties: false
+      required: [public_id, role, lang, needs_language, status]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        role:
+          type: string
+          enum: [buyer, merchant, driver]
+        lang:
+          type: string
+          nullable: true
+          enum: [zh, en, km]
+        needs_language:
+          type: boolean
+          description: True when the account has not completed its first language registration.
+        status:
+          type: string
+          enum: [active, frozen, disabled]
+    AccountProfileSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AccountProfileData" }
+        request_id: { type: string, minLength: 1 }
+    AccountDevice:
+      type: object
+      additionalProperties: false
+      required: [public_id, first_seen_at, last_seen_at, is_current]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        first_seen_at: { type: string, format: date-time }
+        last_seen_at: { type: string, format: date-time }
+        is_current: { type: boolean }
+    AccountDeviceListData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/AccountDevice" }
+    AccountDeviceListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AccountDeviceListData" }
+        request_id: { type: string, minLength: 1 }
     Session:
       type: object
       additionalProperties: false
@@ -1494,6 +1672,16 @@ components:
         data: {$ref: "#/components/schemas/LedgerReadData"}
         request_id: {type: string, minLength: 1}
   responses:
+    AccountProfileSucceeded:
+      description: Safe profile of the authenticated account.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/AccountProfileSuccessResponse"}
+    AccountDeviceListSucceeded:
+      description: Safe device list owned by the authenticated account.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/AccountDeviceListSuccessResponse"}
     LedgerReadSucceeded:
       description: Read-only ledger response.
       content:

@@ -40,6 +40,13 @@ type SessionManagement interface {
 	RevokeSession(context.Context, string, string, string) error
 }
 
+// AccountProfileManagement exposes only self-service IAM profile operations.
+type AccountProfileManagement interface {
+	Me(context.Context, string) (iam.AccountProfile, error)
+	SetLanguage(context.Context, string, string) error
+	Devices(context.Context, string, string) ([]iam.AccountDevice, error)
+}
+
 // AccountLinkManagement is the HTTP-facing IAM port for the merchant account-link flow.
 // It deliberately exposes candidate public IDs only; matching people and owner authorization stay in IAM.
 type AccountLinkManagement interface {
@@ -81,6 +88,7 @@ type Handler struct {
 	Logger           *slog.Logger
 	Login            TelegramLogin
 	Sessions         SessionManagement
+	AccountProfiles  AccountProfileManagement
 	AccountLinks     AccountLinkManagement
 	ClientIP         gateway.ClientIPResolver
 	Audit            *platformaudit.Store
@@ -417,6 +425,24 @@ func (h Handler) GetBuyerMeSessions(w http.ResponseWriter, r *http.Request)    {
 func (h Handler) GetMerchantMeSessions(w http.ResponseWriter, r *http.Request) { h.listSessions(w, r) }
 func (h Handler) GetDriverMeSessions(w http.ResponseWriter, r *http.Request)   { h.listSessions(w, r) }
 
+func (h Handler) GetBuyerMe(w http.ResponseWriter, r *http.Request)    { h.me(w, r) }
+func (h Handler) GetMerchantMe(w http.ResponseWriter, r *http.Request) { h.me(w, r) }
+func (h Handler) GetDriverMe(w http.ResponseWriter, r *http.Request)   { h.me(w, r) }
+
+func (h Handler) PutBuyerMeLanguage(w http.ResponseWriter, r *http.Request, _ gen.PutBuyerMeLanguageParams) {
+	h.setLanguage(w, r)
+}
+func (h Handler) PutMerchantMeLanguage(w http.ResponseWriter, r *http.Request, _ gen.PutMerchantMeLanguageParams) {
+	h.setLanguage(w, r)
+}
+func (h Handler) PutDriverMeLanguage(w http.ResponseWriter, r *http.Request, _ gen.PutDriverMeLanguageParams) {
+	h.setLanguage(w, r)
+}
+
+func (h Handler) GetBuyerMeDevices(w http.ResponseWriter, r *http.Request)    { h.devices(w, r) }
+func (h Handler) GetMerchantMeDevices(w http.ResponseWriter, r *http.Request) { h.devices(w, r) }
+func (h Handler) GetDriverMeDevices(w http.ResponseWriter, r *http.Request)   { h.devices(w, r) }
+
 func (h Handler) DeleteBuyerMeSession(w http.ResponseWriter, r *http.Request, id gen.SessionID, _ gen.DeleteBuyerMeSessionParams) {
 	h.deleteSession(w, r, string(id))
 }
@@ -518,6 +544,80 @@ func (h Handler) deleteSession(w http.ResponseWriter, r *http.Request, sessionID
 		return
 	}
 	httpx.WriteOK(w, r, map[string]bool{"revoked": true})
+}
+
+func (h Handler) me(w http.ResponseWriter, r *http.Request) {
+	profiles, identity, ok := h.accountProfile(w, r)
+	if !ok {
+		return
+	}
+	profile, err := profiles.Me(r.Context(), identity.AccountID)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, profileData(profile))
+}
+
+func (h Handler) setLanguage(w http.ResponseWriter, r *http.Request) {
+	profiles, identity, ok := h.accountProfile(w, r)
+	if !ok {
+		return
+	}
+	body, ok := decodeJSON[gen.LanguageUpdateRequest](w, r)
+	if !ok {
+		return
+	}
+	if err := profiles.SetLanguage(r.Context(), identity.AccountID, string(body.Lang)); err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	profile, err := profiles.Me(r.Context(), identity.AccountID)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, profileData(profile))
+}
+
+func (h Handler) devices(w http.ResponseWriter, r *http.Request) {
+	profiles, identity, ok := h.accountProfile(w, r)
+	if !ok {
+		return
+	}
+	items, err := profiles.Devices(r.Context(), identity.AccountID, identity.SessionID)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	response := make([]gen.AccountDevice, 0, len(items))
+	for _, item := range items {
+		response = append(response, gen.AccountDevice{PublicId: item.PublicID, FirstSeenAt: item.FirstSeenAt, LastSeenAt: item.LastSeenAt, IsCurrent: item.IsCurrent})
+	}
+	httpx.WriteOK(w, r, gen.AccountDeviceListData{Items: response})
+}
+
+func (h Handler) accountProfile(w http.ResponseWriter, r *http.Request) (AccountProfileManagement, gateway.Identity, bool) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if h.AccountProfiles == nil || !ok || identity.AccountID == "" {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return nil, gateway.Identity{}, false
+	}
+	return h.AccountProfiles, identity, true
+}
+
+func profileData(profile iam.AccountProfile) gen.AccountProfileData {
+	data := gen.AccountProfileData{
+		PublicId:      profile.PublicID,
+		Role:          gen.AccountProfileDataRole(profile.Role),
+		NeedsLanguage: profile.NeedsLanguage,
+		Status:        gen.AccountProfileDataStatus(profile.Status),
+	}
+	if profile.Lang != nil {
+		lang := gen.AccountProfileDataLang(*profile.Lang)
+		data.Lang = &lang
+	}
+	return data
 }
 
 func (h Handler) ListPublicCategories(w http.ResponseWriter, r *http.Request, params gen.ListPublicCategoriesParams) {
@@ -709,6 +809,10 @@ func (h Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 		code = httpx.CodePermissionDenied
 	case errors.Is(err, iam.ErrAccountLinkExists):
 		code = httpx.CodeAlreadyProcessed
+	case errors.Is(err, iam.ErrInvalidLanguage):
+		code = httpx.CodeInvalidArgument
+	case errors.Is(err, iam.ErrAccountNotFound):
+		code = httpx.CodeResourceNotFound
 	case errors.Is(err, catalog.ErrNotFound):
 		code = httpx.CodeResourceNotFound
 	case errors.Is(err, catalog.ErrForbidden), errors.Is(err, catalog.ErrMerchantUnknown):
