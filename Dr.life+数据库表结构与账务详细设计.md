@@ -443,6 +443,76 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 - **E-4**：KESS 手续费的费率与口径仍需从 KESS 合同取得（决定 `fee_reserve` 的计算）。退款扣回方式已不影响设计，因为试点只做未结算付款的原路退。
 - **E-7**：已确认方向。待办是在一家合作银行开立公司备用金账户，并完成首笔备付金转入；完成前 P-02 不得上线。
 
+#### 6-B.14 第二轮账务复审后的修订（2026-10-29，回应 LedgerAuditor 在 CMP-670 的 R1–R9；**与 6-B.13 冲突处以本节为准**）
+
+说明：CMP-670 复审的对象是 PR #97 的中间提交 `2a4ef0d`。之后合并的版本已改为“试点只做未结算付款的原路退，`CHANNEL_KESS` 不允许为负”，所以 R2 所说的“科目级 `allow_negative` 约束不住”已经不存在：`CHANNEL_KESS`、`PLATFORM_COST` 都保持 `allow_negative = false`，不改 `00004` 的 `ck_account_negative_policy`。R2 建议的 `PAYABLE_KESS` 只有在开放“已结算付款的原路退”时才需要，届时另行设计。
+
+**R1 幂等键**：全部新键遵守 `post.go` 的 `idemKeyPattern`，即 3–4 段，每段只含 `[A-Za-z0-9_-]`。外部编号先规范化：非法字符替换为 `_`，长度超过 80 时取 SHA-256 前 32 位十六进制；原始编号另存业务表，并加唯一约束。
+
+| 交易 | 幂等键 |
+|---|---|
+| `topup_kess` | `topup_kess:kess:<规范化商户支付号>` |
+| `channel_settle` | `channel_settle:kess:<规范化结算批次号>` |
+| `capital_in` | `capital_in:bank:<规范化 bank_ref>` |
+| `cost_close` | `cost_close:period:<YYYYMM>` |
+| `fee_period_adjust` | `fee_period_adjust:feeline:<费用行 ID>` |
+| `payout_kess` | `payout_kess:withdrawal:<提现单 ID>` |
+| `delivery_fee` / `storage_fee`（费用行） | `rf_fee:<费用行 ID>:v<版本>`（原写法，符合规则） |
+| `shipping_settle` | `shipping_settle:hold:<hold ID>` |
+| `intercompany_settle` | `intercompany_settle:period:<YYYYMM>` |
+
+**R3 平台净头寸的强制点**
+
+- 所有借记 `PLATFORM_HELD` 的交易，服务层统一强校验 `amount ≤ PLATFORM_HELD − PLATFORM_COST − fee_reserve`，校验输入与交易同事务落库。涉及的交易包括 `sweep`、`cost_close`、`fee_period_adjust`、`adjust`，以及对平台收入类交易的 `reversal`。
+- `channel_settle` 不能拒绝过账，因为钱已经实际到了银行。但它要在同一事务里计算净头寸；若 `< 0`：
+  - 写 outbox 高优先级告警 `ledger.platform_net_negative`；
+  - 同事务建立“平台资金冻结”：暂停 `sweep`，以及所有借记 `PLATFORM_HELD` 的交易。客户提现不受影响，因为客户资金仍足额。
+  - 解除条件：注资（`capital_in`）后净头寸恢复 ≥ 0。
+  - **补足时限**：1 个工作日。超时升级给财务负责人和项目负责人。
+
+**R4 `cost_close` 与 `fee_period_adjust` 的台账**
+
+- `ledger.cost_close(id, period char(6) UNIQUE, amount, computed_from_posting_max_id, maker_actor, checker_actor CHECK (checker_actor <> maker_actor), txn_id, created_at)`。
+  - 冲抵额**由服务计算、不由人输入**：等于该期间已入账、尚未冲抵的 `channel_settle` 手续费合计。
+  - 同一期间只能冲抵一次。
+- `ledger.fee_period_adjustment(id, fee_line_id UNIQUE, direction, amount, reason, maker_actor, checker_actor CHECK (<>), txn_id, created_at)`：同一费用行只能做一次跨期调整。若需要再次更正，先冲销上一笔调整（见 R6）。
+- 双人复核写进上述表的 `maker_actor`、`checker_actor` 列，可查询；不写在 `txn.note` 里。
+
+**R5 `ledger.withdrawal` 渠道约束**
+
+- `CHECK ((channel = 'bank' AND payee_account_text IS NOT NULL AND kess_trade_no IS NULL) OR (channel = 'kess' AND payee_account_text IS NULL AND kess_trade_no IS NOT NULL))`
+- `CREATE UNIQUE INDEX uq_withdrawal_kess_trade ON ledger.withdrawal (kess_trade_no) WHERE channel = 'kess' AND status <> 'failed'`：同一支付号同时只能有一张有效的原路退单。
+- 原路退金额上限：同一支付号已成功原路退的合计 + 本次 ≤ 该支付号在本批次中的未结算金额。服务层在同一事务内锁定该支付意向行后校验。
+- `channel = kess` 的 `payout_fail`：与银行渠道相同，DR `PENDING_PAYOUT` / CR `WALLET_AVAIL(buyer)`，钱回到买家钱包；买家改走银行提现。
+
+**R6 新类型的冲销策略**（新迁移扩展 `00009` 的冲销白名单）
+
+| 类型 | 能否用 6.18 冲销 | 更正方式 |
+|---|---|---|
+| `delivery_fee`、`capital_in` | 能（双人，附原因与银行回单） | 冲销后重记 |
+| `channel_settle` | 能（仅限导入错误，双人，附 KESS 报表） | 冲销后按正确报表重记 |
+| `topup_kess` | 不能 | 走退款流程 |
+| `shipping_settle` | 不能 | hold 状态机，结算前取消 |
+| `payout_kess` | 不能 | 提现状态机，失败用 `payout_fail` |
+| `cost_close`、`intercompany_settle` | 不能 | 下一期间调整 |
+| `fee_period_adjust` | 能（双人），且只能冲销一次 | 冲销后可再做一次新的调整，台账唯一约束改为“未冲销的唯一” |
+
+**R7**：`PAYABLE_CARRIER` 当前只代表 RouteFit，且不实际转账。服务层禁用 `carrier_pay`；将来引入第三方承运方再拆科目。
+
+**R8 新对账项的口径**
+
+| 对账项 | 左边 | 右边 | 不一致时 |
+|---|---|---|---|
+| `CHANNEL_KESS` | `ledger.balance` | “已入账 `topup_kess`、所在批次尚未 `channel_settle`”的支付意向合计，减去已确认 `payout_kess` 合计（来自支付意向表与批次表，不取 `balance`） | 写 `recon_issue`（`CHANNEL_KESS`），告警并暂停 `sweep`；不建全局出款冻结，因为不影响客户资金是否足额 |
+| `PLATFORM_COST` | `ledger.balance` | `channel_settle` 手续费分录合计 − `cost_close` 合计（取 `posting`） | 同上 |
+
+- 修正后的恒等式本身只剩下验证余额缓存的作用，真正的闸门是这两项对账，加上 R3 的净头寸检查。
+- 银行流水逐行核对仍是缺口，另开 L 系列卡，P-02 上线前完成。
+
+**R9**：v1 中 `PLATFORM_COST` 只承载 KESS 手续费一种成本，所以不需要按类别归集。新增第二种平台成本时，必须先新增科目或给借方分录支持 `category`，不得直接复用 `PLATFORM_COST`。
+
+**落点补充**：P-02 增加 R1、R3、R5、R6、R8 中与 KESS 相关的部分；R-04 增加 R4、R7。新增的表、约束和白名单扩展放进同一个账务迁移，三道审查。
+
 ### 配套表
 ```sql
 create table ledger.hold (          -- 冻结明细
