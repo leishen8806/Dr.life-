@@ -38,7 +38,8 @@ func TestPresignCreatesPendingFileAndSignsExactMetadata(t *testing.T) {
 
 func TestCompleteMovesOnlyOwnedPendingFileToVerifying(t *testing.T) {
 	store := &memoryStore{file: File{PublicID: "file-1", OwnerAccount: 7, Status: StatusPending}}
-	service := New(store, &fakeObjects{}, Options{})
+	verify := &fakeVerifier{}
+	service := New(store, &fakeObjects{}, Options{Verifier: verify})
 
 	file, err := service.Complete(context.Background(), 7, "file-1")
 	if err != nil {
@@ -47,8 +48,19 @@ func TestCompleteMovesOnlyOwnedPendingFileToVerifying(t *testing.T) {
 	if file.Status != StatusVerifying || store.file.Status != StatusVerifying {
 		t.Fatalf("file status = %q, stored = %q", file.Status, store.file.Status)
 	}
+	if verify.file.PublicID != "file-1" || verify.file.ObjectKey != "" {
+		t.Fatalf("verification task file = %#v", verify.file)
+	}
 	if _, err := service.Complete(context.Background(), 8, "file-1"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("Complete cross-owner error = %v, want %v", err, ErrNotFound)
+	}
+}
+
+func TestCompleteFailsClosedWithoutVerificationQueue(t *testing.T) {
+	store := &memoryStore{file: File{PublicID: "file-1", OwnerAccount: 7, Status: StatusPending}}
+	service := New(store, &fakeObjects{}, Options{})
+	if _, err := service.Complete(context.Background(), 7, "file-1"); !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("Complete without verifier error = %v, want %v", err, ErrNotConfigured)
 	}
 }
 
@@ -91,6 +103,13 @@ type fakeObjects struct {
 	in       storage.PutRequest
 	download storage.SignedURL
 	getKey   string
+}
+
+type fakeVerifier struct{ file File }
+
+func (v *fakeVerifier) EnqueueVerification(_ context.Context, file File) error {
+	v.file = file
+	return nil
 }
 
 func (s *fakeObjects) PresignPut(_ context.Context, in storage.PutRequest) (storage.SignedURL, error) {
