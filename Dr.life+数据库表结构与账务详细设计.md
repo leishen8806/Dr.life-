@@ -605,7 +605,7 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
   - `ledger.capital_injection` 用 `UNIQUE (bank_ref) WHERE reversed_txn_id IS NULL` 代替 `bank_ref UNIQUE`；
   - `kess_batch` 按批次号 + 当前版本唯一。
 - **`channel_settle` 的冲销条件**：只能在其手续费分录尚未被 `cost_close` 水位覆盖时冲销（服务层校验：手续费分录的 `posting.id` 大于最新 `watermark_to_posting_id`）。已被冲抵的批次如发现导入错误，**不冲销**，改用两笔正向更正：
-  - 差额属于手续费的，用 `adjust`（双人）在 `PLATFORM_COST` 与 `PLATFORM_HELD` 之间调整；
+  - 差额属于手续费的：~~用 `adjust`（双人）在 `PLATFORM_COST` 与 `PLATFORM_HELD` 之间调整~~（作废，见 6-B.18 R30）；
   - 差额属于客户款项的，用 `bank_diff` 经 `SUSPENSE` 处理。
 
 **R21 退款后的结算报表毛额**
@@ -672,6 +672,38 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 **R27 `SUSPENSE` 补记款**：经 `bank_diff` 从 `SUSPENSE` 认定为某买家付款时，同一事务补插 `kess_payment` 行（标记 `source = 'suspense_recovery'`，`batch_id` 指向原批次，状态视为已结算），使 6-B.14 R8 对账的右边与之相符。
 
 **R28 原路退在 KESS 侧失败**：`payout_kess` 只在确认 KESS 退款成功后过账（`ConfirmKessRefund` 以 KESS 退款单号 `kess_refund_ref` 为凭据），所以不存在“已过账但 KESS 失败”的正常路径。若事后 KESS 冲回退款（罕见），用 `bank_diff` 经 `SUSPENSE` 处理，并人工回退 `refunded_amount`，须双人复核并写审计。
+
+#### 6-B.18 第六轮账务复审后的修订（2026-10-29，回应 LedgerAuditor 在 CMP-670 第 5 轮结论中的 R29–R33；**与前文冲突处以本节为准**）
+
+说明：第 5 轮的 R23、R29 已在 6-B.17 中处理（R23 统一锁顺序；R29 即 6-B.17 的“R17 补充”，把 `cost_close` 排除在“无生效版本拒绝”之外）。本节处理其余各项。
+
+**R30 已冲抵批次的手续费差额**
+
+- 6-B.16 R19 中的“用 `adjust` 在 `PLATFORM_COST` 与 `PLATFORM_HELD` 之间调整”作废：方向不成立，两个科目也不在 `adjust` 的白名单里（`adjust.go`）。
+- 改为用 `bank_diff`（双人，附 KESS 报表与银行流水），在 `BANK_DEDICATED` 与 `PLATFORM_HELD` 之间更正：
+  - 实收手续费比已入账的**少**（银行多到账）：DR `BANK_DEDICATED` / CR `PLATFORM_HELD`(category=`channel_fee`)；
+  - 实收手续费比已入账的**多**（银行少到账）：DR `PLATFORM_HELD`(category=`channel_fee`) / CR `BANK_DEDICATED`，受 6-B.14 R3 净头寸校验约束。
+- 已冲抵的 `PLATFORM_COST` 不回调，差额直接体现在平台收入里。实现时在 P-02 的账务迁移中，为 `bank_diff` 增加这对科目组合。
+
+**R31 `SUSPENSE` 的清零分录**（6-B.16 R21 兜底的配套）
+
+| 查明结果 | 清零方式 |
+|---|---|
+| 属于某买家付款 | DR `SUSPENSE` / CR `WALLET_AVAIL(buyer)`，并按 6-B.17 R27 补插 `kess_payment` |
+| 属于 KESS 多汇 | DR `SUSPENSE` / CR `BANK_DEDICATED`（退回 KESS 时） |
+| 属于 KESS 少汇 | KESS 补汇时 DR `BANK_DEDICATED` / CR `SUSPENSE` |
+
+三种都用 `bank_diff`，双人复核，幂等键 `bank_diff:suspense:<悬挂明细 ID>:v<n>`。
+
+**R32 `cost_close` 水位的安全前提**（写入文档，供实现与审查核对）：
+1. 所有手续费分录都在 `channel_settle` 中产生，而且都更新 `PLATFORM_COST` 这个单例余额行；
+2. `Post` 先按 `account_id` 升序锁余额行，再插入分录（`post.go` 中加锁在前、插入 `posting` 在后）。
+
+因此手续费分录彼此严格串行，`posting.id` 顺序等于提交顺序，水位不会漏掉晚提交的低 id 分录。以后若有任何不更新 `PLATFORM_COST` 却产生手续费的路径，或改变 `Post` 的加锁顺序，必须重新评估水位算法。
+
+**R33 `kess_refund_ref` 的写入时机**：只能在状态迁移到 `paid` 时写入，`requested`、`review`、`approved` 阶段必须为空（提现状态机触发器校验），写入后不可修改。
+
+至此，6-B.13～6-B.18 合起来是 P-02、T-10、R-04 的账务设计依据。实现卡在本节合并且 LedgerAuditor 给出 APPROVE 后派发。
 
 ### 配套表
 ```sql
