@@ -8,9 +8,11 @@
     "prebuild": "pnpm --filter @drlife/i18n i18n:check",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@drlife/api-client": "workspace:*",
     "@drlife/i18n": "workspace:*",
     "@drlife/ui": "workspace:*",
     "react": "19.2.3",

@@ -72,6 +72,9 @@ importers:
 
   apps/buyer:
     dependencies:
+      '@drlife/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
       '@drlife/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
