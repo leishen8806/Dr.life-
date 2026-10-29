@@ -755,6 +755,20 @@ func TestAdminManagementListRequiresRBACViewAndOmitsCredentials(t *testing.T) {
 	}
 }
 
+func TestGetAdminUserRequiresRBACView(t *testing.T) {
+	manager := fakeAdminManagement{users: []iam.AdminUser{{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAB", Name: "Admin", Email: "admin@example.test", Role: iam.RoleSupport, Status: iam.AdminStatusActive, CreatedAt: time.Unix(1_800_000_000, 0)}}}
+	newHandler := func(allowed bool) http.Handler {
+		return server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, AdminPermissions: fakeAdminPermissions{allowed: allowed}, AdminManagement: &manager})
+	}
+	path := "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB"
+	if got := serve(t, newHandler(false), httptest.NewRequest(http.MethodGet, path, nil)); got.Code != http.StatusForbidden {
+		t.Fatalf("without rbac view status=%d body=%s", got.Code, got.Body.String())
+	}
+	if got := serve(t, newHandler(true), httptest.NewRequest(http.MethodGet, path, nil)); got.Code != http.StatusOK || strings.Contains(got.Body.String(), "password_hash") || strings.Contains(got.Body.String(), "totp_secret_enc") {
+		t.Fatalf("get status=%d body=%s", got.Code, got.Body.String())
+	}
+}
+
 func TestAdminManagementCreateRequiresEditStepUpAndIdempotency(t *testing.T) {
 	manager := &fakeAdminManagement{created: iam.AdminCreateResult{
 		Admin:           iam.AdminUser{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAB", Name: "Created", Email: "created@example.test", Role: iam.RoleSupport, Status: iam.AdminStatusActive, CreatedAt: time.Unix(1_800_000_000, 0)},
