@@ -883,7 +883,12 @@ func productInput(body gen.ProductCreateRequest) catalog.ProductInput {
 		Origin:       string(body.Origin),
 		LeadDays:     body.LeadDays,
 		VolumeM3:     derefString(body.VolM3),
-		Tiers:        fromGenTiers(body.Tiers),
+	}
+	if body.Tiers != nil {
+		input.Tiers = fromGenTiers(*body.Tiers)
+	}
+	if body.Skus != nil {
+		input.SKUs = fromGenSKUs(*body.Skus)
 	}
 	if body.Source != nil {
 		input.Source = string(*body.Source)
@@ -923,6 +928,10 @@ func productPatch(body gen.ProductUpdateRequest, clearSpec bool) catalog.Product
 	}
 	if body.Tiers != nil {
 		patch.Tiers = fromGenTiers(*body.Tiers)
+	}
+	if body.Skus != nil {
+		skus := fromGenSKUs(*body.Skus)
+		patch.SKUs = &skus
 	}
 	return patch
 }
@@ -1052,6 +1061,25 @@ func fromGenTiers(tiers gen.ProductTierList) []catalog.Tier {
 		converted = append(converted, catalog.Tier{MinQty: tier.MinQty, UnitPriceE4: tier.UnitPriceE4})
 	}
 	return converted
+}
+
+func fromGenSKUs(skus gen.SkuCreateList) []catalog.SKUInput {
+	result := make([]catalog.SKUInput, 0, len(skus))
+	for _, sku := range skus {
+		values := make(map[string]string, len(sku.SpecValues))
+		for _, value := range sku.SpecValues {
+			values[value.Key] = value.Value
+		}
+		input := catalog.SKUInput{AttributeValues: values, Tiers: fromGenTiers(sku.Tiers)}
+		if sku.MerchantSkuCode != nil {
+			input.MerchantSKUCode = *sku.MerchantSkuCode
+		}
+		if sku.Unit != nil {
+			input.Unit = *sku.Unit
+		}
+		result = append(result, input)
+	}
+	return result
 }
 
 func optionalString(value string) *string {

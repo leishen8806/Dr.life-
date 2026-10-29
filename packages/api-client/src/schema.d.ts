@@ -944,6 +944,17 @@ export interface components {
             tiers: components["schemas"]["ProductTierList"];
         };
         SKUList: components["schemas"]["SKU"][];
+        SkuSpecValue: {
+            key: string;
+            value: string;
+        };
+        SkuCreate: {
+            spec_values: components["schemas"]["SkuSpecValue"][];
+            merchant_sku_code?: string;
+            unit?: string;
+            tiers: components["schemas"]["ProductTierList"];
+        };
+        SkuCreateList: components["schemas"]["SkuCreate"][];
         Category: {
             public_id: string;
             code: string;
@@ -985,7 +996,8 @@ export interface components {
             /** @enum {string} */
             source?: "manual" | "amazon" | "shopee" | "a1688" | "csv";
             source_ref?: string;
-            tiers: components["schemas"]["ProductTierList"];
+            tiers?: components["schemas"]["ProductTierList"];
+            skus?: components["schemas"]["SkuCreateList"];
         };
         ProductUpdateRequest: {
             category_code?: string;
@@ -1003,6 +1015,7 @@ export interface components {
              */
             status?: "draft" | "off";
             tiers?: components["schemas"]["ProductTierList"];
+            skus?: components["schemas"]["SkuCreateList"];
         };
         CategoryListData: {
             items: components["schemas"]["Category"][];

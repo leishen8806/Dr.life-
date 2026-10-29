@@ -1173,6 +1173,7 @@ type ProductCreateRequest struct {
 	// Name Trilingual text; every language must be present before a product can be published.
 	Name      LocalizedText               `json:"name"`
 	Origin    ProductCreateRequestOrigin  `json:"origin"`
+	Skus      *SkuCreateList              `json:"skus,omitempty"`
 	Source    *ProductCreateRequestSource `json:"source,omitempty"`
 	SourceRef *string                     `json:"source_ref,omitempty"`
 
@@ -1180,9 +1181,9 @@ type ProductCreateRequest struct {
 	Spec *LocalizedText `json:"spec,omitempty"`
 
 	// Tiers At least two tiers, each with a unique minimum order quantity.
-	Tiers ProductTierList `json:"tiers"`
-	Unit  string          `json:"unit"`
-	VolM3 *string         `json:"vol_m3,omitempty"`
+	Tiers *ProductTierList `json:"tiers,omitempty"`
+	Unit  string           `json:"unit"`
+	VolM3 *string          `json:"vol_m3,omitempty"`
 }
 
 // ProductCreateRequestOrigin defines model for ProductCreateRequest.Origin.
@@ -1239,6 +1240,7 @@ type ProductUpdateRequest struct {
 	// Name Trilingual text; every language must be present before a product can be published.
 	Name      *LocalizedText              `json:"name,omitempty"`
 	Origin    *ProductUpdateRequestOrigin `json:"origin,omitempty"`
+	Skus      *SkuCreateList              `json:"skus,omitempty"`
 	SourceRef *string                     `json:"source_ref,omitempty"`
 	Spec      *LocalizedText              `json:"spec,omitempty"`
 
@@ -1332,6 +1334,25 @@ type SessionListSuccessResponse struct {
 
 // SessionListSuccessResponseOk defines model for SessionListSuccessResponse.Ok.
 type SessionListSuccessResponseOk bool
+
+// SkuCreate defines model for SkuCreate.
+type SkuCreate struct {
+	MerchantSkuCode *string        `json:"merchant_sku_code,omitempty"`
+	SpecValues      []SkuSpecValue `json:"spec_values"`
+
+	// Tiers At least two tiers, each with a unique minimum order quantity.
+	Tiers ProductTierList `json:"tiers"`
+	Unit  *string         `json:"unit,omitempty"`
+}
+
+// SkuCreateList defines model for SkuCreateList.
+type SkuCreateList = []SkuCreate
+
+// SkuSpecValue defines model for SkuSpecValue.
+type SkuSpecValue struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
 
 // SuccessEnvelope defines model for SuccessEnvelope.
 type SuccessEnvelope struct {
