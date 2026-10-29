@@ -39,6 +39,7 @@ type AccountStatusService struct {
 
 func (s *AccountStatusService) SetAccountStatus(ctx context.Context, accountPublicID, to, reason string, actor StatusActor) (AccountStatusChange, error) {
 	reason = strings.TrimSpace(reason)
+	actor.ID = strings.TrimSpace(actor.ID)
 	if s.DB == nil || accountPublicID == "" || !validAccountStatus(to) || reason == "" || !validStatusActor(actor) {
 		return AccountStatusChange{}, httpx.NewAppError(httpx.CodeInvalidArgument)
 	}
