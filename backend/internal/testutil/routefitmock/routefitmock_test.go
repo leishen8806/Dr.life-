@@ -326,7 +326,7 @@ func TestPickedCancellationCompletesAfterReturn(t *testing.T) {
 			continue
 		}
 		var payload struct {
-			FulfillmentState string `json:"fulfillmentState"`
+			FulfillmentState  string `json:"fulfillmentState"`
 			InventoryReleased bool   `json:"inventoryReleased"`
 		}
 		if err := json.Unmarshal(e.Payload, &payload); err != nil {

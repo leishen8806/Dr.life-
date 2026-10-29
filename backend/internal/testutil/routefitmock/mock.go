@@ -260,6 +260,7 @@ func (m *Mock) AdvanceFulfillment(id, state string) (Event, error) {
 	if !ok {
 		return Event{}, fmt.Errorf("unsupported fulfillment state %q", state)
 	}
+	cancellationCompleted := f.State == "cancel_requested" && state == "returned"
 	f.State = state
 	f.Version++
 	if state == "picked" || state == "packed" {
@@ -268,6 +269,20 @@ func (m *Mock) AdvanceFulfillment(id, state string) (Event, error) {
 	payload, _ := json.Marshal(map[string]any{"fulfillmentId": f.ID, "externalOrderId": f.Request.ExternalOrderID, "fulfillmentState": state, "evidenceSummaries": evidenceList(f.Evidence)})
 	e := Event{ID: m.id("event"), Type: eventType, SchemaVersion: "v1", OccurredAt: time.Now().UTC(), Aggregate: Aggregate{Type: "fulfillment", ID: f.ID, Version: f.Version}, Payload: payload}
 	m.events = append(m.events, e)
+	if cancellationCompleted {
+		for _, l := range f.Request.Lines {
+			k := stockKey(f.Request.OwnerRef, f.Request.WarehouseID, l.SKU)
+			s := m.stocks[k]
+			s.Quantity += l.Quantity
+			s.Version++
+			m.stocks[k] = s
+			m.recordInventoryChanged(f.Request.OwnerRef, f.Request.WarehouseID, l.SKU, s)
+		}
+		f.State = "cancelled"
+		f.Version++
+		cancelPayload, _ := json.Marshal(map[string]any{"fulfillmentId": f.ID, "externalOrderId": f.Request.ExternalOrderID, "fulfillmentState": f.State, "inventoryReleased": true})
+		m.events = append(m.events, Event{ID: m.id("event"), Type: "fulfillment.cancelled", SchemaVersion: "v1", OccurredAt: time.Now().UTC(), Aggregate: Aggregate{Type: "fulfillment", ID: f.ID, Version: f.Version}, Payload: cancelPayload})
+	}
 	return e, nil
 }
 
