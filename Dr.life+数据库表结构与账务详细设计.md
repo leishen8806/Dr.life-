@@ -404,7 +404,15 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 
 **(4) `sweep` 不得动用预留（回应 A2）**
 
-- 预留额 `fee_reserve` = 未结算 `CHANNEL_KESS` 余额 × 合同费率 + 已出报表、未入账批次的手续费 + 预估下月手续费。合同费率由集成配置 N-10 提供。
+- 预留额 `fee_reserve` = 未结算 `CHANNEL_KESS` 上各笔付款的预期手续费 + 已出报表、未入账批次的手续费 + 预估下月手续费。预期手续费按下面的后台设置计算。
+- **KESS 手续费后台设置**（项目负责人 2026-10-29）：费率不写死在代码里，平台后台提供设置入口（集成配置 N-10 的 KESS 一项，后台页面 U-08）。
+  - 扣费方式二选一：**按订单固定金额**（每笔付款 X 美元，e4 存储）或**按金额比例**（万分比 bps，四舍五入到 e4）。
+  - 每个版本有生效时间，只增不改，修改需“集成配置”编辑权限并写审计。
+  - 每笔付款按付款时生效的版本计算预期手续费，并快照到支付意向上。
+- **用途与边界**：
+  - 后台设置**只用于预期**：计算 `fee_reserve`、在 KESS 结算报表到达时逐笔核对手续费。
+  - **实际入账永远以 KESS 结算报表为准**（6-B.4）。
+  - 报表手续费与预期不一致的，生成对账差异并告警，由财务核对合同或更新设置。不按设置值改写入账金额。
 - `sweep` 服务层强校验：`amount ≤ PLATFORM_HELD − PLATFORM_COST − fee_reserve`。每次 `sweep` 都要把当时的 `PLATFORM_HELD`、`PLATFORM_COST`、`fee_reserve` 及其计算输入落库到划款明细表 `ledger.sweep_detail`，事后可审计。
 - 新增每日审计项：`PLATFORM_HELD − PLATFORM_COST ≥ fee_reserve`，不满足时告警。
 
