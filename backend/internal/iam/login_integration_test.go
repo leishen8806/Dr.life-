@@ -133,6 +133,7 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	t.Run("refresh rotation concurrency reuse and revocation", f.testSessionLifecycle)
 	t.Run("admin refresh rotation uses the shared session storage", f.testAdminSessionRefresh)
 	t.Run("admin password TOTP login locks per account and IP", f.testAdminPasswordLogin)
+	t.Run("admin first password login issues a restricted access token", f.testAdminFirstPasswordLogin)
 	t.Run("admin creation returns bootstrap credentials only once", f.testAdminManagementCreate)
 	t.Run("admin status and role changes revoke sessions and audit", f.testAdminManagementStatusAndRole)
 	t.Run("admin step-up rejects replay and unauthorized scopes", f.testAdminStepUp)
@@ -403,6 +404,41 @@ func (f *loginFixture) testAdminPasswordLogin(t *testing.T) {
 	}
 	if _, err := service.Login(ctx, AdminLoginInput{Email: input.Email, Password: password, TOTPCode: "000000", IP: "198.51.100.5", DeviceID: input.DeviceID, RequestID: input.RequestID}); err == nil {
 		t.Fatal("invalid TOTP accepted")
+	}
+}
+
+func (f *loginFixture) testAdminFirstPasswordLogin(t *testing.T) {
+	ctx := context.Background()
+	password := "first password change only"
+	hash, err := HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "JBSWY3DPEHPK3PXP"
+	adminID, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc, err := EncryptTOTPSecret(ctx, f.envelope, adminID, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status,password_change_required) VALUES($1,'First Password Admin','first-password-admin@example.test',$2,$3,'super','active',true)`, adminID, hash, enc); err != nil {
+		t.Fatal(err)
+	}
+	code, err := totp.GenerateCode(secret, f.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}
+	service := &AdminLoginService{DB: f.pool, Tokens: tokens, Cipher: f.envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: f.cache, Now: func() time.Time { return f.now }}
+	result, err := service.Login(ctx, AdminLoginInput{Email: "first-password-admin@example.test", Password: password, TOTPCode: code, IP: "198.51.100.6", DeviceID: "web:1", RequestID: "first-password-login"})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	identity, _, err := tokens.ParseAccess(ctx, result.AccessToken)
+	if err != nil || !identity.PasswordChangeOnly {
+		t.Fatalf("identity=%+v err=%v, want password-change-only access", identity, err)
 	}
 }
 
