@@ -616,6 +616,33 @@ func (e RevenueByCategoryCategory) Valid() bool {
 	}
 }
 
+// Defines values for SKUStatus.
+const (
+	SKUStatusDraft    SKUStatus = "draft"
+	SKUStatusOff      SKUStatus = "off"
+	SKUStatusOn       SKUStatus = "on"
+	SKUStatusRejected SKUStatus = "rejected"
+	SKUStatusReview   SKUStatus = "review"
+)
+
+// Valid indicates whether the value is a known member of the SKUStatus enum.
+func (e SKUStatus) Valid() bool {
+	switch e {
+	case SKUStatusDraft:
+		return true
+	case SKUStatusOff:
+		return true
+	case SKUStatusOn:
+		return true
+	case SKUStatusRejected:
+		return true
+	case SKUStatusReview:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SessionListSuccessResponseOk.
 const (
 	SessionListSuccessResponseOkTrue SessionListSuccessResponseOk = true
@@ -1113,6 +1140,7 @@ type Product struct {
 	Name      LocalizedText `json:"name"`
 	Origin    ProductOrigin `json:"origin"`
 	PublicId  string        `json:"public_id"`
+	Skus      SKUList       `json:"skus"`
 	Source    ProductSource `json:"source"`
 	SourceRef *string       `json:"source_ref,omitempty"`
 
@@ -1262,6 +1290,24 @@ type RevenueByCategory struct {
 
 // RevenueByCategoryCategory defines model for RevenueByCategory.Category.
 type RevenueByCategoryCategory string
+
+// SKU defines model for SKU.
+type SKU struct {
+	AttributeValues map[string]string `json:"attribute_values"`
+	MerchantSkuCode *string           `json:"merchant_sku_code,omitempty"`
+	PublicId        string            `json:"public_id"`
+	Status          SKUStatus         `json:"status"`
+
+	// Tiers At least two tiers, each with a unique minimum order quantity.
+	Tiers ProductTierList `json:"tiers"`
+	Unit  *string         `json:"unit,omitempty"`
+}
+
+// SKUStatus defines model for SKU.Status.
+type SKUStatus string
+
+// SKUList defines model for SKUList.
+type SKUList = []SKU
 
 // Session defines model for Session.
 type Session struct {

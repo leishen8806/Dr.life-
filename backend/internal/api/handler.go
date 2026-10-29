@@ -945,6 +945,21 @@ func toGenProduct(product catalog.Product) gen.Product {
 	for _, tier := range product.Tiers {
 		tiers = append(tiers, gen.ProductTier{MinQty: tier.MinQty, UnitPriceE4: tier.UnitPriceE4})
 	}
+	skus := make(gen.SKUList, 0, len(product.SKUs))
+	for _, sku := range product.SKUs {
+		skuTiers := make(gen.ProductTierList, 0, len(sku.Tiers))
+		for _, tier := range sku.Tiers {
+			skuTiers = append(skuTiers, gen.ProductTier{MinQty: tier.MinQty, UnitPriceE4: tier.UnitPriceE4})
+		}
+		item := gen.SKU{PublicId: sku.PublicID, AttributeValues: sku.AttributeValues, Status: gen.SKUStatus(sku.Status), Tiers: skuTiers}
+		if sku.MerchantSKUCode != "" {
+			item.MerchantSkuCode = &sku.MerchantSKUCode
+		}
+		if sku.Unit != "" {
+			item.Unit = &sku.Unit
+		}
+		skus = append(skus, item)
+	}
 	source := product.Source
 	if source == "" {
 		source = catalog.SourceManual
@@ -961,6 +976,7 @@ func toGenProduct(product catalog.Product) gen.Product {
 		Status:       gen.ProductStatus(product.Status),
 		StdScore:     product.StdScore,
 		Tiers:        tiers,
+		Skus:         skus,
 		Unit:         product.Unit,
 		UpdatedAt:    product.UpdatedAt,
 		VolM3:        optionalString(product.VolumeM3),

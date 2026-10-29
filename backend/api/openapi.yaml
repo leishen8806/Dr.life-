@@ -1358,6 +1358,32 @@ components:
       description: At least two tiers, each with a unique minimum order quantity.
       items:
         $ref: "#/components/schemas/ProductTier"
+    SKU:
+      type: object
+      additionalProperties: false
+      required: [public_id, attribute_values, status, tiers]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        attribute_values:
+          type: object
+          additionalProperties:
+            type: string
+        merchant_sku_code:
+          type: string
+        status:
+          type: string
+          enum: [draft, review, on, off, rejected]
+        unit:
+          type: string
+          nullable: true
+        tiers:
+          $ref: "#/components/schemas/ProductTierList"
+    SKUList:
+      type: array
+      items:
+        $ref: "#/components/schemas/SKU"
     Category:
       type: object
       additionalProperties: false
@@ -1380,7 +1406,7 @@ components:
     Product:
       type: object
       additionalProperties: false
-      required: [public_id, category_code, name, unit, origin, status, source, tiers, updated_at]
+      required: [public_id, category_code, name, unit, origin, status, source, tiers, skus, updated_at]
       properties:
         public_id:
           type: string
@@ -1422,6 +1448,8 @@ components:
           nullable: true
         tiers:
           $ref: "#/components/schemas/ProductTierList"
+        skus:
+          $ref: "#/components/schemas/SKUList"
         updated_at:
           type: string
           format: date-time
