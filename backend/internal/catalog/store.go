@@ -422,6 +422,50 @@ func refreshTiers(ctx context.Context, q rowQuerier, product Product) (Product, 
 	if product.Tiers == nil {
 		product.Tiers = []Tier{}
 	}
+	return refreshSKUs(ctx, q, product)
+}
+
+func refreshSKUs(ctx context.Context, q rowQuerier, product Product) (Product, error) {
+	rows, err := q.Query(ctx, `SELECT id, public_id, attribute_values, coalesce(merchant_sku_code, ''), status, coalesce(unit, '') FROM catalog.sku WHERE product_id = $1 ORDER BY id`, product.ID)
+	if err != nil {
+		return Product{}, err
+	}
+	defer rows.Close()
+	product.SKUs = []SKU{}
+	for rows.Next() {
+		var id int64
+		var raw []byte
+		var sku SKU
+		var status string
+		if err := rows.Scan(&id, &sku.PublicID, &raw, &sku.MerchantSKUCode, &status, &sku.Unit); err != nil {
+			return Product{}, err
+		}
+		if err := json.Unmarshal(raw, &sku.AttributeValues); err != nil {
+			return Product{}, fmt.Errorf("catalog: decode sku attributes: %w", err)
+		}
+		sku.Status = ProductStatus(status)
+		tierRows, err := q.Query(ctx, `SELECT trim_scale(min_qty)::text, unit_price_e4 FROM catalog.sku_tier WHERE sku_id = $1 ORDER BY min_qty`, id)
+		if err != nil {
+			return Product{}, err
+		}
+		for tierRows.Next() {
+			var tier Tier
+			if err := tierRows.Scan(&tier.MinQty, &tier.UnitPriceE4); err != nil {
+				tierRows.Close()
+				return Product{}, err
+			}
+			sku.Tiers = append(sku.Tiers, tier)
+		}
+		if err := tierRows.Err(); err != nil {
+			tierRows.Close()
+			return Product{}, err
+		}
+		tierRows.Close()
+		product.SKUs = append(product.SKUs, sku)
+	}
+	if err := rows.Err(); err != nil {
+		return Product{}, err
+	}
 	return product, nil
 }
 
@@ -444,6 +488,11 @@ func attachTiers(ctx context.Context, q rowQuerier, products []Product) error {
 		} else {
 			products[i].Tiers = []Tier{}
 		}
+		product, err := refreshSKUs(ctx, q, products[i])
+		if err != nil {
+			return err
+		}
+		products[i] = product
 	}
 	return nil
 }
