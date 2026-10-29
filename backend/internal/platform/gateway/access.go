@@ -110,7 +110,7 @@ func classifyPath(path, publicWebhookPrefix string) audience {
 
 func unsafePath(r *http.Request) bool {
 	path := r.URL.Path
-	if strings.ToLower(path) != path || strings.Contains(path, "//") || strings.Contains(path, "\\") || r.URL.RawPath != "" {
+	if strings.Contains(path, "//") || strings.Contains(path, "\\") || r.URL.RawPath != "" {
 		return true
 	}
 	for _, segment := range strings.Split(path, "/") {

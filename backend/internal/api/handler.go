@@ -93,6 +93,9 @@ type AdminPermissionChecker interface {
 type AdminManagement interface {
 	List(context.Context, string, int) ([]iam.AdminUser, string, error)
 	CreateWithAudit(context.Context, iam.AdminCreateInput, iam.AdminAuditInput) (iam.AdminCreateResult, error)
+	DisableWithAudit(context.Context, string, string, iam.AdminAuditInput) (iam.AdminUser, error)
+	EnableWithAudit(context.Context, string, iam.AdminAuditInput) (iam.AdminUser, error)
+	UpdateRoleWithAudit(context.Context, string, iam.Role, []string, iam.AdminAuditInput) (iam.AdminUser, error)
 }
 
 type LedgerReader interface {
@@ -367,6 +370,70 @@ func (h Handler) CreateAdminUser(w http.ResponseWriter, r *http.Request, _ gen.C
 		Data:      gen.AdminUserCreatedData{Admin: adminUser(created.Admin), InitialPassword: created.InitialPassword, TotpProvisioningUri: created.TOTPProvisioningURI},
 		RequestId: httpx.RequestIDFromContext(r.Context()),
 	})
+}
+
+func (h Handler) DisableAdminUser(w http.ResponseWriter, r *http.Request, publicID gen.AdminPublicID, _ gen.DisableAdminUserParams) {
+	if !h.adminRBACAccess(w, r, "edit") || !h.adminManagementStepUp(w, r) {
+		return
+	}
+	body, ok := decodeJSON[gen.DisableAdminUserJSONRequestBody](w, r)
+	if !ok || strings.TrimSpace(body.Reason) == "" {
+		if ok {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	user, err := h.AdminManagement.DisableWithAudit(r.Context(), string(publicID), body.Reason, h.adminAuditInput(r))
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, gen.AdminUserData{Admin: adminUser(user)})
+}
+
+func (h Handler) EnableAdminUser(w http.ResponseWriter, r *http.Request, publicID gen.AdminPublicID, _ gen.EnableAdminUserParams) {
+	if !h.adminRBACAccess(w, r, "edit") || !h.adminManagementStepUp(w, r) {
+		return
+	}
+	user, err := h.AdminManagement.EnableWithAudit(r.Context(), string(publicID), h.adminAuditInput(r))
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, gen.AdminUserData{Admin: adminUser(user)})
+}
+
+func (h Handler) UpdateAdminUserRole(w http.ResponseWriter, r *http.Request, publicID gen.AdminPublicID, _ gen.UpdateAdminUserRoleParams) {
+	if !h.adminRBACAccess(w, r, "edit") || !h.adminManagementStepUp(w, r) {
+		return
+	}
+	body, ok := decodeJSON[gen.UpdateAdminUserRoleJSONRequestBody](w, r)
+	if !ok {
+		return
+	}
+	user, err := h.AdminManagement.UpdateRoleWithAudit(r.Context(), string(publicID), iam.Role(body.Role), body.DataScope, h.adminAuditInput(r))
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, gen.AdminUserData{Admin: adminUser(user)})
+}
+
+func (h Handler) adminManagementStepUp(w http.ResponseWriter, r *http.Request) bool {
+	if !gateway.StepUpVerified(r.Context()) {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeStepUpInvalid))
+		return false
+	}
+	if h.AdminManagement == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return false
+	}
+	return true
+}
+
+func (h Handler) adminAuditInput(r *http.Request) iam.AdminAuditInput {
+	identity, _ := gateway.IdentityFromContext(r.Context())
+	return iam.AdminAuditInput{ActorPublicID: identity.AccountID, IP: h.ClientIP.Resolve(r), RequestID: httpx.RequestIDFromContext(r.Context())}
 }
 
 func adminUsers(users []iam.AdminUser) []gen.AdminUser {

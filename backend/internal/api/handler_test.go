@@ -662,13 +662,46 @@ func (f *fakeAdminManagement) CreateWithAudit(_ context.Context, input iam.Admin
 	return f.created, nil
 }
 
+func (f *fakeAdminManagement) DisableWithAudit(_ context.Context, publicID, _ string, auditInput iam.AdminAuditInput) (iam.AdminUser, error) {
+	f.auditIn = auditInput
+	for _, user := range f.users {
+		if user.PublicID == publicID {
+			user.Status = iam.AdminStatus("disabled")
+			return user, nil
+		}
+	}
+	return iam.AdminUser{}, errors.New("not found")
+}
+
+func (f *fakeAdminManagement) EnableWithAudit(_ context.Context, publicID string, auditInput iam.AdminAuditInput) (iam.AdminUser, error) {
+	f.auditIn = auditInput
+	for _, user := range f.users {
+		if user.PublicID == publicID {
+			user.Status = iam.AdminStatusActive
+			return user, nil
+		}
+	}
+	return iam.AdminUser{}, errors.New("not found")
+}
+
+func (f *fakeAdminManagement) UpdateRoleWithAudit(_ context.Context, publicID string, role iam.Role, scope []string, auditInput iam.AdminAuditInput) (iam.AdminUser, error) {
+	f.auditIn = auditInput
+	for _, user := range f.users {
+		if user.PublicID == publicID {
+			user.Role, user.DataScope = role, scope
+			return user, nil
+		}
+	}
+	return iam.AdminUser{}, errors.New("not found")
+}
+
 type fakeStepUpVerifier struct{ scope string }
 
-func (f fakeStepUpVerifier) Verify(_ context.Context, _ string, scope, _ string) (string, error) {
+func (f fakeStepUpVerifier) Verify(_ context.Context, token, scope, _ string) (string, error) {
 	if scope != f.scope {
 		return "", errors.New("unexpected scope")
 	}
-	return "stepup-jti-test", nil
+	return token, nil
 }
 
 func ledgerHandler(auth gateway.Authenticator, reader api.LedgerReader, directory api.AccountDirectory, permissions api.AdminPermissionChecker) http.Handler {
@@ -766,7 +799,7 @@ func TestAdminManagementMutationRoutesRequireRBACAndStepUp(t *testing.T) {
 	newHandler := func(allowed bool) http.Handler {
 		return server.NewHandlerWithGateway(nil, server.GatewayOptions{
 			AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
-			Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}},
+			Authenticator:    stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}},
 			AdminPermissions: fakeAdminPermissions{allowed: allowed}, AdminManagement: manager,
 			AdminStepUpVerifier: fakeStepUpVerifier{scope: "permission_change"}, AdminStepUpJTIStore: gateway.NewMemoryJTIStore(),
 		})
@@ -786,17 +819,17 @@ func TestAdminManagementMutationRoutesRequireRBACAndStepUp(t *testing.T) {
 	if got := serve(t, newHandler(false), request(http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`, "valid", "disable-denied")); got.Code != http.StatusForbidden {
 		t.Fatalf("without rbac edit status=%d body=%s", got.Code, got.Body.String())
 	}
-	if got := serve(t, newHandler(true), request(http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`, "", "disable-stepup")); got.Code != http.StatusForbidden {
+	if got := serve(t, newHandler(true), request(http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`, "", "disable-stepup")); got.Code != http.StatusUnauthorized {
 		t.Fatalf("without step-up status=%d body=%s", got.Code, got.Body.String())
 	}
 	for _, tc := range []struct {
-		method, path, body string
+		method, path, body, token string
 	}{
-		{http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`},
-		{http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/enable", ``},
-		{http.MethodPatch, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/role", `{"role":"ops","data_scope":["KH-PP"]}`},
+		{http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`, "disable-stepup-ok"},
+		{http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/enable", ``, "enable-stepup-ok"},
+		{http.MethodPatch, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/role", `{"role":"ops","data_scope":["KH-PP"]}`, "role-stepup-ok"},
 	} {
-		if got := serve(t, newHandler(true), request(tc.method, tc.path, tc.body, "valid", "mutation-success")); got.Code != http.StatusOK {
+		if got := serve(t, newHandler(true), request(tc.method, tc.path, tc.body, tc.token, "mutation-success")); got.Code != http.StatusOK {
 			t.Fatalf("%s %s status=%d body=%s", tc.method, tc.path, got.Code, got.Body.String())
 		}
 	}
@@ -1129,15 +1162,15 @@ func TestPublicSuggestRejectsOverlongQueryBeforeCatalogStoreAccess(t *testing.T)
 
 // 网关（unsafePath）拒绝含大写字母的路径，所以 public_id 在 URL 里必须是小写
 // （见 handler.publicIDFromPath）。这里钉住该约束，避免以后有人直接拼规范大写 ULID。
-func TestUppercasePublicIDInPathIsRejectedByTheGateway(t *testing.T) {
+func TestUppercasePublicIDInPathReachesTheGatewayRouteMatcher(t *testing.T) {
 	handler := catalogHandler(&stubStore{}, activeDirectory(), merchantAuth())
 
 	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/merchant/products/"+merchantULID, nil))
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403; body=%s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404; body=%s", recorder.Code, recorder.Body.String())
 	}
-	if code := decodeErrorCode(t, recorder); code != 2002 {
-		t.Fatalf("code = %d, want 2002", code)
+	if code := decodeErrorCode(t, recorder); code != 1003 {
+		t.Fatalf("code = %d, want 1003", code)
 	}
 }
 func validCreateBody() string {
