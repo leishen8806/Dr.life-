@@ -112,6 +112,26 @@ func TestDatabaseFramework(t *testing.T) {
 		}
 	})
 
+	t.Run("file verification worker may promote a verified object only", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `SET ROLE ops_file_worker`); err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _, _ = admin.Exec(ctx, `RESET ROLE`) }()
+		if _, err := admin.Exec(ctx, `SELECT public_id FROM ops.file WHERE public_id = '01HXFILEPERMISSIONS000000001'`); err != nil {
+			t.Fatalf("ops_file_worker select: %v", err)
+		}
+		if _, err := admin.Exec(ctx, `UPDATE ops.file SET status = 'ready', object_key = 'objects/ready', updated_at = now() WHERE public_id = '01HXFILEPERMISSIONS000000001' AND status = 'verifying'`); err != nil {
+			t.Fatalf("ops_file_worker promotion update: %v", err)
+		}
+		for _, statement := range []string{
+			`INSERT INTO ops.file (public_id, owner_account, purpose, object_key, content_type, size, sha256, status) VALUES ('01HXFILEWORKER00000000001', 1, 'product_image', 'objects/worker', 'image/jpeg', 1, decode('0000000000000000000000000000000000000000000000000000000000000000', 'hex'), 'pending')`,
+			`DELETE FROM ops.file`,
+			`UPDATE ops.file SET owner_account = 2`,
+		} {
+			assertPermissionDenied(t, ctx, admin, statement)
+		}
+	})
+
 	createPermissionFixtures(t, ctx, admin)
 
 	t.Run("module roles cannot cross schema boundaries", func(t *testing.T) {
@@ -204,7 +224,7 @@ func assertSchemasAndRoles(t *testing.T, database *sql.DB) {
 	if schemaCount != len(schemas) {
 		t.Fatalf("schema count = %d, want %d", schemaCount, len(schemas))
 	}
-	roles := []string{"iam_rw", "catalog_rw", "trade_rw", "wms_rw", "logistics_rw", "ledger_rw", "comms_rw", "ai_rw", "ops_rw", "audit_writer", "report_ro"}
+	roles := []string{"iam_rw", "catalog_rw", "trade_rw", "wms_rw", "logistics_rw", "ledger_rw", "comms_rw", "ai_rw", "ops_rw", "ops_file_worker", "audit_writer", "report_ro"}
 	var roleCount int
 	if err := database.QueryRow(`SELECT count(*) FROM pg_roles WHERE rolname = ANY($1) AND NOT rolcanlogin`, roles).Scan(&roleCount); err != nil {
 		t.Fatal(err)
