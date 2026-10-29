@@ -30,6 +30,22 @@ func TestVerificationWorkerMarksMatchingObjectReady(t *testing.T) {
 	}
 }
 
+func TestVerificationWorkerAcceptsMissingProviderChecksum(t *testing.T) {
+	body := []byte("verified file")
+	sum := sha256.Sum256(body)
+	store := &verificationMemoryStore{file: File{PublicID: "file-1", ObjectKey: "objects/file-1", ContentType: "image/jpeg", Size: int64(len(body)), SHA256: sum[:], Status: StatusVerifying}}
+	// RustFS does not return x-amz-checksum-sha256 from HeadObject. The worker
+	// must still stream and verify the declared digest before marking ready.
+	objects := &verificationObjects{body: body, stat: storage.ObjectStat{Size: int64(len(body)), ContentType: "image/jpeg", ETag: "etag"}}
+
+	if err := NewVerificationWorker(store, objects).Handle(context.Background(), asynq.NewTask(TaskVerify, []byte(`{"public_id":"file-1"}`))); err != nil {
+		t.Fatal(err)
+	}
+	if store.file.Status != StatusReady {
+		t.Fatalf("status=%q, want ready", store.file.Status)
+	}
+}
+
 func TestVerificationWorkerRejectsAndDeletesChecksumMismatch(t *testing.T) {
 	expected := sha256.Sum256([]byte("expected"))
 	body := []byte("tampered")
