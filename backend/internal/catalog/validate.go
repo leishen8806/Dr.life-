@@ -8,8 +8,11 @@ import (
 func ValidateSKU(attributes []CategoryAttribute, input SKUInput) error {
 	byKey := make(map[string]CategoryAttribute, len(attributes))
 	for _, attribute := range attributes {
+		if !attribute.IsSKUDimension {
+			continue
+		}
 		byKey[attribute.Key] = attribute
-		if attribute.Required && strings.TrimSpace(input.AttributeValues[attribute.Key]) == "" {
+		if strings.TrimSpace(input.AttributeValues[attribute.Key]) == "" {
 			return invalid("skus.attribute_values."+attribute.Key, "required attribute is missing")
 		}
 	}

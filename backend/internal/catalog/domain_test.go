@@ -166,6 +166,11 @@ func TestValidateSKURequiresUniqueEnumValuesAndTwoTiers(t *testing.T) {
 		Values: []catalog.AttributeValue{
 			{Code: "red", Name: catalog.LocalizedText{"zh": "红", "en": "Red", "km": "ក្រហម"}},
 		},
+	}, {
+		Key:            "thickness",
+		Type:           catalog.AttributeTypeNumber,
+		Required:       true,
+		IsSKUDimension: false,
 	}}
 	valid := catalog.SKUInput{AttributeValues: map[string]string{"color": "red"}, Tiers: []catalog.Tier{{MinQty: "1", UnitPriceE4: 10}, {MinQty: "10", UnitPriceE4: 9}}}
 	if err := catalog.ValidateSKU(attributes, valid); err != nil {
