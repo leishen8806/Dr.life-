@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"runtime"
@@ -458,6 +460,16 @@ func (f *loginFixture) testAdminFirstPasswordLogin(t *testing.T) {
 	refreshedIdentity, _, err := tokens.ParseAccess(ctx, refreshed.AccessToken)
 	if err != nil || !refreshedIdentity.PasswordChangeOnly || refreshed.AccessExpiresIn != int64((10*time.Minute)/time.Second) {
 		t.Fatalf("refreshed identity=%+v expires=%d err=%v, want restricted 10-minute access", refreshedIdentity, refreshed.AccessExpiresIn, err)
+	}
+	protected := gateway.Authenticate(Authenticator{Tokens: tokens}, "")(gateway.Authorize("")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	request := httptest.NewRequest(http.MethodGet, "/v1/admin/admins", nil)
+	request.Header.Set("Authorization", "Bearer "+refreshed.AccessToken)
+	response := httptest.NewRecorder()
+	protected.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("refreshed restricted token protected route status=%d, want %d", response.Code, http.StatusForbidden)
 	}
 }
 
