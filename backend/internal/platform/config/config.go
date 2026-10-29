@@ -45,6 +45,13 @@ type Config struct {
 	CacheMaxEntries                int
 	QueueRedisURL                  string
 	QueueAllowEviction             bool
+	StorageDriver, StorageBucket   string
+	StorageRegion, StorageEndpoint string
+	StorageAccessKey, StorageSecretKey string
+	StorageAllowedContentTypes     []string
+	StorageMaxContentLength        int64
+	FileMaxDailyUploads            int
+	FileMaxDailyBytes              int64
 	CORSBuyerOrigins               []string
 	CORSMerchantOrigins            []string
 	CORSDriverOrigins              []string
@@ -484,6 +491,14 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 			return Config{}, fmt.Errorf("QUEUE_ALLOW_EVICTION must be true or false")
 		}
 	}
+	storageMaxLength, err := optionalPositiveInt64(getenv("STORAGE_MAX_CONTENT_LENGTH"))
+	if err != nil { return Config{}, fmt.Errorf("STORAGE_MAX_CONTENT_LENGTH must be a positive integer") }
+	storageTypes, err := commaSeparated(getenv("STORAGE_ALLOWED_CONTENT_TYPES"))
+	if err != nil { return Config{}, fmt.Errorf("STORAGE_ALLOWED_CONTENT_TYPES %w", err) }
+	fileMaxUploads, err := positiveInt(getenv, "FILE_MAX_DAILY_UPLOADS", 100)
+	if err != nil { return Config{}, err }
+	fileMaxBytes, err := optionalPositiveInt64(getenv("FILE_MAX_DAILY_BYTES"))
+	if err != nil { return Config{}, fmt.Errorf("FILE_MAX_DAILY_BYTES must be a positive integer") }
 	cacheRedisURL := strings.TrimSpace(getenv("CACHE_REDIS_URL"))
 	redisURL := strings.TrimSpace(getenv("REDIS_URL"))
 	queueRedisURL := strings.TrimSpace(getenv("QUEUE_REDIS_URL"))
@@ -521,6 +536,11 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		CacheMaxEntries:        cacheMaxEntries,
 		QueueRedisURL:          queueRedisURL,
 		QueueAllowEviction:     queueAllowEviction,
+		StorageDriver: strings.TrimSpace(getenv("STORAGE_DRIVER")), StorageBucket: strings.TrimSpace(getenv("STORAGE_BUCKET")),
+		StorageRegion: strings.TrimSpace(getenv("STORAGE_REGION")), StorageEndpoint: strings.TrimSpace(getenv("STORAGE_ENDPOINT")),
+		StorageAccessKey: strings.TrimSpace(getenv("STORAGE_ACCESS_KEY")), StorageSecretKey: strings.TrimSpace(getenv("STORAGE_SECRET_KEY")),
+		StorageAllowedContentTypes: storageTypes, StorageMaxContentLength: storageMaxLength,
+		FileMaxDailyUploads: fileMaxUploads, FileMaxDailyBytes: fileMaxBytes,
 		CORSBuyerOrigins:       cors["CORS_BUYER_ORIGINS"],
 		CORSMerchantOrigins:    cors["CORS_MERCHANT_ORIGINS"],
 		CORSDriverOrigins:      cors["CORS_DRIVER_ORIGINS"],
