@@ -2,12 +2,14 @@
 package logistics
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -49,9 +51,13 @@ type RouteFitAggregate struct {
 
 func ParseRouteFitEvent(body []byte) (RouteFitEvent, error) {
 	var event RouteFitEvent
-	decoder := json.NewDecoder(strings.NewReader(string(body)))
+	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&event); err != nil || strings.TrimSpace(event.EventID) == "" || strings.TrimSpace(event.EventType) == "" || event.SchemaVersion <= 0 || event.OccurredAt.IsZero() || strings.TrimSpace(event.Aggregate.Type) == "" || strings.TrimSpace(event.Aggregate.ID) == "" || event.Aggregate.Version < 0 || len(event.Payload) == 0 || !json.Valid(event.Payload) {
+		return RouteFitEvent{}, ErrInvalidRouteFitEvent
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return RouteFitEvent{}, ErrInvalidRouteFitEvent
 	}
 	return event, nil

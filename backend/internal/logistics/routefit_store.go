@@ -3,6 +3,7 @@ package logistics
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 
 	"github.com/jackc/pgx/v5"
@@ -46,6 +47,11 @@ func RecordRouteFitEvent(ctx context.Context, tx pgx.Tx, event RouteFitEvent, ra
 	if tx == nil {
 		return false, errors.New("routefit transaction is required")
 	}
+	// An advisory xact lock also protects an aggregate's first event, for which
+	// SELECT ... FOR UPDATE has no row to lock yet. It releases on commit/rollback.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, routeFitAggregateLockKey(event.Aggregate)); err != nil {
+		return false, err
+	}
 	var current int64
 	err := tx.QueryRow(ctx, `SELECT aggregate_version FROM logistics.shipment_event WHERE aggregate_id = $1 ORDER BY aggregate_version DESC LIMIT 1 FOR UPDATE`, event.Aggregate.ID).Scan(&current)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -61,4 +67,9 @@ func RecordRouteFitEvent(ctx context.Context, tx pgx.Tx, event RouteFitEvent, ra
 		return false, err
 	}
 	return state == "accepted", nil
+}
+
+func routeFitAggregateLockKey(aggregate RouteFitAggregate) int64 {
+	hash := sha256.Sum256([]byte(aggregate.Type + "\x00" + aggregate.ID))
+	return int64(binary.BigEndian.Uint64(hash[:8]))
 }

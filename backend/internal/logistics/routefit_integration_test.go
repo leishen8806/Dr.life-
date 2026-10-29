@@ -104,6 +104,8 @@ func TestRouteFitEventRecorderAcceptsOnlyOneConcurrentFirstAggregateVersion(t *t
 	}
 	select {
 	case <-started:
+	case err := <-errs:
+		t.Fatalf("first Record() error = %v", err)
 	case <-time.After(5 * time.Second):
 		t.Fatal("no concurrent handler started")
 	}
