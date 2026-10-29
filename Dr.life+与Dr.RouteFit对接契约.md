@@ -1,6 +1,6 @@
 # Dr.life+ 与 Dr.RouteFit 对接契约（R-01）
 
-> 状态：**草案 v0.1，待项目负责人与 RouteFit 侧确认**（2026-10-29）。卡片 CMP-638。
+> 状态：**v0.2，项目负责人已确认第 10 节全部事项**（2026-10-29）。RouteFit 侧按第 11 节派卡实现；接口细节如需调整，回到本文修订。卡片 CMP-638。
 > 依据：《试点上线最小范围清单》第 1 节分工与 3.3 节 R-01…R-06；RouteFit 仓库 `E:\Dr.RouteFit` 的 `contracts/`（核对日期 2026-10-29，RouteFit 全部接口状态为 `LOCAL_IMPLEMENTED_NOT_DEPLOYED`）。
 > 本文只定**接口形状与双方责任**，不写实现。凡标 **【RouteFit 需新增/修改】** 的项，由项目负责人在 RouteFit 侧派卡。在 RouteFit 确认之前，Dr.life+ 侧只用本地替身（mock）开发，不能以替身结果通过 G-11。
 
@@ -33,6 +33,7 @@
 | G7 | 可售数量 | ServiceToken 无库存查询；只有货主门户与 WMS 入站 `stock-events` | **【RouteFit 需新增】** 库存查询与变更事件（第 6 节） |
 | G8 | 按商户报告仓配费用并对账 | 有 FeeItem、Quote 和 19 个费目，但无对外费用报告，费用设置页尚未接 API（`fee-settings-v0.1.md:3`） | **【RouteFit 需新增】** 费用行事件与日结单（第 7 节） |
 | G9 | 欠费暂停商户出库 | 无 | **【RouteFit 需新增】**（4.4） |
+| G10 | 买家下单时的实时运费报价 | 只有运营侧报价接口，且只支持固定费，按距离计价返回 `CAPABILITY_DISABLED` | **【RouteFit 需新增】** 平台报价（4.5） |
 
 可以直接沿用的 RouteFit 约定：Bearer 服务令牌、`Idempotency-Key`（16–128 字符，同键异体返回 409）、强 ETag + `If-Match`、`ApiError` 错误体（code、retryable、requestId、currentVersion）、`Money{amountMinor,currency}`、`Location`（E.164 电话、经纬度可空）、内部 outbox 事件信封（`api-design.md:450-488`）。
 
@@ -96,6 +97,22 @@
 - 入仓、存储不受影响。
 - 每次切换都发出 `owner.outbound_hold_changed` 事件。
 
+### 4.5 实时运费报价 【RouteFit 需新增】
+
+`POST /api/platform/v1/quotes`，请求体：`{ownerRef, warehouseId, lines[{skuId, quantity}], delivery: Location, serviceLevel}`。
+
+- 响应：`{quoteId, version, fees[FeeItem], total: Money, expiresAt}`。报价有效期由 RouteFit 定，建议不少于 30 分钟，覆盖买家付款时间。
+- 出库单（4.2）增加字段 `quoteId`、`quoteVersion`。RouteFit 按报价受理并按报价金额报告配送费用行（第 7 节），**事后不再按实际重算**。
+- 报价过期，或订单内容与报价不符，返回 `409 QUOTE_VERSION_CONFLICT`。此时 Dr.life+ 重新报价；金额变化时需买家确认，不能静默改价。
+
+**运费规则（项目负责人 2026-10-29 确认，D-10）：**
+
+- 运费是正常费用。商户按商品选择"包邮"或"买家付运费"。两种情况下，运费都结算给 RouteFit。
+- **买家展示运费 = RouteFit 报价 × (1 + 平台加价率)**。加价率是一个统一比例，后台可改；试点期默认 0%，与"佣金 0、平台费 0"一致。
+- **买家付运费**：买家付款中的运费部分随货款一起进入托管。签收复核后，RouteFit 报价部分转入应付 RouteFit，加价部分转入平台收入，商户钱包不动。
+- **商户包邮**：买家只付货款。RouteFit 报告配送费用行后，按同一公式从商户钱包扣款。
+- **售后退款**：已发生的运费不退给买家，除非责任在商户或配送方，由售后判定（T-09）。判定由商户负责的，运费从商户钱包承担；判定由配送负责的，按 RouteFit 赔付规则处理。
+
 ## 5. RouteFit → Dr.life+ 事件 【RouteFit 需新增】
 
 ### 5.1 投递协议
@@ -136,7 +153,12 @@
 ### 5.3 签收证据 【RouteFit 需新增】
 
 - `delivered_verified` 事件带证据摘要：`[{evidenceId, kind(PHOTO|SIGNATURE|RECIPIENT_CODE), sha256, capturedAt}]`。不带文件内容，也不带个人信息。
-- `GET /api/platform/v1/fulfillments/{id}/evidence/{evidenceId}/download-url` 返回 5 分钟有效的下载链接。只供 Dr.life+ 后台的售后和争议处理使用，每次调用都写入 Dr.life+ 的审计日志。
+- `GET /api/platform/v1/fulfillments/{id}/evidence/{evidenceId}/download-url` 返回 5 分钟有效的下载链接。
+- **可见范围（项目负责人 2026-10-29 确认）**：
+  - **买家**可以看自己订单的签收证据。
+  - **平台售后**可以看所有订单的签收证据。
+  - **商户看不到**证据原件，只能看到"已签收、时间、证据件数"。
+  - Dr.life+ 每次取下载链接都写审计日志；给买家的链接只在其本人会话内生成，不转发、不缓存。
 
 ## 6. 库存 【RouteFit 需新增】
 
@@ -171,7 +193,9 @@ payload：`{feeLineId, version, ownerRef, feeCode, direction(CHARGE|CREDIT), amo
 Dr.life+ 收到后（R-04）：
 
 - **仓储类**（storage、inbound、outbound、packing）：从商户钱包扣款，金额 = RouteFit 金额。现有 6.8 仓储费分录是 DR `WALLET_AVAIL(M)` / CR `PLATFORM_HELD(storage)`，即平台自营仓储的收入；仓储改由 RouteFit 承担后，贷方应改为 `PAYABLE_CARRIER`（应付承运方，明细 = RouteFit）。原 `wms.storage_fee_daily` 日计提不再使用。
-- **配送类**：商户应付 = RouteFit 金额 × (1 + 平台加价率)，加价率在后台按费目配置（D-4）。分录：DR `WALLET_AVAIL(M)`；贷方分两部分，RouteFit 金额记入 CR `PAYABLE_CARRIER`，加价部分记入 CR `PLATFORM_HELD(delivery_margin)`。原 6.9、6.10 的配送费托管与签收分账是为自建配送设计的，改由 RouteFit 承担后不再使用。
+- **配送类**：金额 = 报价金额（4.5），加价率是一个统一比例。按付款方分两种情况：
+  - **商户包邮**：从商户钱包扣款，金额 = RouteFit 金额 × (1 + 加价率)。分录 DR `WALLET_AVAIL(M)`；贷方分两部分，RouteFit 金额记 CR `PAYABLE_CARRIER`，加价部分记 CR `PLATFORM_HELD(delivery_margin)`。
+  - **买家付运费**：运费已在托管中，签收复核后从托管转出，贷方科目同上，商户钱包不动。原 6.9、6.10 的配送费托管与签收分账是为自建配送设计的，改由 RouteFit 承担后不再使用。
 - **账务设计需先修订**：上面两条改动了现有分录（6.8 改贷方，6.9、6.10 停用，新增"配送费按费用行扣款"分录）。R-04 实现前，先修订《数据库表结构与账务详细设计》第六章并经 LedgerAuditor 复核；`PAYABLE_CARRIER` 是否按承运方拆分明细，也一并确定。
 - **余额不足**：照常记欠费，进入宽限期，到期后暂停出库（4.4、R-06）。
 - **同一 feeLineId**：只按最新 version 生效。`fee.adjusted` 生成冲正交易与新的扣款交易，不修改原分录。
@@ -180,7 +204,10 @@ Dr.life+ 收到后（R-04）：
 
 - `GET /api/platform/v1/statements/{serviceDate}` 返回当日全部费用行，以及按货主、按费目汇总的金额与行数，附 `statementVersion`。
 - Dr.life+ 每日 06:00（金边时间）拉取前一日结单，与本地已入账的费用行逐行比对。三类差异写对账异常并告警：缺行、多行、金额不符。异常期间暂停向 RouteFit 付款，不冻结商户。
-- 付款给 RouteFit：按月结，财务在后台发起，走现有出款复核（双人）。沿用 6.17 `carrier_pay`：DR `PAYABLE_CARRIER` / CR `BANK_DEDICATED`，附该月结单编号。每月核对"应付 RouteFit 余额 = 当月结单合计 − 已付"，差异单列处理（沿用现有 ③ 外部对账）。
+- **与 RouteFit 的结算（项目负责人 2026-10-29 确认）**：两个平台属于同一家公司，**只记内部往来账，不实际转账**。
+  - `PAYABLE_CARRIER`（明细 = RouteFit）作为内部往来余额，每月核对一次："应付 RouteFit 余额 = 累计日结单合计 − 已核销"。双方财务确认后，在后台登记内部核销，走现有出款复核（双人）。
+  - 内部核销不经 `BANK_DEDICATED`，需要一种新的交易类型或 `adjust` 的专用子类，在账务设计修订时确定，经 LedgerAuditor 复核。
+  - 客户资金在银行专用账户（或 KESS 待结算）中，不因内部核销而减少。内部核销只改变平台内部归属，不得动用客户本金。
 
 ## 8. Dr.life+ 侧状态与数据（供 R-02…R-06 实现）
 
@@ -196,7 +223,7 @@ Dr.life+ 收到后（R-04）：
   - `Idempotency-Key = drl-<shipment public_id>-r<revision>`。
   - 网络超时后不重新生成键，先用 GET 补查。
   - 可重试错误（429、503，或 retryable=true）按指数退避重试；不可重试错误进入人工处理队列并告警。
-- **结算时点（T-10）**：`delivered_verified` 之后开始售后观察期，期满且没有未结售后时，执行 `SettleHold` 结算给商户。观察期天数在后台配置，试点默认 3 天，待项目负责人确认。
+- **结算时点（T-10）**：`delivered_verified` 之后开始售后观察期，**默认 7 天**（项目负责人 2026-10-29 确认，后台可改）。期满且没有未结售后时，执行 `SettleHold` 把货款结算给商户。有未结售后时，等售后结案后再结算。
 
 ## 9. 测试与验收（G-11）
 
@@ -208,17 +235,17 @@ Dr.life+ 收到后（R-04）：
    - 签名错误、时间戳过期：被拒。
 4. **对账**：连续 3 天日结单与本地入账零差异。
 
-## 10. 待确认事项
+## 10. 已确认事项（项目负责人 2026-10-29）
 
-| # | 事项 | 由谁确认 |
+| # | 事项 | 结论 |
 |---|---|---|
-| Q1 | RouteFit 是否接受新增"平台通道"（G1），而不是每个商户一个令牌 | RouteFit 侧 |
-| Q2 | 平台预付单自动受理、不走人工报价（G3） | RouteFit 侧与项目负责人 |
-| Q3 | 售后观察期默认天数（建议 3 天） | 项目负责人 |
-| Q4 | 配送费加价率与是否按费目区分（D-4 已定"实际运费 + 加价"，具体比例待定） | 项目负责人 |
-| Q5 | 买家是否另付运费（清单 D-10） | 项目负责人 |
-| Q6 | 签收证据中的收货人照片、签名能否给商户看，还是只给平台售后看 | 项目负责人 |
-| Q7 | 向 RouteFit 付款的周期（建议月结）和发票 | 项目负责人与 RouteFit 侧 |
+| Q1 | 商户身份 | RouteFit 新增平台通道：一个令牌代多个商户（4.1） |
+| Q2 | 付款后是否自动发货 | 平台预付单自动受理，不走人工报价；库存不足或地址不可配送时自动拒单并退款（4.2） |
+| Q3 | 售后观察期 | 7 天，后台可改（第 8 节） |
+| Q4 | 平台加价 | 报价已含加价，统一比例，后台可改；试点默认 0%（4.5） |
+| Q5 | 买家运费（D-10） | 运费是正常费用：商户选择包邮或买家付运费，运费都结算给 RouteFit；买家付运费时，下单向 RouteFit 实时询价（4.5） |
+| Q6 | 签收证据可见范围 | 买家（仅本人订单）与平台售后可看，商户不可看（5.3） |
+| Q7 | 与 RouteFit 的结算 | 同一公司，只记内部往来账，不实际转账，每月对账核销（7.3） |
 
 ## 11. 交给 RouteFit 侧的派卡清单（对应清单 E-1…E-6）
 
@@ -227,6 +254,7 @@ Dr.life+ 收到后（R-04）：
 | E-1 | 修复迁移（RF-PM-007），部署测试环境 | — |
 | E-5 + G1 | 平台通道令牌与多货主绑定，以及货主与 SKU 查询 | 3、4.1 |
 | G2/G3 | 平台出库配送单与自动受理 | 4.2 |
+| G10 | 实时运费报价（含按距离计价） | 4.5 |
 | G4 | 取消接口 | 4.3 |
 | E-3 | 出库暂停 | 4.4 |
 | E-2 | 出站事件（签名、重试、死信）与证据下载 | 5 |
