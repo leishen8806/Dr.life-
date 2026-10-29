@@ -188,7 +188,12 @@ func TestIdempotencyRouteTemplateStillBindsTargetPath(t *testing.T) {
 func TestIdempotencyConcurrentExecutesOnce(t *testing.T) {
 	var calls atomic.Int32
 	handler := idempotencyHandler(NewMemoryIdempotencyStore(), nil, &calls)
-	statuses := make(chan int, 50)
+	type response struct {
+		status   int
+		replayed bool
+		body     string
+	}
+	responses := make(chan response, 50)
 	var wg sync.WaitGroup
 	for range 50 {
 		wg.Add(1)
@@ -200,17 +205,35 @@ func TestIdempotencyConcurrentExecutesOnce(t *testing.T) {
 			r.Header.Set("X-Account", "a")
 			w := httptest.NewRecorder()
 			handler.ServeHTTP(w, r)
-			statuses <- w.Code
+			responses <- response{
+				status:   w.Code,
+				replayed: w.Header().Get("Idempotent-Replayed") == "true",
+				body:     w.Body.String(),
+			}
 		}()
 	}
 	wg.Wait()
-	close(statuses)
+	close(responses)
 	created := 0
-	for status := range statuses {
-		if status == http.StatusCreated {
+	var createdBody string
+	var received []response
+	for response := range responses {
+		received = append(received, response)
+		if response.status == http.StatusCreated && !response.replayed {
 			created++
-		} else if status != http.StatusConflict {
-			t.Errorf("unexpected status %d", status)
+			createdBody = response.body
+		}
+	}
+	for _, response := range received {
+		switch {
+		case response.status == http.StatusCreated && !response.replayed:
+		case response.status == http.StatusCreated && response.replayed:
+			if response.body != createdBody {
+				t.Errorf("replayed body=%q, want first created body=%q", response.body, createdBody)
+			}
+		case response.status == http.StatusConflict:
+		default:
+			t.Errorf("unexpected status=%d replayed=%t", response.status, response.replayed)
 		}
 	}
 	if calls.Load() != 1 || created != 1 {
