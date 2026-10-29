@@ -11,18 +11,37 @@ import (
 
 	api "github.com/leishen8806/Dr.life-/backend/internal/api"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
 )
 
 type fakeLogin struct {
 	input  iam.LoginInput
 	result iam.LoginResult
 	err    error
+}
+
+type fakeFiles struct {
+	presign files.PresignResult
+	input   files.PresignInput
+	owner   int64
+}
+
+func (f *fakeFiles) Presign(_ context.Context, owner int64, in files.PresignInput) (files.PresignResult, error) {
+	f.owner, f.input = owner, in
+	return f.presign, nil
+}
+func (*fakeFiles) Complete(context.Context, int64, string) (files.File, error) {
+	return files.File{}, nil
+}
+func (*fakeFiles) DownloadURL(context.Context, int64, string) (storage.SignedURL, error) {
+	return storage.SignedURL{}, nil
 }
 
 type fakeAccountLinks struct {
@@ -192,6 +211,18 @@ func TestTelegramAuthHandlerContract(t *testing.T) {
 	}
 	if body["ok"] != true || body["request_id"] == "" {
 		t.Fatalf("body=%v", body)
+	}
+}
+
+func TestFilePresignUsesGatewayAccountAndReturnsSignedMetadata(t *testing.T) {
+	fake := &fakeFiles{presign: files.PresignResult{File: files.File{PublicID: "file-1", Purpose: "product_image", ContentType: "image/jpeg", Size: 12, Status: files.StatusPending, CreatedAt: time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)}, Upload: storage.SignedURL{URL: "https://storage.test/put", Headers: map[string]string{"x-amz-checksum-sha256": "sum"}}}}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake})
+	req := httptest.NewRequest(http.MethodPost, "/v1/files/presign", strings.NewReader(`{"purpose":"product_image","content_type":"image/jpeg","size":12,"sha256":"sum"}`))
+	req.Header.Set("Idempotency-Key", "file-presign-1")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || fake.owner != 42 || fake.input.Purpose != "product_image" || !strings.Contains(w.Body.String(), "https://storage.test/put") {
+		t.Fatalf("status=%d owner=%d input=%+v body=%s", w.Code, fake.owner, fake.input, w.Body.String())
 	}
 }
 
