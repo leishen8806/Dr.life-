@@ -110,8 +110,17 @@ func (w *VerificationWorker) Handle(ctx context.Context, task *asynq.Task) error
 }
 
 func matchesMetadata(file File, stat storage.ObjectStat) bool {
+	if stat.Size != file.Size || stat.ContentType != file.ContentType {
+		return false
+	}
+	// RustFS does not return x-amz-checksum-sha256 from HeadObject. When a
+	// provider supplies it, keep the cheap metadata check; otherwise the worker
+	// performs the authoritative streamed SHA-256 comparison below.
+	if stat.ChecksumSHA256 == "" {
+		return true
+	}
 	checksum, err := base64.StdEncoding.DecodeString(stat.ChecksumSHA256)
-	return err == nil && stat.Size == file.Size && stat.ContentType == file.ContentType && subtle.ConstantTimeCompare(checksum, file.SHA256) == 1
+	return err == nil && subtle.ConstantTimeCompare(checksum, file.SHA256) == 1
 }
 
 func (w *VerificationWorker) reject(ctx context.Context, file File) error {
