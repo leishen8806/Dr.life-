@@ -441,6 +441,23 @@ func (f *loginFixture) testAdminFirstPasswordLogin(t *testing.T) {
 	if err != nil || !identity.PasswordChangeOnly {
 		t.Fatalf("identity=%+v err=%v, want password-change-only access", identity, err)
 	}
+	// A refresh must preserve the first-password restriction. In particular it
+	// must never turn a cookie obtained at restricted login into a normal admin
+	// token, even though the shared mobile-session manager has a longer TTL.
+	refreshService := &SessionService{
+		DB: f.pool,
+		Tokens: TokenManager{Keys: f.keys, AccessTTL: 15 * time.Minute, Now: func() time.Time { return f.now }},
+		Cache: f.cache, IdleTTL: 15 * time.Minute, AbsoluteTTL: 8 * time.Hour,
+		Now: func() time.Time { return f.now },
+	}
+	refreshed, err := refreshService.Refresh(ctx, result.RefreshToken, "198.51.100.6")
+	if err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	refreshedIdentity, _, err := tokens.ParseAccess(ctx, refreshed.AccessToken)
+	if err != nil || !refreshedIdentity.PasswordChangeOnly || refreshed.AccessExpiresIn != int64((10*time.Minute)/time.Second) {
+		t.Fatalf("refreshed identity=%+v expires=%d err=%v, want restricted 10-minute access", refreshedIdentity, refreshed.AccessExpiresIn, err)
+	}
 }
 
 func (f *loginFixture) testAdminPasswordChange(t *testing.T) {
