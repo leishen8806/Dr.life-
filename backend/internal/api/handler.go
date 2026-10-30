@@ -949,12 +949,19 @@ func productListData(page catalog.ProductPage) gen.ProductListData {
 func publicProductListData(page catalog.ProductPage) gen.ProductListData {
 	items := make([]gen.Product, 0, len(page.Items))
 	for _, item := range page.Items {
-		product := toGenProduct(item)
-		product.SourceRef = nil
-		product.StdScore = nil
-		items = append(items, product)
+		items = append(items, publicProduct(item))
 	}
 	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}
+}
+
+func publicProduct(product catalog.Product) gen.Product {
+	item := toGenProduct(product)
+	item.SourceRef = nil
+	item.StdScore = nil
+	for i := range item.Skus {
+		item.Skus[i].MerchantSkuCode = nil
+	}
+	return item
 }
 
 func categoryListData(page catalog.CategoryPage) gen.CategoryListData {

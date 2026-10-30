@@ -422,6 +422,14 @@ func TestCatalogMigration(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23505", fmt.Sprintf(`INSERT INTO catalog.product (public_id, merchant_id, category_id, name, unit, origin) SELECT '%s', 42, id, '%s', 'u_pc', 'cn' FROM catalog.category WHERE code = '%s'`, firstProductPublicID, productNameJSON, scratchCategoryCode))
 	})
 
+	t.Run("sku text length constraints", func(t *testing.T) {
+		assertSQLState(t, ctx, admin, "23514", fmt.Sprintf(`INSERT INTO catalog.sku (public_id, product_id, attribute_values, merchant_sku_code, status) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD1', id, '{"length":"code"}'::jsonb, repeat('x', 129), 'off' FROM catalog.product WHERE public_id = '%s'`, firstProductPublicID))
+		assertSQLState(t, ctx, admin, "23514", fmt.Sprintf(`INSERT INTO catalog.sku (public_id, product_id, attribute_values, unit, status) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD2', id, '{"length":"unit"}'::jsonb, repeat('u', 33), 'off' FROM catalog.product WHERE public_id = '%s'`, firstProductPublicID))
+		if _, err := admin.Exec(ctx, fmt.Sprintf(`INSERT INTO catalog.sku (public_id, product_id, attribute_values, merchant_sku_code, unit, status) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD3', id, '{"length":"boundary"}'::jsonb, repeat('x', 128), repeat('u', 32), 'off' FROM catalog.product WHERE public_id = '%s'`, firstProductPublicID)); err != nil {
+			t.Fatalf("boundary SKU lengths rejected: %v", err)
+		}
+	})
+
 	t.Run("search_text is derived from the trilingual name", func(t *testing.T) {
 		var matches bool
 		if err := admin.QueryRow(ctx, `SELECT search_text @@ to_tsquery('simple', 'tiles') FROM catalog.product WHERE public_id = $1`, firstProductPublicID).Scan(&matches); err != nil {

@@ -1372,12 +1372,14 @@ components:
             type: string
         merchant_sku_code:
           type: string
+          maxLength: 128
         status:
           type: string
           enum: [on, off]
         unit:
           type: string
           nullable: true
+          maxLength: 32
         tiers:
           $ref: "#/components/schemas/ProductTierList"
     SKUList:
@@ -1407,8 +1409,10 @@ components:
             $ref: "#/components/schemas/SkuSpecValue"
         merchant_sku_code:
           type: string
+          maxLength: 128
         unit:
           type: string
+          maxLength: 32
         tiers:
           $ref: "#/components/schemas/ProductTierList"
     SkuCreateList:

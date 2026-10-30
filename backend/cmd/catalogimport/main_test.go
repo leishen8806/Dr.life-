@@ -23,3 +23,11 @@ func TestParseAttributeTrimsKhmerReviewMarkersAndBuildsEnumValues(t *testing.T) 
 		t.Fatalf("enum values = %#v", attribute.Values)
 	}
 }
+
+func TestParseAttributeRejectsNumberSKUVariant(t *testing.T) {
+	row := []string{"CAT-TILE", "weight", "Weight", "Weight", "Weight", "number", "kg", "true", "true", "", "", "", "test"}
+	_, err := parseAttribute(row, 2)
+	if err == nil || err.Error() != "attributes row 2: sku_variant requires type enum" {
+		t.Fatalf("number SKU dimension error = %v", err)
+	}
+}

@@ -4,6 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode/utf8"
+)
+
+const (
+	maxMerchantSKUCodeRunes = 128
+	maxSKUUnitRunes         = 32
 )
 
 func skuCombinationKey(values map[string]string) string {
@@ -18,6 +24,12 @@ func derefSKUs(value *[]SKUInput) []SKUInput {
 }
 
 func ValidateSKU(attributes []CategoryAttribute, input SKUInput) error {
+	if utf8.RuneCountInString(input.MerchantSKUCode) > maxMerchantSKUCodeRunes {
+		return invalid("merchant_sku_code", "must not exceed 128 characters")
+	}
+	if utf8.RuneCountInString(input.Unit) > maxSKUUnitRunes {
+		return invalid("unit", "must not exceed 32 characters")
+	}
 	byKey := make(map[string]CategoryAttribute, len(attributes))
 	for _, attribute := range attributes {
 		if !attribute.IsSKUDimension {
