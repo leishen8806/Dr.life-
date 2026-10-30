@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -81,6 +82,18 @@ func TestRouteFitEventRecorderCommitsInboxAndDedupAtomically(t *testing.T) {
 	}
 	assertRouteFitCount(t, ctx, pool, `SELECT count(*) FROM ops.processed_event WHERE event_id='evt-3'`, 0)
 	assertRouteFitCount(t, ctx, pool, `SELECT count(*) FROM logistics.shipment_event WHERE event_id='evt-3'`, 0)
+
+	sensitive := routeFitIntegrationEvent("evt-4", 4)
+	if err := recorder.Record(ctx, sensitive, []byte(`{"trackingNo":"TRACK-1","recipientPhone":"+85510000001","unexpected":"do-not-store"}`)); err != nil {
+		t.Fatal(err)
+	}
+	var stored string
+	if err := pool.QueryRow(ctx, `SELECT row_to_json(shipment_event)::text FROM logistics.shipment_event WHERE event_id='evt-4'`).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stored, "+85510000001") || strings.Contains(stored, "do-not-store") {
+		t.Fatalf("shipment inbox retained non-whitelisted payload: %s", stored)
+	}
 }
 
 func TestRouteFitEventRecorderAcceptsOnlyOneConcurrentFirstAggregateVersion(t *testing.T) {

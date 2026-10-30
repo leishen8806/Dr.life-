@@ -132,6 +132,18 @@ func TestRouteFitWebhookVerifierRejectsExpiredAndWrongSignature(t *testing.T) {
 	}
 }
 
+func TestRouteFitWebhookVerifierRejectsExtremeFutureTimestamp(t *testing.T) {
+	body := []byte(`{}`)
+	const timestamp = "9223372036854"
+	request := httptest.NewRequest(http.MethodPost, "/v1/integrations/routefit/events", bytes.NewReader(body))
+	request.Header.Set("X-RouteFit-Timestamp", timestamp)
+	request.Header.Set("X-RouteFit-Signature", "v1="+routeFitSignature("secret", timestamp, body))
+	verifier := RouteFitWebhookVerifier{Secrets: [][]byte{[]byte("secret")}, Now: func() time.Time { return time.Unix(1_793_260_800, 0).UTC() }}
+	if err := verifier.Verify(request, body); err == nil {
+		t.Fatal("Verify() accepted an extreme future timestamp")
+	}
+}
+
 func routeFitSignature(secret, timestamp string, body []byte) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	_, _ = mac.Write([]byte(timestamp))

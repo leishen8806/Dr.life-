@@ -112,6 +112,37 @@ func TestHTTPServerSecurityLimits(t *testing.T) {
 	}
 }
 
+func TestRouteFitCallbackExemptsContentTypeAndIdempotencyButKeepsBodyLimit(t *testing.T) {
+	const path = "/v1/integrations/routefit/events"
+	var calls atomic.Int64
+	handler := NewHandlerWithGateway(nil, GatewayOptions{
+		AppEnv: "test", OriginGroups: gateway.DefaultOriginGroups("test"),
+		Limiter: gateway.NewMemoryLimiter(),
+		IPRules: gateway.RuleSet{Default: gateway.Rule{Limit: 100, Window: time.Minute}},
+		AccountRules: gateway.RuleSet{Default: gateway.Rule{Limit: 100, Window: time.Minute}},
+		WebhookMaxBody: 64 << 10,
+		WebhookBindings: map[string]gateway.WebhookVerifier{path: allowWebhookVerifier{}},
+		RouteFit: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { calls.Add(1); w.WriteHeader(http.StatusNoContent) }),
+	})
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent || calls.Load() != 1 {
+		t.Fatalf("callback status=%d calls=%d, want 204/1", response.Code, calls.Load())
+	}
+
+	request = httptest.NewRequest(http.MethodPost, path, strings.NewReader(strings.Repeat("x", 64<<10+1)))
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusRequestEntityTooLarge || calls.Load() != 1 {
+		t.Fatalf("oversize callback status=%d calls=%d, want 413/1", response.Code, calls.Load())
+	}
+}
+
+type allowWebhookVerifier struct{}
+
+func (allowWebhookVerifier) Verify(*http.Request, []byte) error { return nil }
+
 func TestSecurityHeadersCoverRouterErrors(t *testing.T) {
 	handler := NewHandler(nil, func(context.Context) error { return context.DeadlineExceeded })
 	for _, test := range []struct {

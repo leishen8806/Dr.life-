@@ -50,6 +50,16 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	}
 }
 
+func TestLoadRouteFitEventSecrets(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{"APP_ENV": "test", "ROUTEFIT_EVENT_SECRETS": "first, second"}))
+	if err != nil || cfg.RouteFitEventSecrets != "first, second" {
+		t.Fatalf("RouteFit secrets config = %+v, err=%v", cfg, err)
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "ROUTEFIT_EVENT_SECRETS": ","})); err == nil {
+		t.Fatal("accepted empty RouteFit secret list")
+	}
+}
+
 func TestCacheRedisURLNeverFallsBackToStateRedis(t *testing.T) {
 	cfg, err := load(lookup(map[string]string{
 		"APP_ENV":   "test",
