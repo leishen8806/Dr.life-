@@ -117,6 +117,23 @@ func TestNonV1PathsFailClosedUnlessConfiguredAsWebhook(t *testing.T) {
 	}
 }
 
+func TestRouteFitEventEndpointIsTheOnlyPublicIntegrationRoute(t *testing.T) {
+	handler := httpx.RequestID(Authenticate(nil, "")(Authorize("")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))))
+	for path, want := range map[string]int{
+		"/v1/integrations/routefit/events": http.StatusNoContent,
+		"/v1/integrations/routefit":        http.StatusForbidden,
+		"/v1/integrations/routefit/other":  http.StatusForbidden,
+	} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, nil))
+		if response.Code != want {
+			t.Fatalf("path=%s status=%d want=%d", path, response.Code, want)
+		}
+	}
+}
+
 func TestPathBypassesAreRejected(t *testing.T) {
 	for _, path := range []string{
 		"/v1/public/../admin/x", "/v1/public//x", "/v1/Public/x",
