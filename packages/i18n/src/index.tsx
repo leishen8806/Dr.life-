@@ -28,7 +28,8 @@ const locales: Record<Language, Record<TranslationKey, string>> = {
   km
 };
 
-function supportedLanguage(value?: string | null): Language | undefined {
+/** The language itself when it is one of the three, so callers can tell "none" from "default". */
+export function supportedLanguage(value?: string | null): Language | undefined {
   const language = value?.toLowerCase().split(/[-_]/)[0];
   return language === "zh" || language === "en" || language === "km"
     ? language
