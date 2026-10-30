@@ -157,14 +157,23 @@ func TestCatalogMigration(t *testing.T) {
 				t.Fatalf("public product exposed off SKU: %+v", product.SKUs)
 			}
 		}
+		if _, err := admin.Exec(ctx, `UPDATE catalog.sku SET status = 'on' WHERE product_id = (SELECT id FROM catalog.product WHERE public_id = $1)`, created.PublicID); err != nil {
+			t.Fatal(err)
+		}
 
 		off := catalog.StatusOff
-		unpublished, err := store.UpdateProduct(ctx, 42, created.PublicID, catalog.ProductPatch{Status: &off})
+		unpublished, err := store.UpdateProduct(ctx, 42, created.PublicID, catalog.ProductPatch{
+			Status: &off,
+			Tiers:  []catalog.Tier{{MinQty: "1", UnitPriceE4: 190}, {MinQty: "10", UnitPriceE4: 170}},
+		})
 		if err != nil {
-			t.Fatalf("UpdateProduct off: %v", err)
+			t.Fatalf("UpdateProduct off with tiers: %v", err)
 		}
 		if len(unpublished.SKUs) != 1 || unpublished.SKUs[0].Status != catalog.StatusOff {
 			t.Fatalf("unpublished SKU = %+v, want one off SKU", unpublished.SKUs)
+		}
+		if got := unpublished.SKUs[0].Tiers; len(got) != 2 || got[0].UnitPriceE4 != 190 || got[1].UnitPriceE4 != 170 {
+			t.Fatalf("unpublished SKU tiers = %+v, want updated tiers", got)
 		}
 
 		if _, err := admin.Exec(ctx, `
@@ -189,20 +198,110 @@ func TestCatalogMigration(t *testing.T) {
 		}
 		originalSKU := skuProduct.SKUs[0].PublicID
 
-		updated, err := store.UpdateProduct(ctx, 42, skuProduct.PublicID, catalog.ProductPatch{Tiers: []catalog.Tier{{MinQty: "1", UnitPriceE4: 290}, {MinQty: "10", UnitPriceE4: 240}}})
-		if err != nil {
-			t.Fatalf("UpdateProduct tiers-only after skus: %v", err)
-		}
-		if len(updated.SKUs) != 2 {
-			t.Fatalf("updated SKUs = %+v, want existing SKU plus default SKU", updated.SKUs)
-		}
-
-		updated, err = store.UpdateProduct(ctx, 42, skuProduct.PublicID, catalog.ProductPatch{SKUs: &skuInput.SKUs})
+		updated, err := store.UpdateProduct(ctx, 42, skuProduct.PublicID, catalog.ProductPatch{SKUs: &skuInput.SKUs})
 		if err != nil {
 			t.Fatalf("UpdateProduct skus: %v", err)
 		}
 		if len(updated.SKUs) != 1 || updated.SKUs[0].PublicID != originalSKU {
 			t.Fatalf("updated SKU = %+v, want stable public_id %q", updated.SKUs, originalSKU)
+		}
+		if _, err := store.UpdateProduct(ctx, 42, skuProduct.PublicID, catalog.ProductPatch{Tiers: []catalog.Tier{{MinQty: "1", UnitPriceE4: 290}, {MinQty: "10", UnitPriceE4: 240}}}); err == nil {
+			t.Fatal("UpdateProduct accepted tiers-only update for SKU variants")
+		} else {
+			var validation *catalog.ValidationError
+			if !errors.As(err, &validation) || validation.Field != "tiers" {
+				t.Fatalf("tiers-only update error = %v, want tiers validation", err)
+			}
+		}
+
+		publishedSKUProduct, err := store.PublishProduct(ctx, 42, skuProduct.PublicID)
+		if err != nil {
+			t.Fatalf("PublishProduct sku-only: %v", err)
+		}
+		if publishedSKUProduct.Status != catalog.StatusOn || len(publishedSKUProduct.SKUs) != 1 || publishedSKUProduct.SKUs[0].Status != catalog.StatusOn {
+			t.Fatalf("published SKU-only product = %+v, want on product and SKU", publishedSKUProduct)
+		}
+	})
+
+	t.Run("merchant SKU codes are unique when present", func(t *testing.T) {
+		input := catalog.ProductInput{
+			CategoryCode: scratchCategoryCode,
+			Name:         catalog.LocalizedText{catalog.LangZH: "codes", catalog.LangEN: "codes", catalog.LangKM: "codes"},
+			Unit:         "pcs",
+			Origin:       catalog.OriginCN,
+			Tiers:        []catalog.Tier{{MinQty: "1", UnitPriceE4: 200}, {MinQty: "10", UnitPriceE4: 180}},
+		}
+		product, err := store.CreateProduct(ctx, 42, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.sku (public_id, product_id, attribute_values, merchant_sku_code, status)
+			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FC2', id, '{"color":"red"}'::jsonb, 'merchant-code', 'off'
+			FROM catalog.product WHERE public_id = $1`, product.PublicID); err != nil {
+			t.Fatalf("insert first merchant SKU code: %v", err)
+		}
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.sku (public_id, product_id, attribute_values, merchant_sku_code, status)
+			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FC3', id, '{"color":"blue"}'::jsonb, 'merchant-code', 'off'
+			FROM catalog.product WHERE public_id = $1`, product.PublicID); err == nil {
+			t.Fatal("duplicate merchant SKU code was accepted")
+		} else {
+			var pgErr *pgconn.PgError
+			if !errors.As(err, &pgErr) || pgErr.Code != "23505" {
+				t.Fatalf("duplicate merchant SKU code error = %v, want 23505", err)
+			}
+		}
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.sku (public_id, product_id, attribute_values, status)
+			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FC4', id, '{"color":"blue"}'::jsonb, 'off'
+			FROM catalog.product WHERE public_id = $1`, product.PublicID); err != nil {
+			t.Fatalf("second NULL merchant SKU code: %v", err)
+		}
+	})
+
+	t.Run("publish accepts legacy tiers and rejects missing SKU tiers", func(t *testing.T) {
+		const legacyPublicID = "01ARZ3NDEKTSV4RRFFQ69G5FC5"
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.product (public_id, merchant_id, category_id, name, unit, origin, status)
+			SELECT $1, 42, id, $2::jsonb, 'pcs', 'cn', 'draft'
+			FROM catalog.category WHERE code = $3`, legacyPublicID, productNameJSON, scratchCategoryCode); err != nil {
+			t.Fatal(err)
+		}
+		for _, tier := range []struct {
+			minQty string
+			price  int64
+		}{{"1", 200}, {"10", 180}} {
+			if _, err := admin.Exec(ctx, `
+				INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4)
+				SELECT id, $2::text::numeric, $3 FROM catalog.product WHERE public_id = $1`, legacyPublicID, tier.minQty, tier.price); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := store.PublishProduct(ctx, 42, legacyPublicID); err != nil {
+			t.Fatalf("PublishProduct legacy tiers: %v", err)
+		}
+
+		const missingSKUTiersPublicID = "01ARZ3NDEKTSV4RRFFQ69G5FC6"
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.product (public_id, merchant_id, category_id, name, unit, origin, status)
+			SELECT $1, 42, id, $2::jsonb, 'pcs', 'cn', 'draft'
+			FROM catalog.category WHERE code = $3`, missingSKUTiersPublicID, productNameJSON, scratchCategoryCode); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.sku (public_id, product_id, attribute_values, status)
+			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FC7', id, '{"color":"red"}'::jsonb, 'off'
+			FROM catalog.product WHERE public_id = $1`, missingSKUTiersPublicID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.PublishProduct(ctx, 42, missingSKUTiersPublicID); err == nil {
+			t.Fatal("PublishProduct accepted SKU-only product without sku_tier")
+		} else {
+			var validation *catalog.ValidationError
+			if !errors.As(err, &validation) || validation.Field != "skus[0].tiers" {
+				t.Fatalf("missing SKU tiers error = %v, want skus[0].tiers", err)
+			}
 		}
 	})
 

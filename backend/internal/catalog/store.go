@@ -295,7 +295,7 @@ func (s *PgStore) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 			return Product{}, err
 		}
 	}
-	if patch.Status != nil && patch.Tiers == nil && patch.SKUs == nil {
+	if patch.Status != nil {
 		if _, err := tx.Exec(ctx, `UPDATE catalog.sku SET status = $1 WHERE product_id = $2`, string(skuStatusForProduct(effectiveStatus)), productID); err != nil {
 			return Product{}, err
 		}
@@ -646,6 +646,13 @@ func replaceDefaultSKUTiers(ctx context.Context, tx pgx.Tx, productID int64, tie
 	var skuID int64
 	err := tx.QueryRow(ctx, `SELECT id FROM catalog.sku WHERE product_id = $1 AND attribute_values = '{}'::jsonb FOR UPDATE`, productID).Scan(&skuID)
 	if errors.Is(err, pgx.ErrNoRows) {
+		var hasVariants bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM catalog.sku WHERE product_id = $1 AND attribute_values <> '{}'::jsonb)`, productID).Scan(&hasVariants); err != nil {
+			return err
+		}
+		if hasVariants {
+			return invalid("tiers", "use skus to update a product with SKU variants")
+		}
 		return createDefaultSKU(ctx, tx, productID, tiers, status)
 	}
 	if err != nil {

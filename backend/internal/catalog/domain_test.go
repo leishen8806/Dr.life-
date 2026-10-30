@@ -89,10 +89,23 @@ func TestValidateProductForPublishGatesTrilingualAndTiers(t *testing.T) {
 	if err := catalog.ValidateProductForPublish(product, tiers[:1]); !errors.As(err, &invalid) || invalid.Field != "tiers" {
 		t.Fatalf("single tier = %v, want tiers", err)
 	}
+	if err := catalog.ValidateProductForPublish(product, nil); !errors.As(err, &invalid) || invalid.Field != "tiers" {
+		t.Fatalf("no prices = %v, want tiers", err)
+	}
 
 	product.Status = catalog.StatusOn
 	if err := catalog.ValidateProductForPublish(product, tiers); !errors.As(err, &invalid) || invalid.Field != "status" {
 		t.Fatalf("already published = %v, want status", err)
+	}
+
+	product.Status = catalog.StatusDraft
+	product.SKUs = []catalog.SKU{{Tiers: tiers}}
+	if err := catalog.ValidateProductForPublish(product, nil); err != nil {
+		t.Fatalf("SKU-only product = %v, want nil", err)
+	}
+	product.SKUs[0].Tiers = tiers[:1]
+	if err := catalog.ValidateProductForPublish(product, nil); !errors.As(err, &invalid) || invalid.Field != "skus[0].tiers" {
+		t.Fatalf("SKU-only product with one tier = %v, want skus[0].tiers", err)
 	}
 }
 

@@ -96,6 +96,14 @@ func ValidateProductForPublish(product Product, tiers []Tier) error {
 	if err := ValidateLocalized("name", product.Name); err != nil {
 		return err
 	}
+	if len(product.SKUs) > 0 {
+		for i, sku := range product.SKUs {
+			if err := ValidateTiers(sku.Tiers); err != nil {
+				return invalid(fmt.Sprintf("skus[%d].tiers", i), "SKU price tiers are invalid")
+			}
+		}
+		return nil
+	}
 	return ValidateTiers(tiers)
 }
 
