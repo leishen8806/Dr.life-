@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -60,20 +62,20 @@ func TestHTTPClientUsesOAuthBearerAndConfiguredCreateService(t *testing.T) {
 }
 
 func TestHTTPClientRejectsTamperedNestedDataWithValidTopLevelSignature(t *testing.T) {
-	transport := roundTripper(func(request *http.Request) (*http.Response, error) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
 		case "/oauth/token":
-			return jsonResponse(`{"access_token":"token","token_type":"Bearer","expires_in":60}`), nil
+			_, _ = io.WriteString(writer, `{"access_token":"token","token_type":"Bearer","expires_in":60}`)
 		case "/api/mch/v2/gateway":
 			// The envelope still has a valid signature because data is intentionally
 			// excluded from the official scalar signing set.
-			return jsonResponse(gatewayResponse(t, `{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"99.99","currency":"USD","status":"SUCCESS","transaction_id":"forged"}`)), nil
+			_, _ = io.WriteString(writer, gatewayResponse(t, `{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"99.99","currency":"USD","status":"SUCCESS","transaction_id":"forged"}`))
 		default:
 			t.Fatalf("unexpected path %s", request.URL.Path)
-			return nil, nil
 		}
-	})
-	client, err := NewHTTPClient(validConfig(CreateServiceLower), &http.Client{Transport: transport})
+	}))
+	defer server.Close()
+	client, err := NewHTTPClient(validConfig(CreateServiceLower), sandboxHTTPClient(t, server))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,13 +91,15 @@ func TestHTTPClientRejectsMissingOrInvalidGatewaySignature(t *testing.T) {
 		`{"success":true,"sign":"invalid","data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"12.34","currency":"USD","status":"WAITING","payment_link":"https://devwebpayment.kesspay.io/pay/a"}}`,
 	} {
 		t.Run("reject", func(t *testing.T) {
-			transport := roundTripper(func(request *http.Request) (*http.Response, error) {
+			server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				if request.URL.Path == "/oauth/token" {
-					return jsonResponse(`{"access_token":"token","token_type":"Bearer","expires_in":60}`), nil
+					_, _ = io.WriteString(writer, `{"access_token":"token","token_type":"Bearer","expires_in":60}`)
+					return
 				}
-				return jsonResponse(body), nil
-			})
-			client, err := NewHTTPClient(validConfig(CreateServiceLower), &http.Client{Transport: transport})
+				_, _ = io.WriteString(writer, body)
+			}))
+			defer server.Close()
+			client, err := NewHTTPClient(validConfig(CreateServiceLower), sandboxHTTPClient(t, server))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -139,4 +143,17 @@ func gatewayResponse(t *testing.T, data string) string {
 		t.Fatal(err)
 	}
 	return string(encoded)
+}
+
+// sandboxHTTPClient routes the fixed sandbox host to a local TLS server. The
+// client therefore exercises its real request/response decoding path without
+// any network access to KESS.
+func sandboxHTTPClient(t *testing.T, server *httptest.Server) *http.Client {
+	t.Helper()
+	transport := server.Client().Transport.(*http.Transport).Clone()
+	transport.TLSClientConfig.InsecureSkipVerify = true // #nosec G402 -- test-only local TLS server
+	transport.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, server.Listener.Addr().String())
+	}
+	return &http.Client{Transport: transport}
 }
