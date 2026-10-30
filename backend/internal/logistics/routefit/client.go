@@ -128,12 +128,15 @@ func (c *Client) Deliver(ctx context.Context, cmd CreateShipmentCmd) (Result, er
 }
 
 func (c *Client) create(ctx context.Context, cmd CreateShipmentCmd, key string) (Result, bool, error) {
-	body, _ := json.Marshal(struct {
+	body, err := json.Marshal(struct {
 		CreateShipmentCmd
 		ExternalRevision int64  `json:"externalRevision"`
 		PaymentTerms     string `json:"paymentTerms"`
 		SourcePlatform   string `json:"sourcePlatform"`
 	}{cmd, 1, "PLATFORM_PREPAID", "drlife"})
+	if err != nil {
+		return Result{}, false, fmt.Errorf("encode RouteFit shipment command: %w", err)
+	}
 	response, err := c.request(ctx, http.MethodPost, "/api/platform/v1/fulfillments", body, key)
 	if err != nil {
 		return Result{}, errors.Is(err, context.DeadlineExceeded), err
@@ -196,7 +199,7 @@ func decodeError(response *http.Response) error {
 }
 
 func validate(cmd CreateShipmentCmd) error {
-	if cmd.ExternalOrderID == "" || cmd.OwnerRef == "" || cmd.WarehouseID == "" || len(cmd.Lines) == 0 || len(cmd.Delivery) == 0 || cmd.ServiceLevel == "" || cmd.DeclaredValue.Currency == "" {
+	if cmd.ExternalOrderID == "" || cmd.OwnerRef == "" || cmd.WarehouseID == "" || len(cmd.Lines) == 0 || len(cmd.Delivery) == 0 || !json.Valid(cmd.Delivery) || (len(cmd.RequestedDeliveryWindow) != 0 && !json.Valid(cmd.RequestedDeliveryWindow)) || cmd.ServiceLevel == "" || cmd.DeclaredValue.Currency == "" {
 		return errors.New("invalid RouteFit shipment command")
 	}
 	for _, line := range cmd.Lines {

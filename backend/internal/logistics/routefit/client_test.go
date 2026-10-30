@@ -181,6 +181,40 @@ func TestNewRejectsNonLoopbackHTTPServiceTokenEndpoint(t *testing.T) {
 	}
 }
 
+func TestNewRejectsLookalikeLoopbackHTTPServiceTokenEndpoints(t *testing.T) {
+	for _, baseURL := range []string{"http://localhost.evil.com", "http://127.0.0.1.evil.com"} {
+		t.Run(baseURL, func(t *testing.T) {
+			_, err := routefit.New(routefit.Config{BaseURL: baseURL, ServiceToken: "test-service-token", Timeout: time.Second})
+			if err == nil {
+				t.Fatalf("accepted cleartext lookalike loopback endpoint %q", baseURL)
+			}
+		})
+	}
+}
+
+func TestDeliverRejectsInvalidRawJSONWithoutSendingAuthenticatedRequest(t *testing.T) {
+	for name, mutate := range map[string]func(*routefit.CreateShipmentCmd){
+		"delivery":                  func(cmd *routefit.CreateShipmentCmd) { cmd.Delivery = json.RawMessage(`not-json`) },
+		"requested delivery window": func(cmd *routefit.CreateShipmentCmd) { cmd.RequestedDeliveryWindow = json.RawMessage(`not-json`) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			requests := 0
+			server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { requests++ }))
+			defer server.Close()
+
+			cmd := testCommand()
+			mutate(&cmd)
+			_, err := newClient(t, server.URL).Deliver(context.Background(), cmd)
+			if err == nil {
+				t.Fatal("Deliver accepted invalid raw JSON")
+			}
+			if requests != 0 {
+				t.Fatalf("sent %d authenticated request(s) after local validation failed", requests)
+			}
+		})
+	}
+}
+
 func newClient(t *testing.T, baseURL string) *routefit.Client {
 	t.Helper()
 	client, err := routefit.New(routefit.Config{BaseURL: baseURL, ServiceToken: "test-service-token", Timeout: time.Second, RetryAttempts: 3, RetryInitialDelay: time.Millisecond})
