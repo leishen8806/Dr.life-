@@ -199,6 +199,7 @@ func TestIAMMigration(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.merchant_staff (public_id,merchant_id,name,phone_enc,phone_hash,role,status,invite_code) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FAF',id,'D','\x04','\x3333','owner','invited','invite-3' FROM iam.merchant WHERE public_id='`+merchantPublicID+`'`)
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.merchant_staff (public_id,merchant_id,name,phone_enc,phone_hash,role,status,invite_code) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FAR',id,'E','\x05','\x4444','sales','disabled','invite-4' FROM iam.merchant WHERE public_id='`+merchantPublicID+`'`)
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.merchant_role_perm (merchant_id,role,module,level) SELECT id,'manager','staff','edit' FROM iam.merchant WHERE public_id='`+merchantPublicID+`'`)
+		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.merchant_role_perm_template (role,module,level) VALUES ('manager','staff','edit')`)
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.merchant_role_perm (merchant_id,role,module,level) SELECT id,'manager','unknown','view' FROM iam.merchant WHERE public_id='`+merchantPublicID+`'`)
 	})
 
@@ -347,6 +348,37 @@ func TestIAMMigration(t *testing.T) {
 		assertSQLState(t, ctx, admin, "55000", `TRUNCATE iam.account_status_log`)
 	})
 
+	t.Run("merchant finance migration repairs the template and existing copies", func(t *testing.T) {
+		if err := goose.DownTo(database, migrationsDir, 31); err != nil {
+			t.Fatal(err)
+		}
+		var merchantID int64
+		if err := admin.QueryRow(ctx, `INSERT INTO iam.merchant (public_id,name) VALUES ('01BX5ZZKBKACTAV9WEVGEMMVS2','{"zh":"Existing","en":"Existing","km":"Existing"}') RETURNING id`).Scan(&merchantID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `UPDATE iam.merchant_role_perm_template SET level='edit' WHERE role='finance' AND module='fin'`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.merchant_role_perm (merchant_id,role,module,level) VALUES ($1,'finance','fin','edit')`, merchantID); err != nil {
+			t.Fatal(err)
+		}
+		if err := goose.Up(database, migrationsDir); err != nil {
+			t.Fatal(err)
+		}
+		for _, table := range []string{"iam.merchant_role_perm_template", "iam.merchant_role_perm"} {
+			query := `SELECT level FROM ` + table + ` WHERE role='finance' AND module='fin'`
+			args := []any{}
+			if table == "iam.merchant_role_perm" {
+				query += ` AND merchant_id=$1`
+				args = append(args, merchantID)
+			}
+			var level string
+			if err := admin.QueryRow(ctx, query, args...).Scan(&level); err != nil || level != "view" {
+				t.Fatalf("%s finance/fin=%q err=%v, want view", table, level, err)
+			}
+		}
+	})
+
 	t.Run("permission seeds match approved matrices", func(t *testing.T) {
 		assertAdminMatrix(t, ctx, admin)
 		assertMerchantTemplate(t, ctx, admin)
@@ -356,6 +388,49 @@ func TestIAMMigration(t *testing.T) {
 		}
 		assertAdminMatrix(t, ctx, admin)
 		assertMerchantTemplate(t, ctx, admin)
+	})
+
+	t.Run("merchant permission initialization copies the template idempotently", func(t *testing.T) {
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pool.Close()
+
+		var firstMerchantID, secondMerchantID int64
+		if err := admin.QueryRow(ctx, `INSERT INTO iam.merchant (public_id,name) VALUES ('01BX5ZZKBKACTAV9WEVGEMMVS3','{"zh":"M2","en":"M2","km":"M2"}') RETURNING id`).Scan(&firstMerchantID); err != nil {
+			t.Fatal(err)
+		}
+		if err := admin.QueryRow(ctx, `INSERT INTO iam.merchant (public_id,name) VALUES ('01BX5ZZKBKACTAV9WEVGEMMVS4','{"zh":"M3","en":"M3","km":"M3"}') RETURNING id`).Scan(&secondMerchantID); err != nil {
+			t.Fatal(err)
+		}
+
+		initializer := iam.NewMerchantPermInitializer(pool)
+		if err := initializer.InitMerchantPerms(ctx, firstMerchantID); err != nil {
+			t.Fatal(err)
+		}
+		if err := initializer.InitMerchantPerms(ctx, firstMerchantID); err != nil {
+			t.Fatalf("repeat initialization: %v", err)
+		}
+		if err := initializer.InitMerchantPerms(ctx, secondMerchantID); err != nil {
+			t.Fatal(err)
+		}
+		if err := initializer.InitMerchantPerms(ctx, 0); !errors.Is(err, iam.ErrInvalidMerchantID) {
+			t.Fatalf("zero merchant ID error=%v, want invalid merchant ID", err)
+		}
+		if err := initializer.InitMerchantPerms(ctx, 999999); !errors.Is(err, iam.ErrMerchantNotFound) {
+			t.Fatalf("missing merchant error=%v, want not found", err)
+		}
+
+		assertMerchantPerms(t, ctx, admin, firstMerchantID)
+		assertMerchantPerms(t, ctx, admin, secondMerchantID)
+		var firstCount, secondCount int
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM iam.merchant_role_perm WHERE merchant_id=$1`, firstMerchantID).Scan(&firstCount); err != nil || firstCount != 36 {
+			t.Fatalf("first merchant permissions=%d err=%v, want 36", firstCount, err)
+		}
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM iam.merchant_role_perm WHERE merchant_id=$1`, secondMerchantID).Scan(&secondCount); err != nil || secondCount != 36 {
+			t.Fatalf("second merchant permissions=%d err=%v, want 36", secondCount, err)
+		}
 	})
 
 	t.Run("database roles enforce module and sensitive column boundaries", func(t *testing.T) {
@@ -482,7 +557,7 @@ func assertAdminMatrix(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 func assertMerchantTemplate(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 	t.Helper()
 	modules := []string{"dash", "prod", "orders", "store", "fin", "ads", "prof", "staff", "ai"}
-	wantByRole := map[string]string{"manager": "veeeveeve", "sales": "veevnnvne", "warehouse": "vvvennvne", "finance": "vnvvevvne"}
+	wantByRole := merchantPermissionMatrix()
 	for role, levels := range wantByRole {
 		for i, module := range modules {
 			want := map[byte]string{'e': "edit", 'v': "view", 'n': "none"}[levels[i]]
@@ -498,6 +573,32 @@ func assertMerchantTemplate(t *testing.T, ctx context.Context, conn *pgx.Conn) {
 	var count int
 	if err := conn.QueryRow(ctx, `SELECT count(*) FROM iam.merchant_role_perm_template`).Scan(&count); err != nil || count != 36 {
 		t.Fatalf("merchant template count=%d err=%v", count, err)
+	}
+}
+
+func assertMerchantPerms(t *testing.T, ctx context.Context, conn *pgx.Conn, merchantID int64) {
+	t.Helper()
+	modules := []string{"dash", "prod", "orders", "store", "fin", "ads", "prof", "staff", "ai"}
+	for role, levels := range merchantPermissionMatrix() {
+		for i, module := range modules {
+			want := map[byte]string{'e': "edit", 'v': "view", 'n': "none"}[levels[i]]
+			var got string
+			if err := conn.QueryRow(ctx, `SELECT level FROM iam.merchant_role_perm WHERE merchant_id=$1 AND role=$2 AND module=$3`, merchantID, role, module).Scan(&got); err != nil {
+				t.Fatalf("merchant=%d %s/%s: %v", merchantID, role, module, err)
+			}
+			if got != want {
+				t.Errorf("merchant=%d %s/%s=%s, want %s", merchantID, role, module, got, want)
+			}
+		}
+	}
+}
+
+func merchantPermissionMatrix() map[string]string {
+	return map[string]string{
+		"manager":   "veeeveeve",
+		"sales":     "veevnnvne",
+		"warehouse": "vvvennvne",
+		"finance":   "vnvvvvvne",
 	}
 }
 
