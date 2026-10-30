@@ -8,7 +8,7 @@ import {
   loadCategories,
   loadProducts
 } from "./api";
-import { appendFeed, firstFeed, type ProductFeed } from "./feed";
+import { appendFeed, firstFeed, nextPage, type ProductFeed } from "./feed";
 import { errorMessageKey, type Resource } from "./resource";
 import type { Category, Product } from "./types";
 import { CategoryView } from "./views/category-view";
@@ -101,11 +101,13 @@ function useProductFeed(client: BuyerApiClient, code?: string) {
   }, [retryFirst]);
 
   const loadMore = useCallback(() => {
-    if (resource.status !== "ready" || !resource.value.hasMore) return;
+    if (resource.status !== "ready") return;
     if (current?.loading) return;
     const feed = resource.value;
+    const requested = nextPage(feed);
+    if (requested === undefined) return;
     setMore({ loader, feed, loading: true });
-    loadProducts(client, { category: code, page: feed.page + 1 }).then(
+    loadProducts(client, { category: code, page: requested }).then(
       (page) =>
         setMore({ loader, feed: appendFeed(feed, page), loading: false }),
       (error: unknown) =>

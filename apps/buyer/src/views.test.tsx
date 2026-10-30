@@ -118,6 +118,16 @@ function category(
   );
 }
 
+/** A category whose feed still has pages left, so the load-more row renders. */
+function withMorePages(language: Language) {
+  return category(language, {
+    products: {
+      status: "ready",
+      value: feed({ items: [product], total: 57, hasMore: true })
+    }
+  });
+}
+
 function detail(
   language: Language,
   overrides: Partial<Parameters<typeof ProductDetailView>[0]> = {}
@@ -259,6 +269,21 @@ describe("category view", () => {
     expect(visibleText(category("en"))).not.toContain("Show more");
   });
 
+  /** The nine view snapshots all end the feed, so this covers the other label. */
+  it("labels the load-more control in every language", () => {
+    const labels: Record<Language, string> = {
+      zh: "查看更多",
+      en: "Show more",
+      km: "មើលបន្ថែម"
+    };
+
+    for (const language of languages) {
+      expect(visibleText(withMorePages(language)), language).toContain(
+        labels[language]
+      );
+    }
+  });
+
   it("marks the load-more control busy while the next page is in flight", () => {
     const markup = category("en", {
       products: {
@@ -368,6 +393,10 @@ describe("trilingual snapshots", () => {
 
     it(`renders the category view in ${language}`, () => {
       expect(visibleText(category(language))).toMatchSnapshot();
+    });
+
+    it(`renders the category view with more pages in ${language}`, () => {
+      expect(visibleText(withMorePages(language))).toMatchSnapshot();
     });
 
     it(`renders the product detail view in ${language}`, () => {

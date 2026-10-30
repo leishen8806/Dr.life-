@@ -6,6 +6,11 @@ import type { Product, ProductPage } from "./types";
  */
 export interface ProductFeed {
   items: Product[];
+  /**
+   * The pages pulled in so far, counted here rather than read back from the
+   * server's echoed `page`: a server that keeps echoing page 1 would otherwise
+   * have the next page asked for over and over.
+   */
   page: number;
   total: number;
   hasMore: boolean;
@@ -13,24 +18,34 @@ export interface ProductFeed {
 
 /**
  * A server that reports a total it cannot deliver would otherwise leave the
- * control on screen forever, so an empty page also ends the feed.
+ * control on screen forever, so a page that brought no new row ends the feed.
  */
-function feed(items: Product[], page: ProductPage): ProductFeed {
-  return {
-    items,
-    page: page.page,
-    total: page.total,
-    hasMore: items.length < page.total && page.items.length > 0
-  };
+function feed(
+  items: Product[],
+  page: number,
+  total: number,
+  added: number
+): ProductFeed {
+  return { items, page, total, hasMore: added > 0 && items.length < total };
 }
 
 export function firstFeed(page: ProductPage): ProductFeed {
-  return feed([...page.items], page);
+  return feed([...page.items], 1, page.total, page.items.length);
+}
+
+/** The page the feed needs next, or nothing when it has reached the end. */
+export function nextPage(current: ProductFeed): number | undefined {
+  return current.hasMore ? current.page + 1 : undefined;
 }
 
 /** Pages can overlap while the catalogue changes, so ids are not repeated. */
 export function appendFeed(current: ProductFeed, page: ProductPage): ProductFeed {
   const seen = new Set(current.items.map((item) => item.public_id));
   const added = page.items.filter((item) => !seen.has(item.public_id));
-  return feed([...current.items, ...added], page);
+  return feed(
+    [...current.items, ...added],
+    current.page + 1,
+    page.total,
+    added.length
+  );
 }
