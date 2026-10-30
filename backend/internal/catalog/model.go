@@ -51,9 +51,10 @@ const (
 
 // 列表分页默认值与上限（与 openapi.yaml 的 Page/PageSize 参数一致）。
 const (
-	DefaultPage     = 1
-	DefaultPageSize = 20
-	MaxPageSize     = 100
+	DefaultPage          = 1
+	DefaultPageSize      = 20
+	MaxPageSize          = 100
+	MaxSearchQueryLength = 200
 )
 
 // 产地 origin（设计文档第三节）。

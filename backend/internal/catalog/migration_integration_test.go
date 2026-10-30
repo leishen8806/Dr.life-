@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -117,6 +118,19 @@ func TestCatalogMigration(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 	store := catalog.NewPgStore(pool)
+
+	t.Run("search log truncates untrusted queries", func(t *testing.T) {
+		if err := store.LogSearch(ctx, strings.Repeat("x", catalog.MaxSearchQueryLength+1), 0); err != nil {
+			t.Fatalf("LogSearch: %v", err)
+		}
+		var length int
+		if err := admin.QueryRow(ctx, `SELECT char_length(q) FROM catalog.search_log ORDER BY id DESC LIMIT 1`).Scan(&length); err != nil {
+			t.Fatal(err)
+		}
+		if length != catalog.MaxSearchQueryLength {
+			t.Fatalf("stored query length = %d, want %d", length, catalog.MaxSearchQueryLength)
+		}
+	})
 
 	t.Run("trilingual public search matches the same product", func(t *testing.T) {
 		for _, query := range []string{"瓷砖", "tile", "ក្បឿង"} {

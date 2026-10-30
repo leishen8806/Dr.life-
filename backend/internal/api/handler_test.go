@@ -256,6 +256,7 @@ type stubStore struct {
 	lists        int
 	search       catalog.SearchQuery
 	searchResult *catalog.SearchPage
+	suggestCalls int
 }
 
 func (s *stubStore) ListCategories(_ context.Context, plan catalog.Plan) (catalog.CategoryPage, error) {
@@ -312,6 +313,7 @@ func (s *stubStore) SearchProducts(_ context.Context, filter catalog.ProductFilt
 }
 
 func (s *stubStore) SuggestProducts(context.Context, catalog.ProductFilter, string) ([]catalog.SearchSuggestion, error) {
+	s.suggestCalls++
 	return []catalog.SearchSuggestion{}, nil
 }
 
@@ -749,6 +751,45 @@ func TestPublicSearchIsOpenAndPassesFilters(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Body.String(), `"reason":"recent_in_category"`) {
 		t.Fatalf("search response missing recommendation reason: %s", recorder.Body.String())
+	}
+}
+
+func TestPublicSearchRejectsOverlongQueryBeforeCatalogStoreAccess(t *testing.T) {
+	store := &stubStore{searchResult: &catalog.SearchPage{}}
+	handler := catalogHandler(store, activeDirectory(), nil)
+
+	for _, test := range []struct {
+		name       string
+		query      string
+		wantStatus int
+	}{
+		{name: "maximum accepted", query: strings.Repeat("a", catalog.MaxSearchQueryLength), wantStatus: http.StatusOK},
+		{name: "over maximum rejected", query: strings.Repeat("a", catalog.MaxSearchQueryLength+1), wantStatus: http.StatusBadRequest},
+		{name: "16KiB rejected", query: strings.Repeat("a", 16*1024), wantStatus: http.StatusBadRequest},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store.search = catalog.SearchQuery{}
+			recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/search/products?q="+test.query, nil))
+			if recorder.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body=%s", recorder.Code, test.wantStatus, recorder.Body.String())
+			}
+			if test.wantStatus == http.StatusBadRequest && store.search.Query != "" {
+				t.Fatalf("overlong query reached catalog search: %+v", store.search)
+			}
+		})
+	}
+}
+
+func TestPublicSuggestRejectsOverlongQueryBeforeCatalogStoreAccess(t *testing.T) {
+	store := &stubStore{}
+	handler := catalogHandler(store, activeDirectory(), nil)
+
+	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/search/suggest?q="+strings.Repeat("a", catalog.MaxSearchQueryLength+1), nil))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if store.suggestCalls != 0 {
+		t.Fatalf("overlong suggestion query reached catalog store: suggestCalls=%d", store.suggestCalls)
 	}
 }
 

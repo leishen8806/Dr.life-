@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"unicode/utf8"
 )
 
 // Store 是 catalog 自己 schema 的持久化边界。
@@ -118,6 +119,9 @@ func (s *Service) PublicSearch(ctx context.Context, query SearchQuery) (SearchPa
 	if query.Query == "" {
 		return SearchPage{}, invalid("q", "search query is required")
 	}
+	if utf8.RuneCountInString(query.Query) > MaxSearchQueryLength {
+		return SearchPage{}, invalid("q", "search query is too long")
+	}
 	if query.MinPriceE4 < 0 || query.MaxPriceE4 < 0 || (query.MaxPriceE4 > 0 && query.MinPriceE4 > query.MaxPriceE4) {
 		return SearchPage{}, invalid("price", "invalid price range")
 	}
@@ -171,6 +175,9 @@ func (s *Service) PublicSuggestions(ctx context.Context, prefix string) ([]Searc
 	prefix = strings.TrimSpace(prefix)
 	if prefix == "" {
 		return []SearchSuggestion{}, nil
+	}
+	if utf8.RuneCountInString(prefix) > MaxSearchQueryLength {
+		return nil, invalid("q", "search query is too long")
 	}
 	directory, err := s.directory()
 	if err != nil {

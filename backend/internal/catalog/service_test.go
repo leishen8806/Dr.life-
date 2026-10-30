@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
@@ -56,6 +57,9 @@ type stubStore struct {
 		Query  catalog.SearchQuery
 	}
 	searchResult catalog.SearchPage
+	logQuery     string
+	logCalls     int
+	suggestCalls int
 }
 
 func (s *stubStore) SearchProducts(_ context.Context, filter catalog.ProductFilter, query catalog.SearchQuery) (catalog.SearchPage, error) {
@@ -63,9 +67,14 @@ func (s *stubStore) SearchProducts(_ context.Context, filter catalog.ProductFilt
 	return s.searchResult, nil
 }
 func (s *stubStore) SuggestProducts(context.Context, catalog.ProductFilter, string) ([]catalog.SearchSuggestion, error) {
+	s.suggestCalls++
 	return []catalog.SearchSuggestion{}, nil
 }
-func (s *stubStore) LogSearch(context.Context, string, int) error { return nil }
+func (s *stubStore) LogSearch(_ context.Context, query string, _ int) error {
+	s.logCalls++
+	s.logQuery = query
+	return nil
+}
 
 func (s *stubStore) ListCategories(context.Context, catalog.Plan) (catalog.CategoryPage, error) {
 	return catalog.CategoryPage{Items: []catalog.Category{{PublicID: productULID, Code: "c1"}}}, nil
@@ -206,6 +215,58 @@ func TestPublicSearchRejectsInvalidPriceAndSort(t *testing.T) {
 		if _, err := service.PublicSearch(context.Background(), query); err == nil {
 			t.Fatalf("query %+v must fail", query)
 		}
+	}
+}
+
+func TestPublicSearchEnforcesQueryLengthBeforeAnyStoreCall(t *testing.T) {
+	store := &stubStore{}
+	service := serviceWith(t, store, activeMerchant())
+
+	for _, test := range []struct {
+		name    string
+		query   string
+		wantErr bool
+	}{
+		{name: "maximum length is accepted", query: strings.Repeat("a", catalog.MaxSearchQueryLength)},
+		{name: "one character over is rejected", query: strings.Repeat("a", catalog.MaxSearchQueryLength+1), wantErr: true},
+		{name: "large query is rejected", query: strings.Repeat("a", 16*1024), wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store.search.Filter = catalog.ProductFilter{}
+			store.search.Query = catalog.SearchQuery{}
+			store.logCalls = 0
+			store.logQuery = ""
+
+			_, err := service.PublicSearch(context.Background(), catalog.SearchQuery{Query: test.query})
+			if (err != nil) != test.wantErr {
+				t.Fatalf("PublicSearch error = %v, wantErr %v", err, test.wantErr)
+			}
+			if test.wantErr {
+				if store.search.Query.Query != "" || store.logCalls != 0 {
+					t.Fatalf("rejected query reached store: search=%+v logCalls=%d", store.search.Query, store.logCalls)
+				}
+				return
+			}
+			if store.search.Query.Query != test.query || store.logCalls != 1 || store.logQuery != test.query {
+				t.Fatalf("accepted query was not searched and logged intact: search=%+v log=%q calls=%d", store.search.Query, store.logQuery, store.logCalls)
+			}
+		})
+	}
+}
+
+func TestPublicSuggestionsRejectsOverlongPrefixBeforeAnyStoreCall(t *testing.T) {
+	store := &stubStore{}
+	service := serviceWith(t, store, activeMerchant())
+
+	items, err := service.PublicSuggestions(context.Background(), strings.Repeat("a", catalog.MaxSearchQueryLength+1))
+	if err == nil {
+		t.Fatal("PublicSuggestions accepted an overlong prefix")
+	}
+	if items != nil {
+		t.Fatalf("items = %+v, want nil on validation error", items)
+	}
+	if store.suggestCalls != 0 || store.logCalls != 0 {
+		t.Fatalf("overlong prefix reached store: suggestCalls=%d logCalls=%d", store.suggestCalls, store.logCalls)
 	}
 }
 

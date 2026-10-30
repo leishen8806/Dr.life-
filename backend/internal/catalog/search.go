@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // SearchProducts searches the existing full-text and trgm indexes. The cursor
@@ -63,8 +64,15 @@ func (s *PgStore) SuggestProducts(ctx context.Context, filter ProductFilter, pre
 }
 
 func (s *PgStore) LogSearch(ctx context.Context, query string, resultN int) error {
-	_, err := s.db.Exec(ctx, `INSERT INTO catalog.search_log(q,result_n) VALUES($1,$2)`, query, resultN)
+	_, err := s.db.Exec(ctx, `INSERT INTO catalog.search_log(q,result_n) VALUES($1,$2)`, truncateSearchQuery(query), resultN)
 	return err
+}
+
+func truncateSearchQuery(query string) string {
+	if utf8.RuneCountInString(query) <= MaxSearchQueryLength {
+		return query
+	}
+	return string([]rune(query)[:MaxSearchQueryLength])
 }
 
 const searchMatchesSQL = `
