@@ -208,3 +208,140 @@ func TestRestrictedAdminRefreshHTTPAndReplayRemainRestricted(t *testing.T) {
 	assertRestricted(refresh(refreshCookie))
 	assertRestricted(refresh(refreshCookie))
 }
+
+func TestAdminRefreshReuseRevokesCachedAccessToken(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	container, err := postgres.Run(ctx, "postgres:16-alpine", postgres.WithDatabase("drlife_admin_refresh_reuse_test"), postgres.WithUsername("test_admin"), postgres.WithPassword("test-only"), postgres.BasicWaitStrategies())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = testcontainers.TerminateContainer(container) })
+	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatal(err)
+	}
+	_, file, _, _ := runtime.Caller(0)
+	if err := goose.Up(db, filepath.Join(filepath.Dir(file), "..", "..", "..", "migrations")); err != nil {
+		t.Fatal(err)
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+
+	master, signing := make([]byte, 32), make([]byte, 32)
+	_, _ = rand.Read(master)
+	_, _ = rand.Read(signing)
+	masterKeys, _ := secrets.NewKeyring(map[string][]byte{"test": master}, "test")
+	jwtKeys, _ := secrets.NewKeyring(map[string][]byte{"test": signing}, "test")
+	cipher, _ := secrets.NewEnvelope(masterKeys)
+	now := time.Unix(1_800_000_000, 0)
+	tokens := iam.TokenManager{Keys: jwtKeys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return now }}
+	cache := &memorySessionCache{}
+	adminID, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	password, secret := "active admin password", "JBSWY3DPEHPK3PXP"
+	hash, err := iam.HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secretEnc, err := iam.EncryptTOTPSecret(ctx, cipher, adminID, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status,password_change_required) VALUES($1,'Active Admin','active-admin@example.com',$2,$3,'super','active',false)`, adminID, hash, secretEnc); err != nil {
+		t.Fatal(err)
+	}
+	login := &iam.AdminLoginService{DB: pool, Tokens: tokens, Cipher: cipher, RefreshTTL: time.Hour, IdleTTL: 15 * time.Minute, SessionCache: cache, Now: func() time.Time { return now }}
+	sessions := &iam.SessionService{DB: pool, Tokens: iam.TokenManager{Keys: jwtKeys, AccessTTL: 15 * time.Minute, Now: func() time.Time { return now }}, AdminTokens: tokens, Cache: cache, Grace: time.Minute, IdleTTL: 15 * time.Minute, AbsoluteTTL: time.Hour, Now: func() time.Time { return now }}
+	tokens.Checker = iam.DBSessionChecker{DB: pool, Cache: cache, IdleTTL: 15 * time.Minute, Now: func() time.Time { return now }}
+	rule := gateway.Rule{Limit: 1000, Window: time.Minute}
+	handler := server.NewHandlerWithGateway(nil, server.GatewayOptions{
+		AppEnv: "dev", OriginGroups: gateway.DefaultOriginGroups("dev"), Limiter: gateway.NewMemoryLimiter(), Authenticator: iam.Authenticator{Tokens: tokens},
+		IPRules: gateway.RuleSet{Default: rule, Login: rule, Admin: rule}, AccountRules: gateway.RuleSet{Default: rule, Login: rule, Admin: rule},
+		IdempotencyExempt: func(r *http.Request) bool {
+			return r.URL.Path == "/v1/admin/auth/login" || r.URL.Path == "/v1/admin/auth/refresh"
+		},
+		AdminLogin: login, Sessions: sessions,
+	})
+	httpServer := httptest.NewServer(handler)
+	t.Cleanup(httpServer.Close)
+	code, err := totp.GenerateCode(secret, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(map[string]string{"email": "active-admin@example.com", "password": password, "totp_code": code})
+	loginRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, httpServer.URL+"/v1/admin/auth/login", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse, err := http.DefaultClient.Do(loginRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer loginResponse.Body.Close()
+	if loginResponse.StatusCode != http.StatusOK {
+		t.Fatalf("login status=%d", loginResponse.StatusCode)
+	}
+	var loginResult struct {
+		Data struct {
+			AccessToken string `json:"access_token"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(loginResponse.Body).Decode(&loginResult); err != nil {
+		t.Fatal(err)
+	}
+	refreshCookie := loginResponse.Cookies()[0]
+
+	refresh := func(cookie *http.Cookie) int {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, httpServer.URL+"/v1/admin/auth/refresh", bytes.NewReader([]byte(`{}`)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Origin", "http://localhost:5173")
+		req.Header.Set("X-Requested-With", "drlife")
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		response, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		return response.StatusCode
+	}
+	if status := refresh(refreshCookie); status != http.StatusOK {
+		t.Fatalf("first refresh status=%d", status)
+	}
+	now = now.Add(2 * time.Minute)
+	if status := refresh(refreshCookie); status != http.StatusUnauthorized {
+		t.Fatalf("replayed refresh status=%d, want 401", status)
+	}
+
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, httpServer.URL+"/v1/admin/auth/step-up", bytes.NewReader([]byte(`{}`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+loginResult.Data.AccessToken)
+	request.Header.Set("Content-Type", "application/json")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("cached access token status=%d, want 401 after refresh reuse", response.StatusCode)
+	}
+}

@@ -224,8 +224,36 @@ func (s *SessionService) issueRotatedAccess(ctx context.Context, row refreshRow,
 }
 
 func (s *SessionService) revokeFamilyForReuse(ctx context.Context, tx pgx.Tx, row refreshRow, now time.Time) error {
-	if _, err := tx.Exec(ctx, `UPDATE iam.session SET revoked_at=$1,revoked_reason='refresh_reuse',updated_at=$1 WHERE family_id=$2 AND revoked_at IS NULL`, now, row.FamilyID); err != nil {
+	rows, err := tx.Query(ctx, `
+		UPDATE iam.session
+		SET revoked_at=$1,revoked_reason='refresh_reuse',updated_at=$1
+		WHERE family_id=$2 AND revoked_at IS NULL
+		RETURNING public_id,expires_at`, now, row.FamilyID)
+	if err != nil {
 		return err
+	}
+	defer rows.Close()
+	type revokedSession struct {
+		publicID  string
+		expiresAt time.Time
+	}
+	var revoked []revokedSession
+	for rows.Next() {
+		var item revokedSession
+		if err := rows.Scan(&item.publicID, &item.expiresAt); err != nil {
+			return err
+		}
+		revoked = append(revoked, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if s.Cache != nil {
+		for _, item := range revoked {
+			if err := s.Cache.Revoke(ctx, item.publicID, positiveTTL(now, item.expiresAt)); err != nil {
+				return err
+			}
+		}
 	}
 	if !row.Admin {
 		if _, err := tx.Exec(ctx, `UPDATE iam.account SET token_epoch=token_epoch+1,updated_at=$1 WHERE id=$2`, now, row.AccountID); err != nil {
