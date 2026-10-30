@@ -10,6 +10,10 @@
     },
     "./schema": {
       "types": "./src/schema.d.ts"
+    },
+    "./session": {
+      "types": "./src/session.ts",
+      "default": "./src/session.ts"
     }
   },
   "scripts": {

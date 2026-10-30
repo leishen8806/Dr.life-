@@ -298,3 +298,117 @@ body {
   color: var(--drl-color-surface);
   background: var(--drl-color-danger);
 }
+
+.drl-splash {
+  display: grid;
+  min-height: 100vh;
+  align-content: center;
+  justify-items: center;
+  gap: var(--drl-space-3);
+  padding: var(--drl-space-5);
+  text-align: center;
+}
+
+.drl-splash__halo {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    var(--drl-color-brand),
+    transparent 70%
+  );
+  animation: drl-splash-halo 1.5s linear infinite;
+}
+
+@keyframes drl-splash-halo {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drl-splash__halo {
+    animation: none;
+  }
+}
+
+.drl-splash__mark {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--drl-color-surface);
+  background: var(--drl-color-brand-strong);
+  font-size: var(--drl-font-size-lg);
+  font-weight: 700;
+}
+
+.drl-splash__brand {
+  font-size: var(--drl-font-size-lg);
+}
+
+.drl-splash__slogan,
+.drl-splash__status,
+.drl-language-choice p {
+  margin: 0;
+  color: var(--drl-color-text-muted);
+  font-size: var(--drl-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.drl-splash__skip,
+.drl-language-choice__options button {
+  min-width: max-content;
+  border: 1px solid var(--drl-color-border);
+  border-radius: var(--drl-radius);
+  background: var(--drl-color-surface);
+  font: inherit;
+  white-space: normal;
+  overflow: visible;
+}
+
+.drl-splash__skip {
+  padding: var(--drl-space-2) var(--drl-space-4);
+  color: var(--drl-color-text-muted);
+}
+
+.drl-language-choice {
+  display: grid;
+  gap: var(--drl-space-3);
+  padding: var(--drl-space-5) var(--drl-space-4);
+}
+
+.drl-language-choice h1 {
+  margin: 0;
+  font-size: var(--drl-font-size-lg);
+}
+
+.drl-language-choice__failure {
+  color: var(--drl-color-danger);
+}
+
+.drl-language-choice__options {
+  display: grid;
+  gap: var(--drl-space-2);
+}
+
+.drl-language-choice__options button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--drl-space-2);
+  min-height: 48px;
+  padding: var(--drl-space-3) var(--drl-space-4);
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.drl-language-choice__options small {
+  color: var(--drl-color-brand-strong);
+}
