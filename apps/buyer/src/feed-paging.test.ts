@@ -111,6 +111,25 @@ describe("category paging (the useProductFeed glue)", () => {
     expect(feed.items.map((item) => item.public_id)).toEqual(["a", "b"]);
   });
 
+  /**
+   * The first page is page 1 because that is what the client asked for, not
+   * because the server said so. Reading the echo here would resume from the
+   * wrong place and skip whole pages without a trace, and every behaviour
+   * above happens to echo page 1 for the first page, so none of them can tell
+   * the two apart. Hence a deliberately wrong echo.
+   */
+  it("counts the first page as page 1 even when the server echoes another number", () => {
+    const first = firstFeed({
+      items: slice(1),
+      page: 7,
+      page_size: pageSize,
+      total: catalogue.length
+    });
+
+    expect(first.page).toBe(1);
+    expect(nextPage(first)).toBe(2);
+  });
+
   it("asks for every page at most once, whatever the server answers", () => {
     for (const behaviour of behaviours) {
       const { requested } = drain(behaviour);
