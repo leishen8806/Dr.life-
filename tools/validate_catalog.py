@@ -69,6 +69,8 @@ def main():
             errors.append(f"attribute {category_id}/{row['key']}: invalid type")
         if row["required"] not in {"true", "false"} or row["sku_variant"] not in {"true", "false"}:
             errors.append(f"attribute {category_id}/{row['key']}: flags must be true/false")
+        if row["sku_variant"] == "true" and row["type"] != "enum":
+            errors.append(f"attribute {category_id}/{row['key']}: sku_variant must use enum type")
         if row["type"] == "enum" and not all(row[field].strip() for field in ("values_zh", "values_en", "values_km")):
             errors.append(f"attribute {category_id}/{row['key']}: enum values required in all languages")
         if row["type"] == "enum":
