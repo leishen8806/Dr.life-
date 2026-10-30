@@ -6,6 +6,37 @@ Go 模块化单体后端，采用 chi、pgx、sqlc 与 goose。
 
 Prometheus、Grafana、Sentry 与指标暴露约束见 `../deploy/observability/README.md`。
 
+## 本机测试环境与常见误判
+
+以下是 Windows 本机运行需要 Docker 的 Go 集成测试的约定。命令适用于 **PowerShell 5.1**；每次新开终端后先执行：
+
+```powershell
+$env:Path += ";C:\Program Files\Docker\Docker\resources\bin;C:\Go\bin"
+$env:DOCKER_HOST = "npipe:////./pipe/docker_engine"
+```
+
+推荐从本目录运行测试，并为容器启动和慢测试预留足够时间：
+
+```powershell
+go test ./... -count=1 -timeout 30m
+go test -race -p 1 ./... -count=1 -timeout 60m
+```
+
+`-p 1` 必须串行执行，避免多个 PostgreSQL testcontainers 竞争本机资源而产生假阳性；曾出现 `internal/iam` 的约 0.07 秒封禁过期断言因并发容器拥挤而失败。作为耗时参考，`internal/ledger` 单包通常约 140 秒，不带并发检测；带 `-race` 通常约 284 秒。因此不要用较短的外层命令超时把慢测试误报为挂死。
+
+### 常见误判
+
+- **“docker 不存在”**：通常是 Docker CLI 不在 `PATH`，先执行上面的环境设置，再用 `Get-Command docker` 确认其路径。
+- **“rootless 不支持”**：不要只看 Docker 的安全选项；运行 `docker info --format '{{.ServerVersion}} {{.OSType}} {{.SecurityOptions}}'`，仅当输出含 `name=rootless` 才是 rootless。
+- **“`-race` 挂死”**：先按上面的 60 分钟超时和 `-p 1` 重跑；`internal/ledger` 带 `-race` 的基准约 284 秒，外层超时可能提前中断测试。
+- **“Go 版本不符”**：`C:\Go\bin\go.exe` 的基础版本可能低于 `go.mod`，但 `GOTOOLCHAIN=auto` 会使用已下载的匹配工具链；在本目录运行 `go version` 以确认实际版本。
+
+本机镜像缓存可用时，testcontainers 会复用 `testcontainers/ryuk:0.14.0` 与所需 PostgreSQL 镜像；先以一个真实用例验证环境，例如：
+
+```powershell
+go test ./internal/catalog -run '^TestCatalogMigration$' -count=1 -timeout 15m
+```
+
 ## 审计哈希链
 
 审计模块使用独立的 `AUDIT_DATABASE_URL`（`audit_writer` 登录角色）。配置后，服务把审计数据库加入就绪检查，并启用 `/v1/admin/audit` 查询；查询除 admin 角色外还要求令牌具有 `aud` 的 `view` 或 `edit` 权限。链校验和 UTC 每日锚定命令见 `internal/platform/audit/README.md`。
