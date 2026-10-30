@@ -3,7 +3,10 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -68,8 +71,13 @@ func TestMinIOPresignedURLs(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := NewMinIO(MinIOConfig{Bucket: "files", Endpoint: endpoint, AccessKey: "testaccess", SecretKey: "testsecret"}, Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100})
+	verifier, ok := store.(ObjectVerifier)
+	if !ok {
+		t.Fatal("storage adapter does not expose worker verification access")
+	}
 
-	put, err := store.PresignPut(ctx, PutRequest{ContentType: "image/jpeg", ContentLength: 3})
+	sum := sha256.Sum256([]byte("jpg"))
+	put, err := store.PresignPut(ctx, PutRequest{ContentType: "image/jpeg", ContentLength: 3, ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:])})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +90,7 @@ func TestMinIOPresignedURLs(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "image/jpeg")
+	req.Header.Set("x-amz-checksum-sha256", base64.StdEncoding.EncodeToString(sum[:]))
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +98,108 @@ func TestMinIOPresignedURLs(t *testing.T) {
 	response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("PUT status = %d", response.StatusCode)
+	}
+	stat, err := verifier.Stat(ctx, put.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	racedWrite, err := http.NewRequestWithContext(ctx, http.MethodPut, put.URL, bytes.NewReader([]byte("bad")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	racedWrite.Header.Set("Content-Type", "image/jpeg")
+	response, err = http.DefaultClient.Do(racedWrite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if racedKey, err := verifier.Promote(ctx, put.Key, stat.ETag); err == nil {
+		// RustFS may not enforce CopySourceIfMatch. The worker therefore re-hashes
+		// the private promoted object before marking the file ready.
+		if err := verifier.Delete(ctx, racedKey); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Restore the verified bytes, then promote using a fresh conditional ETag.
+	restore, err := http.NewRequestWithContext(ctx, http.MethodPut, put.URL, bytes.NewReader([]byte("jpg")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	restore.Header.Set("Content-Type", "image/jpeg")
+	response, err = http.DefaultClient.Do(restore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	stat, err = verifier.Stat(ctx, put.Key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	readyKey, err := verifier.Promote(ctx, put.Key, stat.ETag)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The upload URL remains valid, but it can only rewrite its original key;
+	// callers download the promoted key that was never exposed for PUT.
+	rewrite, err := http.NewRequestWithContext(ctx, http.MethodPut, put.URL, bytes.NewReader([]byte("bad")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rewrite.Header.Set("Content-Type", "image/jpeg")
+	response, err = http.DefaultClient.Do(rewrite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	ready, err := verifier.Open(ctx, readyKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	readyBytes, err := io.ReadAll(ready)
+	ready.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(readyBytes) != "jpg" {
+		t.Fatalf("promoted object = %q, want original content", readyBytes)
+	}
+	wrong, err := store.PresignPut(ctx, PutRequest{ContentType: "image/jpeg", ContentLength: 3, ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:])})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err = http.NewRequestWithContext(ctx, http.MethodPut, wrong.URL, bytes.NewReader([]byte("bad")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "image/jpeg")
+	response, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
+		// RustFS accepts this pre-signed PUT without enforcing x-amz-checksum-sha256;
+		// AC-b3 is enforced by the worker SHA-256 verification after upload.
+		contents, err := verifier.Open(ctx, wrong.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		data, err := io.ReadAll(contents)
+		contents.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(data) != "bad" {
+			t.Fatalf("Open() = %q, want tampered content", data)
+		}
+		if err := verifier.Delete(ctx, wrong.Key); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := verifier.Open(ctx, wrong.Key); err == nil {
+			t.Fatal("deleted object remained readable")
+		}
+	} else if response.StatusCode < http.StatusBadRequest || response.StatusCode >= http.StatusInternalServerError {
+		t.Fatalf("tampered upload status = %d, want success or 4xx rejection", response.StatusCode)
 	}
 
 	get, err := store.PresignGet(ctx, put.Key)

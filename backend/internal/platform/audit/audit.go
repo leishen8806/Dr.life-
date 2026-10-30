@@ -21,18 +21,20 @@ var GenesisHash = make([]byte, sha256.Size)
 type Action string
 
 const (
-	ActionLogin              Action = "auth.login"
-	ActionStepUp             Action = "auth.step_up"
-	ActionPermissionChanged  Action = "permission.changed"
-	ActionAccountChanged     Action = "account.changed"
-	ActionMerchantVerified   Action = "merchant.verified"
-	ActionProductModerated   Action = "product.moderated"
-	ActionWithdrawalReviewed Action = "withdrawal.reviewed"
-	ActionWithdrawalPaid     Action = "withdrawal.paid"
-	ActionDisputeResolved    Action = "dispute.resolved"
-	ActionLogisticsChanged   Action = "logistics.changed"
-	ActionIntegrationChanged Action = "integration.changed"
-	ActionRuleChanged        Action = "rule.changed"
+	ActionLogin                     Action = "auth.login"
+	ActionStepUp                    Action = "auth.step_up"
+	ActionPermissionChanged         Action = "permission.changed"
+	ActionAccountChanged            Action = "account.changed"
+	ActionMerchantVerified          Action = "merchant.verified"
+	ActionProductModerated          Action = "product.moderated"
+	ActionWithdrawalReviewed        Action = "withdrawal.reviewed"
+	ActionWithdrawalPaid            Action = "withdrawal.paid"
+	ActionDisputeResolved           Action = "dispute.resolved"
+	ActionLogisticsChanged          Action = "logistics.changed"
+	ActionIntegrationChanged        Action = "integration.changed"
+	ActionRuleChanged               Action = "rule.changed"
+	ActionFilePresigned             Action = "file.presigned"
+	ActionFileVerificationRequested Action = "file.verification_requested"
 )
 
 var validActions = map[Action]struct{}{
@@ -40,6 +42,7 @@ var validActions = map[Action]struct{}{
 	ActionMerchantVerified: {}, ActionProductModerated: {}, ActionWithdrawalReviewed: {},
 	ActionWithdrawalPaid: {}, ActionDisputeResolved: {}, ActionLogisticsChanged: {},
 	ActionIntegrationChanged: {}, ActionRuleChanged: {},
+	ActionFilePresigned: {}, ActionFileVerificationRequested: {},
 }
 
 type Entry struct {

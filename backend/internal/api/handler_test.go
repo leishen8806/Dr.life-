@@ -11,18 +11,42 @@ import (
 
 	api "github.com/leishen8806/Dr.life-/backend/internal/api"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/audit/audittest"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
 )
 
 type fakeLogin struct {
 	input  iam.LoginInput
 	result iam.LoginResult
 	err    error
+}
+
+type fakeFiles struct {
+	presign     files.PresignResult
+	input       files.PresignInput
+	owner       int64
+	err         error
+	completeErr error
+	downloadErr error
+}
+
+func (f *fakeFiles) Presign(_ context.Context, owner int64, in files.PresignInput) (files.PresignResult, error) {
+	f.owner, f.input = owner, in
+	return f.presign, f.err
+}
+func (f *fakeFiles) Complete(context.Context, int64, string) (files.File, error) {
+	return files.File{}, f.completeErr
+}
+func (f *fakeFiles) DownloadURL(context.Context, int64, string) (storage.SignedURL, error) {
+	return storage.SignedURL{}, f.downloadErr
 }
 
 type fakeAccountLinks struct {
@@ -192,6 +216,80 @@ func TestTelegramAuthHandlerContract(t *testing.T) {
 	}
 	if body["ok"] != true || body["request_id"] == "" {
 		t.Fatalf("body=%v", body)
+	}
+}
+
+func TestFilePresignUsesGatewayAccountAndReturnsSignedMetadata(t *testing.T) {
+	fake := &fakeFiles{presign: files.PresignResult{File: files.File{PublicID: "file-1", Purpose: "product_image", ContentType: "image/jpeg", Size: 12, Status: files.StatusPending, CreatedAt: time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)}, Upload: storage.SignedURL{URL: "https://storage.test/put", Headers: map[string]string{"x-amz-checksum-sha256": "sum"}}}}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake, AuditWriter: &audittest.Writer{}})
+	req := httptest.NewRequest(http.MethodPost, "/v1/files/presign", strings.NewReader(`{"purpose":"product_image","content_type":"image/jpeg","size":12,"sha256":"sum"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "file-presign-1")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || fake.owner != 42 || fake.input.Purpose != "product_image" || !strings.Contains(w.Body.String(), "https://storage.test/put") {
+		t.Fatalf("status=%d owner=%d input=%+v body=%s", w.Code, fake.owner, fake.input, w.Body.String())
+	}
+}
+
+func TestFileWritesAppendAuditRecords(t *testing.T) {
+	filesService := &fakeFiles{presign: files.PresignResult{File: files.File{PublicID: "file-1", Purpose: "product_image", ContentType: "image/jpeg", Size: 12, Status: files.StatusPending, CreatedAt: time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)}, Upload: storage.SignedURL{URL: "https://storage.test/put"}}}
+	auditWriter := &audittest.Writer{}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: filesService, AuditWriter: auditWriter})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/files/presign", strings.NewReader(`{"purpose":"product_image","content_type":"image/jpeg","size":12,"sha256":"sum"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "file-audit-1")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(auditWriter.Records) != 1 {
+		t.Fatalf("audit records=%d, want 1", len(auditWriter.Records))
+	}
+	record := auditWriter.Records[0]
+	if record.Action != platformaudit.ActionFilePresigned || record.ActorID != 42 || record.ActorRole != "buyer" || record.Target != "file:file-1" || record.RequestID == "" {
+		t.Fatalf("audit record=%+v", record)
+	}
+}
+
+func TestFilePresignMapsQuotaToRetryable429(t *testing.T) {
+	fake := &fakeFiles{err: files.ErrQuotaExceeded}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake, AuditWriter: &audittest.Writer{}})
+	req := httptest.NewRequest(http.MethodPost, "/v1/files/presign", strings.NewReader(`{"purpose":"product_image","content_type":"image/jpeg","size":12,"sha256":"sum"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "file-quota-1")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusTooManyRequests || w.Header().Get("Retry-After") != "86400" {
+		t.Fatalf("status=%d retry-after=%q body=%s", w.Code, w.Header().Get("Retry-After"), w.Body.String())
+	}
+}
+
+func TestFileCompleteAndDownloadHideCrossOwnerFiles(t *testing.T) {
+	fake := &fakeFiles{completeErr: files.ErrNotFound, downloadErr: files.ErrNotFound}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake, AuditWriter: &audittest.Writer{}})
+	for _, test := range []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodPost, path: "/v1/files/file-1/complete"},
+		{method: http.MethodGet, path: "/v1/files/file-1/download-url"},
+	} {
+		t.Run(test.method, func(t *testing.T) {
+			req := httptest.NewRequest(test.method, test.path, nil)
+			if test.method == http.MethodPost {
+				req.Header.Set("Idempotency-Key", "file-cross-owner-1")
+				req.Header.Set("Content-Type", "application/json")
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, req)
+			if w.Code != http.StatusNotFound || decodeErrorCode(t, w) != 1003 {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+		})
 	}
 }
 

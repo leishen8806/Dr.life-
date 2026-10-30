@@ -30,7 +30,7 @@ func TestPoolsApplySettingsAndKeepLedgerTimeoutLocal(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := config.Config{
-		DatabaseURL: dsn, ReportDatabaseURL: dsn,
+		DatabaseURL: dsn, FileWorkerDatabaseURL: dsn, ReportDatabaseURL: dsn,
 		DBMaxConns: 2, DBReportMaxConns: 3, DBWorkerMaxConns: 4,
 		DBConnectTimeout: time.Second, DBAcquireTimeout: time.Second,
 	}
@@ -58,6 +58,13 @@ func TestPoolsApplySettingsAndKeepLedgerTimeoutLocal(t *testing.T) {
 			"worker", 4,
 			func(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
 				return platformdb.NewWorkerPool(ctx, cfg)
+			},
+			"1min",
+		},
+		{
+			"file worker", 4,
+			func(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error) {
+				return platformdb.NewFileWorkerPool(ctx, cfg)
 			},
 			"1min",
 		},

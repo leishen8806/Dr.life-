@@ -8,9 +8,10 @@ import (
 )
 
 type audience struct {
-	public bool
-	role   Role
-	known  bool
+	public  bool
+	anyRole bool
+	role    Role
+	known   bool
 }
 
 var protectedAudiences = []struct {
@@ -61,7 +62,7 @@ func Authorize(publicWebhookPrefix string) func(http.Handler) http.Handler {
 				writeUnauthenticated(w, r)
 				return
 			}
-			if identity.Role != target.role {
+			if !target.anyRole && identity.Role != target.role {
 				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
 				return
 			}
@@ -81,6 +82,9 @@ func classifyPath(path, publicWebhookPrefix string) audience {
 	}
 	if publicWebhookPrefix != "" && (path == publicWebhookPrefix || strings.HasPrefix(path, publicWebhookPrefix+"/")) {
 		return audience{public: true, known: true}
+	}
+	if path == "/v1/files" || strings.HasPrefix(path, "/v1/files/") {
+		return audience{anyRole: true, known: true}
 	}
 	for _, item := range protectedAudiences {
 		if path == item.prefix || strings.HasPrefix(path, item.prefix+"/") {

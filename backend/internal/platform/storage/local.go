@@ -6,7 +6,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +19,7 @@ type LocalConfig struct {
 	BaseURL string
 	Secret  []byte
 	Now     func() time.Time
+	RootDir string
 }
 
 type localStorage struct {
@@ -23,7 +27,12 @@ type localStorage struct {
 	secret  []byte
 	now     func() time.Time
 	policy  Policy
+	rootDir string
+	puts    map[string]PutRequest
 }
+
+var _ Storage = (*localStorage)(nil)
+var _ ObjectVerifier = (*localStorage)(nil)
 
 func NewLocal(config LocalConfig, policy Policy) (Storage, error) {
 	if len(config.Secret) == 0 {
@@ -33,14 +42,89 @@ func NewLocal(config LocalConfig, policy Policy) (Storage, error) {
 	if now == nil {
 		now = time.Now
 	}
-	return &localStorage{baseURL: strings.TrimRight(config.BaseURL, "/"), secret: config.Secret, now: now, policy: policy}, nil
+	return &localStorage{baseURL: strings.TrimRight(config.BaseURL, "/"), secret: config.Secret, now: now, policy: policy, rootDir: config.RootDir, puts: make(map[string]PutRequest)}, nil
 }
 
 func (s *localStorage) PresignPut(_ context.Context, in PutRequest) (SignedURL, error) {
 	if err := s.policy.validate(in); err != nil {
 		return SignedURL{}, err
 	}
-	return s.signed("PUT", randomKey(), in.ContentType, in.ContentLength, putTTL), nil
+	key := randomKey()
+	s.puts[key] = in
+	signed := s.signed("PUT", key, in.ContentType, in.ContentLength, putTTL)
+	signed.Headers = map[string]string{"Content-Type": in.ContentType, "Content-Length": strconv.FormatInt(in.ContentLength, 10), "X-Amz-Checksum-Sha256": in.ChecksumSHA256}
+	return signed, nil
+}
+
+func (s *localStorage) Stat(_ context.Context, key string) (ObjectStat, error) {
+	if !validRandomKey(key) {
+		return ObjectStat{}, ErrInvalidObjectKey
+	}
+	in, ok := s.puts[key]
+	if !ok || s.rootDir == "" {
+		return ObjectStat{}, os.ErrNotExist
+	}
+	path := filepath.Join(s.rootDir, filepath.FromSlash(key))
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return ObjectStat{}, err
+	}
+	sum := sha256.Sum256(contents)
+	checksum := base64.StdEncoding.EncodeToString(sum[:])
+	return ObjectStat{Size: int64(len(contents)), ContentType: in.ContentType, ChecksumSHA256: checksum, ETag: checksum}, nil
+}
+
+func (s *localStorage) Open(_ context.Context, key string) (io.ReadCloser, error) {
+	if !validRandomKey(key) || s.rootDir == "" {
+		return nil, os.ErrNotExist
+	}
+	return os.Open(filepath.Join(s.rootDir, filepath.FromSlash(key)))
+}
+
+func (s *localStorage) Delete(_ context.Context, key string) error {
+	if !validRandomKey(key) || s.rootDir == "" {
+		return os.ErrNotExist
+	}
+	return os.Remove(filepath.Join(s.rootDir, filepath.FromSlash(key)))
+}
+
+func (s *localStorage) Promote(_ context.Context, key, etag string) (string, error) {
+	if !validRandomKey(key) || s.rootDir == "" {
+		return "", os.ErrNotExist
+	}
+	destination := randomKey()
+	sourcePath := filepath.Join(s.rootDir, filepath.FromSlash(key))
+	destinationPath := filepath.Join(s.rootDir, filepath.FromSlash(destination))
+	if err := os.MkdirAll(filepath.Dir(destinationPath), 0o700); err != nil {
+		return "", err
+	}
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return "", err
+	}
+	defer source.Close()
+	target, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return "", err
+	}
+	contents, readErr := io.ReadAll(source)
+	if readErr != nil {
+		return "", readErr
+	}
+	sum := sha256.Sum256(contents)
+	if base64.StdEncoding.EncodeToString(sum[:]) != etag {
+		return "", ErrInvalidSignature
+	}
+	_, copyErr := target.Write(contents)
+	closeErr := target.Close()
+	if copyErr != nil {
+		return "", copyErr
+	}
+	if closeErr != nil {
+		return "", closeErr
+	}
+	s.puts[destination] = s.puts[key]
+	return destination, nil
 }
 
 func (s *localStorage) PresignGet(_ context.Context, key string) (SignedURL, error) {
