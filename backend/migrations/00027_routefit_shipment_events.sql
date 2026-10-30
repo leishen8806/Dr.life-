@@ -10,7 +10,6 @@ CREATE TABLE logistics.shipment_event (
     occurred_at timestamptz NOT NULL,
     correlation_id text,
     body_sha256 bytea NOT NULL CHECK (octet_length(body_sha256) = 32),
-    payload jsonb NOT NULL,
     processing_state text NOT NULL CHECK (processing_state IN ('accepted', 'stale')),
     received_at timestamptz NOT NULL DEFAULT now()
 );

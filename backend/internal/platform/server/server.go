@@ -70,6 +70,14 @@ func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
 }
 
 func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks ...ReadinessCheck) http.Handler {
+	const routeFitEventsPath = "/v1/integrations/routefit/events"
+	if options.RouteFit != nil {
+		options.BodyPolicy.ExemptPaths = append(options.BodyPolicy.ExemptPaths, routeFitEventsPath)
+		idempotencyExempt := options.IdempotencyExempt
+		options.IdempotencyExempt = func(r *http.Request) bool {
+			return r.Method == http.MethodPost && r.URL.Path == routeFitEventsPath || idempotencyExempt != nil && idempotencyExempt(r)
+		}
+	}
 	router := chi.NewRouter()
 	if options.AdminAccess.AppEnv == "" {
 		options.AdminAccess.AppEnv = options.AppEnv
@@ -103,7 +111,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	})
 	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, Sessions: options.Sessions, AccountProfiles: options.AccountProfiles, AccountLinks: options.AccountLinks, ClientIP: options.ClientIP, Audit: options.Audit, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions}, router)
 	if options.RouteFit != nil {
-		router.Post("/v1/integrations/routefit/events", options.RouteFit.ServeHTTP)
+		router.Post(routeFitEventsPath, options.RouteFit.ServeHTTP)
 	}
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

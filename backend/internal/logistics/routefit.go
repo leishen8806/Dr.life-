@@ -126,6 +126,9 @@ func routeFitSignatures(values []string) [][]byte {
 }
 
 func absDuration(value time.Duration) time.Duration {
+	if value == -1<<63 {
+		return 1<<63 - 1
+	}
 	if value < 0 {
 		return -value
 	}

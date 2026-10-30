@@ -140,7 +140,7 @@ func main() {
 	directory := catalogDirectory{db: database}
 	catalogService := catalog.New(catalog.NewPgStore(database), catalog.Options{Merchants: directory})
 	routeFitReceiver := logistics.RouteFitReceiver{
-		Verifier: logistics.RouteFitWebhookVerifier{Secrets: logistics.RouteFitSecrets(os.Getenv("ROUTEFIT_EVENT_SECRETS"))},
+		Verifier: logistics.RouteFitWebhookVerifier{Secrets: logistics.RouteFitSecrets(cfg.RouteFitEventSecrets)},
 		Record: func(r *http.Request, event logistics.RouteFitEvent, body []byte) error {
 			return (logistics.RouteFitEventRecorder{DB: database}).Record(r.Context(), event, body)
 		},

@@ -105,6 +105,7 @@ type Config struct {
 	OpsAlertLang                     string
 	RouteFitReconciliationSchedule   string
 	RouteFitReconciliationNoEventFor time.Duration
+	RouteFitEventSecrets             string
 	JWTActiveKeyID                   string
 	JWTSigningConfigured             bool
 }
@@ -477,6 +478,14 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, err
 	}
+	routeFitEventSecrets := strings.TrimSpace(getenv("ROUTEFIT_EVENT_SECRETS"))
+	if routeFitEventSecrets != "" {
+		for _, secret := range strings.Split(routeFitEventSecrets, ",") {
+			if strings.TrimSpace(secret) == "" {
+				return Config{}, fmt.Errorf("ROUTEFIT_EVENT_SECRETS must be a comma-separated non-empty list")
+			}
+		}
+	}
 	jwtActiveKeyID := strings.TrimSpace(getenv("JWT_ACTIVE_KEY_ID"))
 	jwtKeys := strings.TrimSpace(getenv("JWT_SIGNING_KEYS"))
 	jwtConfigured := jwtKeys != "" || jwtActiveKeyID != ""
@@ -579,6 +588,7 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		OpsAlertLang:                     opsAlertLang,
 		RouteFitReconciliationSchedule:   routeFitReconciliationSchedule,
 		RouteFitReconciliationNoEventFor: routeFitReconciliationNoEventFor,
+		RouteFitEventSecrets:             routeFitEventSecrets,
 		JWTActiveKeyID:                   jwtActiveKeyID,
 		JWTSigningConfigured:             jwtConfigured,
 	}, nil

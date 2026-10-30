@@ -62,7 +62,7 @@ func RecordRouteFitEvent(ctx context.Context, tx pgx.Tx, event RouteFitEvent, ra
 		state = "stale"
 	}
 	hash := sha256.Sum256(rawBody)
-	_, err = tx.Exec(ctx, `INSERT INTO logistics.shipment_event (event_id,event_type,aggregate_type,aggregate_id,aggregate_version,schema_version,occurred_at,correlation_id,body_sha256,payload,processing_state) VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,''),$9,$10,$11)`, event.EventID, event.EventType, event.Aggregate.Type, event.Aggregate.ID, event.Aggregate.Version, event.SchemaVersion, event.OccurredAt, event.CorrelationID, hash[:], event.Payload, state)
+	_, err = tx.Exec(ctx, `INSERT INTO logistics.shipment_event (event_id,event_type,aggregate_type,aggregate_id,aggregate_version,schema_version,occurred_at,correlation_id,body_sha256,processing_state) VALUES ($1,$2,$3,$4,$5,$6,$7,NULLIF($8,''),$9,$10)`, event.EventID, event.EventType, event.Aggregate.Type, event.Aggregate.ID, event.Aggregate.Version, event.SchemaVersion, event.OccurredAt, event.CorrelationID, hash[:], state)
 	if err != nil {
 		return false, err
 	}
