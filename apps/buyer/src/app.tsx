@@ -76,8 +76,11 @@ interface MorePages {
  * the next ones are appended. A failed next page keeps the rows on screen.
  * Pages of a previous category or language are ignored rather than cleared, so
  * nothing has to be reset from an effect.
+ *
+ * Exported for `feed-hook.test.tsx`: both guards below are out of reach of the
+ * rendered markup, so they are driven through the hook itself.
  */
-function useProductFeed(client: BuyerApiClient, code?: string) {
+export function useProductFeed(client: BuyerApiClient, code?: string) {
   const loader = useCallback<FeedLoader>(
     (signal) =>
       loadProducts(client, { category: code }, signal).then(firstFeed),
