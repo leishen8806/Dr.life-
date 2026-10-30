@@ -66,6 +66,75 @@ exports[`trilingual snapshots > renders the category view in zh 1`] = `
 ]
 `;
 
+exports[`trilingual snapshots > renders the category view with more pages in en 1`] = `
+[
+  "Dr.life+",
+  "Categories",
+  "Back",
+  "All",
+  "Tiles",
+  "Paint and wall",
+  "Tiles",
+  "57 products",
+  "Polished tile 800×800",
+  "10 mm thick, grade A",
+  "From China",
+  "MOQ",
+  "1 m2",
+  "Lead time",
+  "15 days",
+  "from $9.50",
+  "/ m2",
+  "Show more",
+]
+`;
+
+exports[`trilingual snapshots > renders the category view with more pages in km 1`] = `
+[
+  "Dr.life+",
+  "[TODO-KM-REVIEW] ប្រភេទទំនិញ",
+  "ត្រឡប់ក្រោយ",
+  "ទាំងអស់",
+  "ក្បឿង",
+  "ថ្នាំលាបជញ្ជាំង",
+  "ក្បឿង",
+  "[TODO-KM-REVIEW] ទំនិញ 57",
+  "ក្បឿងប៉ូលា 800×800",
+  "កម្រាស់ 10mm ថ្នាក់ A",
+  "ផ្ទាល់ពីចិន",
+  "ចំនួនអប្បបរមា",
+  "1 m2",
+  "រយៈពេល",
+  "[TODO-KM-REVIEW] 15 ថ្ងៃ",
+  "ចាប់ពី $9.50",
+  "/ m2",
+  "មើលបន្ថែម",
+]
+`;
+
+exports[`trilingual snapshots > renders the category view with more pages in zh 1`] = `
+[
+  "Dr.life+",
+  "商品分类",
+  "返回",
+  "全部",
+  "瓷砖",
+  "墙饰涂料",
+  "瓷砖",
+  "57 件商品",
+  "800×800 抛光砖",
+  "厚度 10mm，A 级",
+  "中国直供",
+  "起订量",
+  "1 m2",
+  "交期",
+  "15 天",
+  "$9.50 起",
+  "/ m2",
+  "查看更多",
+]
+`;
+
 exports[`trilingual snapshots > renders the home view in en 1`] = `
 [
   "Dr.life+",
