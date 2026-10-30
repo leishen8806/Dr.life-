@@ -616,6 +616,54 @@ func (e RevenueByCategoryCategory) Valid() bool {
 	}
 }
 
+// Defines values for SearchProductDataReason.
+const (
+	RecentAll        SearchProductDataReason = "recent_all"
+	RecentInCategory SearchProductDataReason = "recent_in_category"
+)
+
+// Valid indicates whether the value is a known member of the SearchProductDataReason enum.
+func (e SearchProductDataReason) Valid() bool {
+	switch e {
+	case RecentAll:
+		return true
+	case RecentInCategory:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchProductSuccessResponseOk.
+const (
+	SearchProductSuccessResponseOkTrue SearchProductSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the SearchProductSuccessResponseOk enum.
+func (e SearchProductSuccessResponseOk) Valid() bool {
+	switch e {
+	case SearchProductSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchSuggestionSuccessResponseOk.
+const (
+	SearchSuggestionSuccessResponseOkTrue SearchSuggestionSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the SearchSuggestionSuccessResponseOk enum.
+func (e SearchSuggestionSuccessResponseOk) Valid() bool {
+	switch e {
+	case SearchSuggestionSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SessionListSuccessResponseOk.
 const (
 	SessionListSuccessResponseOkTrue SessionListSuccessResponseOk = true
@@ -793,6 +841,30 @@ func (e ListMerchantProductsParamsStatus) Valid() bool {
 	case ListMerchantProductsParamsStatusRejected:
 		return true
 	case ListMerchantProductsParamsStatusReview:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchPublicProductsParamsSort.
+const (
+	Newest    SearchPublicProductsParamsSort = "newest"
+	PriceAsc  SearchPublicProductsParamsSort = "price_asc"
+	PriceDesc SearchPublicProductsParamsSort = "price_desc"
+	Relevance SearchPublicProductsParamsSort = "relevance"
+)
+
+// Valid indicates whether the value is a known member of the SearchPublicProductsParamsSort enum.
+func (e SearchPublicProductsParamsSort) Valid() bool {
+	switch e {
+	case Newest:
+		return true
+	case PriceAsc:
+		return true
+	case PriceDesc:
+		return true
+	case Relevance:
 		return true
 	default:
 		return false
@@ -1263,6 +1335,47 @@ type RevenueByCategory struct {
 // RevenueByCategoryCategory defines model for RevenueByCategory.Category.
 type RevenueByCategoryCategory string
 
+// SearchProductData defines model for SearchProductData.
+type SearchProductData struct {
+	Items           []Product                `json:"items"`
+	NextCursor      *string                  `json:"next_cursor,omitempty"`
+	Reason          *SearchProductDataReason `json:"reason,omitempty"`
+	Recommendations []Product                `json:"recommendations"`
+}
+
+// SearchProductDataReason defines model for SearchProductData.Reason.
+type SearchProductDataReason string
+
+// SearchProductSuccessResponse defines model for SearchProductSuccessResponse.
+type SearchProductSuccessResponse struct {
+	Data      SearchProductData              `json:"data"`
+	Ok        SearchProductSuccessResponseOk `json:"ok"`
+	RequestId string                         `json:"request_id"`
+}
+
+// SearchProductSuccessResponseOk defines model for SearchProductSuccessResponse.Ok.
+type SearchProductSuccessResponseOk bool
+
+// SearchSuggestion defines model for SearchSuggestion.
+type SearchSuggestion struct {
+	Text string `json:"text"`
+}
+
+// SearchSuggestionData defines model for SearchSuggestionData.
+type SearchSuggestionData struct {
+	Items []SearchSuggestion `json:"items"`
+}
+
+// SearchSuggestionSuccessResponse defines model for SearchSuggestionSuccessResponse.
+type SearchSuggestionSuccessResponse struct {
+	Data      SearchSuggestionData              `json:"data"`
+	Ok        SearchSuggestionSuccessResponseOk `json:"ok"`
+	RequestId string                            `json:"request_id"`
+}
+
+// SearchSuggestionSuccessResponseOk defines model for SearchSuggestionSuccessResponse.Ok.
+type SearchSuggestionSuccessResponseOk bool
+
 // Session defines model for Session.
 type Session struct {
 	DeviceId  *string   `json:"device_id,omitempty"`
@@ -1608,6 +1721,29 @@ type ListPublicProductsParams struct {
 	Category *CategoryCode `form:"category,omitempty" json:"category,omitempty"`
 }
 
+// SearchPublicProductsParams defines parameters for SearchPublicProducts.
+type SearchPublicProductsParams struct {
+	Q string `form:"q" json:"q"`
+
+	// Category Restrict the result to one category code.
+	Category   *CategoryCode                   `form:"category,omitempty" json:"category,omitempty"`
+	MinPriceE4 *int64                          `form:"min_price_e4,omitempty" json:"min_price_e4,omitempty"`
+	MaxPriceE4 *int64                          `form:"max_price_e4,omitempty" json:"max_price_e4,omitempty"`
+	Sort       *SearchPublicProductsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+	Cursor     *string                         `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// SearchPublicProductsParamsSort defines parameters for SearchPublicProducts.
+type SearchPublicProductsParamsSort string
+
+// SuggestPublicProductsParams defines parameters for SuggestPublicProducts.
+type SuggestPublicProductsParams struct {
+	Q string `form:"q" json:"q"`
+}
+
 // PutBuyerMeLanguageJSONRequestBody defines body for PutBuyerMeLanguage for application/json ContentType.
 type PutBuyerMeLanguageJSONRequestBody = LanguageUpdateRequest
 
@@ -1763,6 +1899,12 @@ type ServerInterface interface {
 	// ListPublicProducts List products that are on sale for a merchant that is not disabled
 	// (GET /v1/public/products)
 	ListPublicProducts(w http.ResponseWriter, r *http.Request, params ListPublicProductsParams)
+	// SearchPublicProducts Search on-sale products across Chinese, English, and Khmer names
+	// (GET /v1/public/search/products)
+	SearchPublicProducts(w http.ResponseWriter, r *http.Request, params SearchPublicProductsParams)
+	// SuggestPublicProducts Suggest at most ten matching product-name prefixes
+	// (GET /v1/public/search/suggest)
+	SuggestPublicProducts(w http.ResponseWriter, r *http.Request, params SuggestPublicProductsParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -2024,6 +2166,18 @@ func (_ Unimplemented) GetPublicPing(w http.ResponseWriter, r *http.Request) {
 // ListPublicProducts List products that are on sale for a merchant that is not disabled
 // (GET /v1/public/products)
 func (_ Unimplemented) ListPublicProducts(w http.ResponseWriter, r *http.Request, params ListPublicProductsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SearchPublicProducts Search on-sale products across Chinese, English, and Khmer names
+// (GET /v1/public/search/products)
+func (_ Unimplemented) SearchPublicProducts(w http.ResponseWriter, r *http.Request, params SearchPublicProductsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SuggestPublicProducts Suggest at most ten matching product-name prefixes
+// (GET /v1/public/search/suggest)
+func (_ Unimplemented) SuggestPublicProducts(w http.ResponseWriter, r *http.Request, params SuggestPublicProductsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3501,6 +3655,150 @@ func (siw *ServerInterfaceWrapper) ListPublicProducts(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// SearchPublicProducts operation middleware
+func (siw *ServerInterfaceWrapper) SearchPublicProducts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchPublicProductsParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "category" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "category", r.URL.Query(), &params.Category, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "category"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "category", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "min_price_e4" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "min_price_e4", r.URL.Query(), &params.MinPriceE4, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "min_price_e4"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "min_price_e4", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "max_price_e4" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "max_price_e4", r.URL.Query(), &params.MaxPriceE4, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "max_price_e4"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "max_price_e4", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SearchPublicProducts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SuggestPublicProducts operation middleware
+func (siw *ServerInterfaceWrapper) SuggestPublicProducts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SuggestPublicProductsParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SuggestPublicProducts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -3718,6 +4016,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/public/products", wrapper.ListPublicProducts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/public/search/products", wrapper.SearchPublicProducts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/public/search/suggest", wrapper.SuggestPublicProducts)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/merchant/me/link-candidates", wrapper.GetMerchantMeLinkCandidates)

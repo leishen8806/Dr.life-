@@ -605,6 +605,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/search/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search on-sale products across Chinese, English, and Khmer names */
+        get: operations["searchPublicProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/search/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggest at most ten matching product-name prefixes */
+        get: operations["suggestPublicProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/merchant/me/link-candidates": {
         parameters: {
             query?: never;
@@ -1013,6 +1047,31 @@ export interface components {
             /** @enum {boolean} */
             ok: true;
             data: components["schemas"]["ProductListData"];
+            request_id: string;
+        };
+        SearchProductData: {
+            items: components["schemas"]["Product"][];
+            next_cursor?: string | null;
+            recommendations: components["schemas"]["Product"][];
+            /** @enum {string|null} */
+            reason?: "recent_in_category" | "recent_all" | null;
+        };
+        SearchProductSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["SearchProductData"];
+            request_id: string;
+        };
+        SearchSuggestion: {
+            text: string;
+        };
+        SearchSuggestionData: {
+            items: components["schemas"]["SearchSuggestion"][];
+        };
+        SearchSuggestionSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["SearchSuggestionData"];
             request_id: string;
         };
         ProductSuccessResponse: {
@@ -2047,6 +2106,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProductListSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            405: components["responses"]["MethodNotAllowed"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    searchPublicProducts: {
+        parameters: {
+            query: {
+                q: string;
+                /** @description Restrict the result to one category code. */
+                category?: components["parameters"]["CategoryCode"];
+                min_price_e4?: number;
+                max_price_e4?: number;
+                sort?: "relevance" | "price_asc" | "price_desc" | "newest";
+                cursor?: string;
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching on-sale products and category recommendations when no match is found. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchProductSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            405: components["responses"]["MethodNotAllowed"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    suggestPublicProducts: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching name prefixes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchSuggestionSuccessResponse"];
                 };
             };
             400: components["responses"]["BadRequest"];

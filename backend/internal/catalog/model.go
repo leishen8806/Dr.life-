@@ -51,9 +51,10 @@ const (
 
 // 列表分页默认值与上限（与 openapi.yaml 的 Page/PageSize 参数一致）。
 const (
-	DefaultPage     = 1
-	DefaultPageSize = 20
-	MaxPageSize     = 100
+	DefaultPage          = 1
+	DefaultPageSize      = 20
+	MaxPageSize          = 100
+	MaxSearchQueryLength = 200
 )
 
 // 产地 origin（设计文档第三节）。
@@ -171,4 +172,41 @@ type CategoryPage struct {
 type ProductPage struct {
 	Items                 []Product
 	Page, PageSize, Total int
+}
+
+type SearchSort string
+
+const (
+	SearchSortRelevance SearchSort = "relevance"
+	SearchSortPriceAsc  SearchSort = "price_asc"
+	SearchSortPriceDesc SearchSort = "price_desc"
+	SearchSortNewest    SearchSort = "newest"
+)
+
+// SearchQuery is the public product search filter. Prices are e4 integers.
+type SearchQuery struct {
+	Query                  string
+	Category               string
+	MinPriceE4, MaxPriceE4 int64
+	Sort                   SearchSort
+	Cursor                 string
+	PageSize               int
+}
+
+type SearchPage struct {
+	Items                []Product
+	NextCursor           string
+	Recommendations      []Product
+	RecommendationReason RecommendationReason
+}
+
+type RecommendationReason string
+
+const (
+	RecommendationRecentInCategory RecommendationReason = "recent_in_category"
+	RecommendationRecentAll        RecommendationReason = "recent_all"
+)
+
+type SearchSuggestion struct {
+	Text string
 }

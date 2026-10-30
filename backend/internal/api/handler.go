@@ -646,6 +646,49 @@ func (h Handler) ListPublicProducts(w http.ResponseWriter, r *http.Request, para
 	httpx.WriteOK(w, r, publicProductListData(page))
 }
 
+func (h Handler) SearchPublicProducts(w http.ResponseWriter, r *http.Request, params gen.SearchPublicProductsParams) {
+	service, ok := h.catalogService(w, r)
+	if !ok {
+		return
+	}
+	query := catalog.SearchQuery{Query: params.Q, Category: derefString((*string)(params.Category)), Cursor: derefString(params.Cursor)}
+	if params.MinPriceE4 != nil {
+		query.MinPriceE4 = *params.MinPriceE4
+	}
+	if params.MaxPriceE4 != nil {
+		query.MaxPriceE4 = *params.MaxPriceE4
+	}
+	if params.Sort != nil {
+		query.Sort = catalog.SearchSort(*params.Sort)
+	}
+	if params.PageSize != nil {
+		query.PageSize = int(*params.PageSize)
+	}
+	page, err := service.PublicSearch(r.Context(), query)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, publicSearchData(page))
+}
+
+func (h Handler) SuggestPublicProducts(w http.ResponseWriter, r *http.Request, params gen.SuggestPublicProductsParams) {
+	service, ok := h.catalogService(w, r)
+	if !ok {
+		return
+	}
+	items, err := service.PublicSuggestions(r.Context(), params.Q)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	data := gen.SearchSuggestionData{Items: make([]gen.SearchSuggestion, 0, len(items))}
+	for _, item := range items {
+		data.Items = append(data.Items, gen.SearchSuggestion{Text: item.Text})
+	}
+	httpx.WriteOK(w, r, data)
+}
+
 func (h Handler) ListMerchantProducts(w http.ResponseWriter, r *http.Request, params gen.ListMerchantProductsParams) {
 	service, ok := h.catalogService(w, r)
 	if !ok {
@@ -919,6 +962,27 @@ func publicProductListData(page catalog.ProductPage) gen.ProductListData {
 		items = append(items, product)
 	}
 	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}
+}
+
+func publicSearchData(page catalog.SearchPage) gen.SearchProductData {
+	items := publicSearchProducts(page.Items)
+	recommendations := publicSearchProducts(page.Recommendations)
+	data := gen.SearchProductData{Items: items, NextCursor: optionalString(page.NextCursor), Recommendations: recommendations}
+	if page.RecommendationReason != "" {
+		reason := gen.SearchProductDataReason(page.RecommendationReason)
+		data.Reason = &reason
+	}
+	return data
+}
+
+func publicSearchProducts(products []catalog.Product) []gen.Product {
+	items := make([]gen.Product, 0, len(products))
+	for _, item := range products {
+		product := toGenProduct(item)
+		product.SourceRef, product.StdScore = nil, nil
+		items = append(items, product)
+	}
+	return items
 }
 
 func categoryListData(page catalog.CategoryPage) gen.CategoryListData {

@@ -613,6 +613,68 @@ paths:
           $ref: "#/components/responses/InternalServerError"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /v1/public/search/products:
+    get:
+      tags: [public]
+      operationId: searchPublicProducts
+      summary: Search on-sale products across Chinese, English, and Khmer names
+      x-roles: ["none"]
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 200}
+        - $ref: "#/components/parameters/CategoryCode"
+        - name: min_price_e4
+          in: query
+          schema: {type: integer, minimum: 0, format: int64}
+        - name: max_price_e4
+          in: query
+          schema: {type: integer, minimum: 0, format: int64}
+        - name: sort
+          in: query
+          schema: {type: string, enum: [relevance, price_asc, price_desc, newest], default: relevance}
+        - name: cursor
+          in: query
+          schema: {type: string, maxLength: 128}
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Matching on-sale products and category recommendations when no match is found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchProductSuccessResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/public/search/suggest:
+    get:
+      tags: [public]
+      operationId: suggestPublicProducts
+      summary: Suggest at most ten matching product-name prefixes
+      x-roles: ["none"]
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 200}
+      responses:
+        "200":
+          description: Matching name prefixes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchSuggestionSuccessResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /v1/merchant/me/link-candidates:
     get:
       tags: [merchant]
@@ -1553,6 +1615,55 @@ components:
         request_id:
           type: string
           minLength: 1
+    SearchProductData:
+      type: object
+      additionalProperties: false
+      required: [items, recommendations]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Product"}
+        next_cursor:
+          type: string
+          nullable: true
+        recommendations:
+          type: array
+          items: {$ref: "#/components/schemas/Product"}
+        reason:
+          type: string
+          nullable: true
+          enum: [recent_in_category, recent_all]
+    SearchProductSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/SearchProductData"}
+        request_id: {type: string, minLength: 1}
+    SearchSuggestion:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text: {type: string}
+    SearchSuggestionData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 10
+          items: {$ref: "#/components/schemas/SearchSuggestion"}
+    SearchSuggestionSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/SearchSuggestionData"}
+        request_id: {type: string, minLength: 1}
     ProductSuccessResponse:
       type: object
       additionalProperties: false
