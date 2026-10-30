@@ -56,6 +56,7 @@ Dr.life+（集团生活板块，柬埔寨）：先解决商家的**仓储 + 配�
 - `historical/`（融资报告、品牌手册）已被 `.gitignore` 排除，**不要提交**。
 
 ## 6. 完成的标准（Definition of Done）
+- 在 Windows 本机跑需要 Docker 的 Go 测试前，先为当前 PowerShell 会话追加 Docker 与 Go 的 `PATH`，并设置 `DOCKER_HOST=npipe:////./pipe/docker_engine`；具体可复制命令见 `backend/README.md`。
 - 对应设计文档里的规则全部满足；新增逻辑有测试；
 - **账务相关必须有测试**（用真实 PostgreSQL，如 testcontainers）：平衡、幂等、并发不超扣、分账之和、不可变、冲销、提现复核（见《数据库表结构与账务详细设计》第十一章）；
 - 权限相关有越权测试（用 A 角色令牌访问 B 角色路径应 403）；
