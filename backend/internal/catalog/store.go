@@ -227,7 +227,16 @@ func (s *PgStore) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 		if patch.Tiers != nil {
 			tiers = patch.Tiers
 		}
-		if err := ValidateTiers(tiers); err != nil {
+		skuTiers := productSKUTiers(locked.SKUs)
+		usesSKUs := len(locked.SKUs) > 0
+		if patch.Tiers != nil {
+			skuTiers = nil
+			usesSKUs = false
+		} else if patch.SKUs != nil {
+			skuTiers = skuInputTiers(*patch.SKUs)
+			usesSKUs = true
+		}
+		if err := validateEffectivePrices(tiers, skuTiers, usesSKUs); err != nil {
 			return Product{}, err
 		}
 	}

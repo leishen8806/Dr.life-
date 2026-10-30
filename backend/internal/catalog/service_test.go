@@ -360,6 +360,35 @@ func TestUpdateKeepsAnOnSaleProductPublishable(t *testing.T) {
 	}
 }
 
+func TestUpdateAllowsPublishedSKUOnlyProductsAndRejectsInvalidSKUPrices(t *testing.T) {
+	on := catalog.StatusOn
+	store := &stubStore{product: catalog.Product{
+		PublicID: productULID, MerchantID: merchantID, Status: on, Name: completeName,
+		SKUs: []catalog.SKU{{Tiers: validTiers}},
+	}}
+	service := serviceWith(t, store, activeMerchant())
+
+	if _, err := service.UpdateProduct(context.Background(), merchantID, productULID, catalog.ProductPatch{Name: completeName}); err != nil {
+		t.Fatalf("published SKU-only name update = %v, want nil", err)
+	}
+	updatedSKUs := []catalog.SKUInput{{Tiers: []catalog.Tier{{MinQty: "10", UnitPriceE4: 130000}, {MinQty: "100", UnitPriceE4: 110000}}}}
+	if _, err := service.UpdateProduct(context.Background(), merchantID, productULID, catalog.ProductPatch{SKUs: &updatedSKUs}); err != nil {
+		t.Fatalf("published SKU-only price update = %v, want nil", err)
+	}
+	invalidSKUs := []catalog.SKUInput{{Tiers: validTiers[:1]}}
+	if _, err := service.UpdateProduct(context.Background(), merchantID, productULID, catalog.ProductPatch{SKUs: &invalidSKUs}); err != nil {
+		assertValidationField(t, err, "tiers")
+	} else {
+		t.Fatal("published SKU-only product accepted invalid SKU tiers")
+	}
+	emptySKUs := []catalog.SKUInput{}
+	if _, err := service.UpdateProduct(context.Background(), merchantID, productULID, catalog.ProductPatch{SKUs: &emptySKUs}); err != nil {
+		assertValidationField(t, err, "skus")
+	} else {
+		t.Fatal("published SKU-only product accepted an empty SKU list")
+	}
+}
+
 func TestMerchantProductsAlwaysScopeToTheAuthenticatedMerchant(t *testing.T) {
 	store := &stubStore{products: []catalog.Product{
 		{PublicID: productULID, MerchantID: merchantID, Status: catalog.StatusDraft},

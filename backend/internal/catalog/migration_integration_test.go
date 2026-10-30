@@ -221,6 +221,29 @@ func TestCatalogMigration(t *testing.T) {
 		if publishedSKUProduct.Status != catalog.StatusOn || len(publishedSKUProduct.SKUs) != 1 || publishedSKUProduct.SKUs[0].Status != catalog.StatusOn {
 			t.Fatalf("published SKU-only product = %+v, want on product and SKU", publishedSKUProduct)
 		}
+		if _, err := store.UpdateProduct(ctx, 42, skuProduct.PublicID, catalog.ProductPatch{Name: catalog.LocalizedText{catalog.LangZH: "renamed", catalog.LangEN: "renamed", catalog.LangKM: "renamed"}}); err != nil {
+			t.Fatalf("UpdateProduct published SKU-only name: %v", err)
+		}
+		updatedSKUInputs := []catalog.SKUInput{{
+			AttributeValues: map[string]string{"color": "red"},
+			Tiers:           []catalog.Tier{{MinQty: "1", UnitPriceE4: 280}, {MinQty: "10", UnitPriceE4: 230}},
+		}}
+		updatedSKUProduct, err := store.UpdateProduct(ctx, 42, skuProduct.PublicID, catalog.ProductPatch{SKUs: &updatedSKUInputs})
+		if err != nil {
+			t.Fatalf("UpdateProduct published SKU-only prices: %v", err)
+		}
+		if got := updatedSKUProduct.SKUs[0].Tiers; len(got) != 2 || got[0].UnitPriceE4 != 280 || got[1].UnitPriceE4 != 230 {
+			t.Fatalf("updated SKU-only tiers = %+v, want 280/230", got)
+		}
+		invalidSKUInputs := []catalog.SKUInput{{AttributeValues: map[string]string{"color": "red"}, Tiers: []catalog.Tier{{MinQty: "1", UnitPriceE4: 280}}}}
+		if _, err := store.UpdateProduct(ctx, 42, skuProduct.PublicID, catalog.ProductPatch{SKUs: &invalidSKUInputs}); err == nil {
+			t.Fatal("UpdateProduct published SKU-only product accepted invalid SKU tiers")
+		} else {
+			var validation *catalog.ValidationError
+			if !errors.As(err, &validation) || validation.Field != "skus[0].tiers" {
+				t.Fatalf("invalid SKU tiers error = %v, want skus[0].tiers validation", err)
+			}
+		}
 	})
 
 	t.Run("merchant SKU codes are unique when present", func(t *testing.T) {

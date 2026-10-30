@@ -88,6 +88,38 @@ func ValidateTiers(tiers []Tier) error {
 	return nil
 }
 
+// validateEffectivePrices applies the same price rule to either SKU tiers or legacy product tiers.
+func validateEffectivePrices(tiers []Tier, skuTiers [][]Tier, usesSKUs bool) error {
+	if !usesSKUs {
+		return ValidateTiers(tiers)
+	}
+	if len(skuTiers) == 0 {
+		return invalid("skus", "at least one SKU is required")
+	}
+	for i, skuTiers := range skuTiers {
+		if err := ValidateTiers(skuTiers); err != nil {
+			return invalid(fmt.Sprintf("skus[%d].tiers", i), "SKU price tiers are invalid")
+		}
+	}
+	return nil
+}
+
+func productSKUTiers(skus []SKU) [][]Tier {
+	tiers := make([][]Tier, len(skus))
+	for i, sku := range skus {
+		tiers[i] = sku.Tiers
+	}
+	return tiers
+}
+
+func skuInputTiers(skus []SKUInput) [][]Tier {
+	tiers := make([][]Tier, len(skus))
+	for i, sku := range skus {
+		tiers[i] = sku.Tiers
+	}
+	return tiers
+}
+
 // ValidateProductForPublish 是上架闸门（验收标准①②）：三语齐全、阶梯价合规、且尚未上架。
 func ValidateProductForPublish(product Product, tiers []Tier) error {
 	if product.Status == StatusOn {
@@ -96,15 +128,7 @@ func ValidateProductForPublish(product Product, tiers []Tier) error {
 	if err := ValidateLocalized("name", product.Name); err != nil {
 		return err
 	}
-	if len(product.SKUs) > 0 {
-		for i, sku := range product.SKUs {
-			if err := ValidateTiers(sku.Tiers); err != nil {
-				return invalid(fmt.Sprintf("skus[%d].tiers", i), "SKU price tiers are invalid")
-			}
-		}
-		return nil
-	}
-	return ValidateTiers(tiers)
+	return validateEffectivePrices(tiers, productSKUTiers(product.SKUs), len(product.SKUs) > 0)
 }
 
 // ParseDecimal 把十进制字符串规范化（去掉多余前后零），最多保留 scale 位小数。
