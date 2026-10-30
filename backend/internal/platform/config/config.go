@@ -111,6 +111,9 @@ type Config struct {
 	OpsAlertChatID                     int64
 	OpsAlertMergeWindow                time.Duration
 	OpsAlertLang                       string
+	RouteFitReconciliationSchedule     string
+	RouteFitReconciliationNoEventFor   time.Duration
+	RouteFitEventSecrets               string
 	JWTActiveKeyID                     string
 	JWTSigningConfigured               bool
 }
@@ -475,6 +478,22 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if opsAlertLang != "zh" && opsAlertLang != "en" && opsAlertLang != "km" {
 		return Config{}, fmt.Errorf("OPS_ALERT_LANG must be zh, en, or km")
 	}
+	routeFitReconciliationSchedule := strings.TrimSpace(getenv("ROUTEFIT_RECONCILIATION_SCHEDULE"))
+	if routeFitReconciliationSchedule == "" {
+		routeFitReconciliationSchedule = "*/10 * * * *"
+	}
+	routeFitReconciliationNoEventFor, err := positiveDuration(getenv, "ROUTEFIT_RECONCILIATION_NO_EVENT_FOR", 30*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	routeFitEventSecrets := strings.TrimSpace(getenv("ROUTEFIT_EVENT_SECRETS"))
+	if routeFitEventSecrets != "" {
+		for _, secret := range strings.Split(routeFitEventSecrets, ",") {
+			if strings.TrimSpace(secret) == "" {
+				return Config{}, fmt.Errorf("ROUTEFIT_EVENT_SECRETS must be a comma-separated non-empty list")
+			}
+		}
+	}
 	jwtActiveKeyID := strings.TrimSpace(getenv("JWT_ACTIVE_KEY_ID"))
 	jwtKeys := strings.TrimSpace(getenv("JWT_SIGNING_KEYS"))
 	jwtConfigured := jwtKeys != "" || jwtActiveKeyID != ""
@@ -581,24 +600,27 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		BrownoutP95Threshold: time.Duration(brownoutP95ThresholdMS) * time.Millisecond, BrownoutP95Recovery: time.Duration(brownoutP95RecoveryMS) * time.Millisecond,
 		BrownoutDBWaitThreshold: time.Duration(brownoutDBWaitMS) * time.Millisecond, BrownoutDBWaitRecovery: time.Duration(brownoutDBWaitRecoveryMS) * time.Millisecond,
 		BrownoutInFlightRatioThreshold: float64(brownoutInFlightPercent) / 100, BrownoutInFlightRatioRecovery: float64(brownoutInFlightRecoveryPercent) / 100,
-		BrownoutSampleInterval: time.Duration(brownoutSampleIntervalMS) * time.Millisecond,
-		TelegramInitDataMaxAge: telegramMaxAge,
-		AccessTokenTTL:         accessTTL,
-		RefreshTokenTTL:        refreshTTL,
-		RefreshTokenGrace:      refreshGrace,
-		SessionIdleTTL:         sessionIdleTTL,
-		SessionMaxPerAccount:   sessionMax,
-		TokenIssuer:            tokenIssuer,
-		TokenLegacyAcceptUntil: legacyAcceptUntil,
-		LoginFailureLimit:      loginFailureLimit,
-		LoginFailureWindow:     loginFailureWindow,
-		BotTokenCacheTTL:       botTokenCacheTTL,
-		OpsAlertBotID:          opsAlertBotID,
-		OpsAlertChatID:         opsAlertChatID,
-		OpsAlertMergeWindow:    opsAlertMergeWindow,
-		OpsAlertLang:           opsAlertLang,
-		JWTActiveKeyID:         jwtActiveKeyID,
-		JWTSigningConfigured:   jwtConfigured,
+		BrownoutSampleInterval:           time.Duration(brownoutSampleIntervalMS) * time.Millisecond,
+		TelegramInitDataMaxAge:           telegramMaxAge,
+		AccessTokenTTL:                   accessTTL,
+		RefreshTokenTTL:                  refreshTTL,
+		RefreshTokenGrace:                refreshGrace,
+		SessionIdleTTL:                   sessionIdleTTL,
+		SessionMaxPerAccount:             sessionMax,
+		TokenIssuer:                      tokenIssuer,
+		TokenLegacyAcceptUntil:           legacyAcceptUntil,
+		LoginFailureLimit:                loginFailureLimit,
+		LoginFailureWindow:               loginFailureWindow,
+		BotTokenCacheTTL:                 botTokenCacheTTL,
+		OpsAlertBotID:                    opsAlertBotID,
+		OpsAlertChatID:                   opsAlertChatID,
+		OpsAlertMergeWindow:              opsAlertMergeWindow,
+		OpsAlertLang:                     opsAlertLang,
+		RouteFitReconciliationSchedule:   routeFitReconciliationSchedule,
+		RouteFitReconciliationNoEventFor: routeFitReconciliationNoEventFor,
+		RouteFitEventSecrets:             routeFitEventSecrets,
+		JWTActiveKeyID:                   jwtActiveKeyID,
+		JWTSigningConfigured:             jwtConfigured,
 	}, nil
 }
 

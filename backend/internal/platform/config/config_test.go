@@ -70,6 +70,16 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	}
 }
 
+func TestLoadRouteFitEventSecrets(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{"APP_ENV": "test", "ROUTEFIT_EVENT_SECRETS": "first, second"}))
+	if err != nil || cfg.RouteFitEventSecrets != "first, second" {
+		t.Fatalf("RouteFit secrets config = %+v, err=%v", cfg, err)
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "ROUTEFIT_EVENT_SECRETS": ","})); err == nil {
+		t.Fatal("accepted empty RouteFit secret list")
+	}
+}
+
 func TestCacheRedisURLNeverFallsBackToStateRedis(t *testing.T) {
 	cfg, err := load(lookup(map[string]string{
 		"APP_ENV":   "test",
@@ -340,6 +350,21 @@ func TestLoadFileStorageAndQuotaConfiguration(t *testing.T) {
 	}
 	if cfg.StorageDriver != "minio" || cfg.StorageBucket != "files" || cfg.FileWorkerDatabaseURL != "postgres://file-worker" || len(cfg.StorageAllowedContentTypes) != 2 || cfg.FileMaxDailyUploads != 20 || cfg.FileMaxDailyBytes != 20971520 {
 		t.Fatalf("unexpected file config: %+v", cfg)
+	}
+}
+
+func TestLoadRouteFitReconciliationConfiguration(t *testing.T) {
+	cfg, err := load(lookup(map[string]string{
+		"APP_ENV": "test", "ROUTEFIT_RECONCILIATION_SCHEDULE": "*/7 * * * *", "ROUTEFIT_RECONCILIATION_NO_EVENT_FOR": "45m",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RouteFitReconciliationSchedule != "*/7 * * * *" || cfg.RouteFitReconciliationNoEventFor != 45*time.Minute {
+		t.Fatalf("unexpected RouteFit reconciliation config: %+v", cfg)
+	}
+	if _, err := load(lookup(map[string]string{"APP_ENV": "test", "ROUTEFIT_RECONCILIATION_NO_EVENT_FOR": "0s"})); err == nil {
+		t.Fatal("invalid RouteFit reconciliation duration accepted")
 	}
 }
 
