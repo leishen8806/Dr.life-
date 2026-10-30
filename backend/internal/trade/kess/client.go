@@ -72,7 +72,7 @@ func (c *HTTPClient) Create(ctx context.Context, intent Intent) (ChannelOrder, e
 	if err != nil {
 		return ChannelOrder{}, err
 	}
-	return decodeOrder(data)
+	return decodeAndValidateOrder(data, intent, true)
 }
 
 func (c *HTTPClient) Query(ctx context.Context, intent Intent) (ChannelOrder, error) {
@@ -80,7 +80,7 @@ func (c *HTTPClient) Query(ctx context.Context, intent Intent) (ChannelOrder, er
 	if err != nil {
 		return ChannelOrder{}, err
 	}
-	return decodeOrder(data)
+	return decodeAndValidateOrder(data, intent, false)
 }
 
 func (c *HTTPClient) gateway(ctx context.Context, fields map[string]string) (json.RawMessage, error) {
@@ -89,17 +89,11 @@ func (c *HTTPClient) gateway(ctx context.Context, fields map[string]string) (jso
 		return nil, err
 	}
 	fields["sign"] = SignScalars(fields, c.config.SigningKey)
-	var response struct {
-		Success bool            `json:"success"`
-		Data    json.RawMessage `json:"data"`
-	}
+	var response json.RawMessage
 	if err := c.post(ctx, "/api/mch/v2/gateway", fields, token, &response); err != nil {
 		return nil, err
 	}
-	if !response.Success || len(response.Data) == 0 || string(response.Data) == "null" {
-		return nil, ErrInvalidChannel
-	}
-	return response.Data, nil
+	return verifyGatewayResponse(response, c.config.SigningKey)
 }
 
 func (c *HTTPClient) accessToken(ctx context.Context) (string, error) {
@@ -171,4 +165,75 @@ func decodeOrder(raw json.RawMessage) (ChannelOrder, error) {
 		return ChannelOrder{}, err
 	}
 	return ChannelOrder{TradeNo: response.TradeNo, SellerCode: response.Seller.Code, Amount: amount, Currency: response.Currency, Status: response.Status, TransactionID: response.TransactionID, PaymentURL: response.PaymentLink}, nil
+}
+
+// verifyGatewayResponse authenticates the signed scalar response envelope.
+// Its nested data remains separately validated against the persisted intent.
+func verifyGatewayResponse(raw json.RawMessage, signingKey string) (json.RawMessage, error) {
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return nil, ErrInvalidChannel
+	}
+	signRaw, ok := envelope["sign"]
+	if !ok {
+		return nil, ErrInvalidChannel
+	}
+	var sign string
+	if err := json.Unmarshal(signRaw, &sign); err != nil || sign == "" {
+		return nil, ErrInvalidChannel
+	}
+	fields := map[string]string{"sign": sign}
+	for name, value := range envelope {
+		if name == "sign" || name == "data" {
+			continue
+		}
+		if scalar, ok := gatewayScalar(value); ok {
+			fields[name] = scalar
+		}
+	}
+	if !VerifyScalars(fields, signingKey) {
+		return nil, ErrInvalidChannel
+	}
+	var success bool
+	if value, ok := envelope["success"]; !ok || json.Unmarshal(value, &success) != nil || !success {
+		return nil, ErrInvalidChannel
+	}
+	data, ok := envelope["data"]
+	if !ok || len(data) == 0 || string(data) == "null" {
+		return nil, ErrInvalidChannel
+	}
+	return data, nil
+}
+
+func gatewayScalar(raw json.RawMessage) (string, bool) {
+	var value any
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if err := decoder.Decode(&value); err != nil {
+		return "", false
+	}
+	switch scalar := value.(type) {
+	case string:
+		return scalar, true
+	case bool:
+		if scalar {
+			return "true", true
+		}
+		return "false", true
+	case json.Number:
+		return scalar.String(), true
+	default:
+		return "", false
+	}
+}
+
+func decodeAndValidateOrder(raw json.RawMessage, intent Intent, requireURL bool) (ChannelOrder, error) {
+	order, err := decodeOrder(raw)
+	if err != nil {
+		return ChannelOrder{}, err
+	}
+	if _, err := validateOrder(intent, order, requireURL); err != nil {
+		return ChannelOrder{}, err
+	}
+	return order, nil
 }
