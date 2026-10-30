@@ -41,7 +41,7 @@ func TestChapter11BackupRestoreIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = restored.Terminate(e.ctx) })
-	createRestoreRoles(t, e.ctx, restored)
+	createRestoreRoles(t, e.ctx, e.admin, restored)
 	if err := restored.CopyToContainer(e.ctx, dump, "/tmp/ledger.dump", 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -91,12 +91,35 @@ func readBackupState(t *testing.T, db interface {
 	return state
 }
 
-func createRestoreRoles(t *testing.T, ctx context.Context, container testcontainers.Container) {
+func createRestoreRoles(t *testing.T, ctx context.Context, source interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}, container testcontainers.Container) {
 	t.Helper()
-	roles := []string{"iam_rw", "catalog_rw", "trade_rw", "wms_rw", "logistics_rw", "ledger_rw", "comms_rw", "ai_rw", "ops_rw", "audit_writer", "report_ro"}
-	statements := make([]string, len(roles))
-	for i, role := range roles {
-		statements[i] = "CREATE ROLE " + role
+	rows, err := source.Query(ctx, `
+		SELECT rolname
+		FROM pg_roles
+		WHERE rolname !~ '^pg_'
+		  AND NOT rolsuper
+		  AND rolname <> current_user
+		ORDER BY 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	var statements []string
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			t.Fatal(err)
+		}
+		statements = append(statements, "DO $$ BEGIN CREATE ROLE "+pgx.Identifier{role}.Sanitize()+"; EXCEPTION WHEN duplicate_object THEN NULL; END $$")
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(statements) == 0 {
+		t.Fatal("no non-superuser restore roles found")
 	}
 	requireContainerCommand(t, ctx, container, []string{"psql", "-U", "test_admin", "-d", "drlife_restore_test", "-v", "ON_ERROR_STOP=1", "-c", strings.Join(statements, ";")})
 }
