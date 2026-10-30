@@ -43,7 +43,16 @@ func request(t *testing.T, h http.Handler, method, path, key string, body any) *
 }
 
 func fulfillmentBody() map[string]any {
-	return map[string]any{"ownerRef": "merchant-1", "externalOrderId": "DRL-order-1", "externalRevision": 1, "warehouseId": "wh-1", "lines": []any{map[string]any{"lineRef": "line-1", "skuId": "sku-1", "quantity": 2}}, "delivery": map[string]any{"address": "Street 1", "contactName": "Buyer", "phone": "+85512345678", "landmark": "near market"}, "serviceLevel": "S1", "paymentTerms": "PLATFORM_PREPAID", "declaredValue": map[string]any{"amountMinor": 1234, "currency": "USD"}, "sourcePlatform": "drlife"}
+	return map[string]any{"ownerRef": "merchant-1", "externalOrderId": "DRL-order-1", "externalRevision": 1, "warehouseId": "wh-1", "lines": []any{map[string]any{"lineRef": "line-1", "skuId": "sku-1", "quantity": 2}}, "delivery": map[string]any{"address": "Street 1", "contactName": "Buyer", "phone": "+85512345678", "landmark": "near market"}, "requestedDeliveryWindow": nil, "serviceLevel": "S1", "paymentTerms": "PLATFORM_PREPAID", "declaredValue": map[string]any{"amountMinor": 1234, "currency": "USD"}, "sourcePlatform": "drlife"}
+}
+
+func TestFulfillmentRequiresNullableRequestedDeliveryWindow(t *testing.T) {
+	body := fulfillmentBody()
+	delete(body, "requestedDeliveryWindow")
+	w := request(t, newMock(t).Handler(), http.MethodPost, "/api/platform/v1/fulfillments", "window", body)
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "INVALID_REQUEST") {
+		t.Fatalf("missing requestedDeliveryWindow: %d %s", w.Code, w.Body.String())
+	}
 }
 
 func TestHTTPReadEndpointsAndQuote(t *testing.T) {

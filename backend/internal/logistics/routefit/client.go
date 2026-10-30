@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -37,13 +38,14 @@ type Line struct {
 
 // CreateShipmentCmd is the seam consumed by the future logistics outbox.
 type CreateShipmentCmd struct {
-	ExternalOrderID string          `json:"externalOrderId"`
-	OwnerRef        string          `json:"ownerRef"`
-	WarehouseID     string          `json:"warehouseId"`
-	Lines           []Line          `json:"lines"`
-	Delivery        json.RawMessage `json:"delivery"`
-	ServiceLevel    string          `json:"serviceLevel"`
-	DeclaredValue   Money           `json:"declaredValue"`
+	ExternalOrderID         string          `json:"externalOrderId"`
+	OwnerRef                string          `json:"ownerRef"`
+	WarehouseID             string          `json:"warehouseId"`
+	Lines                   []Line          `json:"lines"`
+	Delivery                json.RawMessage `json:"delivery"`
+	RequestedDeliveryWindow json.RawMessage `json:"requestedDeliveryWindow"`
+	ServiceLevel            string          `json:"serviceLevel"`
+	DeclaredValue           Money           `json:"declaredValue"`
 }
 
 type Result struct {
@@ -76,6 +78,9 @@ func New(config Config) (*Client, error) {
 	baseURL, err := url.Parse(strings.TrimSpace(config.BaseURL))
 	if err != nil || (baseURL.Scheme != "http" && baseURL.Scheme != "https") || baseURL.Host == "" || baseURL.User != nil || baseURL.RawQuery != "" || baseURL.Fragment != "" {
 		return nil, errors.New("ROUTEFIT_BASE_URL must be an absolute URL")
+	}
+	if baseURL.Scheme == "http" && !loopbackHost(baseURL.Hostname()) {
+		return nil, errors.New("ROUTEFIT_BASE_URL must use https outside loopback")
 	}
 	if strings.TrimSpace(config.ServiceToken) == "" {
 		return nil, errors.New("ROUTEFIT_SERVICE_TOKEN must be configured")
@@ -200,6 +205,14 @@ func validate(cmd CreateShipmentCmd) error {
 		}
 	}
 	return nil
+}
+
+func loopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	address := net.ParseIP(host)
+	return address != nil && address.IsLoopback()
 }
 
 func idempotencyKey(externalOrderID string) string {

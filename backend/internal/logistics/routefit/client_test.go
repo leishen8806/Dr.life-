@@ -125,6 +125,62 @@ func TestNewRequiresServiceTokenConfiguration(t *testing.T) {
 	}
 }
 
+func TestDeliverDoesNotFollowRedirectOrForwardServiceToken(t *testing.T) {
+	var mu sync.Mutex
+	sinkCalls := 0
+	sinkAuthorization := ""
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		sinkCalls++
+		sinkAuthorization = r.Header.Get("Authorization")
+		_ = json.NewEncoder(w).Encode(routefit.Result{FulfillmentID: "attacker-1"})
+	}))
+	defer sink.Close()
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", sink.URL)
+		w.WriteHeader(http.StatusFound)
+	}))
+	defer source.Close()
+
+	client := newClient(t, source.URL)
+	result, err := client.Deliver(context.Background(), testCommand())
+	if err == nil || result.FulfillmentID != "" {
+		t.Fatalf("redirect accepted: result=%#v err=%v", result, err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if sinkCalls != 0 || sinkAuthorization != "" {
+		t.Fatalf("redirect was followed: calls=%d Authorization=%q", sinkCalls, sinkAuthorization)
+	}
+}
+
+func TestDeliverAlwaysSendsNullableRequestedDeliveryWindow(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		window, exists := body["requestedDeliveryWindow"]
+		if !exists || string(window) != "null" {
+			t.Fatalf("requestedDeliveryWindow=%s exists=%t, want explicit null", window, exists)
+		}
+		_ = json.NewEncoder(w).Encode(routefit.Result{FulfillmentID: "fulfillment-1"})
+	}))
+	defer server.Close()
+
+	if _, err := newClient(t, server.URL).Deliver(context.Background(), testCommand()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNewRejectsNonLoopbackHTTPServiceTokenEndpoint(t *testing.T) {
+	_, err := routefit.New(routefit.Config{BaseURL: "http://routefit.example.com", ServiceToken: "test-service-token", Timeout: time.Second})
+	if err == nil {
+		t.Fatal("accepted cleartext non-loopback service token endpoint")
+	}
+}
+
 func newClient(t *testing.T, baseURL string) *routefit.Client {
 	t.Helper()
 	client, err := routefit.New(routefit.Config{BaseURL: baseURL, ServiceToken: "test-service-token", Timeout: time.Second, RetryAttempts: 3, RetryInitialDelay: time.Millisecond})
