@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const page = (name) => readFileSync(fileURLToPath(new URL(`../src/pages/${name}.astro`, import.meta.url)), "utf8");
+const styles = readFileSync(fileURLToPath(new URL("../src/styles/global.css", import.meta.url)), "utf8");
 const english = JSON.parse(readFileSync(fileURLToPath(new URL("../src/i18n/en.json", import.meta.url)), "utf8"));
 const cjk = /[\u3400-\u9fff]/;
 
@@ -35,4 +36,9 @@ test("English entries for the localized content contain no Chinese characters", 
   ]) {
     assert.doesNotMatch(value, cjk, `${value} is not English`);
   }
+});
+
+test("mobile English headings and supporting copy have a wrapping safeguard", () => {
+  assert.match(styles, /@media\(max-width:520px\).*\.eyebrow.*overflow-wrap:anywhere/s);
+  assert.match(styles, /@media\(max-width:520px\).*\.merchant-hero \.section-title.*overflow-wrap:anywhere/s);
 });
