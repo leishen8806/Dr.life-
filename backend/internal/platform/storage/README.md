@@ -34,3 +34,18 @@ This package uses `github.com/aws/aws-sdk-go-v2/service/s3`. The AWS SDK's SigV4
 No presigned URL, access key, or secret key may be written to logs. ScanHook is intentionally only documented here: wiring and a provider decision are outside this package's scope.
 
 `VerifyLocalURL` validates the signature and expiry only. Its caller must separately verify that the actual HTTP request method matches the signed URL's `method` query parameter.
+
+## File retention and cleanup
+
+Every file upload receives a retention deadline. The default is two calendar
+years; set `FILE_RETENTION_PERIOD` to a positive Go duration (for example,
+`17520h`) to override it. An hourly worker removes object-store bytes before
+changing the metadata row, so a failed object deletion leaves the key and row
+available for retry.
+
+- Pending uploads older than 24 hours become `expired` after deletion.
+- Pending, ready, and rejected files whose `retention_until` has passed become
+  `deleted` after deletion.
+- Verification uploads are not included in the 24-hour recovery sweep.
+
+The cleanup worker preserves `ops.file` rows for audit and is safe to rerun.
