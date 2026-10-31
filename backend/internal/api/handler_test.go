@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -355,6 +356,10 @@ type stubStore struct {
 	search       catalog.SearchQuery
 	searchResult *catalog.SearchPage
 	suggestCalls int
+}
+
+func (s *stubStore) CategoryAttributes(context.Context, string) ([]catalog.CategoryAttribute, error) {
+	return nil, nil
 }
 
 func (s *stubStore) ListCategories(_ context.Context, plan catalog.Plan) (catalog.CategoryPage, error) {
@@ -934,12 +939,17 @@ func TestUpdateDistinguishesEmptySpecFromAbsentSpec(t *testing.T) {
 		return recorder
 	}
 
-	patch("test-patch-empty-spec", `{"spec":{}}`)
+	patch("test-patch-null-spec", `{"spec":null}`)
 	if store.patch.Spec == nil {
-		t.Fatal("an explicit empty spec must be a clear signal, not an absent field")
+		t.Fatal("an explicit null spec must be a clear signal, not an absent field")
 	}
 	if len(store.patch.Spec) != 0 {
 		t.Fatalf("spec patch = %+v, want an empty map so the store writes NULL", store.patch.Spec)
+	}
+
+	patch("test-patch-empty-spec", `{"spec":{}}`)
+	if store.patch.Spec == nil || len(store.patch.Spec) != 0 {
+		t.Fatalf("empty object spec patch = %+v, want an empty map", store.patch.Spec)
 	}
 
 	patch("test-patch-absent-spec", `{"unit":"pcs"}`)
@@ -980,6 +990,33 @@ func TestCreateRejectsIllegalNumbers(t *testing.T) {
 				t.Fatalf("code = %d, want 1002", code)
 			}
 		})
+	}
+}
+
+func TestCreateSKUTextLengthBounds(t *testing.T) {
+	handler := catalogHandler(&stubStore{}, activeDirectory(), merchantAuth())
+	requestFor := func(code, unit string) *httptest.ResponseRecorder {
+		body := `{"category_code":"c1","name":{"zh":"瓷砖","en":"Tiles","km":"ក្បឿង"},"origin":"cn","unit":"pcs","skus":[{"merchant_sku_code":"` + code + `","unit":"` + unit + `","spec_values":[],"tiers":[{"min_qty":"1","unit_price_e4":2},{"min_qty":"2","unit_price_e4":1}]}]}`
+		request := httptest.NewRequest(http.MethodPost, "/v1/merchant/products", strings.NewReader(body))
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Idempotency-Key", "test-sku-length-"+strconv.Itoa(len(code))+"-"+strconv.Itoa(len(unit)))
+		return serve(t, handler, request)
+	}
+
+	if recorder := requestFor(strings.Repeat("x", 128), strings.Repeat("u", 32)); recorder.Code != http.StatusCreated {
+		t.Fatalf("boundary status=%d, want 201; body=%s", recorder.Code, recorder.Body.String())
+	}
+	for _, test := range []struct{ code, unit string }{
+		{strings.Repeat("x", 129), "pcs"},
+		{"sku", strings.Repeat("u", 33)},
+	} {
+		recorder := requestFor(test.code, test.unit)
+		if recorder.Code != http.StatusBadRequest {
+			t.Fatalf("length %d/%d status=%d, want 400; body=%s", len(test.code), len(test.unit), recorder.Code, recorder.Body.String())
+		}
+		if code := decodeErrorCode(t, recorder); code != 1002 {
+			t.Fatalf("length %d/%d error code=%d, want 1002", len(test.code), len(test.unit), code)
+		}
 	}
 }
 
@@ -1030,6 +1067,7 @@ func TestPublicProductListHidesSupplierFields(t *testing.T) {
 		Name:       completeName,
 		SourceRef:  "supplier-ref-1",
 		StdScore:   &score,
+		SKUs:       []catalog.SKU{{PublicID: otherULID, MerchantSKUCode: "merchant-sku-internal", Status: catalog.StatusOn, Tiers: []catalog.Tier{{MinQty: "1", UnitPriceE4: 2}, {MinQty: "2", UnitPriceE4: 1}}}},
 	}}}
 
 	public := catalogHandler(store, activeDirectory(), nil)
@@ -1043,6 +1081,13 @@ func TestPublicProductListHidesSupplierFields(t *testing.T) {
 			t.Fatalf("public product leaked %s: %s", field, recorder.Body.String())
 		}
 	}
+	var publicSKUs []map[string]json.RawMessage
+	if err := json.Unmarshal(item["skus"], &publicSKUs); err != nil || len(publicSKUs) != 1 {
+		t.Fatalf("public skus=%s err=%v", item["skus"], err)
+	}
+	if _, leaked := publicSKUs[0]["merchant_sku_code"]; leaked {
+		t.Fatalf("public SKU leaked merchant_sku_code: %s", recorder.Body.String())
+	}
 
 	merchant := catalogHandler(store, activeDirectory(), merchantAuth())
 	recorder = serve(t, merchant, httptest.NewRequest(http.MethodGet, "/v1/merchant/products", nil))
@@ -1054,6 +1099,13 @@ func TestPublicProductListHidesSupplierFields(t *testing.T) {
 		if _, present := item[field]; !present {
 			t.Fatalf("merchant product lost %s: %s", field, recorder.Body.String())
 		}
+	}
+	var merchantSKUs []map[string]json.RawMessage
+	if err := json.Unmarshal(item["skus"], &merchantSKUs); err != nil || len(merchantSKUs) != 1 {
+		t.Fatalf("merchant skus=%s err=%v", item["skus"], err)
+	}
+	if _, present := merchantSKUs[0]["merchant_sku_code"]; !present {
+		t.Fatalf("merchant SKU lost merchant_sku_code: %s", recorder.Body.String())
 	}
 }
 

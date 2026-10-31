@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -827,11 +828,11 @@ func (h Handler) UpdateMerchantProduct(w http.ResponseWriter, r *http.Request, p
 	if !ok {
 		return
 	}
-	body, ok := decodeJSON[gen.UpdateMerchantProductJSONRequestBody](w, r)
+	body, clearSpec, ok := decodeProductUpdateJSON(w, r)
 	if !ok {
 		return
 	}
-	product, err := service.UpdateProduct(r.Context(), merchantID, publicIDFromPath(publicID), productPatch(body))
+	product, err := service.UpdateProduct(r.Context(), merchantID, publicIDFromPath(publicID), productPatch(body, clearSpec))
 	if err != nil {
 		h.writeError(w, r, err)
 		return
@@ -1016,6 +1017,30 @@ func decodeJSON[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 	return body, true
 }
 
+// decodeProductUpdateJSON preserves the distinction between an omitted spec and
+// an explicit JSON null. The generated optional pointer represents both as nil,
+// but catalog uses an empty LocalizedText as the durable clear signal.
+func decodeProductUpdateJSON(w http.ResponseWriter, r *http.Request) (gen.ProductUpdateRequest, bool, bool) {
+	var body gen.ProductUpdateRequest
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+	if err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return body, false, false
+	}
+	if err := json.Unmarshal(payload, &body); err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return body, false, false
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &raw); err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return body, false, false
+	}
+	spec, supplied := raw["spec"]
+	return body, supplied && bytes.Equal(bytes.TrimSpace(spec), []byte("null")), true
+}
+
 func listQuery(page, pageSize *int, sort *string, status, category string) catalog.ListQuery {
 	query := catalog.ListQuery{Status: status, Category: category}
 	if page != nil {
@@ -1039,7 +1064,12 @@ func productInput(body gen.ProductCreateRequest) catalog.ProductInput {
 		Origin:       string(body.Origin),
 		LeadDays:     body.LeadDays,
 		VolumeM3:     derefString(body.VolM3),
-		Tiers:        fromGenTiers(body.Tiers),
+	}
+	if body.Tiers != nil {
+		input.Tiers = fromGenTiers(*body.Tiers)
+	}
+	if body.Skus != nil {
+		input.SKUs = fromGenSKUs(*body.Skus)
 	}
 	if body.Source != nil {
 		input.Source = string(*body.Source)
@@ -1050,7 +1080,7 @@ func productInput(body gen.ProductCreateRequest) catalog.ProductInput {
 	return input
 }
 
-func productPatch(body gen.ProductUpdateRequest) catalog.ProductPatch {
+func productPatch(body gen.ProductUpdateRequest, clearSpec bool) catalog.ProductPatch {
 	patch := catalog.ProductPatch{
 		CategoryCode: body.CategoryCode,
 		Unit:         body.Unit,
@@ -1072,11 +1102,17 @@ func productPatch(body gen.ProductUpdateRequest) catalog.ProductPatch {
 	if body.Name != nil {
 		patch.Name = fromGenLocalized(*body.Name)
 	}
-	if body.Spec != nil {
+	if clearSpec {
+		patch.Spec = catalog.LocalizedText{}
+	} else if body.Spec != nil {
 		patch.Spec = localizedPatch(*body.Spec)
 	}
 	if body.Tiers != nil {
 		patch.Tiers = fromGenTiers(*body.Tiers)
+	}
+	if body.Skus != nil {
+		skus := fromGenSKUs(*body.Skus)
+		patch.SKUs = &skus
 	}
 	return patch
 }
@@ -1094,12 +1130,19 @@ func productListData(page catalog.ProductPage) gen.ProductListData {
 func publicProductListData(page catalog.ProductPage) gen.ProductListData {
 	items := make([]gen.Product, 0, len(page.Items))
 	for _, item := range page.Items {
-		product := toGenProduct(item)
-		product.SourceRef = nil
-		product.StdScore = nil
-		items = append(items, product)
+		items = append(items, publicProduct(item))
 	}
 	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}
+}
+
+func publicProduct(product catalog.Product) gen.Product {
+	item := toGenProduct(product)
+	item.SourceRef = nil
+	item.StdScore = nil
+	for i := range item.Skus {
+		item.Skus[i].MerchantSkuCode = nil
+	}
+	return item
 }
 
 func publicSearchData(page catalog.SearchPage) gen.SearchProductData {
@@ -1147,6 +1190,21 @@ func toGenProduct(product catalog.Product) gen.Product {
 	for _, tier := range product.Tiers {
 		tiers = append(tiers, gen.ProductTier{MinQty: tier.MinQty, UnitPriceE4: tier.UnitPriceE4})
 	}
+	skus := make(gen.SKUList, 0, len(product.SKUs))
+	for _, sku := range product.SKUs {
+		skuTiers := make(gen.ProductTierList, 0, len(sku.Tiers))
+		for _, tier := range sku.Tiers {
+			skuTiers = append(skuTiers, gen.ProductTier{MinQty: tier.MinQty, UnitPriceE4: tier.UnitPriceE4})
+		}
+		item := gen.SKU{PublicId: sku.PublicID, AttributeValues: sku.AttributeValues, Status: gen.SKUStatus(sku.Status), Tiers: skuTiers}
+		if sku.MerchantSKUCode != "" {
+			item.MerchantSkuCode = &sku.MerchantSKUCode
+		}
+		if sku.Unit != "" {
+			item.Unit = &sku.Unit
+		}
+		skus = append(skus, item)
+	}
 	source := product.Source
 	if source == "" {
 		source = catalog.SourceManual
@@ -1163,6 +1221,7 @@ func toGenProduct(product catalog.Product) gen.Product {
 		Status:       gen.ProductStatus(product.Status),
 		StdScore:     product.StdScore,
 		Tiers:        tiers,
+		Skus:         skus,
 		Unit:         product.Unit,
 		UpdatedAt:    product.UpdatedAt,
 		VolM3:        optionalString(product.VolumeM3),
@@ -1211,6 +1270,25 @@ func fromGenTiers(tiers gen.ProductTierList) []catalog.Tier {
 		converted = append(converted, catalog.Tier{MinQty: tier.MinQty, UnitPriceE4: tier.UnitPriceE4})
 	}
 	return converted
+}
+
+func fromGenSKUs(skus gen.SkuCreateList) []catalog.SKUInput {
+	result := make([]catalog.SKUInput, 0, len(skus))
+	for _, sku := range skus {
+		values := make(map[string]string, len(sku.SpecValues))
+		for _, value := range sku.SpecValues {
+			values[value.Key] = value.Value
+		}
+		input := catalog.SKUInput{AttributeValues: values, Tiers: fromGenTiers(sku.Tiers)}
+		if sku.MerchantSkuCode != nil {
+			input.MerchantSKUCode = *sku.MerchantSkuCode
+		}
+		if sku.Unit != nil {
+			input.Unit = *sku.Unit
+		}
+		result = append(result, input)
+	}
+	return result
 }
 
 func optionalString(value string) *string {

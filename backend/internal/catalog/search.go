@@ -34,7 +34,7 @@ func (s *PgStore) SearchProducts(ctx context.Context, filter ProductFilter, quer
 	if err != nil {
 		return SearchPage{}, err
 	}
-	if err := attachTiers(ctx, s.db, items); err != nil {
+	if err := attachTiers(ctx, s.db, items, true); err != nil {
 		return SearchPage{}, err
 	}
 	page := SearchPage{Items: items, Recommendations: []Product{}}

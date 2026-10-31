@@ -1564,6 +1564,68 @@ components:
       description: At least two tiers, each with a unique minimum order quantity.
       items:
         $ref: "#/components/schemas/ProductTier"
+    SKU:
+      type: object
+      additionalProperties: false
+      required: [public_id, attribute_values, status, tiers]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        attribute_values:
+          type: object
+          additionalProperties:
+            type: string
+        merchant_sku_code:
+          type: string
+          maxLength: 128
+        status:
+          type: string
+          enum: [on, off]
+        unit:
+          type: string
+          nullable: true
+          maxLength: 32
+        tiers:
+          $ref: "#/components/schemas/ProductTierList"
+    SKUList:
+      type: array
+      items:
+        $ref: "#/components/schemas/SKU"
+    SkuSpecValue:
+      type: object
+      additionalProperties: false
+      required: [key, value]
+      properties:
+        key:
+          type: string
+          pattern: "^[a-z][a-z0-9_]{1,31}$"
+        value:
+          type: string
+          minLength: 1
+    SkuCreate:
+      type: object
+      additionalProperties: false
+      required: [spec_values, tiers]
+      properties:
+        spec_values:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SkuSpecValue"
+        merchant_sku_code:
+          type: string
+          maxLength: 128
+        unit:
+          type: string
+          maxLength: 32
+        tiers:
+          $ref: "#/components/schemas/ProductTierList"
+    SkuCreateList:
+      type: array
+      minItems: 1
+      items:
+        $ref: "#/components/schemas/SkuCreate"
     Category:
       type: object
       additionalProperties: false
@@ -1586,7 +1648,7 @@ components:
     Product:
       type: object
       additionalProperties: false
-      required: [public_id, category_code, name, unit, origin, status, source, tiers, updated_at]
+      required: [public_id, category_code, name, unit, origin, status, source, tiers, skus, updated_at]
       properties:
         public_id:
           type: string
@@ -1628,13 +1690,16 @@ components:
           nullable: true
         tiers:
           $ref: "#/components/schemas/ProductTierList"
+        skus:
+          $ref: "#/components/schemas/SKUList"
         updated_at:
           type: string
           format: date-time
     ProductCreateRequest:
       type: object
       additionalProperties: false
-      required: [category_code, name, unit, origin, tiers]
+      required: [category_code, name, unit, origin]
+      description: Exactly one of tiers or skus is required.
       properties:
         category_code:
           type: string
@@ -1664,9 +1729,12 @@ components:
           type: string
         tiers:
           $ref: "#/components/schemas/ProductTierList"
+        skus:
+          $ref: "#/components/schemas/SkuCreateList"
     ProductUpdateRequest:
       type: object
       additionalProperties: false
+      description: When changing price data, provide exactly one of tiers or skus.
       properties:
         category_code:
           type: string
@@ -1674,7 +1742,9 @@ components:
         name:
           $ref: "#/components/schemas/LocalizedText"
         spec:
-          $ref: "#/components/schemas/LocalizedText"
+          allOf:
+            - $ref: "#/components/schemas/LocalizedText"
+          nullable: true
         unit:
           type: string
           minLength: 1
@@ -1697,6 +1767,8 @@ components:
           description: Merchants may only move a product between draft and off; on is reached through publish.
         tiers:
           $ref: "#/components/schemas/ProductTierList"
+        skus:
+          $ref: "#/components/schemas/SkuCreateList"
     CategoryListData:
       type: object
       additionalProperties: false

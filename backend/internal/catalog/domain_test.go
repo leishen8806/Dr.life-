@@ -89,10 +89,23 @@ func TestValidateProductForPublishGatesTrilingualAndTiers(t *testing.T) {
 	if err := catalog.ValidateProductForPublish(product, tiers[:1]); !errors.As(err, &invalid) || invalid.Field != "tiers" {
 		t.Fatalf("single tier = %v, want tiers", err)
 	}
+	if err := catalog.ValidateProductForPublish(product, nil); !errors.As(err, &invalid) || invalid.Field != "tiers" {
+		t.Fatalf("no prices = %v, want tiers", err)
+	}
 
 	product.Status = catalog.StatusOn
 	if err := catalog.ValidateProductForPublish(product, tiers); !errors.As(err, &invalid) || invalid.Field != "status" {
 		t.Fatalf("already published = %v, want status", err)
+	}
+
+	product.Status = catalog.StatusDraft
+	product.SKUs = []catalog.SKU{{Tiers: tiers}}
+	if err := catalog.ValidateProductForPublish(product, nil); err != nil {
+		t.Fatalf("SKU-only product = %v, want nil", err)
+	}
+	product.SKUs[0].Tiers = tiers[:1]
+	if err := catalog.ValidateProductForPublish(product, nil); !errors.As(err, &invalid) || invalid.Field != "skus[0].tiers" {
+		t.Fatalf("SKU-only product with one tier = %v, want skus[0].tiers", err)
 	}
 }
 
@@ -154,5 +167,31 @@ func TestProductStatusIsBoundedAndMerchantSettable(t *testing.T) {
 		if status.MerchantSettable() {
 			t.Fatalf("%q.MerchantSettable() = true, want false", status)
 		}
+	}
+}
+
+func TestValidateSKURequiresUniqueEnumValuesAndTwoTiers(t *testing.T) {
+	attributes := []catalog.CategoryAttribute{{
+		Key:            "color",
+		Type:           catalog.AttributeTypeEnum,
+		Required:       true,
+		IsSKUDimension: true,
+		Values: []catalog.AttributeValue{
+			{Code: "red", Name: catalog.LocalizedText{"zh": "红", "en": "Red", "km": "ក្រហម"}},
+		},
+	}, {
+		Key:            "thickness",
+		Type:           catalog.AttributeTypeNumber,
+		Required:       true,
+		IsSKUDimension: false,
+	}}
+	valid := catalog.SKUInput{AttributeValues: map[string]string{"color": "red"}, Tiers: []catalog.Tier{{MinQty: "1", UnitPriceE4: 10}, {MinQty: "10", UnitPriceE4: 9}}}
+	if err := catalog.ValidateSKU(attributes, valid); err != nil {
+		t.Fatalf("ValidateSKU(valid) = %v", err)
+	}
+	invalid := valid
+	invalid.AttributeValues = map[string]string{"color": "blue"}
+	if err := catalog.ValidateSKU(attributes, invalid); err == nil {
+		t.Fatal("unknown enum value must fail")
 	}
 }

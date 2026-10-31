@@ -38,6 +38,32 @@ func NewPgStore(db pool) *PgStore {
 	return &PgStore{db: db}
 }
 
+func (s *PgStore) CategoryAttributes(ctx context.Context, categoryCode string) ([]CategoryAttribute, error) {
+	rows, err := s.db.Query(ctx, `SELECT a.key, a.name, a.type, coalesce(a.unit,''), a.required, a.is_sku_dimension, a.value_json, a.sort FROM catalog.category_attribute a JOIN catalog.category c ON c.id=a.category_id WHERE c.code=$1 ORDER BY a.sort,a.id`, categoryCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	attributes := []CategoryAttribute{}
+	for rows.Next() {
+		var a CategoryAttribute
+		var name, values []byte
+		if err := rows.Scan(&a.Key, &name, &a.Type, &a.Unit, &a.Required, &a.IsSKUDimension, &values, &a.Sort); err != nil {
+			return nil, err
+		}
+		if err := decodeLocalized(name, &a.Name); err != nil {
+			return nil, err
+		}
+		if len(values) != 0 {
+			if err := json.Unmarshal(values, &a.Values); err != nil {
+				return nil, fmt.Errorf("catalog: decode attribute values: %w", err)
+			}
+		}
+		attributes = append(attributes, a)
+	}
+	return attributes, rows.Err()
+}
+
 // productColumns 是列表与单条读取共用的投影。
 // numeric 一律用 trim_scale 转 text 出库，金额/体积永不经由 float64。
 const productColumns = `p.id, p.public_id, p.merchant_id, p.category_id, c.code, p.name, p.spec, p.unit,
@@ -115,7 +141,7 @@ func (s *PgStore) ListProducts(ctx context.Context, filter ProductFilter, plan P
 	if err != nil {
 		return ProductPage{}, err
 	}
-	if err := attachTiers(ctx, s.db, items); err != nil {
+	if err := attachTiers(ctx, s.db, items, filter.Status == StatusOn); err != nil {
 		return ProductPage{}, err
 	}
 	page.Items = items
@@ -155,7 +181,14 @@ func (s *PgStore) CreateProduct(ctx context.Context, merchantID int64, input Pro
 	).Scan(&productID); err != nil {
 		return Product{}, err
 	}
-	if err := replaceTiers(ctx, tx, productID, input.Tiers); err != nil {
+	if input.SKUs == nil {
+		if err := replaceTiers(ctx, tx, productID, input.Tiers); err != nil {
+			return Product{}, err
+		}
+		if err := createDefaultSKU(ctx, tx, productID, input.Tiers, StatusOff); err != nil {
+			return Product{}, err
+		}
+	} else if err := replaceSKUs(ctx, tx, productID, input.SKUs, StatusOff); err != nil {
 		return Product{}, err
 	}
 	product, err := productByID(ctx, tx, productID)
@@ -196,7 +229,16 @@ func (s *PgStore) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 		if patch.Tiers != nil {
 			tiers = patch.Tiers
 		}
-		if err := ValidateTiers(tiers); err != nil {
+		skuTiers := productSKUTiers(locked.SKUs)
+		usesSKUs := len(locked.SKUs) > 0
+		if patch.Tiers != nil {
+			skuTiers = nil
+			usesSKUs = false
+		} else if patch.SKUs != nil {
+			skuTiers = skuInputTiers(*patch.SKUs)
+			usesSKUs = true
+		}
+		if err := validateEffectivePrices(tiers, skuTiers, usesSKUs); err != nil {
 			return Product{}, err
 		}
 	}
@@ -256,6 +298,18 @@ func (s *PgStore) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 		if err := replaceTiers(ctx, tx, productID, patch.Tiers); err != nil {
 			return Product{}, err
 		}
+		if err := replaceDefaultSKUTiers(ctx, tx, productID, patch.Tiers, skuStatusForProduct(effectiveStatus)); err != nil {
+			return Product{}, err
+		}
+	} else if patch.SKUs != nil {
+		if err := replaceSKUs(ctx, tx, productID, *patch.SKUs, skuStatusForProduct(effectiveStatus)); err != nil {
+			return Product{}, err
+		}
+	}
+	if patch.Status != nil {
+		if _, err := tx.Exec(ctx, `UPDATE catalog.sku SET status = $1 WHERE product_id = $2`, string(skuStatusForProduct(effectiveStatus)), productID); err != nil {
+			return Product{}, err
+		}
 	}
 	product, err := productByID(ctx, tx, productID)
 	if err != nil {
@@ -286,6 +340,9 @@ func (s *PgStore) PublishProduct(ctx context.Context, merchantID int64, publicID
 	if _, err := tx.Exec(ctx, `
 		UPDATE catalog.product SET status = $1, updated_at = now()
 		WHERE id = $2`, string(StatusOn), locked.ID); err != nil {
+		return Product{}, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE catalog.sku SET status = $1 WHERE product_id = $2`, string(StatusOn), locked.ID); err != nil {
 		return Product{}, err
 	}
 	product, err := productByID(ctx, tx, locked.ID)
@@ -418,11 +475,72 @@ func refreshTiers(ctx context.Context, q rowQuerier, product Product) (Product, 
 	if product.Tiers == nil {
 		product.Tiers = []Tier{}
 	}
+	return refreshSKUs(ctx, q, product)
+}
+
+func refreshSKUs(ctx context.Context, q rowQuerier, product Product) (Product, error) {
+	return refreshSKUsFiltered(ctx, q, product, false)
+}
+
+func refreshSKUsFiltered(ctx context.Context, q rowQuerier, product Product, onlyOn bool) (Product, error) {
+	query := `SELECT id, public_id, attribute_values, coalesce(merchant_sku_code, ''), status, coalesce(unit, '') FROM catalog.sku WHERE product_id = $1`
+	args := []any{product.ID}
+	if onlyOn {
+		query += " AND status = $2"
+		args = append(args, string(StatusOn))
+	}
+	query += " ORDER BY id"
+	rows, err := q.Query(ctx, query, args...)
+	if err != nil {
+		return Product{}, err
+	}
+	type loadedSKU struct {
+		id  int64
+		sku SKU
+	}
+	loaded := []loadedSKU{}
+	for rows.Next() {
+		var id int64
+		var raw []byte
+		var sku SKU
+		var status string
+		if err := rows.Scan(&id, &sku.PublicID, &raw, &sku.MerchantSKUCode, &status, &sku.Unit); err != nil {
+			rows.Close()
+			return Product{}, err
+		}
+		if err := json.Unmarshal(raw, &sku.AttributeValues); err != nil {
+			rows.Close()
+			return Product{}, fmt.Errorf("catalog: decode sku attributes: %w", err)
+		}
+		sku.Status = ProductStatus(status)
+		loaded = append(loaded, loadedSKU{id: id, sku: sku})
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return Product{}, err
+	}
+	rows.Close()
+	ids := make([]int64, 0, len(loaded))
+	for _, item := range loaded {
+		ids = append(ids, item.id)
+	}
+	tiers, err := listSKUTiers(ctx, q, ids)
+	if err != nil {
+		return Product{}, err
+	}
+	product.SKUs = make([]SKU, 0, len(loaded))
+	for _, item := range loaded {
+		item.sku.Tiers = tiers[item.id]
+		if item.sku.Tiers == nil {
+			item.sku.Tiers = []Tier{}
+		}
+		product.SKUs = append(product.SKUs, item.sku)
+	}
 	return product, nil
 }
 
 // attachTiers 批量补齐列表结果里的阶梯价（一次查询，避免 N+1）。
-func attachTiers(ctx context.Context, q rowQuerier, products []Product) error {
+func attachTiers(ctx context.Context, q rowQuerier, products []Product, onlyOnSKUs bool) error {
 	if len(products) == 0 {
 		return nil
 	}
@@ -440,8 +558,38 @@ func attachTiers(ctx context.Context, q rowQuerier, products []Product) error {
 		} else {
 			products[i].Tiers = []Tier{}
 		}
+		product, err := refreshSKUsFiltered(ctx, q, products[i], onlyOnSKUs)
+		if err != nil {
+			return err
+		}
+		products[i] = product
 	}
 	return nil
+}
+
+func listSKUTiers(ctx context.Context, q rowQuerier, skuIDs []int64) (map[int64][]Tier, error) {
+	tiers := make(map[int64][]Tier, len(skuIDs))
+	if len(skuIDs) == 0 {
+		return tiers, nil
+	}
+	rows, err := q.Query(ctx, `
+		SELECT sku_id, trim_scale(min_qty)::text, unit_price_e4
+		FROM catalog.sku_tier
+		WHERE sku_id = ANY($1)
+		ORDER BY sku_id, min_qty`, skuIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var skuID int64
+		var tier Tier
+		if err := rows.Scan(&skuID, &tier.MinQty, &tier.UnitPriceE4); err != nil {
+			return nil, err
+		}
+		tiers[skuID] = append(tiers[skuID], tier)
+	}
+	return tiers, rows.Err()
 }
 
 func listTiers(ctx context.Context, q rowQuerier, productIDs []int64) (map[int64][]Tier, error) {
@@ -491,6 +639,91 @@ func replaceTiers(ctx context.Context, tx pgx.Tx, productID int64, tiers []Tier)
 		}
 	}
 	return nil
+}
+
+func createDefaultSKU(ctx context.Context, tx pgx.Tx, productID int64, tiers []Tier, status ProductStatus) error {
+	publicID, err := ids.NewULID()
+	if err != nil {
+		return err
+	}
+	var skuID int64
+	if err := tx.QueryRow(ctx, `INSERT INTO catalog.sku (public_id, product_id, attribute_values, status) VALUES ($1, $2, '{}'::jsonb, $3) RETURNING id`, publicID, productID, string(status)).Scan(&skuID); err != nil {
+		return err
+	}
+	return replaceSKUTiers(ctx, tx, skuID, tiers)
+}
+
+func replaceDefaultSKUTiers(ctx context.Context, tx pgx.Tx, productID int64, tiers []Tier, status ProductStatus) error {
+	var skuID int64
+	err := tx.QueryRow(ctx, `SELECT id FROM catalog.sku WHERE product_id = $1 AND attribute_values = '{}'::jsonb FOR UPDATE`, productID).Scan(&skuID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		var hasVariants bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM catalog.sku WHERE product_id = $1 AND attribute_values <> '{}'::jsonb)`, productID).Scan(&hasVariants); err != nil {
+			return err
+		}
+		if hasVariants {
+			return invalid("tiers", "use skus to update a product with SKU variants")
+		}
+		return createDefaultSKU(ctx, tx, productID, tiers, status)
+	}
+	if err != nil {
+		return err
+	}
+	return replaceSKUTiers(ctx, tx, skuID, tiers)
+}
+
+func replaceSKUTiers(ctx context.Context, tx pgx.Tx, skuID int64, tiers []Tier) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM catalog.sku_tier WHERE sku_id = $1`, skuID); err != nil {
+		return err
+	}
+	for _, tier := range tiers {
+		quantity, err := ParseDecimal(tier.MinQty, 3)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO catalog.sku_tier (sku_id, min_qty, unit_price_e4) VALUES ($1, $2::text::numeric, $3)`, skuID, quantity, tier.UnitPriceE4); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func replaceSKUs(ctx context.Context, tx pgx.Tx, productID int64, skus []SKUInput, status ProductStatus) error {
+	keptIDs := make([]int64, 0, len(skus))
+	for _, sku := range skus {
+		publicID, err := ids.NewULID()
+		if err != nil {
+			return err
+		}
+		values, err := json.Marshal(sku.AttributeValues)
+		if err != nil {
+			return err
+		}
+		var skuID int64
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO catalog.sku (public_id,product_id,attribute_values,merchant_sku_code,unit,status)
+			VALUES ($1,$2,$3::jsonb,NULLIF($4,''),NULLIF($5,''),$6)
+			ON CONFLICT (product_id, attribute_values) DO UPDATE
+			SET merchant_sku_code=EXCLUDED.merchant_sku_code, unit=EXCLUDED.unit, status=EXCLUDED.status, updated_at=now()
+			RETURNING id`, publicID, productID, string(values), sku.MerchantSKUCode, sku.Unit, string(status)).Scan(&skuID); err != nil {
+			return err
+		}
+		keptIDs = append(keptIDs, skuID)
+		if err := replaceSKUTiers(ctx, tx, skuID, sku.Tiers); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM catalog.sku WHERE product_id = $1 AND NOT (id = ANY($2))`, productID, keptIDs); err != nil {
+		return err
+	}
+	return nil
+}
+
+func skuStatusForProduct(status ProductStatus) ProductStatus {
+	if status == StatusOn {
+		return StatusOn
+	}
+	return StatusOff
 }
 
 func categoryIDByCode(ctx context.Context, q rowQuerier, code string) (int64, error) {

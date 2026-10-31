@@ -79,6 +79,46 @@ type Tier struct {
 	UnitPriceE4 int64
 }
 
+type AttributeType string
+
+const (
+	AttributeTypeEnum   AttributeType = "enum"
+	AttributeTypeText   AttributeType = "text"
+	AttributeTypeNumber AttributeType = "number"
+)
+
+type AttributeValue struct {
+	Code string
+	Name LocalizedText
+}
+
+type CategoryAttribute struct {
+	Key            string
+	Name           LocalizedText
+	Type           AttributeType
+	Unit           string
+	Required       bool
+	IsSKUDimension bool
+	Values         []AttributeValue
+	Sort           int
+}
+
+type SKU struct {
+	PublicID        string
+	AttributeValues map[string]string
+	MerchantSKUCode string
+	Status          ProductStatus
+	Unit            string
+	Tiers           []Tier
+}
+
+type SKUInput struct {
+	AttributeValues map[string]string
+	MerchantSKUCode string
+	Unit            string
+	Tiers           []Tier
+}
+
 // Category 是商品分类（catalog.category）。
 type Category struct {
 	PublicID    string
@@ -109,6 +149,7 @@ type Product struct {
 	StdScore     *int
 	UpdatedAt    time.Time
 	Tiers        []Tier
+	SKUs         []SKU
 }
 
 // ProductInput 是商家创建商品的输入。
@@ -123,6 +164,7 @@ type ProductInput struct {
 	Source       string
 	SourceRef    string
 	Tiers        []Tier
+	SKUs         []SKUInput
 }
 
 // ProductPatch 是商家修改自己商品的增量输入；指针字段为 nil 表示不改。
@@ -137,6 +179,7 @@ type ProductPatch struct {
 	SourceRef    *string
 	Status       *ProductStatus
 	Tiers        []Tier
+	SKUs         *[]SKUInput
 }
 
 // ListQuery 是列表接口的分页、排序与白名单过滤参数。

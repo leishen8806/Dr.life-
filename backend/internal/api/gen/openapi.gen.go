@@ -739,6 +739,24 @@ func (e RevenueByCategoryCategory) Valid() bool {
 	}
 }
 
+// Defines values for SKUStatus.
+const (
+	SKUStatusOff SKUStatus = "off"
+	SKUStatusOn  SKUStatus = "on"
+)
+
+// Valid indicates whether the value is a known member of the SKUStatus enum.
+func (e SKUStatus) Valid() bool {
+	switch e {
+	case SKUStatusOff:
+		return true
+	case SKUStatusOn:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SearchProductDataReason.
 const (
 	RecentAll        SearchProductDataReason = "recent_all"
@@ -1385,6 +1403,7 @@ type Product struct {
 	Name      LocalizedText `json:"name"`
 	Origin    ProductOrigin `json:"origin"`
 	PublicId  string        `json:"public_id"`
+	Skus      SKUList       `json:"skus"`
 	Source    ProductSource `json:"source"`
 	SourceRef *string       `json:"source_ref,omitempty"`
 
@@ -1409,7 +1428,7 @@ type ProductSource string
 // ProductStatus defines model for Product.Status.
 type ProductStatus string
 
-// ProductCreateRequest defines model for ProductCreateRequest.
+// ProductCreateRequest Exactly one of tiers or skus is required.
 type ProductCreateRequest struct {
 	CategoryCode string `json:"category_code"`
 	LeadDays     *int   `json:"lead_days,omitempty"`
@@ -1417,6 +1436,7 @@ type ProductCreateRequest struct {
 	// Name Trilingual text; every language must be present before a product can be published.
 	Name      LocalizedText               `json:"name"`
 	Origin    ProductCreateRequestOrigin  `json:"origin"`
+	Skus      *SkuCreateList              `json:"skus,omitempty"`
 	Source    *ProductCreateRequestSource `json:"source,omitempty"`
 	SourceRef *string                     `json:"source_ref,omitempty"`
 
@@ -1424,9 +1444,9 @@ type ProductCreateRequest struct {
 	Spec *LocalizedText `json:"spec,omitempty"`
 
 	// Tiers At least two tiers, each with a unique minimum order quantity.
-	Tiers ProductTierList `json:"tiers"`
-	Unit  string          `json:"unit"`
-	VolM3 *string         `json:"vol_m3,omitempty"`
+	Tiers *ProductTierList `json:"tiers,omitempty"`
+	Unit  string           `json:"unit"`
+	VolM3 *string          `json:"vol_m3,omitempty"`
 }
 
 // ProductCreateRequestOrigin defines model for ProductCreateRequest.Origin.
@@ -1475,7 +1495,7 @@ type ProductTier struct {
 // ProductTierList At least two tiers, each with a unique minimum order quantity.
 type ProductTierList = []ProductTier
 
-// ProductUpdateRequest defines model for ProductUpdateRequest.
+// ProductUpdateRequest When changing price data, provide exactly one of tiers or skus.
 type ProductUpdateRequest struct {
 	CategoryCode *string `json:"category_code,omitempty"`
 	LeadDays     *int    `json:"lead_days,omitempty"`
@@ -1483,10 +1503,9 @@ type ProductUpdateRequest struct {
 	// Name Trilingual text; every language must be present before a product can be published.
 	Name      *LocalizedText              `json:"name,omitempty"`
 	Origin    *ProductUpdateRequestOrigin `json:"origin,omitempty"`
+	Skus      *SkuCreateList              `json:"skus,omitempty"`
 	SourceRef *string                     `json:"source_ref,omitempty"`
-
-	// Spec Trilingual text; every language must be present before a product can be published.
-	Spec *LocalizedText `json:"spec,omitempty"`
+	Spec      *LocalizedText              `json:"spec,omitempty"`
 
 	// Status Merchants may only move a product between draft and off; on is reached through publish.
 	Status *ProductUpdateRequestStatus `json:"status,omitempty"`
@@ -1534,6 +1553,24 @@ type RevenueByCategory struct {
 
 // RevenueByCategoryCategory defines model for RevenueByCategory.Category.
 type RevenueByCategoryCategory string
+
+// SKU defines model for SKU.
+type SKU struct {
+	AttributeValues map[string]string `json:"attribute_values"`
+	MerchantSkuCode *string           `json:"merchant_sku_code,omitempty"`
+	PublicId        string            `json:"public_id"`
+	Status          SKUStatus         `json:"status"`
+
+	// Tiers At least two tiers, each with a unique minimum order quantity.
+	Tiers ProductTierList `json:"tiers"`
+	Unit  *string         `json:"unit,omitempty"`
+}
+
+// SKUStatus defines model for SKU.Status.
+type SKUStatus string
+
+// SKUList defines model for SKUList.
+type SKUList = []SKU
 
 // SearchProductData defines model for SearchProductData.
 type SearchProductData struct {
@@ -1601,6 +1638,25 @@ type SessionListSuccessResponse struct {
 
 // SessionListSuccessResponseOk defines model for SessionListSuccessResponse.Ok.
 type SessionListSuccessResponseOk bool
+
+// SkuCreate defines model for SkuCreate.
+type SkuCreate struct {
+	MerchantSkuCode *string        `json:"merchant_sku_code,omitempty"`
+	SpecValues      []SkuSpecValue `json:"spec_values"`
+
+	// Tiers At least two tiers, each with a unique minimum order quantity.
+	Tiers ProductTierList `json:"tiers"`
+	Unit  *string         `json:"unit,omitempty"`
+}
+
+// SkuCreateList defines model for SkuCreateList.
+type SkuCreateList = []SkuCreate
+
+// SkuSpecValue defines model for SkuSpecValue.
+type SkuSpecValue struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
 
 // SuccessEnvelope defines model for SuccessEnvelope.
 type SuccessEnvelope struct {

@@ -20,6 +20,7 @@ function product(public_id: string): Product {
     status: "on",
     source: "manual",
     tiers: [tier("1", 95_000)],
+    skus: [],
     updated_at: "2026-10-29T00:00:00Z"
   };
 }

@@ -39,6 +39,7 @@ func (d stubDirectory) MerchantStatus(_ context.Context, id int64) (catalog.Merc
 }
 
 type stubStore struct {
+	attributes   []catalog.CategoryAttribute
 	products     []catalog.Product
 	product      catalog.Product
 	created      catalog.Product
@@ -74,6 +75,10 @@ func (s *stubStore) LogSearch(_ context.Context, query string, _ int) error {
 	s.logCalls++
 	s.logQuery = query
 	return nil
+}
+
+func (s *stubStore) CategoryAttributes(context.Context, string) ([]catalog.CategoryAttribute, error) {
+	return s.attributes, nil
 }
 
 func (s *stubStore) ListCategories(context.Context, catalog.Plan) (catalog.CategoryPage, error) {
@@ -133,6 +138,23 @@ func serviceWith(t *testing.T, store catalog.Store, directory catalog.MerchantDi
 
 func activeMerchant() stubDirectory {
 	return stubDirectory{sellable: []int64{merchantID}, statuses: map[int64]catalog.MerchantStatus{merchantID: catalog.MerchantActive, otherMerchantID: catalog.MerchantFrozen}}
+}
+
+func TestCreateProductRequiresExactlyOnePriceShape(t *testing.T) {
+	store := &stubStore{attributes: []catalog.CategoryAttribute{{Key: "color", Type: catalog.AttributeTypeEnum, IsSKUDimension: true, Values: []catalog.AttributeValue{{Code: "red"}}}}}
+	service := serviceWith(t, store, activeMerchant())
+	base := catalog.ProductInput{CategoryCode: "c1", Name: completeName, Unit: "pcs", Origin: "cn"}
+	if _, err := service.CreateProduct(context.Background(), merchantID, base); err == nil {
+		t.Fatal("missing both tiers and skus was accepted")
+	}
+	base.Tiers, base.SKUs = validTiers, []catalog.SKUInput{{AttributeValues: map[string]string{"color": "red"}, Tiers: validTiers}}
+	if _, err := service.CreateProduct(context.Background(), merchantID, base); err == nil {
+		t.Fatal("tiers and skus together were accepted")
+	}
+	base.Tiers = nil
+	if _, err := service.CreateProduct(context.Background(), merchantID, base); err != nil {
+		t.Fatalf("valid skus rejected: %v", err)
+	}
 }
 
 func assertValidationField(t *testing.T, err error, want string) {
@@ -471,6 +493,35 @@ func TestUpdateKeepsAnOnSaleProductPublishable(t *testing.T) {
 		assertValidationField(t, err, "tiers")
 	} else {
 		t.Fatal("an on-sale product must keep at least two tiers")
+	}
+}
+
+func TestUpdateAllowsPublishedSKUOnlyProductsAndRejectsInvalidSKUPrices(t *testing.T) {
+	on := catalog.StatusOn
+	store := &stubStore{product: catalog.Product{
+		PublicID: productULID, MerchantID: merchantID, Status: on, Name: completeName,
+		SKUs: []catalog.SKU{{Tiers: validTiers}},
+	}}
+	service := serviceWith(t, store, activeMerchant())
+
+	if _, err := service.UpdateProduct(context.Background(), merchantID, productULID, catalog.ProductPatch{Name: completeName}); err != nil {
+		t.Fatalf("published SKU-only name update = %v, want nil", err)
+	}
+	updatedSKUs := []catalog.SKUInput{{Tiers: []catalog.Tier{{MinQty: "10", UnitPriceE4: 130000}, {MinQty: "100", UnitPriceE4: 110000}}}}
+	if _, err := service.UpdateProduct(context.Background(), merchantID, productULID, catalog.ProductPatch{SKUs: &updatedSKUs}); err != nil {
+		t.Fatalf("published SKU-only price update = %v, want nil", err)
+	}
+	invalidSKUs := []catalog.SKUInput{{Tiers: validTiers[:1]}}
+	if _, err := service.UpdateProduct(context.Background(), merchantID, productULID, catalog.ProductPatch{SKUs: &invalidSKUs}); err != nil {
+		assertValidationField(t, err, "tiers")
+	} else {
+		t.Fatal("published SKU-only product accepted invalid SKU tiers")
+	}
+	emptySKUs := []catalog.SKUInput{}
+	if _, err := service.UpdateProduct(context.Background(), merchantID, productULID, catalog.ProductPatch{SKUs: &emptySKUs}); err != nil {
+		assertValidationField(t, err, "skus")
+	} else {
+		t.Fatal("published SKU-only product accepted an empty SKU list")
 	}
 }
 

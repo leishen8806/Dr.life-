@@ -26,6 +26,7 @@ function product(publicId: string): Product {
     status: "on",
     source: "manual",
     tiers: [{ min_qty: "1", unit_price_e4: 95_000 }],
+    skus: [],
     updated_at: "2026-10-29T00:00:00Z"
   };
 }

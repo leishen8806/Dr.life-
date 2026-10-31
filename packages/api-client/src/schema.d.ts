@@ -1080,6 +1080,29 @@ export interface components {
         };
         /** @description At least two tiers, each with a unique minimum order quantity. */
         ProductTierList: components["schemas"]["ProductTier"][];
+        SKU: {
+            public_id: string;
+            attribute_values: {
+                [key: string]: string;
+            };
+            merchant_sku_code?: string;
+            /** @enum {string} */
+            status: "on" | "off";
+            unit?: string | null;
+            tiers: components["schemas"]["ProductTierList"];
+        };
+        SKUList: components["schemas"]["SKU"][];
+        SkuSpecValue: {
+            key: string;
+            value: string;
+        };
+        SkuCreate: {
+            spec_values: components["schemas"]["SkuSpecValue"][];
+            merchant_sku_code?: string;
+            unit?: string;
+            tiers: components["schemas"]["ProductTierList"];
+        };
+        SkuCreateList: components["schemas"]["SkuCreate"][];
         Category: {
             public_id: string;
             code: string;
@@ -1105,9 +1128,11 @@ export interface components {
             source_ref?: string | null;
             std_score?: number | null;
             tiers: components["schemas"]["ProductTierList"];
+            skus: components["schemas"]["SKUList"];
             /** Format: date-time */
             updated_at: string;
         };
+        /** @description Exactly one of tiers or skus is required. */
         ProductCreateRequest: {
             category_code: string;
             name: components["schemas"]["LocalizedText"];
@@ -1120,12 +1145,14 @@ export interface components {
             /** @enum {string} */
             source?: "manual" | "amazon" | "shopee" | "a1688" | "csv";
             source_ref?: string;
-            tiers: components["schemas"]["ProductTierList"];
+            tiers?: components["schemas"]["ProductTierList"];
+            skus?: components["schemas"]["SkuCreateList"];
         };
+        /** @description When changing price data, provide exactly one of tiers or skus. */
         ProductUpdateRequest: {
             category_code?: string;
             name?: components["schemas"]["LocalizedText"];
-            spec?: components["schemas"]["LocalizedText"];
+            spec?: components["schemas"]["LocalizedText"] | null;
             unit?: string;
             /** @enum {string} */
             origin?: "cn" | "lc";
@@ -1138,6 +1165,7 @@ export interface components {
              */
             status?: "draft" | "off";
             tiers?: components["schemas"]["ProductTierList"];
+            skus?: components["schemas"]["SkuCreateList"];
         };
         CategoryListData: {
             items: components["schemas"]["Category"][];

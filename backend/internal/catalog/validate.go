@@ -1,9 +1,65 @@
 package catalog
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 )
+
+const (
+	maxMerchantSKUCodeRunes = 128
+	maxSKUUnitRunes         = 32
+)
+
+func skuCombinationKey(values map[string]string) string {
+	raw, _ := json.Marshal(values)
+	return string(raw)
+}
+func derefSKUs(value *[]SKUInput) []SKUInput {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func ValidateSKU(attributes []CategoryAttribute, input SKUInput) error {
+	if utf8.RuneCountInString(input.MerchantSKUCode) > maxMerchantSKUCodeRunes {
+		return invalid("merchant_sku_code", "must not exceed 128 characters")
+	}
+	if utf8.RuneCountInString(input.Unit) > maxSKUUnitRunes {
+		return invalid("unit", "must not exceed 32 characters")
+	}
+	byKey := make(map[string]CategoryAttribute, len(attributes))
+	for _, attribute := range attributes {
+		if !attribute.IsSKUDimension {
+			continue
+		}
+		byKey[attribute.Key] = attribute
+		if strings.TrimSpace(input.AttributeValues[attribute.Key]) == "" {
+			return invalid("skus.attribute_values."+attribute.Key, "required attribute is missing")
+		}
+	}
+	for key, value := range input.AttributeValues {
+		attribute, ok := byKey[key]
+		if !ok {
+			return invalid("skus.attribute_values."+key, "unknown attribute")
+		}
+		if attribute.Type == AttributeTypeEnum {
+			found := false
+			for _, choice := range attribute.Values {
+				if value == choice.Code {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return invalid("skus.attribute_values."+key, "unknown enum value")
+			}
+		}
+	}
+	return ValidateTiers(input.Tiers)
+}
 
 // languages 是上架所需的三语顺序；报错按此顺序定位第一个缺失的语言。
 var languages = []string{LangZH, LangEN, LangKM}
@@ -44,6 +100,38 @@ func ValidateTiers(tiers []Tier) error {
 	return nil
 }
 
+// validateEffectivePrices applies the same price rule to either SKU tiers or legacy product tiers.
+func validateEffectivePrices(tiers []Tier, skuTiers [][]Tier, usesSKUs bool) error {
+	if !usesSKUs {
+		return ValidateTiers(tiers)
+	}
+	if len(skuTiers) == 0 {
+		return invalid("skus", "at least one SKU is required")
+	}
+	for i, skuTiers := range skuTiers {
+		if err := ValidateTiers(skuTiers); err != nil {
+			return invalid(fmt.Sprintf("skus[%d].tiers", i), "SKU price tiers are invalid")
+		}
+	}
+	return nil
+}
+
+func productSKUTiers(skus []SKU) [][]Tier {
+	tiers := make([][]Tier, len(skus))
+	for i, sku := range skus {
+		tiers[i] = sku.Tiers
+	}
+	return tiers
+}
+
+func skuInputTiers(skus []SKUInput) [][]Tier {
+	tiers := make([][]Tier, len(skus))
+	for i, sku := range skus {
+		tiers[i] = sku.Tiers
+	}
+	return tiers
+}
+
 // ValidateProductForPublish 是上架闸门（验收标准①②）：三语齐全、阶梯价合规、且尚未上架。
 func ValidateProductForPublish(product Product, tiers []Tier) error {
 	if product.Status == StatusOn {
@@ -52,7 +140,7 @@ func ValidateProductForPublish(product Product, tiers []Tier) error {
 	if err := ValidateLocalized("name", product.Name); err != nil {
 		return err
 	}
-	return ValidateTiers(tiers)
+	return validateEffectivePrices(tiers, productSKUTiers(product.SKUs), len(product.SKUs) > 0)
 }
 
 // ParseDecimal 把十进制字符串规范化（去掉多余前后零），最多保留 scale 位小数。
