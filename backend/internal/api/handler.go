@@ -13,12 +13,14 @@ import (
 
 	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
 )
 
 // maxBodyBytes 限制请求体大小，避免超大 JSON 进入内存。
@@ -80,6 +82,12 @@ type LedgerReader interface {
 	FinancialCenter(context.Context, ledger.FinancialCenterFilter) (ledger.FinancialCenterReport, error)
 }
 
+type FileManagement interface {
+	Presign(context.Context, int64, files.PresignInput) (files.PresignResult, error)
+	Complete(context.Context, int64, string) (files.File, error)
+	DownloadURL(context.Context, int64, string) (storage.SignedURL, error)
+}
+
 // Handler 实现 gen.ServerInterface。
 // 零值 Handler 只提供 /v1/public/ping；商品接口在依赖未注入时返回 500，
 // 这样 server.NewHandler(nil) 与契约测试的既有行为保持不变。
@@ -93,9 +101,11 @@ type Handler struct {
 	AccountLinks     AccountLinkManagement
 	ClientIP         gateway.ClientIPResolver
 	Audit            *platformaudit.Store
+	AuditWriter      platformaudit.Writer
 	Ledger           LedgerReader
 	Directory        AccountDirectory
 	AdminPermissions AdminPermissionChecker
+	Files            FileManagement
 }
 
 func (Handler) GetPublicPing(w http.ResponseWriter, r *http.Request) {
@@ -621,6 +631,63 @@ func profileData(profile iam.AccountProfile) gen.AccountProfileData {
 	return data
 }
 
+func (h Handler) PostFilePresign(w http.ResponseWriter, r *http.Request, _ gen.PostFilePresignParams) {
+	owner, ok := h.fileOwner(w, r)
+	if !ok {
+		return
+	}
+	var body gen.FilePresignRequest
+	if !decodeFileJSON(w, r, &body) {
+		return
+	}
+	if h.AuditWriter == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	result, err := h.Files.Presign(r.Context(), owner, files.PresignInput{Purpose: string(body.Purpose), ContentType: string(body.ContentType), Size: body.Size, SHA256: body.Sha256})
+	if err != nil {
+		h.fileError(w, r, err)
+		return
+	}
+	if !h.appendFileAudit(w, r, owner, platformaudit.ActionFilePresigned, result.File) {
+		return
+	}
+	httpx.WriteOK(w, r, filePresignData(result))
+}
+
+func (h Handler) PostFileComplete(w http.ResponseWriter, r *http.Request, publicID gen.PublicID, _ gen.PostFileCompleteParams) {
+	owner, ok := h.fileOwner(w, r)
+	if !ok {
+		return
+	}
+	if h.AuditWriter == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	file, err := h.Files.Complete(r.Context(), owner, string(publicID))
+	if err != nil {
+		h.fileError(w, r, err)
+		return
+	}
+	if !h.appendFileAudit(w, r, owner, platformaudit.ActionFileVerificationRequested, file) {
+		return
+	}
+	httpx.WriteOK(w, r, fileData(file))
+}
+
+func (h Handler) GetFileDownloadUrl(w http.ResponseWriter, r *http.Request, publicID gen.PublicID) {
+	owner, ok := h.fileOwner(w, r)
+	if !ok {
+		return
+	}
+	download, err := h.Files.DownloadURL(r.Context(), owner, string(publicID))
+	if err != nil {
+		h.fileError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, gen.FileDownloadURLData{DownloadUrl: download.URL, ExpiresAt: download.ExpiresAt})
+}
+
 func (h Handler) ListPublicCategories(w http.ResponseWriter, r *http.Request, params gen.ListPublicCategoriesParams) {
 	service, ok := h.catalogService(w, r)
 	if !ok {
@@ -645,6 +712,49 @@ func (h Handler) ListPublicProducts(w http.ResponseWriter, r *http.Request, para
 		return
 	}
 	httpx.WriteOK(w, r, publicProductListData(page))
+}
+
+func (h Handler) SearchPublicProducts(w http.ResponseWriter, r *http.Request, params gen.SearchPublicProductsParams) {
+	service, ok := h.catalogService(w, r)
+	if !ok {
+		return
+	}
+	query := catalog.SearchQuery{Query: params.Q, Category: derefString((*string)(params.Category)), Cursor: derefString(params.Cursor)}
+	if params.MinPriceE4 != nil {
+		query.MinPriceE4 = *params.MinPriceE4
+	}
+	if params.MaxPriceE4 != nil {
+		query.MaxPriceE4 = *params.MaxPriceE4
+	}
+	if params.Sort != nil {
+		query.Sort = catalog.SearchSort(*params.Sort)
+	}
+	if params.PageSize != nil {
+		query.PageSize = int(*params.PageSize)
+	}
+	page, err := service.PublicSearch(r.Context(), query)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, publicSearchData(page))
+}
+
+func (h Handler) SuggestPublicProducts(w http.ResponseWriter, r *http.Request, params gen.SuggestPublicProductsParams) {
+	service, ok := h.catalogService(w, r)
+	if !ok {
+		return
+	}
+	items, err := service.PublicSuggestions(r.Context(), params.Q)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	data := gen.SearchSuggestionData{Items: make([]gen.SearchSuggestion, 0, len(items))}
+	for _, item := range items {
+		data.Items = append(data.Items, gen.SearchSuggestion{Text: item.Text})
+	}
+	httpx.WriteOK(w, r, data)
 }
 
 func (h Handler) ListMerchantProducts(w http.ResponseWriter, r *http.Request, params gen.ListMerchantProductsParams) {
@@ -827,6 +937,77 @@ func (h Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	httpx.WriteError(w, r, httpx.NewAppError(code))
 }
 
+func (h Handler) fileOwner(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok || identity.AccountID == "" {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return 0, false
+	}
+	if h.Files == nil || h.Directory == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return 0, false
+	}
+	account, found, err := h.Directory.Resolve(r.Context(), identity.AccountID)
+	if err != nil || !found || account.ID <= 0 {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return 0, false
+	}
+	return account.ID, true
+}
+
+func (h Handler) fileError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, files.ErrNotFound), errors.Is(err, files.ErrNotReady):
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
+	case errors.Is(err, files.ErrQuotaExceeded):
+		w.Header().Set("Retry-After", "86400")
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeTooManyRequests))
+	case errors.Is(err, files.ErrUnsupportedPurpose), errors.Is(err, storage.ErrChecksumInvalid), errors.Is(err, storage.ErrContentLengthInvalid), errors.Is(err, storage.ErrContentLengthTooLarge), errors.Is(err, storage.ErrContentTypeNotAllowed):
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+	default:
+		h.writeError(w, r, err)
+	}
+}
+
+func (h Handler) appendFileAudit(w http.ResponseWriter, r *http.Request, owner int64, action platformaudit.Action, file files.File) bool {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return false
+	}
+	detail, err := json.Marshal(map[string]any{"purpose": file.Purpose, "content_type": file.ContentType, "size": file.Size, "status": file.Status})
+	if err == nil {
+		_, err = h.AuditWriter.Append(r.Context(), platformaudit.Entry{ActorID: owner, ActorRole: string(identity.Role), Action: action, Target: "file:" + file.PublicID, Detail: detail, IP: h.ClientIP.Resolve(r), RequestID: httpx.RequestIDFromContext(r.Context())})
+	}
+	if err != nil {
+		if h.Logger != nil {
+			h.Logger.ErrorContext(r.Context(), "file audit append failed", "request_id", httpx.RequestIDFromContext(r.Context()))
+		}
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInternalError))
+		return false
+	}
+	return true
+}
+
+func decodeFileJSON(w http.ResponseWriter, r *http.Request, body *gen.FilePresignRequest) bool {
+	bounded := r.Clone(r.Context())
+	bounded.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	if err := httpx.DecodeJSON(bounded, body); err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return false
+	}
+	return true
+}
+
+func fileData(file files.File) gen.File {
+	return gen.File{PublicId: file.PublicID, Purpose: gen.FilePurpose(file.Purpose), ContentType: file.ContentType, Size: file.Size, Status: gen.FileStatus(file.Status), CreatedAt: file.CreatedAt}
+}
+
+func filePresignData(result files.PresignResult) gen.FilePresignData {
+	file := fileData(result.File)
+	return gen.FilePresignData{PublicId: file.PublicId, Purpose: file.Purpose, ContentType: file.ContentType, Size: file.Size, Status: file.Status, CreatedAt: file.CreatedAt, UploadUrl: result.Upload.URL, UploadHeaders: result.Upload.Headers}
+}
+
 func decodeJSON[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 	var body T
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&body); err != nil {
@@ -962,6 +1143,27 @@ func publicProduct(product catalog.Product) gen.Product {
 		item.Skus[i].MerchantSkuCode = nil
 	}
 	return item
+}
+
+func publicSearchData(page catalog.SearchPage) gen.SearchProductData {
+	items := publicSearchProducts(page.Items)
+	recommendations := publicSearchProducts(page.Recommendations)
+	data := gen.SearchProductData{Items: items, NextCursor: optionalString(page.NextCursor), Recommendations: recommendations}
+	if page.RecommendationReason != "" {
+		reason := gen.SearchProductDataReason(page.RecommendationReason)
+		data.Reason = &reason
+	}
+	return data
+}
+
+func publicSearchProducts(products []catalog.Product) []gen.Product {
+	items := make([]gen.Product, 0, len(products))
+	for _, item := range products {
+		product := toGenProduct(item)
+		product.SourceRef, product.StdScore = nil, nil
+		items = append(items, product)
+	}
+	return items
 }
 
 func categoryListData(page catalog.CategoryPage) gen.CategoryListData {

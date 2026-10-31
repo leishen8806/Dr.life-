@@ -8,9 +8,10 @@ import (
 )
 
 type audience struct {
-	public bool
-	role   Role
-	known  bool
+	public  bool
+	anyRole bool
+	role    Role
+	known   bool
 }
 
 var protectedAudiences = []struct {
@@ -20,6 +21,8 @@ var protectedAudiences = []struct {
 	{"/v1/buyer", RoleBuyer}, {"/v1/merchant", RoleMerchant}, {"/v1/driver", RoleDriver},
 	{"/v1/wms", RoleWMS}, {"/v1/admin", RoleAdmin},
 }
+
+const routeFitEventPath = "/v1/integrations/routefit/events"
 
 func Authenticate(auth Authenticator, publicWebhookPrefix string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
@@ -61,7 +64,7 @@ func Authorize(publicWebhookPrefix string) func(http.Handler) http.Handler {
 				writeUnauthenticated(w, r)
 				return
 			}
-			if identity.Role != target.role {
+			if !target.anyRole && identity.Role != target.role {
 				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
 				return
 			}
@@ -76,11 +79,20 @@ func writeUnauthenticated(w http.ResponseWriter, r *http.Request) {
 }
 
 func classifyPath(path, publicWebhookPrefix string) audience {
+	// RouteFit has one public, signature-verified callback. Do not widen this
+	// exception to the integrations prefix: all other integration paths fail
+	// closed at the gateway.
+	if path == routeFitEventPath {
+		return audience{public: true, known: true}
+	}
 	if path == "/healthz" || path == "/readyz" || path == "/v1/public" || strings.HasPrefix(path, "/v1/public/") {
 		return audience{public: true, known: true}
 	}
 	if publicWebhookPrefix != "" && (path == publicWebhookPrefix || strings.HasPrefix(path, publicWebhookPrefix+"/")) {
 		return audience{public: true, known: true}
+	}
+	if path == "/v1/files" || strings.HasPrefix(path, "/v1/files/") {
+		return audience{anyRole: true, known: true}
 	}
 	for _, item := range protectedAudiences {
 		if path == item.prefix || strings.HasPrefix(path, item.prefix+"/") {

@@ -12,18 +12,42 @@ import (
 
 	api "github.com/leishen8806/Dr.life-/backend/internal/api"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/audit/audittest"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
 )
 
 type fakeLogin struct {
 	input  iam.LoginInput
 	result iam.LoginResult
 	err    error
+}
+
+type fakeFiles struct {
+	presign     files.PresignResult
+	input       files.PresignInput
+	owner       int64
+	err         error
+	completeErr error
+	downloadErr error
+}
+
+func (f *fakeFiles) Presign(_ context.Context, owner int64, in files.PresignInput) (files.PresignResult, error) {
+	f.owner, f.input = owner, in
+	return f.presign, f.err
+}
+func (f *fakeFiles) Complete(context.Context, int64, string) (files.File, error) {
+	return files.File{}, f.completeErr
+}
+func (f *fakeFiles) DownloadURL(context.Context, int64, string) (storage.SignedURL, error) {
+	return storage.SignedURL{}, f.downloadErr
 }
 
 type fakeAccountLinks struct {
@@ -196,6 +220,80 @@ func TestTelegramAuthHandlerContract(t *testing.T) {
 	}
 }
 
+func TestFilePresignUsesGatewayAccountAndReturnsSignedMetadata(t *testing.T) {
+	fake := &fakeFiles{presign: files.PresignResult{File: files.File{PublicID: "file-1", Purpose: "product_image", ContentType: "image/jpeg", Size: 12, Status: files.StatusPending, CreatedAt: time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)}, Upload: storage.SignedURL{URL: "https://storage.test/put", Headers: map[string]string{"x-amz-checksum-sha256": "sum"}}}}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake, AuditWriter: &audittest.Writer{}})
+	req := httptest.NewRequest(http.MethodPost, "/v1/files/presign", strings.NewReader(`{"purpose":"product_image","content_type":"image/jpeg","size":12,"sha256":"sum"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "file-presign-1")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusOK || fake.owner != 42 || fake.input.Purpose != "product_image" || !strings.Contains(w.Body.String(), "https://storage.test/put") {
+		t.Fatalf("status=%d owner=%d input=%+v body=%s", w.Code, fake.owner, fake.input, w.Body.String())
+	}
+}
+
+func TestFileWritesAppendAuditRecords(t *testing.T) {
+	filesService := &fakeFiles{presign: files.PresignResult{File: files.File{PublicID: "file-1", Purpose: "product_image", ContentType: "image/jpeg", Size: 12, Status: files.StatusPending, CreatedAt: time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)}, Upload: storage.SignedURL{URL: "https://storage.test/put"}}}
+	auditWriter := &audittest.Writer{}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: filesService, AuditWriter: auditWriter})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/files/presign", strings.NewReader(`{"purpose":"product_image","content_type":"image/jpeg","size":12,"sha256":"sum"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "file-audit-1")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	if len(auditWriter.Records) != 1 {
+		t.Fatalf("audit records=%d, want 1", len(auditWriter.Records))
+	}
+	record := auditWriter.Records[0]
+	if record.Action != platformaudit.ActionFilePresigned || record.ActorID != 42 || record.ActorRole != "buyer" || record.Target != "file:file-1" || record.RequestID == "" {
+		t.Fatalf("audit record=%+v", record)
+	}
+}
+
+func TestFilePresignMapsQuotaToRetryable429(t *testing.T) {
+	fake := &fakeFiles{err: files.ErrQuotaExceeded}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake, AuditWriter: &audittest.Writer{}})
+	req := httptest.NewRequest(http.MethodPost, "/v1/files/presign", strings.NewReader(`{"purpose":"product_image","content_type":"image/jpeg","size":12,"sha256":"sum"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "file-quota-1")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	if w.Code != http.StatusTooManyRequests || w.Header().Get("Retry-After") != "86400" {
+		t.Fatalf("status=%d retry-after=%q body=%s", w.Code, w.Header().Get("Retry-After"), w.Body.String())
+	}
+}
+
+func TestFileCompleteAndDownloadHideCrossOwnerFiles(t *testing.T) {
+	fake := &fakeFiles{completeErr: files.ErrNotFound, downloadErr: files.ErrNotFound}
+	h := server.NewHandlerWithGateway(nil, server.GatewayOptions{Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}}, Directory: fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Files: fake, AuditWriter: &audittest.Writer{}})
+	for _, test := range []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodPost, path: "/v1/files/file-1/complete"},
+		{method: http.MethodGet, path: "/v1/files/file-1/download-url"},
+	} {
+		t.Run(test.method, func(t *testing.T) {
+			req := httptest.NewRequest(test.method, test.path, nil)
+			if test.method == http.MethodPost {
+				req.Header.Set("Idempotency-Key", "file-cross-owner-1")
+				req.Header.Set("Content-Type", "application/json")
+			}
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, req)
+			if w.Code != http.StatusNotFound || decodeErrorCode(t, w) != 1003 {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestTelegramAuthHandlerRejectsInvalidAndUnifiesErrors(t *testing.T) {
 	for _, body := range []string{`{}`, `{"end":"admin","init_data":"x"}`, `{"end":"buyer","init_data":"x","extra":true}`, `{"end":"buyer","init_data":"` + strings.Repeat("x", telegram.MaxInitDataBytes+1) + `"}`} {
 		w := httptest.NewRecorder()
@@ -247,14 +345,17 @@ func (d stubDirectory) MerchantID(_ context.Context, account string) (int64, boo
 
 // stubStore 只实现 catalog.Store，用于断言接口层透传的分页/排序/过滤参数。
 type stubStore struct {
-	products []catalog.Product
-	product  catalog.Product
-	created  catalog.Product
-	patch    catalog.ProductPatch
-	patched  bool
-	plan     catalog.Plan
-	filter   catalog.ProductFilter
-	lists    int
+	products     []catalog.Product
+	product      catalog.Product
+	created      catalog.Product
+	patch        catalog.ProductPatch
+	patched      bool
+	plan         catalog.Plan
+	filter       catalog.ProductFilter
+	lists        int
+	search       catalog.SearchQuery
+	searchResult *catalog.SearchPage
+	suggestCalls int
 }
 
 func (s *stubStore) CategoryAttributes(context.Context, string) ([]catalog.CategoryAttribute, error) {
@@ -276,6 +377,9 @@ func (s *stubStore) ListProducts(_ context.Context, filter catalog.ProductFilter
 			continue
 		}
 		if filter.Status != "" && product.Status != filter.Status {
+			continue
+		}
+		if plan.Category != "" && product.CategoryCode != plan.Category {
 			continue
 		}
 		items = append(items, product)
@@ -302,6 +406,21 @@ func (s *stubStore) UpdateProduct(_ context.Context, _ int64, _ string, patch ca
 func (s *stubStore) PublishProduct(context.Context, int64, string) (catalog.Product, error) {
 	return s.created, nil
 }
+
+func (s *stubStore) SearchProducts(_ context.Context, filter catalog.ProductFilter, query catalog.SearchQuery) (catalog.SearchPage, error) {
+	s.filter, s.search = filter, query
+	if s.searchResult != nil {
+		return *s.searchResult, nil
+	}
+	return catalog.SearchPage{Items: s.products, Recommendations: []catalog.Product{}}, nil
+}
+
+func (s *stubStore) SuggestProducts(context.Context, catalog.ProductFilter, string) ([]catalog.SearchSuggestion, error) {
+	s.suggestCalls++
+	return []catalog.SearchSuggestion{}, nil
+}
+
+func (s *stubStore) LogSearch(context.Context, string, int) error { return nil }
 
 type stubAuth struct {
 	identity gateway.Identity
@@ -707,7 +826,7 @@ func TestCreateProductReturnsCreatedEnvelope(t *testing.T) {
 
 // 验收：公开浏览接口无需登录即可访问。
 func TestPublicProductListIsOpen(t *testing.T) {
-	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, Status: catalog.StatusOn, Name: completeName}}}
+	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOn, Name: completeName}}}
 	handler := catalogHandler(store, activeDirectory(), nil)
 
 	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/products?category=c1", nil))
@@ -716,6 +835,64 @@ func TestPublicProductListIsOpen(t *testing.T) {
 	}
 	if store.filter.Status != catalog.StatusOn || store.plan.Category != "c1" {
 		t.Fatalf("filter/plan = %+v/%+v", store.filter, store.plan)
+	}
+}
+
+func TestPublicSearchIsOpenAndPassesFilters(t *testing.T) {
+	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOn, Name: completeName}}, searchResult: &catalog.SearchPage{}}
+	handler := catalogHandler(store, activeDirectory(), nil)
+
+	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/search/products?q=tile&category=c1&min_price_e4=100&max_price_e4=200&sort=price_asc&page_size=12", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if store.search.Query != "tile" || store.search.Category != "c1" || store.search.MinPriceE4 != 100 || store.search.MaxPriceE4 != 200 || store.search.Sort != catalog.SearchSortPriceAsc || store.search.PageSize != 12 {
+		t.Fatalf("search query = %+v", store.search)
+	}
+	if store.filter.Status != catalog.StatusOn {
+		t.Fatalf("filter = %+v, want on-sale filter", store.filter)
+	}
+	if !strings.Contains(recorder.Body.String(), `"reason":"recent_in_category"`) {
+		t.Fatalf("search response missing recommendation reason: %s", recorder.Body.String())
+	}
+}
+
+func TestPublicSearchRejectsOverlongQueryBeforeCatalogStoreAccess(t *testing.T) {
+	store := &stubStore{searchResult: &catalog.SearchPage{}}
+	handler := catalogHandler(store, activeDirectory(), nil)
+
+	for _, test := range []struct {
+		name       string
+		query      string
+		wantStatus int
+	}{
+		{name: "maximum accepted", query: strings.Repeat("a", catalog.MaxSearchQueryLength), wantStatus: http.StatusOK},
+		{name: "over maximum rejected", query: strings.Repeat("a", catalog.MaxSearchQueryLength+1), wantStatus: http.StatusBadRequest},
+		{name: "16KiB rejected", query: strings.Repeat("a", 16*1024), wantStatus: http.StatusBadRequest},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store.search = catalog.SearchQuery{}
+			recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/search/products?q="+test.query, nil))
+			if recorder.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body=%s", recorder.Code, test.wantStatus, recorder.Body.String())
+			}
+			if test.wantStatus == http.StatusBadRequest && store.search.Query != "" {
+				t.Fatalf("overlong query reached catalog search: %+v", store.search)
+			}
+		})
+	}
+}
+
+func TestPublicSuggestRejectsOverlongQueryBeforeCatalogStoreAccess(t *testing.T) {
+	store := &stubStore{}
+	handler := catalogHandler(store, activeDirectory(), nil)
+
+	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/search/suggest?q="+strings.Repeat("a", catalog.MaxSearchQueryLength+1), nil))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if store.suggestCalls != 0 {
+		t.Fatalf("overlong suggestion query reached catalog store: suggestCalls=%d", store.suggestCalls)
 	}
 }
 

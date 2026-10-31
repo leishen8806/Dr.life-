@@ -1,0 +1,304 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`trilingual snapshots > renders the category view in en 1`] = `
+[
+  "Dr.life+",
+  "Categories",
+  "Back",
+  "All",
+  "Tiles",
+  "Paint and wall",
+  "Tiles",
+  "1 product",
+  "Polished tile 800×800",
+  "10 mm thick, grade A",
+  "From China",
+  "MOQ",
+  "1 m2",
+  "Lead time",
+  "15 days",
+  "from $9.50",
+  "/ m2",
+]
+`;
+
+exports[`trilingual snapshots > renders the category view in km 1`] = `
+[
+  "Dr.life+",
+  "[TODO-KM-REVIEW] ប្រភេទទំនិញ",
+  "ត្រឡប់ក្រោយ",
+  "ទាំងអស់",
+  "ក្បឿង",
+  "ថ្នាំលាបជញ្ជាំង",
+  "ក្បឿង",
+  "[TODO-KM-REVIEW] ទំនិញ 1",
+  "ក្បឿងប៉ូលា 800×800",
+  "កម្រាស់ 10mm ថ្នាក់ A",
+  "ផ្ទាល់ពីចិន",
+  "ចំនួនអប្បបរមា",
+  "1 m2",
+  "រយៈពេល",
+  "[TODO-KM-REVIEW] 15 ថ្ងៃ",
+  "ចាប់ពី $9.50",
+  "/ m2",
+]
+`;
+
+exports[`trilingual snapshots > renders the category view in zh 1`] = `
+[
+  "Dr.life+",
+  "商品分类",
+  "返回",
+  "全部",
+  "瓷砖",
+  "墙饰涂料",
+  "瓷砖",
+  "1 件商品",
+  "800×800 抛光砖",
+  "厚度 10mm，A 级",
+  "中国直供",
+  "起订量",
+  "1 m2",
+  "交期",
+  "15 天",
+  "$9.50 起",
+  "/ m2",
+]
+`;
+
+exports[`trilingual snapshots > renders the category view with more pages in en 1`] = `
+[
+  "Dr.life+",
+  "Categories",
+  "Back",
+  "All",
+  "Tiles",
+  "Paint and wall",
+  "Tiles",
+  "57 products",
+  "Polished tile 800×800",
+  "10 mm thick, grade A",
+  "From China",
+  "MOQ",
+  "1 m2",
+  "Lead time",
+  "15 days",
+  "from $9.50",
+  "/ m2",
+  "Show more",
+]
+`;
+
+exports[`trilingual snapshots > renders the category view with more pages in km 1`] = `
+[
+  "Dr.life+",
+  "[TODO-KM-REVIEW] ប្រភេទទំនិញ",
+  "ត្រឡប់ក្រោយ",
+  "ទាំងអស់",
+  "ក្បឿង",
+  "ថ្នាំលាបជញ្ជាំង",
+  "ក្បឿង",
+  "[TODO-KM-REVIEW] ទំនិញ 57",
+  "ក្បឿងប៉ូលា 800×800",
+  "កម្រាស់ 10mm ថ្នាក់ A",
+  "ផ្ទាល់ពីចិន",
+  "ចំនួនអប្បបរមា",
+  "1 m2",
+  "រយៈពេល",
+  "[TODO-KM-REVIEW] 15 ថ្ងៃ",
+  "ចាប់ពី $9.50",
+  "/ m2",
+  "មើលបន្ថែម",
+]
+`;
+
+exports[`trilingual snapshots > renders the category view with more pages in zh 1`] = `
+[
+  "Dr.life+",
+  "商品分类",
+  "返回",
+  "全部",
+  "瓷砖",
+  "墙饰涂料",
+  "瓷砖",
+  "57 件商品",
+  "800×800 抛光砖",
+  "厚度 10mm，A 级",
+  "中国直供",
+  "起订量",
+  "1 m2",
+  "交期",
+  "15 天",
+  "$9.50 起",
+  "/ m2",
+  "查看更多",
+]
+`;
+
+exports[`trilingual snapshots > renders the home view in en 1`] = `
+[
+  "Dr.life+",
+  "INFINITE POSSIBILITIES",
+  "Search products",
+  "Search results arrive in a later release",
+  "Categories",
+  "Tiles",
+  "Paint and wall",
+  "Featured materials",
+  "Polished tile 800×800",
+  "10 mm thick, grade A",
+  "From China",
+  "MOQ",
+  "1 m2",
+  "Lead time",
+  "15 days",
+  "from $9.50",
+  "/ m2",
+  "Latex paint 18 L",
+  "Local stock",
+  "MOQ",
+  "1 pail",
+  "from $38.00",
+  "/ pail",
+]
+`;
+
+exports[`trilingual snapshots > renders the home view in km 1`] = `
+[
+  "Dr.life+",
+  "លទ្ធភាពគ្មានដែនកំណត់",
+  "ស្វែងរកទំនិញ",
+  "[TODO-KM-REVIEW] Search results arrive in a later release",
+  "[TODO-KM-REVIEW] ប្រភេទទំនិញ",
+  "ក្បឿង",
+  "ថ្នាំលាបជញ្ជាំង",
+  "សម្ភារៈជ្រើសរើស",
+  "ក្បឿងប៉ូលា 800×800",
+  "កម្រាស់ 10mm ថ្នាក់ A",
+  "ផ្ទាល់ពីចិន",
+  "ចំនួនអប្បបរមា",
+  "1 m2",
+  "រយៈពេល",
+  "[TODO-KM-REVIEW] 15 ថ្ងៃ",
+  "ចាប់ពី $9.50",
+  "/ m2",
+  "ថ្នាំលាប 18L",
+  "ស្តុកក្នុងស្រុក",
+  "ចំនួនអប្បបរមា",
+  "1 pail",
+  "ចាប់ពី $38.00",
+  "/ pail",
+]
+`;
+
+exports[`trilingual snapshots > renders the home view in zh 1`] = `
+[
+  "Dr.life+",
+  "无限可能",
+  "搜索商品",
+  "搜索结果页稍后上线",
+  "商品分类",
+  "瓷砖",
+  "墙饰涂料",
+  "精选建材",
+  "800×800 抛光砖",
+  "厚度 10mm，A 级",
+  "中国直供",
+  "起订量",
+  "1 m2",
+  "交期",
+  "15 天",
+  "$9.50 起",
+  "/ m2",
+  "乳胶漆 18L",
+  "本地现货",
+  "起订量",
+  "1 pail",
+  "$38.00 起",
+  "/ pail",
+]
+`;
+
+exports[`trilingual snapshots > renders the product detail view in en 1`] = `
+[
+  "Dr.life+",
+  "Product details",
+  "Back",
+  "From China",
+  "Polished tile 800×800",
+  "10 mm thick, grade A",
+  "from $9.50",
+  "/ m2",
+  "Tier pricing (more = cheaper)",
+  "1 and up",
+  "$9.50",
+  "100 and up",
+  "$8.80",
+  "500 and up",
+  "$8.20",
+  "Unit",
+  "m2",
+  "MOQ",
+  "1 m2",
+  "Lead time",
+  "15 days",
+  "Supplier",
+  "Dr Building Supply",
+]
+`;
+
+exports[`trilingual snapshots > renders the product detail view in km 1`] = `
+[
+  "Dr.life+",
+  "[TODO-KM-REVIEW] ព័ត៌មានទំនិញ",
+  "ត្រឡប់ក្រោយ",
+  "ផ្ទាល់ពីចិន",
+  "ក្បឿងប៉ូលា 800×800",
+  "កម្រាស់ 10mm ថ្នាក់ A",
+  "ចាប់ពី $9.50",
+  "/ m2",
+  "តម្លៃតាមបរិមាណ (ទិញច្រើន ថោកជាង)",
+  "[TODO-KM-REVIEW] ចាប់ពី 1",
+  "$9.50",
+  "[TODO-KM-REVIEW] ចាប់ពី 100",
+  "$8.80",
+  "[TODO-KM-REVIEW] ចាប់ពី 500",
+  "$8.20",
+  "[TODO-KM-REVIEW] ឯកតា",
+  "m2",
+  "ចំនួនអប្បបរមា",
+  "1 m2",
+  "រយៈពេល",
+  "[TODO-KM-REVIEW] 15 ថ្ងៃ",
+  "អ្នកផ្គត់ផ្គង់",
+  "Dr Building Supply",
+]
+`;
+
+exports[`trilingual snapshots > renders the product detail view in zh 1`] = `
+[
+  "Dr.life+",
+  "商品详情",
+  "返回",
+  "中国直供",
+  "800×800 抛光砖",
+  "厚度 10mm，A 级",
+  "$9.50 起",
+  "/ m2",
+  "阶梯价（买得越多越便宜）",
+  "1 起",
+  "$9.50",
+  "100 起",
+  "$8.80",
+  "500 起",
+  "$8.20",
+  "计价单位",
+  "m2",
+  "起订量",
+  "1 m2",
+  "交期",
+  "15 天",
+  "供应商",
+  "Dr Building Supply",
+]
+`;

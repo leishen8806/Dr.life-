@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
@@ -52,6 +53,28 @@ type stubStore struct {
 	listCalls    int
 	filter       catalog.ProductFilter
 	plan         catalog.Plan
+	search       struct {
+		Filter catalog.ProductFilter
+		Query  catalog.SearchQuery
+	}
+	searchResult catalog.SearchPage
+	logQuery     string
+	logCalls     int
+	suggestCalls int
+}
+
+func (s *stubStore) SearchProducts(_ context.Context, filter catalog.ProductFilter, query catalog.SearchQuery) (catalog.SearchPage, error) {
+	s.search.Filter, s.search.Query = filter, query
+	return s.searchResult, nil
+}
+func (s *stubStore) SuggestProducts(context.Context, catalog.ProductFilter, string) ([]catalog.SearchSuggestion, error) {
+	s.suggestCalls++
+	return []catalog.SearchSuggestion{}, nil
+}
+func (s *stubStore) LogSearch(_ context.Context, query string, _ int) error {
+	s.logCalls++
+	s.logQuery = query
+	return nil
 }
 
 func (s *stubStore) CategoryAttributes(context.Context, string) ([]catalog.CategoryAttribute, error) {
@@ -74,6 +97,9 @@ func (s *stubStore) ListProducts(_ context.Context, filter catalog.ProductFilter
 			continue
 		}
 		if filter.Status != "" && product.Status != filter.Status {
+			continue
+		}
+		if plan.Category != "" && product.CategoryCode != plan.Category {
 			continue
 		}
 		items = append(items, product)
@@ -181,6 +207,116 @@ func TestPublicProductsSkipTheQueryWhenNoMerchantIsSellable(t *testing.T) {
 	}
 	if store.listCalls != 0 {
 		t.Fatalf("list calls = %d, want 0", store.listCalls)
+	}
+}
+
+func TestPublicSearchNormalizesQueryAndForcesOnSaleScope(t *testing.T) {
+	store := &stubStore{}
+	service := serviceWith(t, store, activeMerchant())
+
+	_, err := service.PublicSearch(context.Background(), catalog.SearchQuery{Query: "  tile  ", Sort: catalog.SearchSortPriceAsc, PageSize: 12})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if store.search.Filter.Status != catalog.StatusOn || !slices.Equal(store.search.Filter.MerchantIDs, []int64{merchantID}) {
+		t.Fatalf("search filter = %+v, want on-sale active-merchant scope", store.search.Filter)
+	}
+	if store.search.Query.Query != "tile" || store.search.Query.Sort != catalog.SearchSortPriceAsc || store.search.Query.PageSize != 12 {
+		t.Fatalf("search query = %+v", store.search.Query)
+	}
+}
+
+func TestPublicSearchRejectsInvalidPriceAndSort(t *testing.T) {
+	service := serviceWith(t, &stubStore{}, activeMerchant())
+	for _, query := range []catalog.SearchQuery{
+		{Query: "tile", MinPriceE4: -1},
+		{Query: "tile", MinPriceE4: 20, MaxPriceE4: 10},
+		{Query: "tile", Sort: "advertised"},
+		{Query: ""},
+	} {
+		if _, err := service.PublicSearch(context.Background(), query); err == nil {
+			t.Fatalf("query %+v must fail", query)
+		}
+	}
+}
+
+func TestPublicSearchEnforcesQueryLengthBeforeAnyStoreCall(t *testing.T) {
+	store := &stubStore{}
+	service := serviceWith(t, store, activeMerchant())
+
+	for _, test := range []struct {
+		name    string
+		query   string
+		wantErr bool
+	}{
+		{name: "maximum length is accepted", query: strings.Repeat("a", catalog.MaxSearchQueryLength)},
+		{name: "one character over is rejected", query: strings.Repeat("a", catalog.MaxSearchQueryLength+1), wantErr: true},
+		{name: "large query is rejected", query: strings.Repeat("a", 16*1024), wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store.search.Filter = catalog.ProductFilter{}
+			store.search.Query = catalog.SearchQuery{}
+			store.logCalls = 0
+			store.logQuery = ""
+
+			_, err := service.PublicSearch(context.Background(), catalog.SearchQuery{Query: test.query})
+			if (err != nil) != test.wantErr {
+				t.Fatalf("PublicSearch error = %v, wantErr %v", err, test.wantErr)
+			}
+			if test.wantErr {
+				if store.search.Query.Query != "" || store.logCalls != 0 {
+					t.Fatalf("rejected query reached store: search=%+v logCalls=%d", store.search.Query, store.logCalls)
+				}
+				return
+			}
+			if store.search.Query.Query != test.query || store.logCalls != 1 || store.logQuery != test.query {
+				t.Fatalf("accepted query was not searched and logged intact: search=%+v log=%q calls=%d", store.search.Query, store.logQuery, store.logCalls)
+			}
+		})
+	}
+}
+
+func TestPublicSuggestionsRejectsOverlongPrefixBeforeAnyStoreCall(t *testing.T) {
+	store := &stubStore{}
+	service := serviceWith(t, store, activeMerchant())
+
+	items, err := service.PublicSuggestions(context.Background(), strings.Repeat("a", catalog.MaxSearchQueryLength+1))
+	if err == nil {
+		t.Fatal("PublicSuggestions accepted an overlong prefix")
+	}
+	if items != nil {
+		t.Fatalf("items = %+v, want nil on validation error", items)
+	}
+	if store.suggestCalls != 0 || store.logCalls != 0 {
+		t.Fatalf("overlong prefix reached store: suggestCalls=%d logCalls=%d", store.suggestCalls, store.logCalls)
+	}
+}
+
+func TestPublicSearchRecommendsRecentOnSaleProductsWhenNoMatch(t *testing.T) {
+	store := &stubStore{products: []catalog.Product{
+		{PublicID: productULID, MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOn},
+		{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAX", MerchantID: merchantID, CategoryCode: "c2", Status: catalog.StatusOn},
+		{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAY", MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOff},
+	}}
+	service := serviceWith(t, store, activeMerchant())
+
+	categoryPage, err := service.PublicSearch(context.Background(), catalog.SearchQuery{Query: "none", Category: "c1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if categoryPage.RecommendationReason != catalog.RecommendationRecentInCategory || len(categoryPage.Recommendations) != 1 || categoryPage.Recommendations[0].CategoryCode != "c1" {
+		t.Fatalf("category recommendations = %+v", categoryPage)
+	}
+	if store.plan.Sort != "-updated_at" || store.plan.PageSize != 8 || store.plan.Category != "c1" || store.filter.Status != catalog.StatusOn {
+		t.Fatalf("recommendation plan/filter = %+v/%+v", store.plan, store.filter)
+	}
+
+	allPage, err := service.PublicSearch(context.Background(), catalog.SearchQuery{Query: "none"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allPage.RecommendationReason != catalog.RecommendationRecentAll || len(allPage.Recommendations) != 2 {
+		t.Fatalf("all recommendations = %+v", allPage)
 	}
 }
 

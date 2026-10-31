@@ -6,8 +6,9 @@ import {
   useI18n
 } from "@drlife/i18n";
 
-const languages: Language[] = ["zh", "en", "km"];
-const languageKeys: Record<Language, TranslationKey> = {
+/** Display order of the three supported languages; shared with the first-run chooser. */
+export const languages: Language[] = ["zh", "en", "km"];
+export const languageKeys: Record<Language, TranslationKey> = {
   zh: "language.zh",
   en: "language.en",
   km: "language.km"

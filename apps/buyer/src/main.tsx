@@ -1,85 +1,46 @@
-import { StrictMode, useCallback, useMemo } from "react";
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { createTelegramSession } from "@drlife/api-client/session";
 import {
   I18nProvider,
   readLanguagePreference,
   resolveLanguage,
-  useI18n
+  supportedLanguage
 } from "@drlife/i18n";
-
-const languageKeys = {
-  zh: "language.zh",
-  en: "language.en",
-  km: "language.km"
-} as const;
 import {
   getTelegramEnvironment,
-  LanguageSwitcher,
   mountTelegramTheme,
-  useBackButton,
-  useMainButton
+  StartupGate
 } from "@drlife/ui";
 import "@drlife/ui/styles.css";
 import "./styles.css";
+import { BuyerApp } from "./app";
 
 const environment = getTelegramEnvironment();
 mountTelegramTheme();
 
-function App() {
-  const { language, t } = useI18n();
-  const noOp = useCallback(() => undefined, []);
-  useBackButton(noOp, environment.isTelegram);
-  useMainButton(noOp, t("common.confirm"), environment.isTelegram);
-  const languageName = useMemo(() => t(languageKeys[language]), [language, t]);
+const initialLanguage = resolveLanguage(
+  readLanguagePreference(),
+  environment.languageCode
+);
 
-  return (
-    <main
-      className="mini-shell"
-      style={{ backgroundColor: environment.backgroundColor }}
-    >
-      <header>
-        <p className="eyebrow">Dr.life+</p>
-        <h1>{t("app.buyer")}</h1>
-        <strong
-          className={environment.isTelegram ? "mode telegram" : "mode dev"}
-        >
-          {t(
-            environment.isTelegram
-              ? "shell.telegramMode"
-              : "shell.developmentMode"
-          )}
-        </strong>
-      </header>
-      <section className="card">
-        <p>{t("shell.currentLanguage", { language: languageName })}</p>
-        <p>{t("shell.initData", { length: environment.initData.length })}</p>
-        <p>{t("shell.theme", { color: environment.backgroundColor })}</p>
-        <LanguageSwitcher />
-      </section>
-      <section className="card typography-demo">
-        <p lang="zh">{t("demo.zh")}</p>
-        <p lang="en">{t("demo.en")}</p>
-        <p lang="km" className="drl-khmer">
-          {t("demo.km")}
-        </p>
-      </section>
-      <footer>
-        <span>{t("shell.backButtonDemo")}</span>
-        <span>{t("shell.mainButtonDemo")}</span>
-      </footer>
-    </main>
-  );
-}
+// Created once: a new session identity would start the sign-in over.
+// initData is read per call so a refresh replays the current launch parameters.
+const session = createTelegramSession({
+  end: "buyer",
+  initData: () => getTelegramEnvironment().initData,
+  getLanguage: () => readLanguagePreference() ?? initialLanguage
+});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <I18nProvider
-      initialLanguage={resolveLanguage(
-        readLanguagePreference(),
-        environment.languageCode
-      )}
-    >
-      <App />
+    <I18nProvider initialLanguage={initialLanguage}>
+      <StartupGate
+        gateway={session}
+        suggested={supportedLanguage(environment.languageCode)}
+      >
+        <BuyerApp isTelegram={environment.isTelegram} />
+      </StartupGate>
     </I18nProvider>
   </StrictMode>
 );

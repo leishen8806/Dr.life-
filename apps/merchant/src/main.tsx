@@ -1,12 +1,17 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { createApiClient } from "@drlife/api-client";
+import { createTelegramSession } from "@drlife/api-client/session";
 import {
   I18nProvider,
   readLanguagePreference,
-  resolveLanguage
+  resolveLanguage,
+  supportedLanguage
 } from "@drlife/i18n";
-import { getTelegramEnvironment, mountTelegramTheme } from "@drlife/ui";
+import {
+  getTelegramEnvironment,
+  mountTelegramTheme,
+  StartupGate
+} from "@drlife/ui";
 import "@drlife/ui/styles.css";
 import "./styles.css";
 import { createMerchantProductApi } from "./products/api";
@@ -20,18 +25,26 @@ const initialLanguage = resolveLanguage(
   environment.languageCode
 );
 
-// 商家端登录属于另一片，本卡不含鉴权：没有令牌时接口回 2001，界面照常给出提示。
-// LanguageSwitcher 会把选择写进偏好存储，所以这里读偏好就是当前语言。
-const api = createMerchantProductApi(
-  createApiClient({
-    getLanguage: () => readLanguagePreference() ?? initialLanguage
-  })
-);
+// Created once: a new session identity would start the sign-in over.
+// initData is read per call so a refresh replays the current launch parameters.
+const session = createTelegramSession({
+  end: "merchant",
+  initData: () => getTelegramEnvironment().initData,
+  getLanguage: () => readLanguagePreference() ?? initialLanguage
+});
+
+// The product screen runs behind the gate, so its client is the signed-in one.
+const api = createMerchantProductApi(session.client);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <I18nProvider initialLanguage={initialLanguage}>
-      <ProductScreen api={api} />
+      <StartupGate
+        gateway={session}
+        suggested={supportedLanguage(environment.languageCode)}
+      >
+        <ProductScreen api={api} />
+      </StartupGate>
     </I18nProvider>
   </StrictMode>
 );

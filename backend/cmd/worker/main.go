@@ -12,13 +12,17 @@ import (
 
 	"github.com/hibiken/asynq"
 	commsTelegram "github.com/leishen8806/Dr.life-/backend/internal/comms/telegram"
+	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
+	"github.com/leishen8806/Dr.life-/backend/internal/logistics"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
+	platformdb "github.com/leishen8806/Dr.life-/backend/internal/platform/db"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/observability"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/opsalert"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue/outbox"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -57,6 +61,39 @@ func main() {
 		fmt.Fprintln(os.Stderr, "queue registry error:", err)
 		os.Exit(1)
 	}
+	var fileStore files.PostgresStore
+	var fileObjects storage.ObjectVerifier
+	if cfg.StorageDriver != "" {
+		if cfg.FileWorkerDatabaseURL == "" {
+			fmt.Fprintln(os.Stderr, "file storage configuration error: FILE_WORKER_DATABASE_URL is required")
+			os.Exit(1)
+		}
+		objects, objectErr := files.NewObjectStore(cfg)
+		if objectErr != nil {
+			fmt.Fprintln(os.Stderr, "file storage configuration error:", objectErr)
+			os.Exit(1)
+		}
+		fileObjects, _ = objects.(storage.ObjectVerifier)
+		if fileObjects == nil {
+			fmt.Fprintln(os.Stderr, "file storage configuration error: verification access unavailable")
+			os.Exit(1)
+		}
+		fileDatabase, fileDatabaseErr := platformdb.NewFileWorkerPool(ctx, cfg)
+		if fileDatabaseErr != nil {
+			fmt.Fprintln(os.Stderr, "file worker database configuration error:", fileDatabaseErr)
+			os.Exit(1)
+		}
+		defer fileDatabase.Close()
+		fileStore = files.PostgresStore{DB: fileDatabase}
+		if err := files.RegisterTasks(registry); err != nil {
+			fmt.Fprintln(os.Stderr, "file queue registry error:", err)
+			os.Exit(1)
+		}
+	}
+	if err := logistics.RegisterRouteFitReconciliationTask(registry); err != nil {
+		fmt.Fprintln(os.Stderr, "RouteFit reconciliation queue registration error:", err)
+		os.Exit(1)
+	}
 	worker, err := queue.NewWorker(cfg.QueueRedisURL, registry, queue.WorkerOptions{ShutdownTimeout: cfg.ShutdownTimeout, Logger: logger, Observer: queueMetrics})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "worker configuration error:", err)
@@ -83,6 +120,18 @@ func main() {
 	}
 	if err := worker.Register(opsalert.TaskFlush, alerts.Flush); err != nil {
 		fmt.Fprintln(os.Stderr, "queue handler error:", err)
+		os.Exit(1)
+	}
+	if fileObjects != nil {
+		if err := files.RegisterVerificationHandler(worker, fileStore, fileObjects); err != nil {
+			fmt.Fprintln(os.Stderr, "file queue handler error:", err)
+			os.Exit(1)
+		}
+	}
+	// R-02 installs the RouteFit client runner. Until then the scheduled task is
+	// deliberately a no-op after the queue payload is validated by its contract.
+	if err := worker.Register(logistics.RouteFitReconciliationTaskType, logistics.NewRouteFitReconciliationHandler(nil)); err != nil {
+		fmt.Fprintln(os.Stderr, "RouteFit reconciliation handler error:", err)
 		os.Exit(1)
 	}
 	relay, err := outbox.New(ledger.New(database, ledger.Options{}), client, outbox.Options{

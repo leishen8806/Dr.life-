@@ -80,6 +80,27 @@ func TestPublicCacheETagVariesByAcceptLanguage(t *testing.T) {
 	}
 }
 
+func TestPublicCacheETagDoesNotCrossQueryVariants(t *testing.T) {
+	handler := httpx.ETag(httpx.CacheControl(true, time.Minute, time.Minute)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"same":true}`))
+	})))
+
+	first := httptest.NewRecorder()
+	handler.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/v1/public/search/products?q=tile&category=c1", nil))
+
+	second := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/public/search/products?q=stone&category=c2&sort=newest&cursor=next", nil)
+	request.Header.Set("If-None-Match", first.Header().Get("ETag"))
+	handler.ServeHTTP(second, request)
+
+	if second.Code != http.StatusOK {
+		t.Fatalf("query variant status = %d, want 200", second.Code)
+	}
+	if second.Header().Get("ETag") == first.Header().Get("ETag") {
+		t.Fatalf("query variants share ETag %q", second.Header().Get("ETag"))
+	}
+}
+
 func TestUndeclaredPublicRouteKeepsNoStore(t *testing.T) {
 	handler := httpx.ETag(httpx.RequestID(gateway.SecurityHeaders("test")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteOK(w, r, map[string]bool{"pong": true})

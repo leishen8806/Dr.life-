@@ -77,7 +77,9 @@ func ETag(next http.Handler) http.Handler {
 			_, _ = w.Write(buffered.body.Bytes())
 			return
 		}
-		etag := contentETag(stableBody(buffered.body.Bytes()))
+		// RequestURI is part of the cache key; bind it into the validator too so
+		// a validator from one search query can never validate another query.
+		etag := contentETag(append([]byte(r.URL.RequestURI()+"\n"), stableBody(buffered.body.Bytes())...))
 		w.Header().Set("ETag", etag)
 		if etagMatches(r.Header.Get("If-None-Match"), etag) {
 			w.Header().Del("Content-Length")

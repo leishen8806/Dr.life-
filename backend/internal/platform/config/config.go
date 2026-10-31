@@ -18,93 +18,104 @@ import (
 )
 
 type Config struct {
-	HTTPAddr                       string
-	MetricsAddr                    string
-	AppEnv                         string
-	AppRelease                     string
-	LogLevel                       slog.Level
-	ShutdownTimeout                time.Duration
-	ReadHeaderTimeout              time.Duration
-	ReadTimeout                    time.Duration
-	IdleTimeout                    time.Duration
-	DatabaseURL                    string
-	ReportDatabaseURL              string
-	DBMaxConns                     int32
-	DBReportMaxConns               int32
-	DBWorkerMaxConns               int32
-	DBMinConns                     int32
-	DBConnectTimeout               time.Duration
-	DBAcquireTimeout               time.Duration
-	DBSlowQuery                    time.Duration
-	SentryDSN                      string
-	RedisURL                       string
-	CacheRedisURL                  string
-	CacheStaleTTL                  time.Duration
-	CacheNegativeTTL               time.Duration
-	CacheRefreshTimeout            time.Duration
-	CacheMaxEntries                int
-	QueueRedisURL                  string
-	QueueAllowEviction             bool
-	CORSBuyerOrigins               []string
-	CORSMerchantOrigins            []string
-	CORSDriverOrigins              []string
-	CORSWMSOrigins                 []string
-	CORSAdminOrigins               []string
-	CORSPublicOrigins              []string
-	CORSCredentialPaths            []string
-	WebhookPrefix                  string
-	WebhookMaxBodyBytes            int64
-	TrustedProxyHeader             string
-	TrustedProxyCIDRs              []string
-	AdminAllowedCIDRs              []string
-	RequestBodyMaxBytes            int64
-	RequestBodyOverrides           map[string]int64
-	ContentTypeExemptPaths         []string
-	IdempotencyTTL                 time.Duration
-	IdempotencyMaxBytes            int
-	FinancialPrefixes              []string
-	RateLimitIP                    int
-	RateLimitAccount               int
-	RateLimitLogin                 int
-	RateLimitWithdraw              int
-	RateLimitAI                    int
-	RateLimitAdmin                 int
-	LedgerReconTimezone            string
-	BulkheadTotal                  int
-	BulkheadWait                   time.Duration
-	BulkheadDrain                  time.Duration
-	BulkheadLimits                 map[string]int
-	BulkheadRules                  map[string]string
-	BulkheadCriticalPrefixes       []string
-	BulkheadDeadlineExemptions     map[string]bool
-	BrownoutEscalateAfter          time.Duration
-	BrownoutRecoverAfter           time.Duration
-	BrownoutP95Threshold           time.Duration
-	BrownoutP95Recovery            time.Duration
-	BrownoutDBWaitThreshold        time.Duration
-	BrownoutDBWaitRecovery         time.Duration
-	BrownoutInFlightRatioThreshold float64
-	BrownoutInFlightRatioRecovery  float64
-	BrownoutSampleInterval         time.Duration
-	IAMDatabaseURL                 string
-	AuditDatabaseURL               string
-	TelegramInitDataMaxAge         time.Duration
-	AccessTokenTTL                 time.Duration
-	RefreshTokenTTL                time.Duration
-	RefreshTokenGrace              time.Duration
-	SessionIdleTTL                 time.Duration
-	SessionMaxPerAccount           int
-	TokenIssuer                    string
-	TokenLegacyAcceptUntil         time.Time
-	LoginFailureLimit              int
-	LoginFailureWindow             time.Duration
-	BotTokenCacheTTL               time.Duration
-	OpsAlertBotID                  int64
-	OpsAlertChatID                 int64
-	OpsAlertMergeWindow            time.Duration
-	OpsAlertLang                   string
-	JWTActiveKeyID                 string
-	JWTSigningConfigured           bool
+	HTTPAddr                           string
+	MetricsAddr                        string
+	AppEnv                             string
+	AppRelease                         string
+	LogLevel                           slog.Level
+	ShutdownTimeout                    time.Duration
+	ReadHeaderTimeout                  time.Duration
+	ReadTimeout                        time.Duration
+	IdleTimeout                        time.Duration
+	DatabaseURL                        string
+	FileWorkerDatabaseURL              string
+	ReportDatabaseURL                  string
+	DBMaxConns                         int32
+	DBReportMaxConns                   int32
+	DBWorkerMaxConns                   int32
+	DBMinConns                         int32
+	DBConnectTimeout                   time.Duration
+	DBAcquireTimeout                   time.Duration
+	DBSlowQuery                        time.Duration
+	SentryDSN                          string
+	RedisURL                           string
+	CacheRedisURL                      string
+	CacheStaleTTL                      time.Duration
+	CacheNegativeTTL                   time.Duration
+	CacheRefreshTimeout                time.Duration
+	CacheMaxEntries                    int
+	QueueRedisURL                      string
+	QueueAllowEviction                 bool
+	StorageDriver, StorageBucket       string
+	StorageRegion, StorageEndpoint     string
+	StorageAccessKey, StorageSecretKey string
+	StorageAllowedContentTypes         []string
+	StorageMaxContentLength            int64
+	FileMaxDailyUploads                int
+	FileMaxDailyBytes                  int64
+	CORSBuyerOrigins                   []string
+	CORSMerchantOrigins                []string
+	CORSDriverOrigins                  []string
+	CORSWMSOrigins                     []string
+	CORSAdminOrigins                   []string
+	CORSPublicOrigins                  []string
+	CORSCredentialPaths                []string
+	WebhookPrefix                      string
+	WebhookMaxBodyBytes                int64
+	TrustedProxyHeader                 string
+	TrustedProxyCIDRs                  []string
+	AdminAllowedCIDRs                  []string
+	RequestBodyMaxBytes                int64
+	RequestBodyOverrides               map[string]int64
+	ContentTypeExemptPaths             []string
+	IdempotencyTTL                     time.Duration
+	IdempotencyMaxBytes                int
+	FinancialPrefixes                  []string
+	RateLimitIP                        int
+	RateLimitAccount                   int
+	RateLimitLogin                     int
+	RateLimitWithdraw                  int
+	RateLimitAI                        int
+	RateLimitAdmin                     int
+	LedgerReconTimezone                string
+	BulkheadTotal                      int
+	BulkheadWait                       time.Duration
+	BulkheadDrain                      time.Duration
+	BulkheadLimits                     map[string]int
+	BulkheadRules                      map[string]string
+	BulkheadCriticalPrefixes           []string
+	BulkheadDeadlineExemptions         map[string]bool
+	BrownoutEscalateAfter              time.Duration
+	BrownoutRecoverAfter               time.Duration
+	BrownoutP95Threshold               time.Duration
+	BrownoutP95Recovery                time.Duration
+	BrownoutDBWaitThreshold            time.Duration
+	BrownoutDBWaitRecovery             time.Duration
+	BrownoutInFlightRatioThreshold     float64
+	BrownoutInFlightRatioRecovery      float64
+	BrownoutSampleInterval             time.Duration
+	IAMDatabaseURL                     string
+	AuditDatabaseURL                   string
+	TelegramInitDataMaxAge             time.Duration
+	AccessTokenTTL                     time.Duration
+	RefreshTokenTTL                    time.Duration
+	RefreshTokenGrace                  time.Duration
+	SessionIdleTTL                     time.Duration
+	SessionMaxPerAccount               int
+	TokenIssuer                        string
+	TokenLegacyAcceptUntil             time.Time
+	LoginFailureLimit                  int
+	LoginFailureWindow                 time.Duration
+	BotTokenCacheTTL                   time.Duration
+	OpsAlertBotID                      int64
+	OpsAlertChatID                     int64
+	OpsAlertMergeWindow                time.Duration
+	OpsAlertLang                       string
+	RouteFitReconciliationSchedule     string
+	RouteFitReconciliationNoEventFor   time.Duration
+	RouteFitEventSecrets               string
+	JWTActiveKeyID                     string
+	JWTSigningConfigured               bool
 }
 
 func Load() (Config, error) {
@@ -467,6 +478,22 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if opsAlertLang != "zh" && opsAlertLang != "en" && opsAlertLang != "km" {
 		return Config{}, fmt.Errorf("OPS_ALERT_LANG must be zh, en, or km")
 	}
+	routeFitReconciliationSchedule := strings.TrimSpace(getenv("ROUTEFIT_RECONCILIATION_SCHEDULE"))
+	if routeFitReconciliationSchedule == "" {
+		routeFitReconciliationSchedule = "*/10 * * * *"
+	}
+	routeFitReconciliationNoEventFor, err := positiveDuration(getenv, "ROUTEFIT_RECONCILIATION_NO_EVENT_FOR", 30*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	routeFitEventSecrets := strings.TrimSpace(getenv("ROUTEFIT_EVENT_SECRETS"))
+	if routeFitEventSecrets != "" {
+		for _, secret := range strings.Split(routeFitEventSecrets, ",") {
+			if strings.TrimSpace(secret) == "" {
+				return Config{}, fmt.Errorf("ROUTEFIT_EVENT_SECRETS must be a comma-separated non-empty list")
+			}
+		}
+	}
 	jwtActiveKeyID := strings.TrimSpace(getenv("JWT_ACTIVE_KEY_ID"))
 	jwtKeys := strings.TrimSpace(getenv("JWT_SIGNING_KEYS"))
 	jwtConfigured := jwtKeys != "" || jwtActiveKeyID != ""
@@ -484,6 +511,22 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 			return Config{}, fmt.Errorf("QUEUE_ALLOW_EVICTION must be true or false")
 		}
 	}
+	storageMaxLength, err := optionalPositiveInt64(getenv("STORAGE_MAX_CONTENT_LENGTH"))
+	if err != nil {
+		return Config{}, fmt.Errorf("STORAGE_MAX_CONTENT_LENGTH must be a positive integer")
+	}
+	storageTypes, err := commaSeparated(getenv("STORAGE_ALLOWED_CONTENT_TYPES"))
+	if err != nil {
+		return Config{}, fmt.Errorf("STORAGE_ALLOWED_CONTENT_TYPES %w", err)
+	}
+	fileMaxUploads, err := positiveInt(getenv, "FILE_MAX_DAILY_UPLOADS", 100)
+	if err != nil {
+		return Config{}, err
+	}
+	fileMaxBytes, err := optionalPositiveInt64(getenv("FILE_MAX_DAILY_BYTES"))
+	if err != nil {
+		return Config{}, fmt.Errorf("FILE_MAX_DAILY_BYTES must be a positive integer")
+	}
 	cacheRedisURL := strings.TrimSpace(getenv("CACHE_REDIS_URL"))
 	redisURL := strings.TrimSpace(getenv("REDIS_URL"))
 	queueRedisURL := strings.TrimSpace(getenv("QUEUE_REDIS_URL"))
@@ -492,35 +535,41 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	}
 
 	return Config{
-		HTTPAddr:               httpAddr,
-		MetricsAddr:            metricsAddr,
-		AppEnv:                 appEnv,
-		AppRelease:             strings.TrimSpace(getenv("APP_RELEASE")),
-		LogLevel:               logLevel,
-		ShutdownTimeout:        time.Duration(shutdownSeconds) * time.Second,
-		ReadHeaderTimeout:      time.Duration(readHeaderSeconds) * time.Second,
-		ReadTimeout:            time.Duration(readSeconds) * time.Second,
-		IdleTimeout:            time.Duration(idleSeconds) * time.Second,
-		DatabaseURL:            strings.TrimSpace(getenv("DATABASE_URL")),
-		IAMDatabaseURL:         strings.TrimSpace(getenv("IAM_DATABASE_URL")),
-		AuditDatabaseURL:       strings.TrimSpace(getenv("AUDIT_DATABASE_URL")),
-		ReportDatabaseURL:      strings.TrimSpace(getenv("REPORT_DATABASE_URL")),
-		DBMaxConns:             int32(dbMaxConns),
-		DBReportMaxConns:       int32(dbReportMaxConns),
-		DBWorkerMaxConns:       int32(dbWorkerMaxConns),
-		DBMinConns:             int32(dbMinConns),
-		DBConnectTimeout:       time.Duration(dbConnectSeconds) * time.Second,
-		DBAcquireTimeout:       time.Duration(dbAcquireMilliseconds) * time.Millisecond,
-		DBSlowQuery:            time.Duration(dbSlowQueryMS) * time.Millisecond,
-		SentryDSN:              strings.TrimSpace(getenv("SENTRY_DSN")),
-		RedisURL:               redisURL,
-		CacheRedisURL:          cacheRedisURL,
-		CacheStaleTTL:          time.Duration(cacheStaleSeconds) * time.Second,
-		CacheNegativeTTL:       time.Duration(cacheNegativeSeconds) * time.Second,
-		CacheRefreshTimeout:    cacheRefreshTimeout,
-		CacheMaxEntries:        cacheMaxEntries,
-		QueueRedisURL:          queueRedisURL,
-		QueueAllowEviction:     queueAllowEviction,
+		HTTPAddr:              httpAddr,
+		MetricsAddr:           metricsAddr,
+		AppEnv:                appEnv,
+		AppRelease:            strings.TrimSpace(getenv("APP_RELEASE")),
+		LogLevel:              logLevel,
+		ShutdownTimeout:       time.Duration(shutdownSeconds) * time.Second,
+		ReadHeaderTimeout:     time.Duration(readHeaderSeconds) * time.Second,
+		ReadTimeout:           time.Duration(readSeconds) * time.Second,
+		IdleTimeout:           time.Duration(idleSeconds) * time.Second,
+		DatabaseURL:           strings.TrimSpace(getenv("DATABASE_URL")),
+		FileWorkerDatabaseURL: strings.TrimSpace(getenv("FILE_WORKER_DATABASE_URL")),
+		IAMDatabaseURL:        strings.TrimSpace(getenv("IAM_DATABASE_URL")),
+		AuditDatabaseURL:      strings.TrimSpace(getenv("AUDIT_DATABASE_URL")),
+		ReportDatabaseURL:     strings.TrimSpace(getenv("REPORT_DATABASE_URL")),
+		DBMaxConns:            int32(dbMaxConns),
+		DBReportMaxConns:      int32(dbReportMaxConns),
+		DBWorkerMaxConns:      int32(dbWorkerMaxConns),
+		DBMinConns:            int32(dbMinConns),
+		DBConnectTimeout:      time.Duration(dbConnectSeconds) * time.Second,
+		DBAcquireTimeout:      time.Duration(dbAcquireMilliseconds) * time.Millisecond,
+		DBSlowQuery:           time.Duration(dbSlowQueryMS) * time.Millisecond,
+		SentryDSN:             strings.TrimSpace(getenv("SENTRY_DSN")),
+		RedisURL:              redisURL,
+		CacheRedisURL:         cacheRedisURL,
+		CacheStaleTTL:         time.Duration(cacheStaleSeconds) * time.Second,
+		CacheNegativeTTL:      time.Duration(cacheNegativeSeconds) * time.Second,
+		CacheRefreshTimeout:   cacheRefreshTimeout,
+		CacheMaxEntries:       cacheMaxEntries,
+		QueueRedisURL:         queueRedisURL,
+		QueueAllowEviction:    queueAllowEviction,
+		StorageDriver:         strings.TrimSpace(getenv("STORAGE_DRIVER")), StorageBucket: strings.TrimSpace(getenv("STORAGE_BUCKET")),
+		StorageRegion: strings.TrimSpace(getenv("STORAGE_REGION")), StorageEndpoint: strings.TrimSpace(getenv("STORAGE_ENDPOINT")),
+		StorageAccessKey: strings.TrimSpace(getenv("STORAGE_ACCESS_KEY")), StorageSecretKey: strings.TrimSpace(getenv("STORAGE_SECRET_KEY")),
+		StorageAllowedContentTypes: storageTypes, StorageMaxContentLength: storageMaxLength,
+		FileMaxDailyUploads: fileMaxUploads, FileMaxDailyBytes: fileMaxBytes,
 		CORSBuyerOrigins:       cors["CORS_BUYER_ORIGINS"],
 		CORSMerchantOrigins:    cors["CORS_MERCHANT_ORIGINS"],
 		CORSDriverOrigins:      cors["CORS_DRIVER_ORIGINS"],
@@ -551,24 +600,27 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		BrownoutP95Threshold: time.Duration(brownoutP95ThresholdMS) * time.Millisecond, BrownoutP95Recovery: time.Duration(brownoutP95RecoveryMS) * time.Millisecond,
 		BrownoutDBWaitThreshold: time.Duration(brownoutDBWaitMS) * time.Millisecond, BrownoutDBWaitRecovery: time.Duration(brownoutDBWaitRecoveryMS) * time.Millisecond,
 		BrownoutInFlightRatioThreshold: float64(brownoutInFlightPercent) / 100, BrownoutInFlightRatioRecovery: float64(brownoutInFlightRecoveryPercent) / 100,
-		BrownoutSampleInterval: time.Duration(brownoutSampleIntervalMS) * time.Millisecond,
-		TelegramInitDataMaxAge: telegramMaxAge,
-		AccessTokenTTL:         accessTTL,
-		RefreshTokenTTL:        refreshTTL,
-		RefreshTokenGrace:      refreshGrace,
-		SessionIdleTTL:         sessionIdleTTL,
-		SessionMaxPerAccount:   sessionMax,
-		TokenIssuer:            tokenIssuer,
-		TokenLegacyAcceptUntil: legacyAcceptUntil,
-		LoginFailureLimit:      loginFailureLimit,
-		LoginFailureWindow:     loginFailureWindow,
-		BotTokenCacheTTL:       botTokenCacheTTL,
-		OpsAlertBotID:          opsAlertBotID,
-		OpsAlertChatID:         opsAlertChatID,
-		OpsAlertMergeWindow:    opsAlertMergeWindow,
-		OpsAlertLang:           opsAlertLang,
-		JWTActiveKeyID:         jwtActiveKeyID,
-		JWTSigningConfigured:   jwtConfigured,
+		BrownoutSampleInterval:           time.Duration(brownoutSampleIntervalMS) * time.Millisecond,
+		TelegramInitDataMaxAge:           telegramMaxAge,
+		AccessTokenTTL:                   accessTTL,
+		RefreshTokenTTL:                  refreshTTL,
+		RefreshTokenGrace:                refreshGrace,
+		SessionIdleTTL:                   sessionIdleTTL,
+		SessionMaxPerAccount:             sessionMax,
+		TokenIssuer:                      tokenIssuer,
+		TokenLegacyAcceptUntil:           legacyAcceptUntil,
+		LoginFailureLimit:                loginFailureLimit,
+		LoginFailureWindow:               loginFailureWindow,
+		BotTokenCacheTTL:                 botTokenCacheTTL,
+		OpsAlertBotID:                    opsAlertBotID,
+		OpsAlertChatID:                   opsAlertChatID,
+		OpsAlertMergeWindow:              opsAlertMergeWindow,
+		OpsAlertLang:                     opsAlertLang,
+		RouteFitReconciliationSchedule:   routeFitReconciliationSchedule,
+		RouteFitReconciliationNoEventFor: routeFitReconciliationNoEventFor,
+		RouteFitEventSecrets:             routeFitEventSecrets,
+		JWTActiveKeyID:                   jwtActiveKeyID,
+		JWTSigningConfigured:             jwtConfigured,
 	}, nil
 }
 

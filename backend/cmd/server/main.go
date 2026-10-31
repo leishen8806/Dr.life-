@@ -13,9 +13,11 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
+	"github.com/leishen8806/Dr.life-/backend/internal/logistics"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/cache"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
@@ -138,6 +140,12 @@ func main() {
 	go brownout.Run(ctx, cfg.BrownoutSampleInterval)
 	directory := catalogDirectory{db: database}
 	catalogService := catalog.New(catalog.NewPgStore(database), catalog.Options{Merchants: directory})
+	routeFitReceiver := logistics.RouteFitReceiver{
+		Verifier: logistics.RouteFitWebhookVerifier{Secrets: logistics.RouteFitSecrets(cfg.RouteFitEventSecrets)},
+		Record: func(r *http.Request, event logistics.RouteFitEvent, body []byte) error {
+			return (logistics.RouteFitEventRecorder{DB: database}).Record(r.Context(), event, body)
+		},
+	}
 	var auditStore *platformaudit.Store
 	var auditReadiness server.ReadinessCheck
 	if cfg.AuditDatabaseURL != "" {
@@ -154,6 +162,7 @@ func main() {
 		go monitorAuditAnchor(ctx, auditStore, logger)
 	}
 
+	var fileEnqueuer *queue.Enqueuer
 	if cfg.QueueRedisURL != "" {
 		queueCollector, queueErr := queue.NewMetricsCollector(cfg.QueueRedisURL, queue.AllQueues,
 			func(ctx context.Context) (int64, time.Duration, error) { return queue.OutboxLag(ctx, database) })
@@ -169,8 +178,22 @@ func main() {
 		}
 		queueClient := asynq.NewClient(queueRedis)
 		defer queueClient.Close()
-		// The registry is empty until business modules register scheduled task types.
-		scheduler, queueErr := queue.NewScheduler(queue.NewEnqueuer(queueClient, queue.NewRegistry(), queue.EnqueueOptions{}), nil)
+		registry := queue.NewRegistry()
+		if cfg.StorageDriver != "" {
+			if queueErr := files.RegisterTasks(registry); queueErr != nil {
+				logger.Error("file queue registry configuration failed", "error", queueErr)
+				os.Exit(1)
+			}
+		}
+		fileEnqueuer = queue.NewEnqueuer(queueClient, registry, queue.EnqueueOptions{})
+		if queueErr := logistics.RegisterRouteFitReconciliationTask(registry); queueErr != nil {
+			logger.Error("RouteFit reconciliation queue registration failed", "error", queueErr)
+			os.Exit(1)
+		}
+		reconciliation := logistics.RouteFitReconciliationConfig{
+			Schedule: cfg.RouteFitReconciliationSchedule, NoEventFor: cfg.RouteFitReconciliationNoEventFor,
+		}
+		scheduler, queueErr := queue.NewScheduler(fileEnqueuer, []queue.ScheduledTask{logistics.RouteFitReconciliationScheduledTask(reconciliation)})
 		if queueErr != nil {
 			logger.Error("queue scheduler configuration failed", "error", queueErr)
 			os.Exit(1)
@@ -180,6 +203,21 @@ func main() {
 			logger.Error("queue metrics registration failed", "error", queueErr)
 			os.Exit(1)
 		}
+	}
+	var fileService *files.Service
+	if cfg.StorageDriver != "" {
+		if fileEnqueuer == nil {
+			logger.Error("file storage requires QUEUE_REDIS_URL")
+			os.Exit(1)
+		}
+		objects, objectErr := files.NewObjectStore(cfg)
+		if objectErr != nil {
+			logger.Error("file storage configuration failed", "error", objectErr)
+			os.Exit(1)
+		}
+		fileService = files.New(files.PostgresStore{DB: database}, objects, files.Options{
+			Verifier: files.NewQueueVerifier(fileEnqueuer), MaxDailyUploads: cfg.FileMaxDailyUploads, MaxDailyBytes: cfg.FileMaxDailyBytes,
+		})
 	}
 
 	clientIP, err := gateway.NewClientIPResolver(cfg.TrustedProxyHeader, cfg.TrustedProxyCIDRs)
@@ -302,7 +340,11 @@ func main() {
 			WMS: cfg.CORSWMSOrigins, Admin: cfg.CORSAdminOrigins, Public: cfg.CORSPublicOrigins,
 			CredentialPaths: cfg.CORSCredentialPaths,
 		},
-		WebhookPrefix:  cfg.WebhookPrefix,
+		WebhookPrefix: cfg.WebhookPrefix,
+		WebhookBindings: map[string]gateway.WebhookVerifier{
+			"/v1/integrations/routefit/events": routeFitReceiver.Verifier,
+		},
+		RouteFit:       routeFitReceiver,
 		WebhookMaxBody: cfg.WebhookMaxBodyBytes,
 		ClientIP:       clientIP,
 		AdminAccess:    adminAccess,
@@ -330,6 +372,7 @@ func main() {
 		AccountLinks:    accountLinkService,
 		Ledger:          ledgerReader,
 		Directory:       accountDirectory,
+		Files:           fileService,
 		Bulkhead:        bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)

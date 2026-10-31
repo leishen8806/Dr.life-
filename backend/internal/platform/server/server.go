@@ -34,6 +34,7 @@ type GatewayOptions struct {
 	OriginGroups      gateway.OriginGroups
 	WebhookPrefix     string
 	WebhookBindings   map[string]gateway.WebhookVerifier
+	RouteFit          http.Handler
 	WebhookMaxBody    int64
 	ClientIP          gateway.ClientIPResolver
 	AdminAccess       gateway.AdminAccess
@@ -52,12 +53,14 @@ type GatewayOptions struct {
 	Logger            *slog.Logger
 	Login             api.TelegramLogin
 	Audit             *platformaudit.Store
+	AuditWriter       platformaudit.Writer
 	Sessions          api.SessionManagement
 	AccountProfiles   api.AccountProfileManagement
 	AccountLinks      api.AccountLinkManagement
 	Ledger            api.LedgerReader
 	Directory         api.AccountDirectory
 	AdminPermissions  api.AdminPermissionChecker
+	Files             api.FileManagement
 }
 
 func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
@@ -69,6 +72,14 @@ func NewHandler(logger *slog.Logger, checks ...ReadinessCheck) http.Handler {
 }
 
 func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks ...ReadinessCheck) http.Handler {
+	const routeFitEventsPath = "/v1/integrations/routefit/events"
+	if options.RouteFit != nil {
+		options.BodyPolicy.ExemptPaths = append(options.BodyPolicy.ExemptPaths, routeFitEventsPath)
+		idempotencyExempt := options.IdempotencyExempt
+		options.IdempotencyExempt = func(r *http.Request) bool {
+			return r.Method == http.MethodPost && r.URL.Path == routeFitEventsPath || idempotencyExempt != nil && idempotencyExempt(r)
+		}
+	}
 	router := chi.NewRouter()
 	if options.AdminAccess.AppEnv == "" {
 		options.AdminAccess.AppEnv = options.AppEnv
@@ -100,7 +111,14 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.MethodNotAllowed(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeMethodNotAllowed))
 	})
-	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, Sessions: options.Sessions, AccountProfiles: options.AccountProfiles, AccountLinks: options.AccountLinks, ClientIP: options.ClientIP, Audit: options.Audit, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions}, router)
+	auditWriter := options.AuditWriter
+	if auditWriter == nil {
+		auditWriter = options.Audit
+	}
+	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, Sessions: options.Sessions, AccountProfiles: options.AccountProfiles, AccountLinks: options.AccountLinks, ClientIP: options.ClientIP, Audit: options.Audit, AuditWriter: auditWriter, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions, Files: options.Files}, router)
+	if options.RouteFit != nil {
+		router.Post(routeFitEventsPath, options.RouteFit.ServeHTTP)
+	}
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)

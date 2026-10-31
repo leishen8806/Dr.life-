@@ -613,6 +613,68 @@ paths:
           $ref: "#/components/responses/InternalServerError"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /v1/public/search/products:
+    get:
+      tags: [public]
+      operationId: searchPublicProducts
+      summary: Search on-sale products across Chinese, English, and Khmer names
+      x-roles: ["none"]
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 200}
+        - $ref: "#/components/parameters/CategoryCode"
+        - name: min_price_e4
+          in: query
+          schema: {type: integer, minimum: 0, format: int64}
+        - name: max_price_e4
+          in: query
+          schema: {type: integer, minimum: 0, format: int64}
+        - name: sort
+          in: query
+          schema: {type: string, enum: [relevance, price_asc, price_desc, newest], default: relevance}
+        - name: cursor
+          in: query
+          schema: {type: string, maxLength: 128}
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Matching on-sale products and category recommendations when no match is found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchProductSuccessResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/public/search/suggest:
+    get:
+      tags: [public]
+      operationId: suggestPublicProducts
+      summary: Suggest at most ten matching product-name prefixes
+      x-roles: ["none"]
+      security: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 200}
+      responses:
+        "200":
+          description: Matching name prefixes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchSuggestionSuccessResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
   /v1/merchant/me/link-candidates:
     get:
       tags: [merchant]
@@ -839,6 +901,72 @@ paths:
           $ref: "#/components/responses/InternalServerError"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /v1/files/presign:
+    post:
+      tags: [buyer]
+      operationId: postFilePresign
+      summary: Create a private upload and obtain a direct PUT URL
+      description: Available to every authenticated end. The object is not downloadable until verification completes.
+      x-roles: [buyer, merchant, driver, wms, admin]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/FilePresignRequest"}
+      responses:
+        "201":
+          description: Pending file and direct upload details.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FilePresignSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/files/{public_id}/complete:
+    parameters:
+      - $ref: "#/components/parameters/PublicID"
+    post:
+      tags: [buyer]
+      operationId: postFileComplete
+      summary: Submit a direct upload for asynchronous verification
+      x-roles: [buyer, merchant, driver, wms, admin]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: File state after synchronous metadata validation.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FileSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/files/{public_id}/download-url:
+    parameters:
+      - $ref: "#/components/parameters/PublicID"
+    get:
+      tags: [buyer]
+      operationId: getFileDownloadUrl
+      summary: Obtain a five-minute private download URL for a verified file
+      x-roles: [buyer, merchant, driver, wms, admin]
+      responses:
+        "200":
+          description: Direct private download details.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FileDownloadURLSuccessResponse"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
 components:
   securitySchemes:
     bearerAuth:
@@ -1242,6 +1370,84 @@ components:
         ok: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/SessionListData" }
         request_id: { type: string, minLength: 1 }
+    FilePurpose:
+      type: string
+      enum: [merchant_kyc, product_image, inbound_photo, delivery_proof]
+    FileStatus:
+      type: string
+      enum: [pending, verifying, ready, rejected, expired, deleted]
+    FilePresignRequest:
+      type: object
+      additionalProperties: false
+      required: [purpose, content_type, size, sha256]
+      properties:
+        purpose: {$ref: "#/components/schemas/FilePurpose"}
+        content_type:
+          type: string
+          enum: [image/jpeg, image/png, image/webp, application/pdf]
+        size:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10485760
+        sha256:
+          type: string
+          description: Base64-encoded SHA-256 of the bytes sent directly to object storage.
+          minLength: 44
+          maxLength: 44
+    File:
+      type: object
+      additionalProperties: false
+      required: [public_id, purpose, content_type, size, status, created_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        purpose: {$ref: "#/components/schemas/FilePurpose"}
+        content_type: {type: string}
+        size: {type: integer, format: int64}
+        status: {$ref: "#/components/schemas/FileStatus"}
+        created_at: {type: string, format: date-time}
+    FilePresignData:
+      allOf:
+        - {$ref: "#/components/schemas/File"}
+        - type: object
+          additionalProperties: false
+          required: [upload_url, upload_headers]
+          properties:
+            upload_url: {type: string, format: uri}
+            upload_headers:
+              type: object
+              additionalProperties: {type: string}
+    FileDownloadURLData:
+      type: object
+      additionalProperties: false
+      required: [download_url, expires_at]
+      properties:
+        download_url: {type: string, format: uri}
+        expires_at: {type: string, format: date-time}
+    FileSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/File"}
+        request_id: {type: string, minLength: 1}
+    FilePresignSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/FilePresignData"}
+        request_id: {type: string, minLength: 1}
+    FileDownloadURLSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/FileDownloadURLData"}
+        request_id: {type: string, minLength: 1}
     ActionData:
       type: object
       additionalProperties: false
@@ -1625,6 +1831,55 @@ components:
         request_id:
           type: string
           minLength: 1
+    SearchProductData:
+      type: object
+      additionalProperties: false
+      required: [items, recommendations]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/Product"}
+        next_cursor:
+          type: string
+          nullable: true
+        recommendations:
+          type: array
+          items: {$ref: "#/components/schemas/Product"}
+        reason:
+          type: string
+          nullable: true
+          enum: [recent_in_category, recent_all]
+    SearchProductSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/SearchProductData"}
+        request_id: {type: string, minLength: 1}
+    SearchSuggestion:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text: {type: string}
+    SearchSuggestionData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          maxItems: 10
+          items: {$ref: "#/components/schemas/SearchSuggestion"}
+    SearchSuggestionSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/SearchSuggestionData"}
+        request_id: {type: string, minLength: 1}
     ProductSuccessResponse:
       type: object
       additionalProperties: false

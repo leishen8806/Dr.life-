@@ -25,6 +25,12 @@ func NewWorkerPool(ctx context.Context, cfg config.Config, tracers ...pgx.QueryT
 	return newPool(ctx, cfg.DatabaseURL, cfg, cfg.DBWorkerMaxConns, "60s", false, tracers...)
 }
 
+// NewFileWorkerPool opens the dedicated least-privilege connection used only by
+// file verification and promotion tasks.
+func NewFileWorkerPool(ctx context.Context, cfg config.Config, tracers ...pgx.QueryTracer) (*pgxpool.Pool, error) {
+	return newPool(ctx, cfg.FileWorkerDatabaseURL, cfg, cfg.DBWorkerMaxConns, "60s", false, tracers...)
+}
+
 func newPool(ctx context.Context, databaseURL string, cfg config.Config, maxConns int32, statementTimeout string, readOnly bool, tracers ...pgx.QueryTracer) (*pgxpool.Pool, error) {
 	if databaseURL == "" {
 		return nil, fmt.Errorf("database URL is required")

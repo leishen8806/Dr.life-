@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -246,6 +247,31 @@ func TestCatalogMigration(t *testing.T) {
 		}
 	})
 
+	t.Run("search log truncates untrusted queries", func(t *testing.T) {
+		if err := store.LogSearch(ctx, strings.Repeat("x", catalog.MaxSearchQueryLength+1), 0); err != nil {
+			t.Fatalf("LogSearch: %v", err)
+		}
+		var length int
+		if err := admin.QueryRow(ctx, `SELECT char_length(q) FROM catalog.search_log ORDER BY id DESC LIMIT 1`).Scan(&length); err != nil {
+			t.Fatal(err)
+		}
+		if length != catalog.MaxSearchQueryLength {
+			t.Fatalf("stored query length = %d, want %d", length, catalog.MaxSearchQueryLength)
+		}
+	})
+
+	t.Run("trilingual public search matches the same product", func(t *testing.T) {
+		for _, query := range []string{"瓷砖", "tile", "ក្បឿង"} {
+			page, err := store.SearchProducts(ctx, catalog.ProductFilter{}, catalog.SearchQuery{Query: query, PageSize: 10})
+			if err != nil {
+				t.Fatalf("SearchProducts(%q): %v", query, err)
+			}
+			if len(page.Items) != 1 || page.Items[0].PublicID != firstProductPublicID {
+				t.Fatalf("SearchProducts(%q) items=%+v, want %s", query, page.Items, firstProductPublicID)
+			}
+		}
+	})
+
 	t.Run("merchant SKU codes are unique when present", func(t *testing.T) {
 		input := catalog.ProductInput{
 			CategoryCode: scratchCategoryCode,
@@ -324,6 +350,62 @@ func TestCatalogMigration(t *testing.T) {
 			var validation *catalog.ValidationError
 			if !errors.As(err, &validation) || validation.Field != "skus[0].tiers" {
 				t.Fatalf("missing SKU tiers error = %v, want skus[0].tiers", err)
+			}
+		}
+	})
+
+	t.Run("search combines category, minimum tier price, and price sort", func(t *testing.T) {
+		const otherCategoryCode = "test_other"
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.category (public_id, code, name, is_custom)
+			VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB4', $1, $2::jsonb, true)`, otherCategoryCode, productNameJSON); err != nil {
+			t.Fatal(err)
+		}
+
+		for _, fixture := range []struct {
+			publicID, categoryCode string
+			price                  int64
+		}{
+			{"01ARZ3NDEKTSV4RRFFQ69G5FB5", scratchCategoryCode, 120000}, // inclusive lower bound
+			{"01ARZ3NDEKTSV4RRFFQ69G5FB6", scratchCategoryCode, 180000},
+			{"01ARZ3NDEKTSV4RRFFQ69G5FB7", scratchCategoryCode, 300000}, // outside maximum
+			{"01ARZ3NDEKTSV4RRFFQ69G5FB8", otherCategoryCode, 150000},   // wrong category
+		} {
+			if _, err := admin.Exec(ctx, `
+				INSERT INTO catalog.product (public_id, merchant_id, category_id, name, unit, origin, status)
+				SELECT $1, 42, id, '{"zh":"瓷砖","en":"Tile","km":"ក្បឿង"}'::jsonb, 'pcs', 'cn', 'on'
+				FROM catalog.category WHERE code = $2`, fixture.publicID, fixture.categoryCode); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := admin.Exec(ctx, `
+				INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4)
+				SELECT id, 1, $2 FROM catalog.product WHERE public_id = $1`, fixture.publicID, fixture.price); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		base := catalog.SearchQuery{
+			Query: "tile", Category: scratchCategoryCode, MinPriceE4: 120000, MaxPriceE4: 180000, PageSize: 10,
+		}
+		for _, assertion := range []struct {
+			sort catalog.SearchSort
+			want []string
+		}{
+			{catalog.SearchSortPriceAsc, []string{"01ARZ3NDEKTSV4RRFFQ69G5FB5", "01ARZ3NDEKTSV4RRFFQ69G5FB6"}},
+			{catalog.SearchSortPriceDesc, []string{"01ARZ3NDEKTSV4RRFFQ69G5FB6", "01ARZ3NDEKTSV4RRFFQ69G5FB5"}},
+		} {
+			base.Sort = assertion.sort
+			page, err := store.SearchProducts(ctx, catalog.ProductFilter{Status: catalog.StatusOn}, base)
+			if err != nil {
+				t.Fatalf("SearchProducts(%s): %v", assertion.sort, err)
+			}
+			if len(page.Items) != len(assertion.want) {
+				t.Fatalf("SearchProducts(%s) returned %d items, want %d: %+v", assertion.sort, len(page.Items), len(assertion.want), page.Items)
+			}
+			for i, want := range assertion.want {
+				if page.Items[i].PublicID != want {
+					t.Fatalf("SearchProducts(%s) item %d = %s, want %s", assertion.sort, i, page.Items[i].PublicID, want)
+				}
 			}
 		}
 	})

@@ -310,6 +310,129 @@ func (e ErrorEnvelopeOk) Valid() bool {
 	}
 }
 
+// Defines values for FileDownloadURLSuccessResponseOk.
+const (
+	FileDownloadURLSuccessResponseOkTrue FileDownloadURLSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the FileDownloadURLSuccessResponseOk enum.
+func (e FileDownloadURLSuccessResponseOk) Valid() bool {
+	switch e {
+	case FileDownloadURLSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FilePresignRequestContentType.
+const (
+	Applicationpdf FilePresignRequestContentType = "application/pdf"
+	Imagejpeg      FilePresignRequestContentType = "image/jpeg"
+	Imagepng       FilePresignRequestContentType = "image/png"
+	Imagewebp      FilePresignRequestContentType = "image/webp"
+)
+
+// Valid indicates whether the value is a known member of the FilePresignRequestContentType enum.
+func (e FilePresignRequestContentType) Valid() bool {
+	switch e {
+	case Applicationpdf:
+		return true
+	case Imagejpeg:
+		return true
+	case Imagepng:
+		return true
+	case Imagewebp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FilePresignSuccessResponseOk.
+const (
+	FilePresignSuccessResponseOkTrue FilePresignSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the FilePresignSuccessResponseOk enum.
+func (e FilePresignSuccessResponseOk) Valid() bool {
+	switch e {
+	case FilePresignSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FilePurpose.
+const (
+	DeliveryProof FilePurpose = "delivery_proof"
+	InboundPhoto  FilePurpose = "inbound_photo"
+	MerchantKyc   FilePurpose = "merchant_kyc"
+	ProductImage  FilePurpose = "product_image"
+)
+
+// Valid indicates whether the value is a known member of the FilePurpose enum.
+func (e FilePurpose) Valid() bool {
+	switch e {
+	case DeliveryProof:
+		return true
+	case InboundPhoto:
+		return true
+	case MerchantKyc:
+		return true
+	case ProductImage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FileStatus.
+const (
+	FileStatusDeleted   FileStatus = "deleted"
+	FileStatusExpired   FileStatus = "expired"
+	FileStatusPending   FileStatus = "pending"
+	FileStatusReady     FileStatus = "ready"
+	FileStatusRejected  FileStatus = "rejected"
+	FileStatusVerifying FileStatus = "verifying"
+)
+
+// Valid indicates whether the value is a known member of the FileStatus enum.
+func (e FileStatus) Valid() bool {
+	switch e {
+	case FileStatusDeleted:
+		return true
+	case FileStatusExpired:
+		return true
+	case FileStatusPending:
+		return true
+	case FileStatusReady:
+		return true
+	case FileStatusRejected:
+		return true
+	case FileStatusVerifying:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FileSuccessResponseOk.
+const (
+	FileSuccessResponseOkTrue FileSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the FileSuccessResponseOk enum.
+func (e FileSuccessResponseOk) Valid() bool {
+	switch e {
+	case FileSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FinancialCenterSuccessResponseOk.
 const (
 	FinancialCenterSuccessResponseOkTrue FinancialCenterSuccessResponseOk = true
@@ -634,6 +757,54 @@ func (e SKUStatus) Valid() bool {
 	}
 }
 
+// Defines values for SearchProductDataReason.
+const (
+	RecentAll        SearchProductDataReason = "recent_all"
+	RecentInCategory SearchProductDataReason = "recent_in_category"
+)
+
+// Valid indicates whether the value is a known member of the SearchProductDataReason enum.
+func (e SearchProductDataReason) Valid() bool {
+	switch e {
+	case RecentAll:
+		return true
+	case RecentInCategory:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchProductSuccessResponseOk.
+const (
+	SearchProductSuccessResponseOkTrue SearchProductSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the SearchProductSuccessResponseOk enum.
+func (e SearchProductSuccessResponseOk) Valid() bool {
+	switch e {
+	case SearchProductSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchSuggestionSuccessResponseOk.
+const (
+	SearchSuggestionSuccessResponseOkTrue SearchSuggestionSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the SearchSuggestionSuccessResponseOk enum.
+func (e SearchSuggestionSuccessResponseOk) Valid() bool {
+	switch e {
+	case SearchSuggestionSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SessionListSuccessResponseOk.
 const (
 	SessionListSuccessResponseOkTrue SessionListSuccessResponseOk = true
@@ -811,6 +982,30 @@ func (e ListMerchantProductsParamsStatus) Valid() bool {
 	case ListMerchantProductsParamsStatusRejected:
 		return true
 	case ListMerchantProductsParamsStatusReview:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SearchPublicProductsParamsSort.
+const (
+	Newest    SearchPublicProductsParamsSort = "newest"
+	PriceAsc  SearchPublicProductsParamsSort = "price_asc"
+	PriceDesc SearchPublicProductsParamsSort = "price_desc"
+	Relevance SearchPublicProductsParamsSort = "relevance"
+)
+
+// Valid indicates whether the value is a known member of the SearchPublicProductsParamsSort enum.
+func (e SearchPublicProductsParamsSort) Valid() bool {
+	switch e {
+	case Newest:
+		return true
+	case PriceAsc:
+		return true
+	case PriceDesc:
+		return true
+	case Relevance:
 		return true
 	default:
 		return false
@@ -1027,6 +1222,83 @@ type ErrorEnvelope struct {
 
 // ErrorEnvelopeOk defines model for ErrorEnvelope.Ok.
 type ErrorEnvelopeOk bool
+
+// File defines model for File.
+type File struct {
+	ContentType string      `json:"content_type"`
+	CreatedAt   time.Time   `json:"created_at"`
+	PublicId    string      `json:"public_id"`
+	Purpose     FilePurpose `json:"purpose"`
+	Size        int64       `json:"size"`
+	Status      FileStatus  `json:"status"`
+}
+
+// FileDownloadURLData defines model for FileDownloadURLData.
+type FileDownloadURLData struct {
+	DownloadUrl string    `json:"download_url"`
+	ExpiresAt   time.Time `json:"expires_at"`
+}
+
+// FileDownloadURLSuccessResponse defines model for FileDownloadURLSuccessResponse.
+type FileDownloadURLSuccessResponse struct {
+	Data      FileDownloadURLData              `json:"data"`
+	Ok        FileDownloadURLSuccessResponseOk `json:"ok"`
+	RequestId string                           `json:"request_id"`
+}
+
+// FileDownloadURLSuccessResponseOk defines model for FileDownloadURLSuccessResponse.Ok.
+type FileDownloadURLSuccessResponseOk bool
+
+// FilePresignData defines model for FilePresignData.
+type FilePresignData struct {
+	ContentType   string            `json:"content_type"`
+	CreatedAt     time.Time         `json:"created_at"`
+	PublicId      string            `json:"public_id"`
+	Purpose       FilePurpose       `json:"purpose"`
+	Size          int64             `json:"size"`
+	Status        FileStatus        `json:"status"`
+	UploadHeaders map[string]string `json:"upload_headers"`
+	UploadUrl     string            `json:"upload_url"`
+}
+
+// FilePresignRequest defines model for FilePresignRequest.
+type FilePresignRequest struct {
+	ContentType FilePresignRequestContentType `json:"content_type"`
+	Purpose     FilePurpose                   `json:"purpose"`
+
+	// Sha256 Base64-encoded SHA-256 of the bytes sent directly to object storage.
+	Sha256 string `json:"sha256"`
+	Size   int64  `json:"size"`
+}
+
+// FilePresignRequestContentType defines model for FilePresignRequest.ContentType.
+type FilePresignRequestContentType string
+
+// FilePresignSuccessResponse defines model for FilePresignSuccessResponse.
+type FilePresignSuccessResponse struct {
+	Data      FilePresignData              `json:"data"`
+	Ok        FilePresignSuccessResponseOk `json:"ok"`
+	RequestId string                       `json:"request_id"`
+}
+
+// FilePresignSuccessResponseOk defines model for FilePresignSuccessResponse.Ok.
+type FilePresignSuccessResponseOk bool
+
+// FilePurpose defines model for FilePurpose.
+type FilePurpose string
+
+// FileStatus defines model for FileStatus.
+type FileStatus string
+
+// FileSuccessResponse defines model for FileSuccessResponse.
+type FileSuccessResponse struct {
+	Data      File                  `json:"data"`
+	Ok        FileSuccessResponseOk `json:"ok"`
+	RequestId string                `json:"request_id"`
+}
+
+// FileSuccessResponseOk defines model for FileSuccessResponse.Ok.
+type FileSuccessResponseOk bool
 
 // FinancialCenterData defines model for FinancialCenterData.
 type FinancialCenterData struct {
@@ -1300,6 +1572,47 @@ type SKUStatus string
 // SKUList defines model for SKUList.
 type SKUList = []SKU
 
+// SearchProductData defines model for SearchProductData.
+type SearchProductData struct {
+	Items           []Product                `json:"items"`
+	NextCursor      *string                  `json:"next_cursor,omitempty"`
+	Reason          *SearchProductDataReason `json:"reason,omitempty"`
+	Recommendations []Product                `json:"recommendations"`
+}
+
+// SearchProductDataReason defines model for SearchProductData.Reason.
+type SearchProductDataReason string
+
+// SearchProductSuccessResponse defines model for SearchProductSuccessResponse.
+type SearchProductSuccessResponse struct {
+	Data      SearchProductData              `json:"data"`
+	Ok        SearchProductSuccessResponseOk `json:"ok"`
+	RequestId string                         `json:"request_id"`
+}
+
+// SearchProductSuccessResponseOk defines model for SearchProductSuccessResponse.Ok.
+type SearchProductSuccessResponseOk bool
+
+// SearchSuggestion defines model for SearchSuggestion.
+type SearchSuggestion struct {
+	Text string `json:"text"`
+}
+
+// SearchSuggestionData defines model for SearchSuggestionData.
+type SearchSuggestionData struct {
+	Items []SearchSuggestion `json:"items"`
+}
+
+// SearchSuggestionSuccessResponse defines model for SearchSuggestionSuccessResponse.
+type SearchSuggestionSuccessResponse struct {
+	Data      SearchSuggestionData              `json:"data"`
+	Ok        SearchSuggestionSuccessResponseOk `json:"ok"`
+	RequestId string                            `json:"request_id"`
+}
+
+// SearchSuggestionSuccessResponseOk defines model for SearchSuggestionSuccessResponse.Ok.
+type SearchSuggestionSuccessResponseOk bool
+
 // Session defines model for Session.
 type Session struct {
 	DeviceId  *string   `json:"device_id,omitempty"`
@@ -1571,6 +1884,18 @@ type DeleteDriverMeSessionParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// PostFilePresignParams defines parameters for PostFilePresign.
+type PostFilePresignParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PostFileCompleteParams defines parameters for PostFileComplete.
+type PostFileCompleteParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // PostMerchantAuthLogoutParams defines parameters for PostMerchantAuthLogout.
 type PostMerchantAuthLogoutParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
@@ -1664,11 +1989,37 @@ type ListPublicProductsParams struct {
 	Category *CategoryCode `form:"category,omitempty" json:"category,omitempty"`
 }
 
+// SearchPublicProductsParams defines parameters for SearchPublicProducts.
+type SearchPublicProductsParams struct {
+	Q string `form:"q" json:"q"`
+
+	// Category Restrict the result to one category code.
+	Category   *CategoryCode                   `form:"category,omitempty" json:"category,omitempty"`
+	MinPriceE4 *int64                          `form:"min_price_e4,omitempty" json:"min_price_e4,omitempty"`
+	MaxPriceE4 *int64                          `form:"max_price_e4,omitempty" json:"max_price_e4,omitempty"`
+	Sort       *SearchPublicProductsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+	Cursor     *string                         `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// SearchPublicProductsParamsSort defines parameters for SearchPublicProducts.
+type SearchPublicProductsParamsSort string
+
+// SuggestPublicProductsParams defines parameters for SuggestPublicProducts.
+type SuggestPublicProductsParams struct {
+	Q string `form:"q" json:"q"`
+}
+
 // PutBuyerMeLanguageJSONRequestBody defines body for PutBuyerMeLanguage for application/json ContentType.
 type PutBuyerMeLanguageJSONRequestBody = LanguageUpdateRequest
 
 // PutDriverMeLanguageJSONRequestBody defines body for PutDriverMeLanguage for application/json ContentType.
 type PutDriverMeLanguageJSONRequestBody = LanguageUpdateRequest
+
+// PostFilePresignJSONRequestBody defines body for PostFilePresign for application/json ContentType.
+type PostFilePresignJSONRequestBody = FilePresignRequest
 
 // PutMerchantMeLanguageJSONRequestBody defines body for PutMerchantMeLanguage for application/json ContentType.
 type PutMerchantMeLanguageJSONRequestBody = LanguageUpdateRequest
@@ -1756,6 +2107,15 @@ type ServerInterface interface {
 	// GetDriverWalletTransaction Read one driver transaction visible to the authenticated account
 	// (GET /v1/driver/wallet/transactions/{txn_no})
 	GetDriverWalletTransaction(w http.ResponseWriter, r *http.Request, txnNo string)
+	// PostFilePresign Create a private upload and obtain a direct PUT URL
+	// (POST /v1/files/presign)
+	PostFilePresign(w http.ResponseWriter, r *http.Request, params PostFilePresignParams)
+	// PostFileComplete Submit a direct upload for asynchronous verification
+	// (POST /v1/files/{public_id}/complete)
+	PostFileComplete(w http.ResponseWriter, r *http.Request, publicId PublicID, params PostFileCompleteParams)
+	// GetFileDownloadUrl Obtain a five-minute private download URL for a verified file
+	// (GET /v1/files/{public_id}/download-url)
+	GetFileDownloadUrl(w http.ResponseWriter, r *http.Request, publicId PublicID)
 	// PostMerchantAuthLogout Revoke the current merchant session
 	// (POST /v1/merchant/auth/logout)
 	PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, params PostMerchantAuthLogoutParams)
@@ -1819,6 +2179,12 @@ type ServerInterface interface {
 	// ListPublicProducts List products that are on sale for a merchant that is not disabled
 	// (GET /v1/public/products)
 	ListPublicProducts(w http.ResponseWriter, r *http.Request, params ListPublicProductsParams)
+	// SearchPublicProducts Search on-sale products across Chinese, English, and Khmer names
+	// (GET /v1/public/search/products)
+	SearchPublicProducts(w http.ResponseWriter, r *http.Request, params SearchPublicProductsParams)
+	// SuggestPublicProducts Suggest at most ten matching product-name prefixes
+	// (GET /v1/public/search/suggest)
+	SuggestPublicProducts(w http.ResponseWriter, r *http.Request, params SuggestPublicProductsParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -1957,6 +2323,24 @@ func (_ Unimplemented) GetDriverWalletTransaction(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// PostFilePresign Create a private upload and obtain a direct PUT URL
+// (POST /v1/files/presign)
+func (_ Unimplemented) PostFilePresign(w http.ResponseWriter, r *http.Request, params PostFilePresignParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostFileComplete Submit a direct upload for asynchronous verification
+// (POST /v1/files/{public_id}/complete)
+func (_ Unimplemented) PostFileComplete(w http.ResponseWriter, r *http.Request, publicId PublicID, params PostFileCompleteParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetFileDownloadUrl Obtain a five-minute private download URL for a verified file
+// (GET /v1/files/{public_id}/download-url)
+func (_ Unimplemented) GetFileDownloadUrl(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // PostMerchantAuthLogout Revoke the current merchant session
 // (POST /v1/merchant/auth/logout)
 func (_ Unimplemented) PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, params PostMerchantAuthLogoutParams) {
@@ -2080,6 +2464,18 @@ func (_ Unimplemented) GetPublicPing(w http.ResponseWriter, r *http.Request) {
 // ListPublicProducts List products that are on sale for a merchant that is not disabled
 // (GET /v1/public/products)
 func (_ Unimplemented) ListPublicProducts(w http.ResponseWriter, r *http.Request, params ListPublicProductsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SearchPublicProducts Search on-sale products across Chinese, English, and Khmer names
+// (GET /v1/public/search/products)
+func (_ Unimplemented) SearchPublicProducts(w http.ResponseWriter, r *http.Request, params SearchPublicProductsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SuggestPublicProducts Suggest at most ten matching product-name prefixes
+// (GET /v1/public/search/suggest)
+func (_ Unimplemented) SuggestPublicProducts(w http.ResponseWriter, r *http.Request, params SuggestPublicProductsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2785,6 +3181,131 @@ func (siw *ServerInterfaceWrapper) GetDriverWalletTransaction(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetDriverWalletTransaction(w, r, txnNo)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostFilePresign operation middleware
+func (siw *ServerInterfaceWrapper) PostFilePresign(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostFilePresignParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostFilePresign(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostFileComplete operation middleware
+func (siw *ServerInterfaceWrapper) PostFileComplete(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostFileCompleteParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostFileComplete(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetFileDownloadUrl operation middleware
+func (siw *ServerInterfaceWrapper) GetFileDownloadUrl(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFileDownloadUrl(w, r, publicId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3557,6 +4078,150 @@ func (siw *ServerInterfaceWrapper) ListPublicProducts(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// SearchPublicProducts operation middleware
+func (siw *ServerInterfaceWrapper) SearchPublicProducts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchPublicProductsParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "category" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "category", r.URL.Query(), &params.Category, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "category"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "category", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "min_price_e4" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "min_price_e4", r.URL.Query(), &params.MinPriceE4, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "min_price_e4"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "min_price_e4", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "max_price_e4" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "max_price_e4", r.URL.Query(), &params.MaxPriceE4, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "max_price_e4"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "max_price_e4", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SearchPublicProducts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SuggestPublicProducts operation middleware
+func (siw *ServerInterfaceWrapper) SuggestPublicProducts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SuggestPublicProductsParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SuggestPublicProducts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -3776,6 +4441,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/v1/public/products", wrapper.ListPublicProducts)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/public/search/products", wrapper.SearchPublicProducts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/public/search/suggest", wrapper.SuggestPublicProducts)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/merchant/me/link-candidates", wrapper.GetMerchantMeLinkCandidates)
 	})
 	r.Group(func(r chi.Router) {
@@ -3798,6 +4469,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/merchant/products/{public_id}/publish", wrapper.PublishMerchantProduct)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/files/presign", wrapper.PostFilePresign)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/files/{public_id}/complete", wrapper.PostFileComplete)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/files/{public_id}/download-url", wrapper.GetFileDownloadUrl)
 	})
 
 	return r
