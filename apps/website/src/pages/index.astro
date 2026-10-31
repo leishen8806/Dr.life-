@@ -1,0 +1,21 @@
+---
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+import Layout from "../components/Layout.astro";
+import Localizer from "../components/Localizer.astro";
+import { EXTERNAL_LINKS } from "../constants";
+import { locales } from "../i18n";
+const copy = locales.zh;
+---
+<Layout titleKey="home.title" descriptionKey="home.intro">
+  <main>
+    <section class="hero" id="top"><Header dark />
+      <div class="hero-content"><p class="eyebrow" data-i18n="home.eyebrow">{copy.home.eyebrow}</p><h1 data-i18n="home.title">{copy.home.title}</h1><p class="subtitle" data-i18n="home.subtitle">{copy.home.subtitle}</p><p class="hero-copy" data-i18n="home.intro">{copy.home.intro}</p><div class="button-row"><a class="button button--gold" href="/merchant" data-i18n="home.primary">{copy.home.primary}</a><a class="button" href="#vision" data-i18n="home.secondary">{copy.home.secondary}</a></div></div>
+      <div class="stats">{copy.home.stats.map(([number, label]) => <div class="stat"><strong>{number}</strong><span>{label}</span></div>)}</div>
+    </section>
+    <section class="section" id="vision"><p class="eyebrow" data-i18n="home.visionLabel">{copy.home.visionLabel}</p><h2 class="section-title" data-i18n="home.visionTitle">{copy.home.visionTitle}</h2><p class="section-copy" data-i18n="home.visionIntro">{copy.home.visionIntro}</p><div class="stages">{copy.home.stages.map(([number, status, title, body]) => <article class="stage"><strong>{number}</strong><span class="badge">{status}</span><h3>{title}</h3><p>{body}</p></article>)}</div></section>
+    <section class="section section--dark" id="ecosystem"><div class="ecosystem"><div><p class="eyebrow" data-i18n="home.ecoLabel">{copy.home.ecoLabel}</p><h2 class="section-title" data-i18n="home.ecoTitle">{copy.home.ecoTitle}</h2><p class="section-copy" data-i18n="home.ecoIntro">{copy.home.ecoIntro}</p><p><span class="badge">{copy.home.open}</span> <span class="badge">{copy.home.planned}</span></p></div><div class="ecosystem-orbit" role="img" aria-label="DR.LIFE+ platform ecosystem"><strong>DR.LIFE<span>+</span></strong><div class="eco-list">{copy.home.ecosystem.map((item) => <span>{item}</span>)}</div></div></div></section>
+    <section class="section" id="service"><p class="eyebrow" data-i18n="home.chainLabel">{copy.home.chainLabel}</p><h2 class="section-title" data-i18n="home.chainTitle">{copy.home.chainTitle}</h2><div class="chain">{copy.home.chain.map((item) => <span>{item}</span>)}</div><p class="section-copy" data-i18n="home.chainNote">{copy.home.chainNote}</p></section>
+    <section class="section" id="about"><h2 class="section-title" data-i18n="home.partnersTitle">{copy.home.partnersTitle}</h2><div class="partners">{copy.home.partners.map(([title, body]) => <article class="partner"><h3>{title}</h3><p>{body}</p></article>)}</div><div class="button-row"><a class="button button--gold" href={EXTERNAL_LINKS.buyerBot} data-i18n="nav.shop">{copy.nav.shop}</a></div></section>
+  </main><Footer /><Localizer />
+</Layout>

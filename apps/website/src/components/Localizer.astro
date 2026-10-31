@@ -1,0 +1,11 @@
+---
+import { locales } from "../i18n";
+---
+<script define:vars={{ locales }}>
+  const language = new URLSearchParams(window.location.search).get("lang");
+  const copy = locales[language] || locales.zh;
+  document.documentElement.lang = language === "zh" || !language ? "zh-CN" : language;
+  const read = (path) => path.split(".").reduce((value, key) => value && value[key], copy) || "";
+  document.querySelectorAll("[data-i18n]").forEach((node) => { node.textContent = read(node.dataset.i18n); });
+  document.querySelectorAll("[data-language]").forEach((node) => { if (node.dataset.language === (language || "zh")) node.setAttribute("aria-current", "true"); });
+</script>
