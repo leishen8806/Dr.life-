@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -104,6 +105,48 @@ func TestCleanupPostgresAndRustFS(t *testing.T) {
 	second, err := (PostgresStore{DB: pool}).Cleanup(ctx, now, verifier.Delete)
 	if err != nil || second != (CleanupResult{}) {
 		t.Fatalf("second=%+v err=%v", second, err)
+	}
+
+	// Two workers racing the same ready object must claim it only once. The
+	// PostgreSQL row lock makes the second worker observe no candidate rather
+	// than deleting an already-promoted object or overwriting the terminal state.
+	raceKey := "objects/00000000000000000000000000000099"
+	if _, err := client.PutObject(ctx, &awss3.PutObjectInput{Bucket: aws.String("files"), Key: aws.String(raceKey), Body: nil}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO ops.file(public_id,owner_account,purpose,object_key,content_type,size,sha256,status,retention_until,created_at,updated_at) VALUES('ready-race',1,'product_image',$1,'image/jpeg',1,decode(repeat('00',32),'hex'),'ready',$2,$3,$3)`, raceKey, now.Add(-time.Second), now.Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	results := make(chan CleanupResult, 2)
+	errs := make(chan error, 2)
+	var group sync.WaitGroup
+	for range 2 {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			result, cleanupErr := (PostgresStore{DB: pool}).Cleanup(ctx, now, verifier.Delete)
+			results <- result
+			errs <- cleanupErr
+		}()
+	}
+	group.Wait()
+	close(results)
+	close(errs)
+	var deleted int
+	for cleanupErr := range errs {
+		if cleanupErr != nil {
+			t.Fatal(cleanupErr)
+		}
+	}
+	for result := range results {
+		deleted += result.Deleted
+	}
+	if deleted != 1 {
+		t.Fatalf("concurrent cleanup deleted=%d, want 1", deleted)
+	}
+	var raceStatus string
+	if err := pool.QueryRow(ctx, `SELECT status FROM ops.file WHERE public_id='ready-race'`).Scan(&raceStatus); err != nil || raceStatus != "deleted" {
+		t.Fatalf("ready-race status=%q err=%v", raceStatus, err)
 	}
 	t.Logf("cleanup database result expired=%d deleted=%d; second run expired=%d deleted=%d", result.Expired, result.Deleted, second.Expired, second.Deleted)
 }
