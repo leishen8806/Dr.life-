@@ -512,7 +512,7 @@ func (m *Mock) createFulfillment(w http.ResponseWriter, r *http.Request) {
 		writeFulfillment(w, f, true)
 		return
 	}
-	if req.OwnerRef == "" || req.ExternalOrderID == "" || req.ExternalRevision < 1 || req.WarehouseID == "" || len(req.Lines) < 1 || len(req.Lines) > 200 || len(req.Delivery) == 0 || req.ServiceLevel == "" || req.PaymentTerms != "PLATFORM_PREPAID" || req.SourcePlatform != "drlife" || req.DeclaredValue.Currency == "" {
+	if req.OwnerRef == "" || req.ExternalOrderID == "" || req.ExternalRevision < 1 || req.WarehouseID == "" || len(req.Lines) < 1 || len(req.Lines) > 200 || len(req.Delivery) == 0 || req.RequestedWindow == nil || req.ServiceLevel == "" || req.PaymentTerms != "PLATFORM_PREPAID" || req.SourcePlatform != "drlife" || req.DeclaredValue.Currency == "" {
 		writeError(w, 400, "INVALID_REQUEST", "required fields are missing or invalid", nil)
 		return
 	}
