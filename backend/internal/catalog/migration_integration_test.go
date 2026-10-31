@@ -123,9 +123,9 @@ func TestCatalogMigration(t *testing.T) {
 		input := catalog.ProductInput{
 			CategoryCode: scratchCategoryCode,
 			Name: catalog.LocalizedText{
-				catalog.LangZH: "tiles",
-				catalog.LangEN: "tiles",
-				catalog.LangKM: "tiles",
+				catalog.LangZH: "sku variant",
+				catalog.LangEN: "sku variant",
+				catalog.LangKM: "sku variant",
 			},
 			Unit:   "pcs",
 			Origin: catalog.OriginCN,

@@ -25,6 +25,7 @@ const product: Product = {
     { min_qty: "1", unit_price_e4: 95_000 },
     { min_qty: "100", unit_price_e4: 88_000 }
   ],
+  skus: [],
   updated_at: "2026-10-29T00:00:00Z"
 };
 
