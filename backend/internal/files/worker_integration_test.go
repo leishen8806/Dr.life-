@@ -5,6 +5,9 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"io"
 	"net/http"
 	"os"
@@ -52,7 +55,7 @@ func TestVerificationWorkerRejectsTamperedRustFSUpload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	objects := storage.NewMinIO(storage.MinIOConfig{Bucket: "files", Endpoint: endpoint, AccessKey: "testaccess", SecretKey: "testsecret"}, storage.Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100})
+	objects := storage.NewMinIO(storage.MinIOConfig{Bucket: "files", Endpoint: endpoint, AccessKey: "testaccess", SecretKey: "testsecret"}, storage.Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 1 << 20})
 	verifier, ok := objects.(storage.ObjectVerifier)
 	if !ok {
 		t.Fatal("storage adapter does not expose worker verification access")
@@ -125,12 +128,12 @@ func TestVerificationWorkerMarksHonestRustFSUploadReady(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	objects := storage.NewMinIO(storage.MinIOConfig{Bucket: "files", Endpoint: endpoint, AccessKey: "testaccess", SecretKey: "testsecret"}, storage.Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 100})
+	objects := storage.NewMinIO(storage.MinIOConfig{Bucket: "files", Endpoint: endpoint, AccessKey: "testaccess", SecretKey: "testsecret"}, storage.Policy{AllowedContentTypes: []string{"image/jpeg"}, MaxContentLength: 1 << 20})
 	verifier, ok := objects.(storage.ObjectVerifier)
 	if !ok {
 		t.Fatal("storage adapter does not expose worker verification access")
 	}
-	body := []byte("jpg")
+	body := jpegWithGPS(t)
 	sum := sha256.Sum256(body)
 	put, err := objects.PresignPut(ctx, storage.PutRequest{ContentType: "image/jpeg", ContentLength: int64(len(body)), ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:])})
 	if err != nil {
@@ -170,7 +173,24 @@ func TestVerificationWorkerMarksHonestRustFSUploadReady(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(got, body) {
-		t.Fatalf("promoted object = %q, want %q", got, body)
+	if bytes.Contains(got, []byte("GPS")) || bytes.Contains(got, []byte("Latitude")) {
+		t.Fatal("promoted image retained GPS metadata")
 	}
+	if _, err := jpeg.Decode(bytes.NewReader(got)); err != nil {
+		t.Fatalf("promoted image is not decodable: %v", err)
+	}
+}
+
+func jpegWithGPS(t *testing.T) []byte {
+	t.Helper()
+	imageData := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	imageData.Set(0, 0, color.RGBA{R: 0x20, G: 0x40, B: 0x60, A: 0xff})
+	var base bytes.Buffer
+	if err := jpeg.Encode(&base, imageData, nil); err != nil {
+		t.Fatal(err)
+	}
+	// APP1 carries an EXIF/TIFF GPSInfo pointer (0x8825) and GPS marker.
+	exif := []byte("Exif\x00\x00II*\x00\x08\x00\x00\x00\x01\x00%\x88\x04\x00\x01\x00\x00\x00\x1a\x00\x00\x00\x00\x00\x00\x00\x01\x00\x02\x00\x02\x00\x00\x00\x02\x00\x00\x00(\x00\x00\x00\x00\x00\x00\x00NGPSLatitude\x00")
+	segment := append([]byte{0xff, 0xe1, byte((len(exif) + 2) >> 8), byte(len(exif) + 2)}, exif...)
+	return append(append([]byte{}, base.Bytes()[:2]...), append(segment, base.Bytes()[2:]...)...)
 }

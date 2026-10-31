@@ -102,6 +102,13 @@ func (w *VerificationWorker) Handle(ctx context.Context, task *asynq.Task) error
 		_ = w.objects.Delete(ctx, readyKey)
 		return w.reject(ctx, file)
 	}
+	if file.ContentType == "image/jpeg" || file.ContentType == "image/png" {
+		sanitizer, ok := w.objects.(storage.ImageSanitizer)
+		if !ok || sanitizer.SanitizeImage(ctx, readyKey, file.ContentType) != nil {
+			_ = w.objects.Delete(ctx, readyKey)
+			return w.reject(ctx, file)
+		}
+	}
 	if err := w.store.MarkReady(ctx, file.PublicID, readyKey); err != nil {
 		_ = w.objects.Delete(ctx, readyKey)
 		return err

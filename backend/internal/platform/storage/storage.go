@@ -68,6 +68,11 @@ type ObjectVerifier interface {
 	Delete(context.Context, string) error
 }
 
+// ImageSanitizer rewrites a private object without retaining metadata.
+type ImageSanitizer interface {
+	SanitizeImage(context.Context, string, string) error
+}
+
 func (p Policy) validate(in PutRequest) error {
 	if len(p.AllowedContentTypes) == 0 || p.MaxContentLength <= 0 {
 		return ErrPolicyNotConfigured
