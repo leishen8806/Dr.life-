@@ -24,6 +24,21 @@ test("merchant commission and settlement labels are i18n-backed", () => {
   assert.doesNotMatch(source, cjk, "merchant page retains a Chinese hard-coded label");
 });
 
+test("merchant step and fee cards are i18n-backed field by field", () => {
+  const source = page("merchant");
+
+  for (const key of ["merchant.steps", "merchant.fees"]) {
+    for (const field of [0, 1]) {
+      assert.match(
+        source,
+        new RegExp("data-i18n=\\{`" + key + "\\.\\$\\{index\\}\\." + field + "`\\}"),
+        `${key}.${field} is not localized`
+      );
+    }
+  }
+  assert.match(source, /data-i18n=\{`merchant\.fees\.\$\{index\}\.2`\}/, "merchant.fees.2 is not localized");
+});
+
 test("English entries for the localized content contain no Chinese characters", () => {
   for (const value of [
     ...english.home.stats.flat(),
@@ -31,6 +46,8 @@ test("English entries for the localized content contain no Chinese characters", 
     ...english.home.ecosystem,
     ...english.home.chain,
     ...english.home.partners.flat(),
+    ...english.merchant.steps.flat(),
+    ...english.merchant.fees.flat(),
     english.merchant.fees[0][0],
     english.merchant.fees[1][0]
   ]) {
