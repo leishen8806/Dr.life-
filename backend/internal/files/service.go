@@ -28,6 +28,8 @@ const (
 	StatusVerifying Status = "verifying"
 	StatusReady     Status = "ready"
 	StatusRejected  Status = "rejected"
+	StatusExpired   Status = "expired"
+	StatusDeleted   Status = "deleted"
 )
 
 type File struct {
@@ -36,6 +38,7 @@ type File struct {
 	SHA256                                    []byte
 	Status                                    Status
 	CreatedAt                                 time.Time
+	RetentionUntil                            *time.Time
 }
 type Usage struct {
 	Count int
@@ -54,6 +57,7 @@ type Options struct {
 	Verifier        Verifier
 	MaxDailyUploads int
 	MaxDailyBytes   int64
+	RetentionPeriod time.Duration
 }
 
 // Verifier is the queue-facing port. The worker alone reads object bytes.
@@ -107,7 +111,8 @@ func (s *Service) Presign(ctx context.Context, ownerAccount int64, in PresignInp
 	if err != nil {
 		return PresignResult{}, err
 	}
-	file := File{PublicID: s.options.NewPublicID(), OwnerAccount: ownerAccount, Purpose: in.Purpose, ObjectKey: upload.Key, ContentType: in.ContentType, Size: in.Size, SHA256: checksum, Status: StatusPending, CreatedAt: s.options.Now().UTC()}
+	retentionUntil := s.retentionUntil()
+	file := File{PublicID: s.options.NewPublicID(), OwnerAccount: ownerAccount, Purpose: in.Purpose, ObjectKey: upload.Key, ContentType: in.ContentType, Size: in.Size, SHA256: checksum, Status: StatusPending, CreatedAt: s.options.Now().UTC(), RetentionUntil: &retentionUntil}
 	if file.PublicID == "" {
 		return PresignResult{}, ErrNotConfigured
 	}
@@ -115,6 +120,13 @@ func (s *Service) Presign(ctx context.Context, ownerAccount int64, in PresignInp
 		return PresignResult{}, err
 	}
 	return PresignResult{File: file, Upload: upload}, nil
+}
+
+func (s *Service) retentionUntil() time.Time {
+	if s.options.RetentionPeriod <= 0 {
+		return s.options.Now().UTC().AddDate(2, 0, 0)
+	}
+	return s.options.Now().UTC().Add(s.options.RetentionPeriod)
 }
 
 // Complete makes a pending upload visible to the verification worker. It does
