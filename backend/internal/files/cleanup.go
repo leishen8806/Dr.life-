@@ -2,7 +2,12 @@ package files
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"time"
+
+	"github.com/hibiken/asynq"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 )
 
 const (
@@ -14,6 +19,31 @@ const (
 type CleanupResult struct {
 	Expired int
 	Deleted int
+}
+
+type cleanupRegistrar interface {
+	Register(string, queue.Handler) error
+}
+
+func RegisterCleanupHandler(worker cleanupRegistrar, store CleanupStore, objects objectDeleter) error {
+	if worker == nil {
+		return ErrNotConfigured
+	}
+	return worker.Register(TaskCleanup, NewCleanupWorker(store, objects, nil).Handle)
+}
+
+func (w *CleanupWorker) Handle(ctx context.Context, task *asynq.Task) error {
+	if task == nil {
+		return ErrNotConfigured
+	}
+	var payload struct {
+		Window time.Time `json:"window"`
+	}
+	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
+		return errors.New("invalid file cleanup task")
+	}
+	_, err := w.Run(ctx)
+	return err
 }
 
 type cleanupCandidate struct {
@@ -38,6 +68,20 @@ type CleanupWorker struct {
 	store   CleanupStore
 	objects objectDeleter
 	now     func() time.Time
+}
+
+// CleanupScheduledTask runs hourly; each run uses the worker clock so a
+// delayed queue delivery still applies the correct retention boundary.
+func CleanupScheduledTask() queue.ScheduledTask {
+	return queue.ScheduledTask{
+		Name: "files_cleanup", Cron: "@hourly", Type: TaskCleanup,
+		Payload: func(window time.Time) []byte {
+			payload, _ := json.Marshal(struct {
+				Window time.Time `json:"window"`
+			}{Window: window.UTC()})
+			return payload
+		},
+	}
 }
 
 func NewCleanupWorker(store CleanupStore, objects objectDeleter, now func() time.Time) *CleanupWorker {

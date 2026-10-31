@@ -199,7 +199,11 @@ func main() {
 		reconciliation := logistics.RouteFitReconciliationConfig{
 			Schedule: cfg.RouteFitReconciliationSchedule, NoEventFor: cfg.RouteFitReconciliationNoEventFor,
 		}
-		scheduler, queueErr := queue.NewScheduler(fileEnqueuer, []queue.ScheduledTask{logistics.RouteFitReconciliationScheduledTask(reconciliation)})
+		scheduledTasks := []queue.ScheduledTask{logistics.RouteFitReconciliationScheduledTask(reconciliation)}
+		if cfg.StorageDriver != "" {
+			scheduledTasks = append(scheduledTasks, files.CleanupScheduledTask())
+		}
+		scheduler, queueErr := queue.NewScheduler(fileEnqueuer, scheduledTasks)
 		if queueErr != nil {
 			logger.Error("queue scheduler configuration failed", "error", queueErr)
 			os.Exit(1)
@@ -222,7 +226,7 @@ func main() {
 			os.Exit(1)
 		}
 		fileService = files.New(files.PostgresStore{DB: database}, objects, files.Options{
-			Verifier: files.NewQueueVerifier(fileEnqueuer), MaxDailyUploads: cfg.FileMaxDailyUploads, MaxDailyBytes: cfg.FileMaxDailyBytes,
+			Verifier: files.NewQueueVerifier(fileEnqueuer), MaxDailyUploads: cfg.FileMaxDailyUploads, MaxDailyBytes: cfg.FileMaxDailyBytes, RetentionPeriod: cfg.FileRetentionPeriod,
 		})
 	}
 
