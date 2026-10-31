@@ -1,9 +1,12 @@
 package files
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"fmt"
+	"io"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -148,7 +151,45 @@ func TestCleanupPostgresAndRustFS(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT status FROM ops.file WHERE public_id='ready-race'`).Scan(&raceStatus); err != nil || raceStatus != "deleted" {
 		t.Fatalf("ready-race status=%q err=%v", raceStatus, err)
 	}
+
+	// MarkReady persists the bytes that are actually retained after image
+	// sanitation, rather than the pre-sanitization upload declaration.
+	publishedKey := "objects/00000000000000000000000000000098"
+	published := []byte("sanitized-published-object")
+	publishedSHA256 := sha256.Sum256(published)
+	if _, err := client.PutObject(ctx, &awss3.PutObjectInput{Bucket: aws.String("files"), Key: aws.String(publishedKey), Body: bytes.NewReader(published)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO ops.file(public_id,owner_account,purpose,object_key,content_type,size,sha256,status,retention_until,created_at,updated_at) VALUES('published-metadata',1,'product_image',$1,'image/jpeg',1,decode(repeat('00',32),'hex'),'verifying',$2,$3,$3)`, publishedKey, now.Add(time.Hour), now); err != nil {
+		t.Fatal(err)
+	}
+	if err := (PostgresStore{DB: pool}).MarkReady(ctx, "published-metadata", publishedKey, int64(len(published)), publishedSHA256[:]); err != nil {
+		t.Fatal(err)
+	}
+	var persistedSize int64
+	var persistedSHA256 []byte
+	var persistedStatus string
+	if err := pool.QueryRow(ctx, `SELECT size, sha256, status FROM ops.file WHERE public_id='published-metadata'`).Scan(&persistedSize, &persistedSHA256, &persistedStatus); err != nil {
+		t.Fatal(err)
+	}
+	body, err := verifier.Open(ctx, publishedKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	actual, readErr := io.ReadAll(body)
+	closeErr := body.Close()
+	if readErr != nil || closeErr != nil {
+		t.Fatalf("read published object: read=%v close=%v", readErr, closeErr)
+	}
+	if persistedStatus != "ready" || persistedSize != int64(len(actual)) || !bytes.Equal(persistedSHA256, sha256Sum(actual)) {
+		t.Fatalf("published metadata status=%q size=%d sha256=%x object size=%d sha256=%x", persistedStatus, persistedSize, persistedSHA256, len(actual), sha256Sum(actual))
+	}
 	t.Logf("cleanup database result expired=%d deleted=%d; second run expired=%d deleted=%d", result.Expired, result.Deleted, second.Expired, second.Deleted)
+}
+
+func sha256Sum(value []byte) []byte {
+	sum := sha256.Sum256(value)
+	return sum[:]
 }
 
 func filesMigrationDir(t *testing.T) string {
