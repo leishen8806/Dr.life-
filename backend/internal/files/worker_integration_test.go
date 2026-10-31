@@ -179,6 +179,10 @@ func TestVerificationWorkerMarksHonestRustFSUploadReady(t *testing.T) {
 	if _, err := jpeg.Decode(bytes.NewReader(got)); err != nil {
 		t.Fatalf("promoted image is not decodable: %v", err)
 	}
+	publishedSHA256 := sha256.Sum256(got)
+	if store.file.Size != int64(len(got)) || !bytes.Equal(store.file.SHA256, publishedSHA256[:]) {
+		t.Fatalf("ready metadata size=%d sha256=%x, object size=%d sha256=%x", store.file.Size, store.file.SHA256, len(got), publishedSHA256)
+	}
 }
 
 func jpegWithGPS(t *testing.T) []byte {

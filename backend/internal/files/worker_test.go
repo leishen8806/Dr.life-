@@ -28,6 +28,9 @@ func TestVerificationWorkerMarksMatchingObjectReady(t *testing.T) {
 	if store.file.ObjectKey == "objects/file-1" {
 		t.Fatal("ready file retained the key exposed by the upload URL")
 	}
+	if store.file.Size != int64(len(body)) || !bytes.Equal(store.file.SHA256, sum[:]) {
+		t.Fatal("ready metadata did not match the published object")
+	}
 }
 
 func TestVerificationWorkerAcceptsMissingProviderChecksum(t *testing.T) {
@@ -78,12 +81,14 @@ func (s *verificationMemoryStore) GetVerifying(_ context.Context, publicID strin
 	}
 	return s.file, nil
 }
-func (s *verificationMemoryStore) MarkReady(_ context.Context, publicID, objectKey string) error {
+func (s *verificationMemoryStore) MarkReady(_ context.Context, publicID, objectKey string, size int64, sha256 []byte) error {
 	if s.file.PublicID != publicID || s.file.Status != StatusVerifying {
 		return ErrNotFound
 	}
 	s.file.Status = StatusReady
 	s.file.ObjectKey = objectKey
+	s.file.Size = size
+	s.file.SHA256 = append([]byte(nil), sha256...)
 	return nil
 }
 func (s *verificationMemoryStore) MarkRejected(_ context.Context, publicID string) error {

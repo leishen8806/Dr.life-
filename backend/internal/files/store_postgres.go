@@ -143,11 +143,11 @@ func (s PostgresStore) GetVerifying(ctx context.Context, publicID string) (File,
 	return file, err
 }
 
-func (s PostgresStore) MarkReady(ctx context.Context, publicID, objectKey string) error {
+func (s PostgresStore) MarkReady(ctx context.Context, publicID, objectKey string, size int64, sha256 []byte) error {
 	if s.DB == nil {
 		return ErrNotConfigured
 	}
-	result, err := s.DB.Exec(ctx, `UPDATE ops.file SET status='ready', object_key=$2, updated_at=now() WHERE public_id=$1 AND status='verifying'`, publicID, objectKey)
+	result, err := s.DB.Exec(ctx, `UPDATE ops.file SET status='ready', object_key=$2, size=$3, sha256=$4, updated_at=now() WHERE public_id=$1 AND status='verifying'`, publicID, objectKey, size, sha256)
 	if err != nil {
 		return err
 	}
