@@ -46,6 +46,11 @@ test("legal page retains the confirmed table-of-contents label through i18n", ()
   assert.match(copy, /toc: "目录"/);
 });
 
+test("merchant delivery fee preserves the confirmed quote wording", () => {
+  const copy = source("i18n/page-copy.ts");
+  assert.match(copy, /配送费", "按订单实时报价", "买家支付，或商户设置包邮后由商户承担；下单时即显示金额。/);
+});
+
 test("the static build exposes the required public routes", () => {
   for (const page of ["index.html", "privacy/index.html", "terms/index.html"]) {
     assert.equal(existsSync(join(dist, page)), true, `${page} is missing`);
