@@ -67,6 +67,13 @@ test("merchant CTA retains the confirmed consultation path through i18n", () => 
   assert.match(copy, /ctaTitle: "准备好了吗？"/);
 });
 
+test("home section headings preserve confirmed line breaks through i18n", () => {
+  const home = source("pages/index.astro");
+  assert.match(home, /home\.visionTitleLines/);
+  assert.match(home, /home\.ecoTitleLines/);
+  assert.match(home, /home\.chainTitleLines/);
+});
+
 test("the static build exposes the required public routes", () => {
   for (const page of ["index.html", "privacy/index.html", "terms/index.html"]) {
     assert.equal(existsSync(join(dist, page)), true, `${page} is missing`);
