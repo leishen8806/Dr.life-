@@ -67,6 +67,13 @@ test("merchant CTA retains the confirmed consultation path through i18n", () => 
   assert.match(copy, /ctaTitle: "准备好了吗？"/);
 });
 
+test("merchant route uses the confirmed merchant-specific navigation through i18n", () => {
+  const header = source("components/Header.astro");
+  const copy = source("i18n/page-copy.ts");
+  assert.match(header, /merchant\.nav/);
+  assert.match(copy, /nav: \["商城", "商户入驻", "费用说明", "帮助与联系"\]/);
+});
+
 test("home section headings preserve confirmed line breaks through i18n", () => {
   const home = source("pages/index.astro");
   assert.match(home, /home\.visionTitleLines/);

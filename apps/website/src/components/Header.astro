@@ -3,7 +3,10 @@ import { EXTERNAL_LINKS } from "../constants";
 import { locales, read } from "../i18n";
 const { dark = false } = Astro.props;
 const copy = locales.zh;
-const links = [["#vision", "nav.vision"], ["#ecosystem", "nav.ecosystem"], ["#service", "nav.service"], ["/merchant", "nav.merchant"], ["#about", "nav.about"]];
+const isMerchant = Astro.url.pathname.startsWith("/merchant");
+const links = isMerchant
+  ? [["/", "merchant.nav.0"], ["#join", "merchant.nav.1"], ["#fees", "merchant.nav.2"], ["/contact", "merchant.nav.3"]]
+  : [["#vision", "nav.vision"], ["#ecosystem", "nav.ecosystem"], ["#service", "nav.service"], ["/merchant", "nav.merchant"], ["#about", "nav.about"]];
 ---
 <header class:list={["site-header", { "site-header--dark": dark }]}>
   <a class="brand" href="/" aria-label="DR.LIFE+">DR.LIFE<span>+</span></a>
