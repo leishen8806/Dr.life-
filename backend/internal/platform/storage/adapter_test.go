@@ -37,7 +37,7 @@ func TestAdaptersSharePresignContract(t *testing.T) {
 					t.Fatal(err)
 				}
 				headers := u.Query().Get("X-Amz-SignedHeaders")
-				if !strings.Contains(headers, "content-type") || !strings.Contains(headers, "content-length") || u.Query().Get("X-Amz-Checksum-Sha256") != checksum || signed.Headers["X-Amz-Checksum-Sha256"] != checksum {
+				if !strings.Contains(headers, "content-type") || !strings.Contains(headers, "content-length") || !strings.Contains(headers, "x-amz-checksum-sha256") || signed.Headers["X-Amz-Checksum-Sha256"] != checksum {
 					t.Fatalf("URL/signed headers = %q/%#v/%q, want content type, length and checksum", headers, signed.Headers, u.Query())
 				}
 			}
