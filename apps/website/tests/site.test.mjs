@@ -39,6 +39,13 @@ test("confirmed home stage and ecosystem copy remains unabridged", () => {
   assert.match(copy, /交易带来客户，仓配建立信任，结算保障资金，服务提升效率。每一项能力都为下一个品类复用。/);
 });
 
+test("legal page retains the confirmed table-of-contents label through i18n", () => {
+  const legalPage = source("components/LegalPage.astro");
+  const copy = source("i18n/page-copy.ts");
+  assert.match(legalPage, /data-i18n="legal\.toc"/);
+  assert.match(copy, /toc: "目录"/);
+});
+
 test("the static build exposes the required public routes", () => {
   for (const page of ["index.html", "privacy/index.html", "terms/index.html"]) {
     assert.equal(existsSync(join(dist, page)), true, `${page} is missing`);

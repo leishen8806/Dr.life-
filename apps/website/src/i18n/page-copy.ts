@@ -17,7 +17,7 @@ const zh = {
     feesIntro: "所有费用都在商家 Mini App 的账单里逐项列出。下表金额以正式报价单与费用公告为准。", feeHeaders: ["项目", "收费", "说明"],
     fees: [["平台销售佣金", "0%", "不按成交额抽成。"], ["结算服务费", "0", "货款结算到商户钱包不另收服务费。"], ["仓储费", "15 美元/立方米/月起", "按体积计费、按天计提、每月出账；承诺期与存量优惠按公开规则执行，以入仓报价单为准。"], ["跨境集运与清关", "按线路报价", "广州集货中转到金边入仓，按商品、体积与线路逐单报价。"]]
   },
-  legal: { history: "历史版本", historyCurrent: "当前版本；以前的版本发布后在此保留，可按版本号查看原文。" }
+  legal: { toc: "目录", history: "历史版本", historyCurrent: "当前版本；以前的版本发布后在此保留，可按版本号查看原文。" }
 } as const;
 
 const en = {
@@ -35,7 +35,7 @@ const en = {
     steps: [["Open the merchant Bot", "Open @DrLifeMerchantBot in Telegram, choose a language and accept the merchant agreement."], ["Submit documents", "Business licence, responsible person's identification and settlement account. Documents are used only for verification."], ["Platform review", "Operations verifies the documents and sends the result through the Bot; requests for additional documents state the reason."], ["List products", "Complete specifications and prices from the category template. Products become visible after review."], ["Deliver to the warehouse", "Deliver goods to the partner warehouse through a warehouse appointment. Sellable quantity follows received inventory."]],
     feesIntro: "Every charge is itemised in the merchant Mini App bill. Table amounts are subject to the formal quotation and fee notice.", feeHeaders: ["Item", "Charge", "Details"], fees: [["Platform sales commission", "0%", "No percentage is charged on transaction value."], ["Settlement service fee", "0", "No extra service fee is charged when sales proceeds settle to the merchant wallet."], ["Storage", "US$15/m³/month from", "Charged by volume, accrued daily and billed monthly; commitments and existing-stock discounts follow published rules and the inbound quotation."], ["Cross-border consolidation and customs clearance", "Quoted by route", "Guangzhou consolidation through Phnom Penh warehousing is quoted per order by product, volume and route."]]
   },
-  legal: { history: "Version history", historyCurrent: "Current version; earlier versions will remain here after publication and can be viewed by version number." }
+  legal: { toc: "Table of contents", history: "Version history", historyCurrent: "Current version; earlier versions will remain here after publication and can be viewed by version number." }
 } as const;
 
 // The task permits Chinese fallback when Localizer's corresponding Khmer copy is absent.
