@@ -58,7 +58,8 @@ func TestVerificationWorkerRejectsTamperedRustFSUpload(t *testing.T) {
 		t.Fatal("storage adapter does not expose worker verification access")
 	}
 	expected := sha256.Sum256([]byte("jpg"))
-	put, err := objects.PresignPut(ctx, storage.PutRequest{ContentType: "image/jpeg", ContentLength: 3, ChecksumSHA256: base64.StdEncoding.EncodeToString(expected[:])})
+	tampered := sha256.Sum256([]byte("bad"))
+	put, err := objects.PresignPut(ctx, storage.PutRequest{ContentType: "image/jpeg", ContentLength: 3, ChecksumSHA256: base64.StdEncoding.EncodeToString(tampered[:])})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,6 +68,7 @@ func TestVerificationWorkerRejectsTamperedRustFSUpload(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "image/jpeg")
+	req.Header.Set("x-amz-checksum-sha256", base64.StdEncoding.EncodeToString(tampered[:]))
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
