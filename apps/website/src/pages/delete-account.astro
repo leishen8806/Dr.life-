@@ -1,0 +1,9 @@
+---
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+import Layout from "../components/Layout.astro";
+import Localizer from "../components/Localizer.astro";
+import { locales } from "../i18n";
+const copy = locales.zh;
+---
+<Layout titleKey="deleteAccount.title" descriptionKey="deleteAccount.intro"><Header /><main class="legal-page"><p class="draft" data-i18n="legal.draft">{copy.legal.draft}</p><h1 data-i18n="deleteAccount.title">{copy.deleteAccount.title}</h1><p data-i18n="deleteAccount.intro">{copy.deleteAccount.intro}</p><ol class="legal-content">{copy.deleteAccount.steps.map((step) => <li>{step}</li>)}</ol></main><Footer /><Localizer /></Layout>

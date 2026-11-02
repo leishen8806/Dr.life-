@@ -1,0 +1,9 @@
+---
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+import Layout from "../components/Layout.astro";
+import Localizer from "../components/Localizer.astro";
+import { locales } from "../i18n";
+const copy = locales.zh;
+---
+<Layout titleKey="contact.title" descriptionKey="contact.intro"><Header /><main class="legal-page"><h1 data-i18n="contact.title">{copy.contact.title}</h1><p data-i18n="contact.intro">{copy.contact.intro}</p></main><Footer /><Localizer /></Layout>

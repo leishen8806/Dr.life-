@@ -1,0 +1,25 @@
+---
+import { EXTERNAL_LINKS } from "../constants";
+import { locales, read } from "../i18n";
+const { dark = false } = Astro.props;
+const copy = locales.zh;
+const links = [["#vision", "nav.vision"], ["#ecosystem", "nav.ecosystem"], ["#service", "nav.service"], ["/merchant", "nav.merchant"], ["#about", "nav.about"]];
+---
+<header class:list={["site-header", { "site-header--dark": dark }]}>
+  <a class="brand" href="/" aria-label="DR.LIFE+">DR.LIFE<span>+</span></a>
+  <nav aria-label={read(copy, "nav.about")} class="main-nav">
+    {links.map(([href, label]) => <a href={href} data-i18n={label}>{read(copy, label)}</a>)}
+  </nav>
+  <div class="header-actions">
+    <div class="languages" aria-label="Language">
+      <a href="?lang=zh" data-language="zh">中文</a><a href="?lang=en" data-language="en">EN</a><a href="?lang=km" data-language="km">ខ្មែរ</a>
+    </div>
+    <a class="shop-link" href={EXTERNAL_LINKS.buyerBot} data-i18n="nav.shop">{read(copy, "nav.shop")}</a>
+  </div>
+  <details class="mobile-menu">
+    <summary aria-label={read(copy, "nav.about")}><span></span><span></span><span></span></summary>
+    <nav aria-label={read(copy, "nav.about")}>
+      {links.map(([href, label]) => <a href={href} data-i18n={label}>{read(copy, label)}</a>)}
+    </nav>
+  </details>
+</header>

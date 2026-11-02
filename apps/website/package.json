@@ -1,0 +1,15 @@
+{
+  "name": "@drlife/website",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "lint": "eslint src tests astro.config.mjs",
+    "test": "astro build && node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "astro": "5.15.1"
+  }
+}
