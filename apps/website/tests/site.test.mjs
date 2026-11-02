@@ -74,6 +74,15 @@ test("merchant route uses the confirmed merchant-specific navigation through i18
   assert.match(copy, /nav: \["商城", "商户入驻", "费用说明", "帮助与联系"\]/);
 });
 
+test("merchant hero preserves the confirmed title break and Bot header action through i18n", () => {
+  const header = source("components/Header.astro");
+  const merchant = source("pages/merchant.astro");
+  const copy = source("i18n/page-copy.ts");
+  assert.match(header, /merchant\.headerAction/);
+  assert.match(merchant, /merchant\.titleLines/);
+  assert.match(copy, /titleLines: \["在金边开一家线上建材店，", "不抽成"\]/);
+});
+
 test("home section headings preserve confirmed line breaks through i18n", () => {
   const home = source("pages/index.astro");
   assert.match(home, /home\.visionTitleLines/);
