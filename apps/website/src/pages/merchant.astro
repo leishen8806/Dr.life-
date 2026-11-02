@@ -6,13 +6,11 @@ import Localizer from "../components/Localizer.astro";
 import { EXTERNAL_LINKS } from "../constants";
 import { locales } from "../i18n";
 const copy = locales.zh;
-const fees = [...copy.merchant.fees, ["配送费", "按订单实时报价", "买家支付，或商户设置包邮后由商户承担；下单时即显示金额。"], ["付款通道费", "[以费用公告为准]", "KESS 在线付款产生的通道费用，按公告的规则计算。"]];
-const faq = [["货款什么时候到账", "买家付款后款项先由平台托管；配送签收经复核，并过完 7 天售后观察期后，结算到商户钱包。提现由财务人工复核后出款。"], ["仓配账单逾期", "账单到期未付会每天提醒；超过宽限期（默认 7 天）后，暂停该商户的新出库，付清后自动恢复。"], ["员工与权限", "店主可邀请员工并分配角色。财务角色可以查看和导出账单，提现与改价等动钱操作只有店主可以做。"]];
+const fees = copy.merchant.fees;
 ---
 <Layout titleKey="merchant.title" descriptionKey="merchant.intro"><Header /><main>
   <section class="merchant-hero"><div class="merchant-hero__inner"><div><p class="eyebrow" data-i18n="merchant.eyebrow">{copy.merchant.eyebrow}</p><h1 class="section-title" data-i18n="merchant.title">{copy.merchant.title}</h1><p class="hero-copy" data-i18n="merchant.intro">{copy.merchant.intro}</p></div><div class="merchant-stats"><div><strong>0%</strong><span data-i18n="merchant.fees.0.0">{copy.merchant.fees[0][0]}</span></div><div><strong>0</strong><span data-i18n="merchant.fees.1.0">{copy.merchant.fees[1][0]}</span></div></div></div></section>
   <section class="merchant-section"><h2 class="section-title" data-i18n="merchant.stepsTitle">{copy.merchant.stepsTitle}</h2><ol class="steps">{copy.merchant.steps.map(([title, body], index) => <li class="step"><strong>0{index + 1}</strong><h3 data-i18n={`merchant.steps.${index}.0`}>{title}</h3><p data-i18n={`merchant.steps.${index}.1`}>{body}</p></li>)}</ol></section>
-  <section class="merchant-section" id="fees"><h2 class="section-title" data-i18n="merchant.feesTitle">{copy.merchant.feesTitle}</h2><p class="section-copy" data-i18n="merchant.feesIntro">{copy.merchant.feesIntro}</p><div class="merchant-fee-table"><table><thead><tr><th>项目</th><th>收费</th><th>说明</th></tr></thead><tbody>{fees.map(([title, fee, body], index) => <tr><th data-i18n={`merchant.fees.${Math.min(index, 3)}.0`}>{title}</th><td>{fee}</td><td>{body}</td></tr>)}</tbody></table></div></section>
-  <section class="merchant-faq"><div>{faq.map(([title, body]) => <article><h3>{title}</h3><p>{body}</p></article>)}</div></section>
-  <section class="merchant-cta"><div><h2>准备好了吗？</h2><p>打开商家 Bot 开始申请，或先联系招商顾问了解入仓报价。</p></div><div class="button-row"><a class="button button--dark" href={EXTERNAL_LINKS.merchantBot} data-i18n="merchant.cta">{copy.merchant.cta}</a><a class="button" href="/contact">联系招商顾问</a></div></section>
+  <section class="merchant-section" id="fees"><h2 class="section-title" data-i18n="merchant.feesTitle">{copy.merchant.feesTitle}</h2><p class="section-copy" data-i18n="merchant.feesIntro">{copy.merchant.feesIntro}</p><div class="merchant-fee-table"><table><thead><tr><th></th><th></th><th></th></tr></thead><tbody>{fees.map(([title, fee, body], index) => <tr><th data-i18n={`merchant.fees.${index}.0`}>{title}</th><td data-i18n={`merchant.fees.${index}.1`}>{fee}</td><td data-i18n={`merchant.fees.${index}.2`}>{body}</td></tr>)}</tbody></table></div></section>
+  <section class="merchant-cta"><div class="button-row"><a class="button button--dark" href={EXTERNAL_LINKS.merchantBot} data-i18n="merchant.cta">{copy.merchant.cta}</a></div></section>
 </main><Footer /><Localizer /></Layout>
