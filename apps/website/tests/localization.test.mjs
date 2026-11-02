@@ -11,7 +11,7 @@ const cjk = /[\u3400-\u9fff]/;
 test("English home content paths are wired for every repeated buyer-visible section", () => {
   const source = page("index");
 
-  for (const key of ["home.stats", "home.stages", "home.ecosystem", "home.chain", "home.partners"]) {
+  for (const key of ["home.stats", "home.stages", "home.ecosystemNodes", "home.chain", "home.partners"]) {
     assert.match(source, new RegExp("data-i18n=\\{`" + key + "\\.\\$\\{index\\}"), `${key} is not localized`);
   }
 });
@@ -58,4 +58,12 @@ test("English entries for the localized content contain no Chinese characters", 
 test("mobile English headings and supporting copy have a wrapping safeguard", () => {
   assert.match(styles, /@media\(max-width:520px\).*\.eyebrow.*overflow-wrap:anywhere/s);
   assert.match(styles, /@media\(max-width:520px\).*\.merchant-hero \.section-title.*overflow-wrap:anywhere/s);
+});
+
+test("homepage and legal visible copy are i18n-backed", () => {
+  for (const name of ["index", "merchant"]) {
+    assert.doesNotMatch(page(name), cjk, `${name} page retains Chinese hard-coded copy`);
+  }
+  const legal = readFileSync(fileURLToPath(new URL("../src/components/LegalPage.astro", import.meta.url)), "utf8");
+  assert.doesNotMatch(legal, cjk, "legal page retains Chinese hard-coded copy");
 });

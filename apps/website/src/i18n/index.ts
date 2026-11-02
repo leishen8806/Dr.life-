@@ -1,8 +1,13 @@
 import en from "./en.json";
 import km from "./km.json";
+import { pageCopy } from "./page-copy";
 import zh from "./zh.json";
 
-export const locales = { zh, en, km } as const;
+export const locales = {
+  zh: { ...zh, home: { ...zh.home, ...pageCopy.zh.home }, merchant: { ...zh.merchant, ...pageCopy.zh.merchant }, legal: { ...zh.legal, ...pageCopy.zh.legal } },
+  en: { ...en, home: { ...en.home, ...pageCopy.en.home }, merchant: { ...en.merchant, ...pageCopy.en.merchant }, legal: { ...en.legal, ...pageCopy.en.legal } },
+  km: { ...km, home: { ...km.home, ...pageCopy.km.home }, merchant: { ...km.merchant, ...pageCopy.km.merchant }, legal: { ...km.legal, ...pageCopy.km.legal } }
+} as const;
 export type Locale = keyof typeof locales;
 export const localeCodes = Object.keys(locales) as Locale[];
 
