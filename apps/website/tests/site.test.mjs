@@ -51,6 +51,14 @@ test("merchant delivery fee preserves the confirmed quote wording", () => {
   assert.match(copy, /配送费", "按订单实时报价", "买家支付，或商户设置包邮后由商户承担；下单时即显示金额。/);
 });
 
+test("merchant financial FAQ and payment-channel copy remain wired through i18n", () => {
+  const merchant = source("pages/merchant.astro");
+  const copy = source("i18n/page-copy.ts");
+  assert.match(merchant, /merchant\.faqs/);
+  assert.match(copy, /付款通道费", "\[以费用公告为准\]", "KESS 在线付款产生的通道费用，按公告的规则计算。/);
+  assert.match(copy, /货款什么时候到账", "买家付款后款项先由平台托管；配送签收经复核，并过完 7 天售后观察期后，结算到商户钱包。提现由财务人工复核后出款。/);
+});
+
 test("the static build exposes the required public routes", () => {
   for (const page of ["index.html", "privacy/index.html", "terms/index.html"]) {
     assert.equal(existsSync(join(dist, page)), true, `${page} is missing`);

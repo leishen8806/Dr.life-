@@ -7,10 +7,12 @@ import { EXTERNAL_LINKS } from "../constants";
 import { locales } from "../i18n";
 const copy = locales.zh;
 const fees = copy.merchant.fees;
+const faqs = copy.merchant.faqs;
 ---
 <Layout titleKey="merchant.title" descriptionKey="merchant.intro"><Header /><main>
   <section class="merchant-hero"><div class="merchant-hero__inner"><div><p class="eyebrow" data-i18n="merchant.eyebrow">{copy.merchant.eyebrow}</p><h1 class="section-title" data-i18n="merchant.title">{copy.merchant.title}</h1><p class="hero-copy" data-i18n="merchant.intro">{copy.merchant.intro}</p></div><div class="merchant-stats"><div><strong>0%</strong><span data-i18n="merchant.fees.0.0">{copy.merchant.fees[0][0]}</span></div><div><strong>0</strong><span data-i18n="merchant.fees.1.0">{copy.merchant.fees[1][0]}</span></div></div></div></section>
   <section class="merchant-section"><h2 class="section-title" data-i18n="merchant.stepsTitle">{copy.merchant.stepsTitle}</h2><ol class="steps">{copy.merchant.steps.map(([title, body], index) => <li class="step"><strong>0{index + 1}</strong><h3 data-i18n={`merchant.steps.${index}.0`}>{title}</h3><p data-i18n={`merchant.steps.${index}.1`}>{body}</p></li>)}</ol></section>
   <section class="merchant-section" id="fees"><h2 class="section-title" data-i18n="merchant.feesTitle">{copy.merchant.feesTitle}</h2><p class="section-copy" data-i18n="merchant.feesIntro">{copy.merchant.feesIntro}</p><div class="merchant-fee-table"><table><thead><tr>{copy.merchant.feeHeaders.map((header, index) => <th data-i18n={`merchant.feeHeaders.${index}`}>{header}</th>)}</tr></thead><tbody>{fees.map(([title, fee, body], index) => <tr><th data-i18n={`merchant.fees.${index}.0`}>{title}</th><td data-i18n={`merchant.fees.${index}.1`}>{fee}</td><td data-i18n={`merchant.fees.${index}.2`}>{body}</td></tr>)}</tbody></table></div></section>
+  <section class="merchant-faq"><div>{faqs.map(([title, body], index) => <article><h3 data-i18n={`merchant.faqs.${index}.0`}>{title}</h3><p data-i18n={`merchant.faqs.${index}.1`}>{body}</p></article>)}</div></section>
   <section class="merchant-cta"><div class="button-row"><a class="button button--dark" href={EXTERNAL_LINKS.merchantBot} data-i18n="merchant.cta">{copy.merchant.cta}</a></div></section>
 </main><Footer /><Localizer /></Layout>
