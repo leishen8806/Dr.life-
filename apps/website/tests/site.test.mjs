@@ -33,6 +33,12 @@ test("warehouse scale and storage price use the board-approved values in every l
   }
 });
 
+test("confirmed home stage and ecosystem copy remains unabridged", () => {
+  const copy = source("i18n/page-copy.ts");
+  assert.match(copy, /家电、数码、日用、食品、美妆与更多品类。品牌旗舰店与本地商家并行/);
+  assert.match(copy, /交易带来客户，仓配建立信任，结算保障资金，服务提升效率。每一项能力都为下一个品类复用。/);
+});
+
 test("the static build exposes the required public routes", () => {
   for (const page of ["index.html", "privacy/index.html", "terms/index.html"]) {
     assert.equal(existsSync(join(dist, page)), true, `${page} is missing`);
