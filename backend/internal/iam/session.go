@@ -56,6 +56,7 @@ type SessionService struct {
 	Metrics     SessionMetrics
 	Alerter     SecurityAlerter
 	Audit       platformaudit.Writer
+	EpochWriter EpochCacheWriter
 	Now         func() time.Time
 }
 
@@ -186,9 +187,7 @@ func (s *SessionService) refresh(ctx context.Context, refreshToken, ip string, a
 		if err := tx.Commit(ctx); err != nil {
 			return RefreshResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 		}
-		if s.Cache != nil {
-			_ = s.Cache.SetAccountEpoch(ctx, row.AccountPublicID, row.Epoch+1, s.absoluteTTL())
-		}
+		s.epochWriter().Write(ctx, row.AccountPublicID, row.Epoch+1, s.absoluteTTL(), "refresh_reuse")
 		if s.Alerter != nil {
 			s.Alerter.SessionReuseDetected(ctx, row.AccountPublicID, row.FamilyID)
 		}
@@ -358,9 +357,7 @@ func (s *SessionService) RevokeAllSessions(ctx context.Context, accountID, reaso
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
-	if s.Cache != nil {
-		_ = s.Cache.SetAccountEpoch(ctx, accountID, epoch, s.absoluteTTL())
-	}
+	s.epochWriter().Write(ctx, accountID, epoch, s.absoluteTTL(), "revoke_all_sessions")
 	return nil
 }
 
@@ -427,6 +424,12 @@ func (s *SessionService) metric(endpoint, result string) {
 	if s.Metrics != nil {
 		s.Metrics.SessionRefresh(endpoint, result)
 	}
+}
+func (s *SessionService) epochWriter() EpochCacheWriter {
+	if s.EpochWriter.Cache != nil {
+		return s.EpochWriter
+	}
+	return EpochCacheWriter{Cache: s.Cache}
 }
 func equalHash(a, b []byte) bool { return hmac.Equal(a, b) }
 func positiveTTL(now, end time.Time) time.Duration {

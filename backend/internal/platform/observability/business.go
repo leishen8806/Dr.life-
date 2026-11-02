@@ -14,6 +14,7 @@ type Business struct {
 	loginFailures         *prometheus.CounterVec
 	loginAuditFailures    *prometheus.CounterVec
 	sessionRefresh        *prometheus.CounterVec
+	sessionEpochCacheFail *prometheus.CounterVec
 	ledger                *prometheus.CounterVec
 	reconciliationRuns    *prometheus.CounterVec
 	reconciliation        *prometheus.CounterVec
@@ -34,6 +35,7 @@ func newBusiness(registry *prometheus.Registry) *Business {
 		loginFailures:         prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_login_validation_failures_total", Help: "Login validation failures."}, []string{"endpoint", "reason"}),
 		loginAuditFailures:    prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_login_audit_write_failures_total", Help: "Login audit write failures."}, []string{"endpoint"}),
 		sessionRefresh:        prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_session_refresh_total", Help: "Refresh-token rotation results."}, []string{"endpoint", "result"}),
+		sessionEpochCacheFail: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_session_epoch_cache_write_failures_total", Help: "Failed session epoch cache invalidations."}, []string{"source"}),
 		ledger:                prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_posts_total", Help: "Ledger posting results."}, []string{"status", "reason"}),
 		reconciliationRuns:    prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_reconciliation_runs_total", Help: "Ledger reconciliation runs."}, []string{"status"}),
 		reconciliation:        prometheus.NewCounterVec(prometheus.CounterOpts{Name: "drlife_ledger_reconciliation_mismatches_total", Help: "Ledger reconciliation mismatches."}, []string{"check_code"}),
@@ -44,7 +46,7 @@ func newBusiness(registry *prometheus.Registry) *Business {
 		opsAlertUndeliverable: prometheus.NewCounterVec(prometheus.CounterOpts{Name: "ops_alert_undeliverable_total", Help: "Operations reconciliation alerts that could not be delivered."}, []string{"reason"}),
 		outboxRelayRetries:    prometheus.NewCounter(prometheus.CounterOpts{Name: "drlife_outbox_relay_retries_total", Help: "Transient database failures retried by the outbox relay."}),
 	}
-	registry.MustRegister(b.orders, b.withdrawals, b.ai, b.bots, b.loginFailures, b.loginAuditFailures, b.sessionRefresh, b.ledger, b.reconciliationRuns, b.reconciliation, b.spotChecksDropped, b.opsAlertUndeliverable, b.outboxRelayRetries, b.auditAppends, b.auditVerifyFailures, b.auditAnchorMissing)
+	registry.MustRegister(b.orders, b.withdrawals, b.ai, b.bots, b.loginFailures, b.loginAuditFailures, b.sessionRefresh, b.sessionEpochCacheFail, b.ledger, b.reconciliationRuns, b.reconciliation, b.spotChecksDropped, b.opsAlertUndeliverable, b.outboxRelayRetries, b.auditAppends, b.auditVerifyFailures, b.auditAnchorMissing)
 	return b
 }
 
@@ -72,6 +74,9 @@ func (b *Business) LoginAuditWriteFailed(endpoint string) {
 }
 func (b *Business) SessionRefresh(endpoint, result string) {
 	b.sessionRefresh.WithLabelValues(bounded(endpoint, "buyer", "merchant", "driver"), bounded(result, "success", "replayed", "invalid", "expired", "blocked", "reuse")).Inc()
+}
+func (b *Business) SessionEpochCacheWriteFailed(source string) {
+	b.sessionEpochCacheFail.WithLabelValues(bounded(source, "account_status", "refresh_reuse", "revoke_all_sessions")).Inc()
 }
 func (b *Business) BotSent(endpoint string, bot int, success bool, reason string) {
 	status := "success"

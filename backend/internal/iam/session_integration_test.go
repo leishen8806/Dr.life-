@@ -23,11 +23,12 @@ type cachedTestSession struct {
 }
 
 type testSessionCache struct {
-	mu          sync.Mutex
-	sessions    map[string]cachedTestSession
-	epochs      map[string]int64
-	epochTTL    time.Duration
-	unavailable bool
+	mu               sync.Mutex
+	sessions         map[string]cachedTestSession
+	epochs           map[string]int64
+	epochTTL         time.Duration
+	unavailable      bool
+	epochUnavailable bool
 }
 
 func newTestSessionCache() *testSessionCache {
@@ -42,6 +43,11 @@ func (c *testSessionCache) Get(_ context.Context, accountID, sessionID string) (
 	}
 	item, ok := c.sessions[sessionID]
 	return ok && !item.revoked && item.account == accountID && item.epoch == c.epochs[accountID], ok, nil
+}
+func (c *testSessionCache) setEpochUnavailable(value bool) {
+	c.mu.Lock()
+	c.epochUnavailable = value
+	c.mu.Unlock()
 }
 func (c *testSessionCache) Put(_ context.Context, accountID, sessionID string, epoch int64, ttl time.Duration) error {
 	c.mu.Lock()
@@ -69,7 +75,7 @@ func (c *testSessionCache) Revoke(_ context.Context, sessionID string, _ time.Du
 func (c *testSessionCache) SetAccountEpoch(_ context.Context, accountID string, epoch int64, ttl time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.unavailable {
+	if c.unavailable || c.epochUnavailable {
 		return ErrSessionStoreUnavailable
 	}
 	c.epochs[accountID] = epoch
@@ -151,6 +157,13 @@ func (f *loginFixture) testSessionLifecycle(t *testing.T) {
 	}
 
 	sessions.Now = func() time.Time { return f.now.Add(11 * time.Second) }
+	f.cache.setEpochUnavailable(true)
+	sessions.EpochWriter = EpochCacheWriter{Cache: f.cache, Metrics: &epochWriterTestMetrics{}, Retry: func(_ context.Context, write func() error) {
+		f.cache.setEpochUnavailable(false)
+		if err := write(); err != nil {
+			t.Errorf("reuse epoch retry: %v", err)
+		}
+	}}
 	if _, err := sessions.Refresh(ctx, login.RefreshToken, "203.0.113.43"); err == nil {
 		t.Fatal("refresh token reuse outside grace was accepted")
 	}
@@ -242,6 +255,13 @@ func (f *loginFixture) testSessionAccess(t *testing.T) {
 	if _, err := f.pool.Exec(ctx, `UPDATE iam.account SET status='frozen',status_reason='test' WHERE public_id=$1`, login.Account.PublicID); err != nil {
 		t.Fatal(err)
 	}
+	f.cache.setEpochUnavailable(true)
+	sessions.EpochWriter = EpochCacheWriter{Cache: f.cache, Metrics: &epochWriterTestMetrics{}, Retry: func(_ context.Context, write func() error) {
+		f.cache.setEpochUnavailable(false)
+		if err := write(); err != nil {
+			t.Errorf("revoke-all epoch retry: %v", err)
+		}
+	}}
 	if err := sessions.RevokeAllSessions(ctx, login.Account.PublicID, "account_frozen"); err != nil {
 		t.Fatal(err)
 	}

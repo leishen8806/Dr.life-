@@ -332,7 +332,8 @@ func main() {
 		}
 		checker := iam.DBSessionChecker{DB: iamDatabase, Cache: sessionCache, IdleTTL: cfg.SessionIdleTTL}
 		tokens := iam.TokenManager{Keys: jwtKeys, AccessTTL: cfg.AccessTokenTTL, Issuer: cfg.TokenIssuer, LegacyAcceptUntil: cfg.TokenLegacyAcceptUntil, Checker: checker}
-		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}, Audit: auditStore}
+		epochWriter := iam.EpochCacheWriter{Cache: sessionCache, Logger: logger, Metrics: metrics.Business(), Retry: iam.RetryEpochCacheWrite, Context: ctx}
+		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}, Audit: auditStore, EpochWriter: epochWriter}
 		accountProfileService = &iam.AccountProfileService{DB: iamDatabase}
 		accountLinkService = iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: iamDatabase}, ids.NewULID)
 		consentService = iam.NewConsentService(iam.PostgresConsentRepository{DB: iamDatabase}, nil)
