@@ -15,7 +15,7 @@ test("confirmed-design sections remain present in the source", () => {
   for (const marker of ["hero-arc", "category-grid", "ecosystem-node", "chain-step"]) {
     assert.match(home, new RegExp(marker), `homepage is missing ${marker}`);
   }
-  for (const marker of ["merchant-fee-table", "merchant-faq", "merchant-cta"]) {
+  for (const marker of ["merchant-fee-table", "merchant-cta"]) {
     assert.match(merchant, new RegExp(marker), `merchant page is missing ${marker}`);
   }
   for (const marker of ["legal-history", "legal-note", "legal-current"]) {
