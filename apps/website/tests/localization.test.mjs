@@ -73,3 +73,9 @@ test("homepage and legal visible copy are i18n-backed", () => {
   const legal = readFileSync(fileURLToPath(new URL("../src/components/LegalPage.astro", import.meta.url)), "utf8");
   assert.doesNotMatch(legal, cjk, "legal page retains Chinese hard-coded copy");
 });
+
+test("confirmed-page Khmer additions do not fall back to Chinese", () => {
+  const copy = readFileSync(fileURLToPath(new URL("../src/i18n/page-copy.ts", import.meta.url)), "utf8");
+
+  assert.doesNotMatch(copy, /const km = zh/, "Khmer confirmed-page copy must not fall back to Chinese");
+});
