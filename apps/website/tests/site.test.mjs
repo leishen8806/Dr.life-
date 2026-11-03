@@ -120,5 +120,5 @@ test("the static build contains no prohibited claims and every internal link res
 test("the static site loads a Khmer-capable font for Khmer pages", () => {
   const layout = source("components/Layout.astro");
   assert.match(layout, /Noto\+Sans\+Khmer/);
-  assert.match(layout, /display=optional/);
+  assert.match(layout, /display=swap/, "Khmer glyphs must not be skipped when the font is late");
 });
