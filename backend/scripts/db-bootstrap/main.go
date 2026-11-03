@@ -32,6 +32,13 @@ var roles = []role{
 // app_catalog 跑 cmd/server：组装根实现 catalog 的出站端口时要读两列 iam 数据，
 // 所以按登录用户（而不是 catalog_rw）授最小列权限；catalog 模块本身仍只碰 catalog schema。
 var extraGrants = map[string][]string{
+	"app_iam": {
+		"GRANT USAGE ON SCHEMA ops TO app_iam",
+		"GRANT SELECT ON ops.legal_doc TO app_iam",
+		"GRANT SELECT, INSERT ON ops.consent TO app_iam",
+		"GRANT UPDATE (revoked_at) ON ops.consent TO app_iam",
+		"GRANT USAGE, SELECT ON SEQUENCE ops.consent_id_seq TO app_iam",
+	},
 	"app_catalog": {
 		"GRANT USAGE ON SCHEMA iam TO app_catalog",
 		"GRANT SELECT (id, status) ON iam.merchant TO app_catalog",

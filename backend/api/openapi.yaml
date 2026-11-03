@@ -532,6 +532,22 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/public/legal/{kind}:
+    get:
+      tags: [public]
+      operationId: getPublicLegal
+      summary: Get the current effective legal document
+      x-roles: ["none"]
+      security: []
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: {$ref: "#/components/schemas/ConsentKind"}
+      responses:
+        "200": {$ref: "#/components/responses/LegalDocumentSucceeded"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
   /v1/public/ping:
     get:
       tags: [public]
@@ -556,6 +572,21 @@ paths:
           $ref: "#/components/responses/InternalServerError"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+  /v1/buyer/me/consents:
+    get: {tags: [buyer], operationId: getBuyerMeConsents, summary: Get consent state, x-roles: [buyer], responses: {"200": {$ref: "#/components/responses/ConsentStatusSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}}
+    post: {tags: [buyer], operationId: postBuyerMeConsents, summary: Accept the current legal document, x-roles: [buyer], parameters: [{$ref: "#/components/parameters/IdempotencyKey"}], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ConsentAcceptRequest"}}}}, responses: {"200": {$ref: "#/components/responses/ActionSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}}
+  /v1/buyer/me/consents/revoke:
+    post: {tags: [buyer], operationId: postBuyerMeConsentRevoke, summary: Revoke consent, x-roles: [buyer], parameters: [{$ref: "#/components/parameters/IdempotencyKey"}], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ConsentRevokeRequest"}}}}, responses: {"200": {$ref: "#/components/responses/ActionSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}}
+  /v1/merchant/me/consents:
+    get: {tags: [merchant], operationId: getMerchantMeConsents, summary: Get consent state, x-roles: [merchant], responses: {"200": {$ref: "#/components/responses/ConsentStatusSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}}
+    post: {tags: [merchant], operationId: postMerchantMeConsents, summary: Accept the current legal document, x-roles: [merchant], parameters: [{$ref: "#/components/parameters/IdempotencyKey"}], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ConsentAcceptRequest"}}}}, responses: {"200": {$ref: "#/components/responses/ActionSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}}
+  /v1/merchant/me/consents/revoke:
+    post: {tags: [merchant], operationId: postMerchantMeConsentRevoke, summary: Revoke consent, x-roles: [merchant], parameters: [{$ref: "#/components/parameters/IdempotencyKey"}], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ConsentRevokeRequest"}}}}, responses: {"200": {$ref: "#/components/responses/ActionSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}}
+  /v1/driver/me/consents:
+    get: {tags: [driver], operationId: getDriverMeConsents, summary: Get consent state, x-roles: [driver], responses: {"200": {$ref: "#/components/responses/ConsentStatusSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}}
+    post: {tags: [driver], operationId: postDriverMeConsents, summary: Accept the current legal document, x-roles: [driver], parameters: [{$ref: "#/components/parameters/IdempotencyKey"}], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ConsentAcceptRequest"}}}}, responses: {"200": {$ref: "#/components/responses/ActionSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}}
+  /v1/driver/me/consents/revoke:
+    post: {tags: [driver], operationId: postDriverMeConsentRevoke, summary: Revoke consent, x-roles: [driver], parameters: [{$ref: "#/components/parameters/IdempotencyKey"}], requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ConsentRevokeRequest"}}}}, responses: {"200": {$ref: "#/components/responses/ActionSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}}
   /v1/public/categories:
     get:
       tags: [public]
@@ -1091,7 +1122,7 @@ components:
       type: integer
       format: int32
       description: Documented application error code; ranges are described in the API description.
-      enum: [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 7001]
+      enum: [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2009, 7001]
       x-enum-varnames:
         - InternalError
         - InvalidArgument
@@ -1111,6 +1142,7 @@ components:
         - TelegramLoginFailed
         - AccountBlocked
         - LoginTooManyAttempts
+        - ConsentRequired
         - WebhookInvalid
     Messages:
       type: object
@@ -1535,15 +1567,51 @@ components:
       required: [zh, en, km]
       description: Trilingual text; every language must be present before a product can be published.
       properties:
-        zh:
-          type: string
-          minLength: 1
-        en:
-          type: string
-          minLength: 1
-        km:
-          type: string
-          minLength: 1
+        zh: {type: string, minLength: 1}
+        en: {type: string, minLength: 1}
+        km: {type: string, minLength: 1}
+    ConsentKind:
+      type: string
+      enum: [privacy, terms]
+    ConsentAcceptRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, version]
+      properties:
+        kind: {$ref: "#/components/schemas/ConsentKind"}
+        version: {type: string, pattern: '^v[0-9]+\\.[0-9]+$', minLength: 4, maxLength: 32}
+    ConsentRevokeRequest:
+      type: object
+      additionalProperties: false
+      required: [kind]
+      properties:
+        kind: {$ref: "#/components/schemas/ConsentKind"}
+    ConsentStatus:
+      type: object
+      additionalProperties: false
+      required: [kind, version, accepted, needs_reaccept]
+      properties:
+        kind: {$ref: "#/components/schemas/ConsentKind"}
+        version: {type: string}
+        accepted: {type: boolean}
+        needs_reaccept: {type: boolean}
+    ConsentStatusData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/ConsentStatus"}
+    LegalDocument:
+      type: object
+      additionalProperties: false
+      required: [kind, version, effective_at, body]
+      properties:
+        kind: {$ref: "#/components/schemas/ConsentKind"}
+        version: {type: string}
+        effective_at: {type: string, format: date-time}
+        body: {$ref: "#/components/schemas/LocalizedText"}
     ProductTier:
       type: object
       additionalProperties: false
@@ -1999,6 +2067,24 @@ components:
         data: {$ref: "#/components/schemas/LedgerReadData"}
         request_id: {type: string, minLength: 1}
   responses:
+    ConsentStatusSucceeded:
+      description: Consent state for every current legal document.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/ConsentStatusData"}
+    LegalDocumentSucceeded:
+      description: The current effective three-language legal document.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/LegalDocument"}
     AccountProfileSucceeded:
       description: Safe profile of the authenticated account.
       content:

@@ -58,6 +58,13 @@ type AccountLinkManagement interface {
 	Unlink(context.Context, string, string) error
 }
 
+type ConsentManagement interface {
+	CurrentDocument(context.Context, iam.LegalDocumentKind) (iam.LegalDocument, error)
+	Status(context.Context, string) ([]iam.ConsentStatus, error)
+	Accept(context.Context, string, iam.LegalDocumentKind, string, string) error
+	Revoke(context.Context, string, iam.LegalDocumentKind) error
+}
+
 // AccountDirectory is the only L-09a bridge from ledger to IAM. The ledger
 // schema stores owner_account as an opaque IAM id and must not query iam.account
 // directly.
@@ -99,6 +106,7 @@ type Handler struct {
 	Sessions         SessionManagement
 	AccountProfiles  AccountProfileManagement
 	AccountLinks     AccountLinkManagement
+	Consents         ConsentManagement
 	ClientIP         gateway.ClientIPResolver
 	Audit            *platformaudit.Store
 	AuditWriter      platformaudit.Writer
@@ -110,6 +118,23 @@ type Handler struct {
 
 func (Handler) GetPublicPing(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, map[string]bool{"pong": true})
+}
+
+func (h Handler) GetPublicLegal(w http.ResponseWriter, r *http.Request, kind gen.ConsentKind) {
+	if h.Consents == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	document, err := h.Consents.CurrentDocument(r.Context(), iam.LegalDocumentKind(kind))
+	if errors.Is(err, iam.ErrLegalDocumentNotFound) {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
+		return
+	}
+	if err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	httpx.WriteOK(w, r, gen.LegalDocument{Kind: gen.ConsentKind(document.Kind), Version: document.Version, EffectiveAt: document.EffectiveAt, Body: gen.LocalizedText{Zh: document.BodyZH, En: document.BodyEN, Km: document.BodyKM}})
 }
 
 func (h Handler) GetAdminLedgerTxns(w http.ResponseWriter, r *http.Request) {
@@ -439,6 +464,102 @@ func (h Handler) GetDriverMeSessions(w http.ResponseWriter, r *http.Request)   {
 func (h Handler) GetBuyerMe(w http.ResponseWriter, r *http.Request)    { h.me(w, r) }
 func (h Handler) GetMerchantMe(w http.ResponseWriter, r *http.Request) { h.me(w, r) }
 func (h Handler) GetDriverMe(w http.ResponseWriter, r *http.Request)   { h.me(w, r) }
+
+func (h Handler) GetBuyerMeConsents(w http.ResponseWriter, r *http.Request)    { h.consentStatus(w, r) }
+func (h Handler) GetMerchantMeConsents(w http.ResponseWriter, r *http.Request) { h.consentStatus(w, r) }
+func (h Handler) GetDriverMeConsents(w http.ResponseWriter, r *http.Request)   { h.consentStatus(w, r) }
+func (h Handler) PostBuyerMeConsents(w http.ResponseWriter, r *http.Request, _ gen.PostBuyerMeConsentsParams) {
+	h.acceptConsent(w, r)
+}
+func (h Handler) PostMerchantMeConsents(w http.ResponseWriter, r *http.Request, _ gen.PostMerchantMeConsentsParams) {
+	h.acceptConsent(w, r)
+}
+func (h Handler) PostDriverMeConsents(w http.ResponseWriter, r *http.Request, _ gen.PostDriverMeConsentsParams) {
+	h.acceptConsent(w, r)
+}
+func (h Handler) PostBuyerMeConsentRevoke(w http.ResponseWriter, r *http.Request, _ gen.PostBuyerMeConsentRevokeParams) {
+	h.revokeConsent(w, r)
+}
+func (h Handler) PostMerchantMeConsentRevoke(w http.ResponseWriter, r *http.Request, _ gen.PostMerchantMeConsentRevokeParams) {
+	h.revokeConsent(w, r)
+}
+func (h Handler) PostDriverMeConsentRevoke(w http.ResponseWriter, r *http.Request, _ gen.PostDriverMeConsentRevokeParams) {
+	h.revokeConsent(w, r)
+}
+
+func (h Handler) consentService(w http.ResponseWriter, r *http.Request) (ConsentManagement, string, bool) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return nil, "", false
+	}
+	if h.Consents == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return nil, "", false
+	}
+	return h.Consents, identity.AccountID, true
+}
+func (h Handler) consentStatus(w http.ResponseWriter, r *http.Request) {
+	consents, accountID, ok := h.consentService(w, r)
+	if !ok {
+		return
+	}
+	statuses, err := consents.Status(r.Context(), accountID)
+	if err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	items := make([]gen.ConsentStatus, 0, len(statuses))
+	for _, status := range statuses {
+		items = append(items, gen.ConsentStatus{Kind: gen.ConsentKind(status.Kind), Version: status.Version, Accepted: status.Accepted, NeedsReaccept: status.NeedsReaccept})
+	}
+	httpx.WriteOK(w, r, gen.ConsentStatusData{Items: items})
+}
+func (h Handler) acceptConsent(w http.ResponseWriter, r *http.Request) {
+	consents, accountID, ok := h.consentService(w, r)
+	if !ok {
+		return
+	}
+	body, ok := decodeJSON[gen.ConsentAcceptRequest](w, r)
+	if !ok || !iam.LegalDocumentKind(body.Kind).Valid() || body.Version == "" {
+		if ok {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	err := consents.Accept(r.Context(), accountID, iam.LegalDocumentKind(body.Kind), body.Version, "mini_app")
+	if errors.Is(err, iam.ErrConsentVersionNotCurrent) {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return
+	}
+	if errors.Is(err, iam.ErrLegalDocumentNotFound) {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
+		return
+	}
+	if err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	httpx.WriteOK(w, r, map[string]bool{"accepted": true})
+}
+func (h Handler) revokeConsent(w http.ResponseWriter, r *http.Request) {
+	consents, accountID, ok := h.consentService(w, r)
+	if !ok {
+		return
+	}
+	body, ok := decodeJSON[gen.ConsentRevokeRequest](w, r)
+	if !ok || !iam.LegalDocumentKind(body.Kind).Valid() {
+		if ok {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	if err := consents.Revoke(r.Context(), accountID, iam.LegalDocumentKind(body.Kind)); err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	httpx.WriteOK(w, r, map[string]bool{"revoked": true})
+}
 
 func (h Handler) PutBuyerMeLanguage(w http.ResponseWriter, r *http.Request, _ gen.PutBuyerMeLanguageParams) {
 	h.setLanguage(w, r)
