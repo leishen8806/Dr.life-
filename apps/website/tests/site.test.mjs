@@ -116,3 +116,8 @@ test("the static build contains no prohibited claims and every internal link res
     }
   }
 });
+
+test("the static site does not block rendering on external font requests", () => {
+  const layout = source("components/Layout.astro");
+  assert.doesNotMatch(layout, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
+});
