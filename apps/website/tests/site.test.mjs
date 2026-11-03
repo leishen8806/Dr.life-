@@ -122,3 +122,8 @@ test("the static site loads a Khmer-capable font for Khmer pages", () => {
   assert.match(layout, /Noto\+Sans\+Khmer/);
   assert.match(layout, /display=swap/, "Khmer glyphs must not be skipped when the font is late");
 });
+
+test("mobile Khmer display headings have an explicit no-clipping wrap guard", () => {
+  const css = source("styles/global.css");
+  assert.match(css, /\[data-lang="km"\] \.hero h1,\[data-lang="km"\] \.subtitle,\[data-lang="km"\] \.merchant-hero \.section-title,\[data-lang="km"\] \.legal-page h1\{max-inline-size:100%;min-width:0;overflow-wrap:anywhere;word-break:break-word;letter-spacing:normal\}/);
+});
