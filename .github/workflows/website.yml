@@ -32,13 +32,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+      - name: Enable pnpm
+        run: corepack enable
       - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-      - name: Enable pnpm
-        run: corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Lint
@@ -97,4 +97,4 @@ jobs:
       - name: Deploy approved artifact to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
-          command: pages deploy website-dist --project-name "$CLOUDFLARE_PAGES_PROJECT" --branch main
+          command: pages deploy website-dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch main

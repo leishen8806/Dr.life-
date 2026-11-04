@@ -13,6 +13,7 @@ PR 只构建和上传 artifact，绝不发布。合并后的生产部署作业�
 - [ ] GitHub Actions 的 `Website / Build website` 成功；下载并检查本次 `website-dist` artifact。
 - [ ] 本次变更已通过产品、法务发布前置（包括 CMP-1078）；三种语言页面可用。
 - [ ] 审核 `_headers` 与现行页面资源一致。字体、图标均从本站静态产物加载；CSP 不得放行 `fonts.googleapis.com` 或 `fonts.gstatic.com`。
+- [ ] 已在 GitHub Environment `website-production` 设置 required reviewers，并以设置页截图或文字记录核对其生效；未配置时该 Environment 会直接放行部署，尚不得配置或启用生产 secrets。
 - [ ] 已在 Cloudflare Pages 中确认 `settlecore.org` 为生产自定义域名。
 - [ ] 已确认上一成功 Pages deployment 可供回滚，并记录其部署时间/标识于本次发布记录（不在仓库保存账号或令牌）。
 - [ ] 在 GitHub Environment 审批页面确认本次合并、artifact 和批准人，然后才批准 `website-production`。
