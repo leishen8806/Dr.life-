@@ -11,7 +11,8 @@ PR 只构建和上传 artifact，绝不发布。合并后的生产部署作业�
 ## 发布前检查清单
 
 - [ ] GitHub Actions 的 `Website / Build website` 成功；下载并检查本次 `website-dist` artifact。
-- [ ] 本次变更已通过产品、法务发布前置（包括 CMP-1078）；三种语言页面可用。
+- [ ] 发布口径与项目负责人 2026-11-04 的决定一致：官网以**草案**上线，保留方括号占位与「草案，待律师审核」横幅，原样发布；发布过程中不得替换占位，也不得填入任何未经项目负责人或律师确认的值。三种语言页面可用。
+- [ ] 律师审核后的**正式版**不适用上一条：发布前须先完成 CMP-1078（权威输入与律师确认）、CMP-1079（高棉语母语审校）、CMP-1080（三语字典回填），并按公司章程完成内容审批与董事会确认。
 - [ ] 审核 `_headers` 与现行页面资源一致。字体、图标均从本站静态产物加载；CSP 不得放行 `fonts.googleapis.com` 或 `fonts.gstatic.com`。
 - [ ] 已在 GitHub Environment `website-production` 设置 required reviewers，并以设置页截图或文字记录核对其生效；未配置时该 Environment 会直接放行部署，尚不得配置或启用生产 secrets。
 - [ ] 已在 Cloudflare Pages 中确认 `settlecore.org` 为生产自定义域名。
