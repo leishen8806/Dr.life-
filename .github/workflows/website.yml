@@ -67,11 +67,12 @@ jobs:
     steps:
       - id: configuration
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          WEBSITE_DEPLOY_HOST: ${{ secrets.WEBSITE_DEPLOY_HOST }}
+          WEBSITE_DEPLOY_USER: ${{ secrets.WEBSITE_DEPLOY_USER }}
+          WEBSITE_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.WEBSITE_DEPLOY_SSH_PRIVATE_KEY }}
+          WEBSITE_DEPLOY_KNOWN_HOSTS: ${{ secrets.WEBSITE_DEPLOY_KNOWN_HOSTS }}
         run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_PAGES_PROJECT" ]; then
+          if [ -n "$WEBSITE_DEPLOY_HOST" ] && [ -n "$WEBSITE_DEPLOY_USER" ] && [ -n "$WEBSITE_DEPLOY_SSH_PRIVATE_KEY" ] && [ -n "$WEBSITE_DEPLOY_KNOWN_HOSTS" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -84,17 +85,31 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: website-production
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
     steps:
       - name: Download approved build artifact
         uses: actions/download-artifact@v5
         with:
           name: website-dist
           path: website-dist
-      - name: Deploy approved artifact to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          command: pages deploy website-dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch main
+      - name: Atomically publish approved artifact to VPS
+        env:
+          WEBSITE_DEPLOY_HOST: ${{ secrets.WEBSITE_DEPLOY_HOST }}
+          WEBSITE_DEPLOY_USER: ${{ secrets.WEBSITE_DEPLOY_USER }}
+          WEBSITE_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.WEBSITE_DEPLOY_SSH_PRIVATE_KEY }}
+          WEBSITE_DEPLOY_KNOWN_HOSTS: ${{ secrets.WEBSITE_DEPLOY_KNOWN_HOSTS }}
+          WEBSITE_RELEASE_SUFFIX: ${{ github.run_id }}-${{ github.sha }}
+        run: |
+          set -eu
+          release_id="$(date -u +%Y%m%dT%H%M%SZ)-$WEBSITE_RELEASE_SUFFIX"
+          key="$RUNNER_TEMP/website-deploy-key"
+          known_hosts="$RUNNER_TEMP/website-known-hosts"
+          trap 'rm -f "$key" "$known_hosts"' EXIT
+          printf '%s\n' "$WEBSITE_DEPLOY_SSH_PRIVATE_KEY" > "$key"
+          printf '%s\n' "$WEBSITE_DEPLOY_KNOWN_HOSTS" > "$known_hosts"
+          chmod 600 "$key" "$known_hosts"
+          remote="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts"
+          target="$WEBSITE_DEPLOY_USER@$WEBSITE_DEPLOY_HOST"
+          $remote "$target" "mkdir -p /srv/settlecore/incoming/$release_id"
+          rsync -a --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
+            -e "$remote" website-dist/ "$target:/srv/settlecore/incoming/$release_id/"
+          $remote "$target" "sudo /usr/local/sbin/settlecore-website-publish $release_id"
