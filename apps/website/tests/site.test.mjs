@@ -23,6 +23,48 @@ test("confirmed-design sections remain present in the source", () => {
   }
 });
 
+test("release output includes a localized, non-indexable 404 page with site icons", () => {
+  const notFound = join(dist, "404.html");
+  assert.ok(existsSync(notFound), "dist must include 404.html");
+
+  const html = readFileSync(notFound, "utf8");
+  assert.match(html, /name="robots" content="noindex"/, "404 page must not be indexed");
+  assert.match(html, /rel="icon" href="\/favicon\.svg"/, "404 page must link the SVG favicon");
+  assert.match(html, /rel="apple-touch-icon" href="\/apple-touch-icon\.png"/, "404 page must link the Apple touch icon");
+  assert.doesNotMatch(html, /\[[^\]]+\]/, "404 page must not contain bracket placeholders");
+
+  for (const asset of ["favicon.svg", "favicon.ico", "apple-touch-icon.png"]) {
+    assert.ok(existsSync(join(dist, asset)), `dist must publish ${asset}`);
+  }
+
+  for (const file of readdirSync(dist, { recursive: true }).filter((entry) => entry.endsWith(".html"))) {
+    const document = readFileSync(join(dist, file), "utf8");
+    assert.match(document, /rel="icon" href="\/favicon\.svg"/, `${file} must link the SVG favicon`);
+    assert.match(document, /rel="apple-touch-icon" href="\/apple-touch-icon\.png"/, `${file} must link the Apple touch icon`);
+  }
+});
+
+test("404 copy is complete in Chinese, English and Khmer without placeholders", () => {
+  const copy = source("i18n/not-found-copy.ts");
+
+  for (const locale of ["zh", "en", "km"]) {
+    assert.match(copy, new RegExp(`${locale}:\\s*\\{[^}]+title:[^}]+intro:[^}]+home:[^}]+merchant:[^}]+contact:`, "s"));
+  }
+  assert.match(copy, /draft:/, "Khmer copy must disclose its draft status");
+  assert.doesNotMatch(copy, /\[[^\]]+\]/, "404 copy must not contain bracket placeholders");
+});
+
+test("release output uses self-hosted fonts only", () => {
+  const files = readdirSync(dist, { recursive: true });
+  const text = files
+    .filter((file) => /\.(?:html|css)$/i.test(file))
+    .map((file) => readFileSync(join(dist, file), "utf8"))
+    .join("\n");
+
+  assert.doesNotMatch(text, /(?:fonts\.googleapis\.com|fonts\.gstatic\.com|https?:\/\/[^\s"')]+\/[^\s"')]*\.(?:woff2?|ttf|otf))/i);
+  assert.match(text, /\/fonts\//, "site CSS must reference locally published font files");
+});
+
 test("warehouse scale and storage price use the board-approved values in every locale", () => {
   for (const locale of ["i18n/zh.json", "i18n/en.json", "i18n/km.json"]) {
     const copy = source(locale);
