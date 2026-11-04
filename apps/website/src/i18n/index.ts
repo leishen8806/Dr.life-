@@ -1,12 +1,13 @@
 import en from "./en.json";
 import km from "./km.json";
+import { notFoundCopy } from "./not-found-copy";
 import { pageCopy } from "./page-copy";
 import zh from "./zh.json";
 
 export const locales = {
-  zh: { ...zh, home: { ...zh.home, ...pageCopy.zh.home }, merchant: { ...zh.merchant, ...pageCopy.zh.merchant }, legal: { ...zh.legal, ...pageCopy.zh.legal } },
-  en: { ...en, home: { ...en.home, ...pageCopy.en.home }, merchant: { ...en.merchant, ...pageCopy.en.merchant }, legal: { ...en.legal, ...pageCopy.en.legal } },
-  km: { ...km, home: { ...km.home, ...pageCopy.km.home }, merchant: { ...km.merchant, ...pageCopy.km.merchant }, legal: { ...km.legal, ...pageCopy.km.legal } }
+  zh: { ...zh, home: { ...zh.home, ...pageCopy.zh.home }, merchant: { ...zh.merchant, ...pageCopy.zh.merchant }, legal: { ...zh.legal, ...pageCopy.zh.legal }, notFound: notFoundCopy.zh },
+  en: { ...en, home: { ...en.home, ...pageCopy.en.home }, merchant: { ...en.merchant, ...pageCopy.en.merchant }, legal: { ...en.legal, ...pageCopy.en.legal }, notFound: notFoundCopy.en },
+  km: { ...km, home: { ...km.home, ...pageCopy.km.home }, merchant: { ...km.merchant, ...pageCopy.km.merchant }, legal: { ...km.legal, ...pageCopy.km.legal }, notFound: notFoundCopy.km }
 } as const;
 export type Locale = keyof typeof locales;
 export const localeCodes = Object.keys(locales) as Locale[];
