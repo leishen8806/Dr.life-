@@ -60,9 +60,27 @@ http { include /etc/nginx/mime.types; include /work/settlecore.org.conf; }
   Assert-Contains $hidden '403 Forbidden'
   $rollbackCommand = 'set -eu; ln -s releases/' + $third + ' /srv/settlecore/current; sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $second + '; sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $first + '; if sh /rollback-current.sh; then exit 1; fi; test $(readlink /srv/settlecore/current) = releases/' + $first
   Invoke-Docker run --rm --network none -v "${temp}/site:/srv/settlecore" -v "${rollback}:/rollback-current.sh:ro" alpine:3.20 sh -c $rollbackCommand
-  New-Item -ItemType Directory -Path "$temp/site/incoming/test-release" | Out-Null
-  Set-Content -NoNewline "$temp/site/incoming/test-release/version.txt" 'published'
-  Invoke-Docker run --rm --network none -v "${temp}/site:/srv/settlecore" -v "${publish}:/publish-release.sh:ro" alpine:3.20 sh -c 'set -eu; rm /srv/settlecore/current; sh /publish-release.sh test-release; test $(readlink /srv/settlecore/current) = releases/test-release; test -d /srv/settlecore/releases/test-release'
+  $publishSecurityCommand = @'
+set -eu
+useradd --create-home --uid 1001 deploy
+install -d -o deploy -g deploy -m 0700 /srv/settlecore/incoming
+install -d -o root -g root -m 0700 /srv/settlecore/staging
+install -d -o root -g root -m 0755 /srv/settlecore/releases
+su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/test-release; printf published > /srv/settlecore/incoming/test-release/index.html' deploy
+sh /publish-release.sh test-release
+test "$(readlink /srv/settlecore/current)" = releases/test-release
+test "$(stat -c %U /srv/settlecore/releases/test-release/index.html)" = root
+test "$(stat -c %a /srv/settlecore/releases/test-release)" = 755
+test "$(stat -c %a /srv/settlecore/releases/test-release/index.html)" = 644
+if su -s /bin/sh -c 'printf TAMPERED >> /srv/settlecore/releases/test-release/index.html' deploy; then exit 1; fi
+if su -s /bin/sh -c 'touch /srv/settlecore/releases/test-release/evil.html' deploy; then exit 1; fi
+test ! -e /srv/settlecore/releases/test-release/evil.html
+su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/bad-release; ln -s /etc/passwd /srv/settlecore/incoming/bad-release/not-allowed' deploy
+if sh /publish-release.sh bad-release; then exit 1; fi
+test ! -e /srv/settlecore/staging/bad-release
+'@
+  $publishSecurityEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($publishSecurityCommand))
+  Invoke-Docker run --rm --network none -v "${publish}:/publish-release.sh:ro" node:22-bookworm-slim sh -c "printf '%s' $publishSecurityEncoded | base64 -d | sh"
   Write-Host 'AC-2 and AC-3 container verification passed.'
 } finally {
   docker rm -f settlecore-nginx-test 2>$null

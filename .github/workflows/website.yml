@@ -97,14 +97,14 @@ jobs:
           WEBSITE_DEPLOY_USER: ${{ secrets.WEBSITE_DEPLOY_USER }}
           WEBSITE_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.WEBSITE_DEPLOY_SSH_PRIVATE_KEY }}
           WEBSITE_DEPLOY_KNOWN_HOSTS: ${{ secrets.WEBSITE_DEPLOY_KNOWN_HOSTS }}
-          RELEASE_ID: ${{ github.run_id }}-${{ github.sha }}
+          WEBSITE_RELEASE_SUFFIX: ${{ github.run_id }}-${{ github.sha }}
         run: |
           set -eu
-          release_id="$(date -u +%Y%m%dT%H%M%SZ)-$RELEASE_ID"
+          release_id="$(date -u +%Y%m%dT%H%M%SZ)-$WEBSITE_RELEASE_SUFFIX"
           key="$RUNNER_TEMP/website-deploy-key"
           known_hosts="$RUNNER_TEMP/website-known-hosts"
           trap 'rm -f "$key" "$known_hosts"' EXIT
-          printf '%s' "$WEBSITE_DEPLOY_SSH_PRIVATE_KEY" > "$key"
+          printf '%s\n' "$WEBSITE_DEPLOY_SSH_PRIVATE_KEY" > "$key"
           printf '%s\n' "$WEBSITE_DEPLOY_KNOWN_HOSTS" > "$known_hosts"
           chmod 600 "$key" "$known_hosts"
           remote="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts"

@@ -5,7 +5,10 @@ site_root=/srv/settlecore
 current="$site_root/current"
 releases="$site_root/releases"
 
-test -L "$current"
+if ! test -L "$current"; then
+  printf '%s\n' 'current release link is missing' >&2
+  exit 1
+fi
 current_target=$(readlink -f "$current")
 previous=''
 found_current=false
@@ -18,8 +21,14 @@ for candidate in $(find "$releases" -mindepth 1 -maxdepth 1 -type d -print | sor
   previous=$candidate
 done
 
-test "$found_current" = true
-test -n "$previous"
+if test "$found_current" != true; then
+  printf '%s\n' 'current release is not in releases' >&2
+  exit 1
+fi
+if test -z "$previous"; then
+  printf '%s\n' 'no earlier release is available' >&2
+  exit 1
+fi
 ln -s "releases/$(basename "$previous")" "$site_root/.current.next"
 mv -Tf "$site_root/.current.next" "$current"
 printf 'rolled back to %s\n' "$(readlink "$current")"

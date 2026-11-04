@@ -9,11 +9,29 @@ esac
 
 site_root=/srv/settlecore
 incoming="$site_root/incoming/$release_id"
+staging="$site_root/staging"
+staged="$staging/$release_id"
 releases="$site_root/releases"
 test -d "$incoming"
+test -d "$staging"
+test ! -e "$staged"
 test ! -e "$releases/$release_id"
 
-mv "$incoming" "$releases/$release_id"
+mv "$incoming" "$staged"
+
+# The deploy account cannot enter staging, so validation and permission changes
+# happen after its upload has been removed from its writable tree.
+if find "$staged" ! -type d ! -type f -print -quit | grep -q .; then
+  printf '%s\n' 'release contains a symbolic link or special file' >&2
+  rm -rf "$staged"
+  exit 1
+fi
+
+chown -R root:root "$staged"
+find "$staged" -type d -exec chmod 0755 {} +
+find "$staged" -type f -exec chmod 0644 {} +
+
+mv "$staged" "$releases/$release_id"
 ln -s "releases/$release_id" "$site_root/.current.next"
 mv -Tf "$site_root/.current.next" "$site_root/current"
 ls -1dt "$releases"/* | tail -n +6 | xargs -r rm -rf

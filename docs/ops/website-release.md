@@ -7,13 +7,13 @@
 - 配置：`deploy/nginx/settlecore.org.conf` 及 `deploy/nginx/settlecore-security-headers.conf`。源站只启用 gzip；Cloudflare 在访客边缘按浏览器能力压缩（含 Brotli），无需 Brotli 模块或 `load_module`。
 - TLS 使用 Cloudflare Origin CA，Cloudflare SSL/TLS 设为 **Full (strict)**。证书、私钥、部署密钥和主机指纹不得进仓库。
 - 可选的“仅 Cloudflare IP 段访问源站”防火墙规则是独立生产变更，须另行审批。
-- `/_astro/` 和带哈希的 `fonts/*.woff2` 长缓存；HTML、`fonts.css` 与其他字体目录文件为 `no-cache`。全部响应（包括缓存资源和 404）都带安全头与 CSP，`font-src 'self'`，不放行 Google Fonts。
+- 仅 `/_astro/` 长缓存；HTML 与 `/fonts/` 下全部文件均为 `no-cache`。全部响应（包括缓存资源和 404）都带安全头与 CSP，`font-src 'self'`，不放行 Google Fonts。
 
 ## 项目负责人一次性准备（获批后执行）
 
-1. 安装 nginx 和 rsync；不要安装 Brotli 模块。创建根目录、`releases`、`incoming` 和占位 release：`/srv/settlecore`、`/srv/settlecore/releases` 由 `root:root` 所有且为 `0755`；`/srv/settlecore/incoming` 由 `settlecore-deploy:settlecore-deploy` 所有且为 `0700`。创建仅含临时 `index.html` 与 `404.html` 的 `/srv/settlecore/releases/bootstrap`，由 `root:root` 所有、目录 `0755`、文件 `0644`；把 `current` 建为指向 `releases/bootstrap` 的符号链接。这样 reload 到首次批准发布之间不会全站 404。
+1. 安装 nginx 和 rsync；不要安装 Brotli 模块。创建根目录、`releases`、`incoming`、`staging` 和占位 release：`/srv/settlecore`、`/srv/settlecore/releases` 由 `root:root` 所有且为 `0755`；`/srv/settlecore/incoming` 由 `settlecore-deploy:settlecore-deploy` 所有且为 `0700`；`/srv/settlecore/staging` 由 `root:root` 所有且为 `0700`，部署账号不得进入。创建仅含临时 `index.html` 与 `404.html` 的 `/srv/settlecore/releases/bootstrap`，由 `root:root` 所有、目录 `0755`、文件 `0644`；把 `current` 建为指向 `releases/bootstrap` 的符号链接。这样 reload 到首次批准发布之间不会全站 404。
 2. 安装 nginx 站点配置和安全头 include；放置 Origin CA 证书与私钥；先执行 `nginx -t`，再由获批变更执行 reload。不要改后端站点。裸 `/privacy` 预期为 301 到 `/privacy/`，配置已关闭绝对主机和端口重写。
-3. 将 `publish-release.sh`、`rollback-current.sh` 分别安装为 `/usr/local/sbin/settlecore-website-publish`、`/usr/local/sbin/settlecore-website-rollback`，均为 `root:root`、`0755`；部署账号对两脚本、`/srv/settlecore` 和 `releases` 无写权限。sudoers 示例：`settlecore-deploy ALL=(root) NOPASSWD: /usr/local/sbin/settlecore-website-publish *, /usr/local/sbin/settlecore-website-rollback`。不得配置 `env_keep` 或使用 `sudo -E`；两个脚本都固定 `/srv/settlecore`，不接受环境变量覆盖。
+3. 将 `publish-release.sh`、`rollback-current.sh` 分别安装为 `/usr/local/sbin/settlecore-website-publish`、`/usr/local/sbin/settlecore-website-rollback`，均为 `root:root`、`0755`；部署账号对两脚本、`/srv/settlecore`、`staging` 和 `releases` 无写权限。sudoers 示例：`settlecore-deploy ALL=(root) NOPASSWD: /usr/local/sbin/settlecore-website-publish *, /usr/local/sbin/settlecore-website-rollback`。不得配置 `env_keep` 或使用 `sudo -E`；两个脚本都固定 `/srv/settlecore`，不接受环境变量覆盖。
 4. GitHub Environment 创建 `website-production`，配置 required reviewers，禁止自行审批。
 5. 部署公钥仅允许部署账号；项目负责人必须在 VPS 本机用 `ssh-keygen -lf` 核验主机公钥指纹，再把已核验的 known-hosts 条目写入 GitHub secret。禁止在 runner 上使用 `ssh-keyscan`。
 6. 保持两条官网 A 记录为 Cloudflare 代理状态。完成 nginx 校验、reload 和占位 `current` 后，才将 Cloudflare SSL/TLS 切到 Full (strict)；首次真实发布仍须等待合并及 Environment 人工批准。
@@ -22,7 +22,7 @@
 
 `website.yml` 在 PR 与 main push 均构建 artifact；只有 main push 能通过 secrets 门禁。缺任一部署 secret 时部署作业跳过。门禁通过后仍必须等待 `website-production` 人工批准。
 
-批准后，专用账号仅可把 artifact 上传到 `/srv/settlecore/incoming/<release-id>/`。工作流随后通过受控 root 脚本发布：脚本验证 release-id、将 incoming 目录移动到 `releases/`、原子替换 `current` 符号链接并只保留最新五个 release。部署账号不能直接改 `current` 或已有 release。
+批准后，专用账号仅可把 artifact 上传到 `/srv/settlecore/incoming/<release-id>/`。工作流随后通过受控 root 脚本发布：脚本验证 release-id，先把 incoming 原子移动到仅 root 可进入的 `staging/`，拒绝符号链接和非常规文件；再把内容改为 `root:root`（目录 `0755`、文件 `0644`），移动到 `releases/`，原子替换 `current` 符号链接并只保留最新五个 release。发布后，部署账号不能修改或新增已有 release 的文件；发布核验应以该账号分别尝试追加 `index.html` 与新增文件，二者都必须失败。
 
 发布后无缓存核验首页、`/privacy`（预期 301→`/privacy/`）、`/terms`、404、`/_astro/` 和字体资源；记录状态码、安全头、gzip、缓存头和三语切换结果。
 
