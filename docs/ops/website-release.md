@@ -24,6 +24,12 @@
 
 批准后的作业通过专用 SSH 账号把 artifact 上传至 `releases/.incoming-<时间戳>-<运行号>-<提交号>`；上传完成才改名为正式 release，并以 `mv -Tf .current.next current` 原子切换符号链接。随后仅保留最新五个 release。每次发布后的核验：无缓存请求首页、`/privacy`、`/terms`，记录状态码、安全头与三语切换结果。
 
+## 性能验证（正式访客路径）
+
+性能复测一律通过 Cloudflare 代理后的正式域名 `https://settlecore.org` 进行；记录测试时间、协议、是否启用压缩、HTTP 版本及各项分数。即使源站 nginx 与 Cloudflare 间使用 HTTP/1.1，也不改变浏览器访问路径由 Cloudflare 提供 HTTP/2 或 HTTP/3 的事实。
+
+若启用「仅允许 Cloudflare IP 段访问源站」的可选加固，禁止把源站 IP 直连结果当作访客性能结论：直连可能被拒绝，或绕开 Cloudflare 而得到不具代表性的分数。确因排障需直连源站时，结论必须明确标注「直连源站、非访客路径」。
+
 ## 回滚
 
 回滚是生产变更，须先取得董事会审批。登录服务器后，执行受控命令：
