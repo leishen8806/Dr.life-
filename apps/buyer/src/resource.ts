@@ -30,6 +30,7 @@ const serverMessageKeys = {
   2005: "error.2005",
   2006: "error.2006",
   2007: "error.2007",
+  2009: "error.2009",
   7001: "error.7001"
 } satisfies Record<components["schemas"]["ErrorCode"], TranslationKey>;
 

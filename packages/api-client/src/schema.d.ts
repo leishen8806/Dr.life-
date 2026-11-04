@@ -554,6 +554,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/legal/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the current effective legal document */
+        get: operations["getPublicLegal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/public/ping": {
         parameters: {
             query?: never;
@@ -565,6 +582,111 @@ export interface paths {
         get: operations["getPublicPing"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/buyer/me/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get consent state */
+        get: operations["getBuyerMeConsents"];
+        put?: never;
+        /** Accept the current legal document */
+        post: operations["postBuyerMeConsents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/buyer/me/consents/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke consent */
+        post: operations["postBuyerMeConsentRevoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/me/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get consent state */
+        get: operations["getMerchantMeConsents"];
+        put?: never;
+        /** Accept the current legal document */
+        post: operations["postMerchantMeConsents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/me/consents/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke consent */
+        post: operations["postMerchantMeConsentRevoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/driver/me/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get consent state */
+        get: operations["getDriverMeConsents"];
+        put?: never;
+        /** Accept the current legal document */
+        post: operations["postDriverMeConsents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/driver/me/consents/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke consent */
+        post: operations["postDriverMeConsentRevoke"];
         delete?: never;
         options?: never;
         head?: never;
@@ -824,7 +946,7 @@ export interface components {
          * @description Documented application error code; ranges are described in the API description.
          * @enum {integer}
          */
-        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 7001;
+        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2009 | 7001;
         Messages: {
             zh: string;
             en: string;
@@ -1068,6 +1190,31 @@ export interface components {
             zh: string;
             en: string;
             km: string;
+        };
+        /** @enum {string} */
+        ConsentKind: "privacy" | "terms";
+        ConsentAcceptRequest: {
+            kind: components["schemas"]["ConsentKind"];
+            version: string;
+        };
+        ConsentRevokeRequest: {
+            kind: components["schemas"]["ConsentKind"];
+        };
+        ConsentStatus: {
+            kind: components["schemas"]["ConsentKind"];
+            version: string;
+            accepted: boolean;
+            needs_reaccept: boolean;
+        };
+        ConsentStatusData: {
+            items: components["schemas"]["ConsentStatus"][];
+        };
+        LegalDocument: {
+            kind: components["schemas"]["ConsentKind"];
+            version: string;
+            /** Format: date-time */
+            effective_at: string;
+            body: components["schemas"]["LocalizedText"];
         };
         ProductTier: {
             /** @description Minimum order quantity as a decimal string; never a floating-point number. */
@@ -1320,6 +1467,28 @@ export interface components {
         };
     };
     responses: {
+        /** @description Consent state for every current legal document. */
+        ConsentStatusSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["ConsentStatusData"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description The current effective three-language legal document. */
+        LegalDocumentSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["LegalDocument"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
         /** @description Safe profile of the authenticated account. */
         AccountProfileSucceeded: {
             headers: {
@@ -2166,6 +2335,22 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    getPublicLegal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: components["schemas"]["ConsentKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["LegalDocumentSucceeded"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     getPublicPing: {
         parameters: {
             query?: never;
@@ -2188,6 +2373,189 @@ export interface operations {
             405: components["responses"]["MethodNotAllowed"];
             429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getBuyerMeConsents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ConsentStatusSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postBuyerMeConsents: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentAcceptRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postBuyerMeConsentRevoke: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentRevokeRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getMerchantMeConsents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ConsentStatusSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postMerchantMeConsents: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentAcceptRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postMerchantMeConsentRevoke: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentRevokeRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getDriverMeConsents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["ConsentStatusSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postDriverMeConsents: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentAcceptRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postDriverMeConsentRevoke: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentRevokeRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
