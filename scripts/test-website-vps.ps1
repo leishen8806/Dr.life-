@@ -75,6 +75,15 @@ test "$(stat -c %a /srv/settlecore/releases/test-release/index.html)" = 644
 if su -s /bin/sh -c 'printf TAMPERED >> /srv/settlecore/releases/test-release/index.html' deploy; then exit 1; fi
 if su -s /bin/sh -c 'touch /srv/settlecore/releases/test-release/evil.html' deploy; then exit 1; fi
 test ! -e /srv/settlecore/releases/test-release/evil.html
+su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/fd-release; printf orig > /srv/settlecore/incoming/fd-release/index.html; exec 3>> /srv/settlecore/incoming/fd-release/index.html; touch /tmp/fd-open; while test ! -e /tmp/fd-go; do sleep 0.1; done; printf FD_WRITE >&3; exec 3>&-' deploy &
+writer=$!
+while test ! -e /tmp/fd-open; do sleep 0.1; done
+sh /publish-release.sh fd-release
+touch /tmp/fd-go
+wait "$writer"
+test "$(cat /srv/settlecore/releases/fd-release/index.html)" = orig
+printf '%s\n' "fd_handle_online_content=$(cat /srv/settlecore/releases/fd-release/index.html)"
+rm -f /tmp/fd-open /tmp/fd-go
 su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/bad-release; ln -s /etc/passwd /srv/settlecore/incoming/bad-release/not-allowed' deploy
 if sh /publish-release.sh bad-release; then exit 1; fi
 test ! -e /srv/settlecore/staging/bad-release

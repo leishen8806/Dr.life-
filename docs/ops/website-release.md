@@ -22,7 +22,7 @@
 
 `website.yml` 在 PR 与 main push 均构建 artifact；只有 main push 能通过 secrets 门禁。缺任一部署 secret 时部署作业跳过。门禁通过后仍必须等待 `website-production` 人工批准。
 
-批准后，专用账号仅可把 artifact 上传到 `/srv/settlecore/incoming/<release-id>/`。工作流随后通过受控 root 脚本发布：脚本验证 release-id，先把 incoming 原子移动到仅 root 可进入的 `staging/`，拒绝符号链接和非常规文件；再把内容改为 `root:root`（目录 `0755`、文件 `0644`），移动到 `releases/`，原子替换 `current` 符号链接并只保留最新五个 release。发布后，部署账号不能修改或新增已有 release 的文件；发布核验应以该账号分别尝试追加 `index.html` 与新增文件，二者都必须失败。
+批准后，专用账号仅可把 artifact 上传到 `/srv/settlecore/incoming/<release-id>/`。工作流随后通过受控 root 脚本发布：脚本验证 release-id，先把 incoming 原子移动到仅 root 可进入的 `staging/`，拒绝符号链接和非常规文件；再在 staging 内创建 root 所有的新目录并复制内容，设为 `root:root`（目录 `0755`、文件 `0644`）后移动到 `releases/`，删除旧 staging 内容，原子替换 `current` 符号链接并只保留最新五个 release。复制使线上文件拥有新的 inode，即使上传账号在移动前已打开写句柄，之后的句柄写入也不会影响线上文件。发布后，部署账号不能修改或新增已有 release 的文件；发布核验应以该账号分别尝试追加 `index.html`、新增文件及保留的写句柄写入，三者都必须失败或不影响线上内容。
 
 发布后无缓存核验首页、`/privacy`（预期 301→`/privacy/`）、`/terms`、404、`/_astro/` 和字体资源；记录状态码、安全头、gzip、缓存头和三语切换结果。
 
