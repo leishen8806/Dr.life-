@@ -11,7 +11,7 @@ const cjk = /[\u3400-\u9fff]/;
 test("English home content paths are wired for every repeated buyer-visible section", () => {
   const source = page("index");
 
-  for (const key of ["home.stats", "home.stages", "home.ecosystem", "home.chain", "home.partners"]) {
+  for (const key of ["home.stats", "home.stages", "home.ecosystemNodes", "home.chain", "home.partners"]) {
     assert.match(source, new RegExp("data-i18n=\\{`" + key + "\\.\\$\\{index\\}"), `${key} is not localized`);
   }
 });
@@ -58,4 +58,24 @@ test("English entries for the localized content contain no Chinese characters", 
 test("mobile English headings and supporting copy have a wrapping safeguard", () => {
   assert.match(styles, /@media\(max-width:520px\).*\.eyebrow.*overflow-wrap:anywhere/s);
   assert.match(styles, /@media\(max-width:520px\).*\.merchant-hero \.section-title.*overflow-wrap:anywhere/s);
+});
+
+test("confirmed mobile layout keeps hero stats and ecosystem nodes compact", () => {
+  assert.match(styles, /@media\(max-width:520px\).*\.stats\{grid-template-columns:repeat\(4,1fr\)/s);
+  assert.match(styles, /@media\(max-width:520px\).*\.ecosystem-orbit\{height:auto;display:grid;grid-template-columns:repeat\(2,1fr\)/s);
+  assert.match(styles, /@media\(max-width:520px\).*\.hero h1\{font-size:40px/s);
+});
+
+test("homepage and legal visible copy are i18n-backed", () => {
+  for (const name of ["index", "merchant"]) {
+    assert.doesNotMatch(page(name), cjk, `${name} page retains Chinese hard-coded copy`);
+  }
+  const legal = readFileSync(fileURLToPath(new URL("../src/components/LegalPage.astro", import.meta.url)), "utf8");
+  assert.doesNotMatch(legal, cjk, "legal page retains Chinese hard-coded copy");
+});
+
+test("confirmed-page Khmer additions do not fall back to Chinese", () => {
+  const copy = readFileSync(fileURLToPath(new URL("../src/i18n/page-copy.ts", import.meta.url)), "utf8");
+
+  assert.doesNotMatch(copy, /const km = zh/, "Khmer confirmed-page copy must not fall back to Chinese");
 });
