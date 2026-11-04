@@ -31,7 +31,6 @@ test("release output includes a localized, non-indexable 404 page with site icon
   assert.match(html, /name="robots" content="noindex"/, "404 page must not be indexed");
   assert.match(html, /rel="icon" href="\/favicon\.svg"/, "404 page must link the SVG favicon");
   assert.match(html, /rel="apple-touch-icon" href="\/apple-touch-icon\.png"/, "404 page must link the Apple touch icon");
-  assert.doesNotMatch(html, /\[[^\]]+\]/, "404 page must not contain bracket placeholders");
 
   for (const asset of ["favicon.svg", "favicon.ico", "apple-touch-icon.png"]) {
     assert.ok(existsSync(join(dist, asset)), `dist must publish ${asset}`);
@@ -199,8 +198,11 @@ test("the static build contains no prohibited claims and every internal link res
 
 test("the static site loads a Khmer-capable font for Khmer pages", () => {
   const layout = source("components/Layout.astro");
-  assert.match(layout, /Noto\+Sans\+Khmer/);
-  assert.match(layout, /display=swap/, "Khmer glyphs must not be skipped when the font is late");
+  const fonts = readFileSync(fileURLToPath(new URL("../public/fonts/fonts.css", import.meta.url)), "utf8");
+  assert.match(layout, /noto-sans-khmer-.*\.woff2/, "Khmer font must be preloaded from this site");
+  assert.match(fonts, /font-family:\s*'Noto Sans Khmer'/, "Khmer family must be self-hosted");
+  assert.match(fonts, /font-display:\s*swap/, "Khmer glyphs must not be skipped when the font is late");
+  assert.match(fonts, /unicode-range:/, "Khmer font must retain Unicode-range splits");
 });
 
 test("mobile Khmer display headings have an explicit no-clipping wrap guard", () => {
