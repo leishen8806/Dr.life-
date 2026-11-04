@@ -26,9 +26,11 @@ PR 只构建和上传 artifact，绝不发布。合并后的生产部署作业�
 
 ## 回滚
 
-1. 停止批准任何尚未批准的 `website-production` 作业。
+前置：回滚属于生产变更，须取得董事会批准并在故障记录中填写审批编号；实施人须拥有 Cloudflare Pages 项目的 deployment rollback 权限，以及取消或停止未批准 GitHub Environment 作业的权限。权限或批准缺失时不得继续操作。
+
+1. 停止或取消任何尚未批准的 `website-production` 作业。
 2. Cloudflare Dashboard → Workers & Pages → Pages 项目 → Deployments，找到上一成功生产 deployment，选择 **Rollback to this deployment** 并确认。
-3. 用无缓存请求核对首页、`/privacy`、`/terms` 和安全响应头；记录回滚时间与恢复的 deployment 标识。
+3. 用无缓存请求核对首页、`/privacy`、`/terms` 均成功响应，且响应安全头符合随站发布的 `_headers`；在故障记录中写入回滚时间、恢复的 deployment 标识和核验结果。
 4. 保留相关 GitHub `website-dist` artifact 至少 14 天。若 Pages 控制台无法回滚，在董事会批准后才可用对应 artifact 重新发布；本卡不授权该操作。
 5. 创建故障记录，说明触发条件、影响、恢复版本和后续修复负责人。
 
