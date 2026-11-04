@@ -1,0 +1,100 @@
+name: Website
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/website/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".github/workflows/website.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/website/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - ".github/workflows/website.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build website
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Enable pnpm
+        run: corepack enable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm --filter @drlife/website lint
+      - name: Type check
+        run: pnpm --filter @drlife/website typecheck
+      - name: Test
+        run: pnpm --filter @drlife/website test
+      - name: Build three-language static site
+        run: pnpm --filter @drlife/website build
+      - name: Upload static artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-dist
+          path: apps/website/dist
+          if-no-files-found: error
+          retention-days: 14
+
+  deployment-gate:
+    name: Check production deployment configuration
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.configuration.outputs.ready }}
+    steps:
+      - id: configuration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$CLOUDFLARE_PAGES_PROJECT" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy-production:
+    name: Deploy production
+    if: needs.deployment-gate.outputs.ready == 'true'
+    needs: [build, deployment-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: website-production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+    steps:
+      - name: Download approved build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: website-dist
+          path: website-dist
+      - name: Deploy approved artifact to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          command: pages deploy website-dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch main
