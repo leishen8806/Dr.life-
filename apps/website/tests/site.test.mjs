@@ -45,12 +45,15 @@ test("release output includes a localized, non-indexable 404 page with site icon
 
 test("404 copy is complete in Chinese, English and Khmer without placeholders", () => {
   const copy = source("i18n/not-found-copy.ts");
+  const notFound = source("pages/404.astro");
 
   for (const locale of ["zh", "en", "km"]) {
     assert.match(copy, new RegExp(`${locale}:\\s*\\{[^}]+title:[^}]+intro:[^}]+home:[^}]+merchant:[^}]+contact:`, "s"));
   }
   assert.match(copy, /draft:/, "Khmer copy must disclose its draft status");
   assert.doesNotMatch(copy, /\[[^\]]+\]/, "404 copy must not contain bracket placeholders");
+  const main = notFound.match(/<main class="not-found-page">([\s\S]*?)<\/main>/)?.[1] || "";
+  assert.doesNotMatch(main, /\[[^\]]+\]/, "404 main content must not contain bracket placeholders");
 });
 
 test("release output uses self-hosted fonts only", () => {
