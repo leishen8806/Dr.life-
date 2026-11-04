@@ -109,7 +109,7 @@ jobs:
           chmod 600 "$key" "$known_hosts"
           remote="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts"
           target="$WEBSITE_DEPLOY_USER@$WEBSITE_DEPLOY_HOST"
-          $remote "$target" "mkdir -p /srv/settlecore/releases/.incoming-$release_id"
+          $remote "$target" "mkdir -p /srv/settlecore/incoming/$release_id"
           rsync -a --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
-            -e "$remote" website-dist/ "$target:/srv/settlecore/releases/.incoming-$release_id/"
-          $remote "$target" "set -eu; root=/srv/settlecore; mv \"\$root/releases/.incoming-$release_id\" \"\$root/releases/$release_id\"; ln -s \"releases/$release_id\" \"\$root/.current.next\"; mv -Tf \"\$root/.current.next\" \"\$root/current\"; ls -1dt \"\$root\"/releases/* | tail -n +6 | xargs -r rm -rf"
+            -e "$remote" website-dist/ "$target:/srv/settlecore/incoming/$release_id/"
+          $remote "$target" "sudo /usr/local/sbin/settlecore-website-publish $release_id"
