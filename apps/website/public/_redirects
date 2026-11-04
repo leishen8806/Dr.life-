@@ -1,0 +1,3 @@
+# Cloudflare Pages _redirects only supports paths, not host names.
+# Configure the required www.settlecore.org -> settlecore.org 301 as the
+# Cloudflare Bulk Redirect documented in docs/ops/website-release.md.
