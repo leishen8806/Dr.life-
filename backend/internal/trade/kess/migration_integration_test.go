@@ -45,7 +45,7 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 	if err := goose.Up(database, migrations); err != nil {
 		t.Fatal(err)
 	}
-	if err := goose.DownTo(database, migrations, 25); err != nil {
+	if err := goose.DownTo(database, migrations, 52); err != nil {
 		t.Fatal(err)
 	}
 	var exists bool
