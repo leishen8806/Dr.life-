@@ -5,17 +5,32 @@ $siteConfig = Join-Path $root 'deploy/nginx/settlecore.org.conf'
 $headers = Join-Path $root 'deploy/nginx/settlecore-security-headers.conf'
 $rollback = Join-Path $root 'deploy/website/rollback-current.sh'
 $publish = Join-Path $root 'deploy/website/publish-release.sh'
+$releaseGuide = Join-Path $root 'docs/ops/website-release.md'
+$dockerExe = 'C:\Program Files\Docker\Docker\resources\bin\docker.exe'
 $temp = Join-Path ([IO.Path]::GetTempPath()) ("settlecore-nginx-" + [guid]::NewGuid())
 
-function Invoke-Docker { & docker @args; if ($LASTEXITCODE -ne 0) { throw 'docker command failed' } }
+function Invoke-Docker { & $dockerExe @args; if ($LASTEXITCODE -ne 0) { throw 'docker command failed' } }
 function Invoke-Curl { param([string[]]$CurlArgs); $output = & curl.exe @CurlArgs; if ($LASTEXITCODE -ne 0) { throw 'curl command failed' }; $output }
 function Assert-Contains { param([string]$Output, [string]$Expected); if ($Output -notmatch [regex]::Escape($Expected)) { throw "missing expected output: $Expected`n$Output" } }
 function Assert-Equal { param([string]$Actual, [string]$Expected); if ($Actual -cne $Expected) { throw "expected: $Expected`nactual: $Actual" } }
+function Test-EffectiveSecurePath { param([string]$SudoList, [string]$ExpectedPath); $SudoList -match "(?m)^\s*secure_path=$([regex]::Escape($ExpectedPath))\s*$" }
 
 try {
   Assert-Equal (Get-Content -LiteralPath $publish -TotalCount 1) '#!/bin/sh'
   Assert-Equal (Get-Content -LiteralPath $rollback -TotalCount 1) '#!/bin/sh'
   Assert-Contains (Get-Content -Raw -LiteralPath $siteConfig) 'disable_symlinks on from=$document_root;'
+  Assert-Contains (Get-Content -Raw -LiteralPath $releaseGuide) 'sudo -l -U settlecore-deploy'
+  $securePath = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+  $sudoCases = @(
+    @{ Name = 'effective'; Output = "Matching Defaults entries for settlecore-deploy on host:`n    secure_path=$securePath"; Expected = $true }
+    @{ Name = 'commented'; Output = "# secure_path=$securePath"; Expected = $false }
+    @{ Name = 'disabled'; Output = 'Defaults !secure_path'; Expected = $false }
+    @{ Name = 'missing'; Output = 'Matching Defaults entries for settlecore-deploy on host:'; Expected = $false }
+  )
+  foreach ($case in $sudoCases) {
+    Assert-Equal ([string](Test-EffectiveSecurePath $case.Output $securePath)) ([string]$case.Expected)
+  }
+  Write-Host 'R1 effective sudoers fixture verification passed.'
   $first = '20261104T000001Z-first'; $second = '20261104T000002Z-second'; $third = '20261104T000003Z-third'
   New-Item -ItemType Directory -Path "$temp/site/releases/$first", "$temp/site/releases/$second", "$temp/site/releases/$third", "$temp/snippets" | Out-Null
   Copy-Item -Recurse "$dist/*" "$temp/site/releases/$first/"
@@ -67,7 +82,7 @@ http { include /etc/nginx/mime.types; include /work/settlecore.org.conf; }
   $symlink = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: settlecore.org', 'http://127.0.0.1:18081/escape.txt')
   Write-Host $symlink
   if ($symlink -match '200 OK') { throw 'nginx followed a release symlink outside the document root' }
-  $rollbackCommand = 'set -eu; ln -s releases/' + $third + ' /srv/settlecore/current; sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $second + '; sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $first + '; if sh /rollback-current.sh; then exit 1; fi; test $(readlink /srv/settlecore/current) = releases/' + $first
+  $rollbackCommand = 'set -eu; mkdir -p /tmp/test-bin; printf "#!/bin/sh\nexit 66\n" >/tmp/test-bin/find; chmod 0755 /tmp/test-bin/find; ln -s releases/' + $third + ' /srv/settlecore/current; ln -s releases/' + $first + ' /srv/settlecore/.current.next; PATH=/tmp/test-bin:$PATH sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $second + '; sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $first + '; if sh /rollback-current.sh; then exit 1; fi; test $(readlink /srv/settlecore/current) = releases/' + $first
   Invoke-Docker run --rm --network none -v "${temp}/site:/srv/settlecore" -v "${rollback}:/rollback-current.sh:ro" alpine:3.20 sh -c $rollbackCommand
   $publishSecurityCommand = @'
 set -eu
@@ -119,10 +134,11 @@ EOF
 chmod 0755 /tmp/test-bin/find
 su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/window-release; printf safe > /srv/settlecore/incoming/window-release/index.html' deploy
 current_before=$(readlink /srv/settlecore/current)
-if sh /publish-release.sh window-release; then exit 1; fi
-test ! -e /srv/settlecore/releases/window-release
-test "$(readlink /srv/settlecore/current)" = "$current_before"
-rm -f /tmp/test-bin/find
+  sh /publish-release.sh window-release
+  test -f /srv/settlecore/releases/window-release/index.html
+  test "$(readlink /srv/settlecore/current)" = releases/window-release
+  current_before=$(readlink /srv/settlecore/current)
+  rm -f /tmp/test-bin/find
 cat >/tmp/test-bin/cp <<'EOF'
 #!/bin/sh
 if test "$1" = -R && test "$2" = --no-dereference; then
@@ -146,6 +162,6 @@ test "$(readlink /srv/settlecore/current)" = "$current_before"
   Invoke-Docker run --rm --network none -v "${publish}:/publish-release.sh:ro" alpine:3.20 sh -c "printf '%s' $publishSecurityEncoded | base64 -d | sh"
   Write-Host 'AC-2 and AC-3 container verification passed.'
 } finally {
-  if (Get-Command docker -ErrorAction SilentlyContinue) { docker rm -f settlecore-nginx-test 2>$null }
+  if (Test-Path -LiteralPath $dockerExe) { & $dockerExe rm -f settlecore-nginx-test 2>$null }
   Remove-Item -Recurse -Force $temp -ErrorAction SilentlyContinue
 }
