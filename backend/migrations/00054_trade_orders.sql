@@ -50,11 +50,13 @@ CREATE TABLE trade.order_event (
     CONSTRAINT ux_trade_order_event_source UNIQUE (merchant_order_id, source_type, source_ref)
 );
 
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION trade.reject_order_event_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     RAISE EXCEPTION 'trade.order_event is append-only' USING ERRCODE = '55000';
 END;
 $$;
+-- +goose StatementEnd
 CREATE TRIGGER trg_trade_order_event_immutable BEFORE UPDATE OR DELETE ON trade.order_event
     FOR EACH ROW EXECUTE FUNCTION trade.reject_order_event_mutation();
 
