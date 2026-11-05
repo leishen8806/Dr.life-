@@ -5,10 +5,10 @@
 在安装 sudoers 示例行之前，先仅作只读校验，确认 `settlecore-deploy` 的**生效值**：
 
 ```sh
-sudo -l -U settlecore-deploy | grep -E '^[[:space:]]*secure_path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin[[:space:]]*$'
+sudo -l -U settlecore-deploy | tr -d '\\' | tr ',' '\n' | grep -E '^[[:space:]]*secure_path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin(:/snap/bin)?[[:space:]]*$'
 ```
 
-预期输出恰为一行 `secure_path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`（可带行首空白）。若没有该输出，立即停止，不继续后续步骤，并把命令输出交给项目负责人；被注释的 `secure_path`、`Defaults !secure_path` 或仅 `env_keep+=PATH` 都不算通过。服务器为 Debian/Ubuntu，发布脚本以 GNU `cp -R --no-dereference` 复制；复制前后都会校验非常规文件，任一失败会删除临时目录、写入 stderr 并非零退出，且不改动 `releases/` 或 `current`。Nginx 另以 `disable_symlinks on from=$document_root;` 拒绝跟随站点根目录下的符号链接。
+预期输出为一项 `secure_path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`，或其带 `:/snap/bin` 的 Ubuntu 变体。该命令先去掉 sudo 列表对冒号的转义，再把逗号分隔的生效 Defaults 拆为单项后精确匹配 `secure_path`；若没有该输出，立即停止，不继续后续步骤，并把命令输出交给项目负责人；被注释的 `secure_path`、`Defaults !secure_path` 或仅 `env_keep+=PATH` 都不算通过。服务器为 Debian/Ubuntu，发布脚本以 GNU `cp -R --no-dereference` 复制；复制前后都会校验非常规文件，任一失败会删除临时目录、写入 stderr 并非零退出，且不改动 `releases/` 或 `current`。Nginx 另以 `disable_symlinks on from=$document_root;` 拒绝跟随站点根目录下的符号链接。
 
 适用 `apps/website` 的 Astro 静态产物。页面仍按“草案上线”发布，方括号占位与草案横幅不得在本流程中替换。站点为独立 nginx 站点：`settlecore.org` 提供静态文件，`www` 保留路径和查询参数并 301 到主域名。
 

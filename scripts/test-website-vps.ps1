@@ -13,24 +13,31 @@ function Invoke-Docker { & $dockerExe @args; if ($LASTEXITCODE -ne 0) { throw 'd
 function Invoke-Curl { param([string[]]$CurlArgs); $output = & curl.exe @CurlArgs; if ($LASTEXITCODE -ne 0) { throw 'curl command failed' }; $output }
 function Assert-Contains { param([string]$Output, [string]$Expected); if ($Output -notmatch [regex]::Escape($Expected)) { throw "missing expected output: $Expected`n$Output" } }
 function Assert-Equal { param([string]$Actual, [string]$Expected); if ($Actual -cne $Expected) { throw "expected: $Expected`nactual: $Actual" } }
-function Test-EffectiveSecurePath { param([string]$SudoList, [string]$ExpectedPath); $SudoList -match "(?m)^\s*secure_path=$([regex]::Escape($ExpectedPath))\s*$" }
+function Test-GuideSudoersCase {
+  param([string]$Pipeline, [string]$SudoList)
+  $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($SudoList))
+  & $dockerExe run --rm --network none alpine:3.20 sh -c "printf '%s' $encoded | base64 -d | $Pipeline" *> $null
+  return $LASTEXITCODE -eq 0
+}
 
 try {
   Assert-Equal (Get-Content -LiteralPath $publish -TotalCount 1) '#!/bin/sh'
   Assert-Equal (Get-Content -LiteralPath $rollback -TotalCount 1) '#!/bin/sh'
   Assert-Contains (Get-Content -Raw -LiteralPath $siteConfig) 'disable_symlinks on from=$document_root;'
-  Assert-Contains (Get-Content -Raw -LiteralPath $releaseGuide) 'sudo -l -U settlecore-deploy'
+  $guideCommand = Get-Content -LiteralPath $releaseGuide | Where-Object { $_ -like 'sudo -l -U settlecore-deploy*' }
+  Assert-Equal ([string]$guideCommand.Count) '1'
+  $guidePipeline = $guideCommand.Substring($guideCommand.IndexOf('|') + 1).Trim()
   $securePath = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
   $sudoCases = @(
-    @{ Name = 'effective'; Output = "Matching Defaults entries for settlecore-deploy on host:`n    secure_path=$securePath"; Expected = $true }
+    @{ Name = 'effective'; Output = "Matching Defaults entries for settlecore-deploy on host:`n    env_reset, mail_badpass, secure_path=$($securePath -replace ':', '\\:'), use_pty"; Expected = $true }
     @{ Name = 'commented'; Output = "# secure_path=$securePath"; Expected = $false }
     @{ Name = 'disabled'; Output = 'Defaults !secure_path'; Expected = $false }
     @{ Name = 'missing'; Output = 'Matching Defaults entries for settlecore-deploy on host:'; Expected = $false }
   )
   foreach ($case in $sudoCases) {
-    Assert-Equal ([string](Test-EffectiveSecurePath $case.Output $securePath)) ([string]$case.Expected)
+    Assert-Equal ([string](Test-GuideSudoersCase $guidePipeline $case.Output)) ([string]$case.Expected)
   }
-  Write-Host 'R1 effective sudoers fixture verification passed.'
+  Write-Host 'R1 guide-command sudoers fixture verification passed.'
   $first = '20261104T000001Z-first'; $second = '20261104T000002Z-second'; $third = '20261104T000003Z-third'
   New-Item -ItemType Directory -Path "$temp/site/releases/$first", "$temp/site/releases/$second", "$temp/site/releases/$third", "$temp/snippets" | Out-Null
   Copy-Item -Recurse "$dist/*" "$temp/site/releases/$first/"
@@ -87,16 +94,6 @@ http { include /etc/nginx/mime.types; include /work/settlecore.org.conf; }
   $publishSecurityCommand = @'
 set -eu
 mkdir -p /tmp/test-bin
-cat >/tmp/test-bin/cp <<'EOF'
-#!/bin/sh
-if test "$1" = -R && test "$2" = --no-dereference; then
-  shift 2
-  exec /bin/cp -R -P "$@"
-fi
-exec /bin/cp "$@"
-EOF
-chmod 0755 /tmp/test-bin/cp
-PATH=/tmp/test-bin:$PATH
 adduser -D -u 1001 deploy
 install -d -o deploy -g deploy -m 0700 /srv/settlecore/incoming
 install -d -o root -g root -m 0700 /srv/settlecore/staging
@@ -124,6 +121,16 @@ if sh /publish-release.sh bad-release; then exit 1; fi
 test ! -e /srv/settlecore/staging/bad-release
 cat >/tmp/test-bin/find <<'EOF'
 #!/bin/sh
+exit 66
+EOF
+chmod 0755 /tmp/test-bin/find
+su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/path-release; printf safe > /srv/settlecore/incoming/path-release/index.html' deploy
+PATH=/tmp/test-bin:$PATH sh /publish-release.sh path-release
+test -f /srv/settlecore/releases/path-release/index.html
+rm -f /tmp/test-bin/find
+mkdir -p /usr/local/bin
+cat >/usr/local/bin/find <<'EOF'
+#!/bin/sh
 /usr/bin/find "$@"
 result=$?
 if test "$1" = /srv/settlecore/staging/window-release; then
@@ -131,15 +138,14 @@ if test "$1" = /srv/settlecore/staging/window-release; then
 fi
 exit "$result"
 EOF
-chmod 0755 /tmp/test-bin/find
+chmod 0755 /usr/local/bin/find
 su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/window-release; printf safe > /srv/settlecore/incoming/window-release/index.html' deploy
 current_before=$(readlink /srv/settlecore/current)
-  sh /publish-release.sh window-release
-  test -f /srv/settlecore/releases/window-release/index.html
-  test "$(readlink /srv/settlecore/current)" = releases/window-release
-  current_before=$(readlink /srv/settlecore/current)
-  rm -f /tmp/test-bin/find
-cat >/tmp/test-bin/cp <<'EOF'
+if sh /publish-release.sh window-release; then exit 1; fi
+test ! -e /srv/settlecore/releases/window-release
+test "$(readlink /srv/settlecore/current)" = "$current_before"
+rm -f /usr/local/bin/find
+cat >/usr/local/bin/cp <<'EOF'
 #!/bin/sh
 if test "$1" = -R && test "$2" = --no-dereference; then
   shift 2
@@ -152,11 +158,12 @@ if test "$1" = -R && test "$2" = --no-dereference; then
 fi
 exec /bin/cp "$@"
 EOF
-chmod 0755 /tmp/test-bin/cp
+chmod 0755 /usr/local/bin/cp
 su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/postcopy-release; printf safe > /srv/settlecore/incoming/postcopy-release/index.html' deploy
 if sh /publish-release.sh postcopy-release; then exit 1; fi
 test ! -e /srv/settlecore/releases/postcopy-release
 test "$(readlink /srv/settlecore/current)" = "$current_before"
+rm -f /usr/local/bin/cp
 '@
   $publishSecurityEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($publishSecurityCommand))
   Invoke-Docker run --rm --network none -v "${publish}:/publish-release.sh:ro" alpine:3.20 sh -c "printf '%s' $publishSecurityEncoded | base64 -d | sh"
