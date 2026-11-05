@@ -25,7 +25,13 @@ func (s *stubAvailability) Reserve(_ context.Context, sku string, n int64) error
 	s.reserved[sku] += n
 	return nil
 }
-func (s *stubAvailability) Release(context.Context, string, int64) error { return nil }
+func (s *stubAvailability) Release(_ context.Context, sku string, n int64) error {
+	if s.reserved[sku] < n {
+		return ErrInsufficientAvailability
+	}
+	s.reserved[sku] -= n
+	return nil
+}
 
 type stubOrders struct{ created CreateOrder }
 
@@ -63,5 +69,15 @@ func TestPlaceOrderRejectsFrozenAndInsufficientWithoutWriting(t *testing.T) {
 				t.Fatal("wrote order")
 			}
 		})
+	}
+}
+
+func TestReleaseReservationsReturnsEachLine(t *testing.T) {
+	a := &stubAvailability{available: map[string]int64{}, reserved: map[string]int64{"A": 2, "B": 3}}
+	if err := ReleaseReservations(context.Background(), a, []OrderItem{{SKUPublicID: "A", Quantity: 2}, {SKUPublicID: "B", Quantity: 3}}); err != nil {
+		t.Fatal(err)
+	}
+	if a.reserved["A"] != 0 || a.reserved["B"] != 0 {
+		t.Fatalf("reservations not released: %v", a.reserved)
 	}
 }

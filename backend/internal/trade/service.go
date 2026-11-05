@@ -94,3 +94,18 @@ func (s *Service) Place(ctx context.Context, buyer int64, lines []OrderLineInput
 	}
 	return order, nil
 }
+
+// ReleaseReservations releases local stock reservations when an order is
+// cancelled or expires before payment. It consumes the order-line snapshot and
+// therefore never needs current catalog data.
+func ReleaseReservations(ctx context.Context, availability Availability, items []OrderItem) error {
+	for _, item := range items {
+		if item.SKUPublicID == "" || item.Quantity <= 0 {
+			return ErrInvalidOrderLine
+		}
+		if err := availability.Release(ctx, item.SKUPublicID, item.Quantity); err != nil {
+			return err
+		}
+	}
+	return nil
+}
