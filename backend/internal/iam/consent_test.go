@@ -3,6 +3,8 @@ package iam
 import (
 	"context"
 	"errors"
+	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -66,6 +68,45 @@ func TestConsentServiceNeedsConsentRejectsNilReceiver(t *testing.T) {
 
 	if _, err := service.NeedsConsent(context.Background(), "account-1"); !errors.Is(err, ErrInvalidLegalDocumentKind) {
 		t.Fatalf("NeedsConsent error = %v, want ErrInvalidLegalDocumentKind", err)
+	}
+}
+
+func TestConsentServiceStatusRejectsNilStore(t *testing.T) {
+	service := NewConsentService(nil, time.Now)
+
+	if _, err := service.Status(context.Background(), "account-1"); !errors.Is(err, ErrInvalidLegalDocumentKind) {
+		t.Fatalf("Status error = %v, want ErrInvalidLegalDocumentKind", err)
+	}
+}
+
+func TestConsentServiceNeedsConsentRejectsNilStore(t *testing.T) {
+	service := NewConsentService(nil, time.Now)
+
+	needs, err := service.NeedsConsent(context.Background(), "account-1")
+	if !errors.Is(err, ErrInvalidLegalDocumentKind) || needs {
+		t.Fatalf("NeedsConsent = %v, %v; want false, ErrInvalidLegalDocumentKind", needs, err)
+	}
+}
+
+func TestConsentServiceNeedsConsentKeepsOwnFailClosedGuard(t *testing.T) {
+	source, err := os.ReadFile("consent.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	methodStart := strings.Index(string(source), "func (s *ConsentService) NeedsConsent(")
+	if methodStart < 0 {
+		t.Fatal("NeedsConsent method not found")
+	}
+	method := string(source[methodStart:])
+	methodEnd := strings.Index(method, "\n}\n")
+	if methodEnd < 0 {
+		t.Fatal("NeedsConsent method end not found")
+	}
+	method = method[:methodEnd]
+	guardAt := strings.Index(method, "if s == nil || s.store == nil {")
+	statusCallAt := strings.Index(method, "s.Status(ctx, accountID)")
+	if guardAt < 0 || statusCallAt < 0 || guardAt > statusCallAt {
+		t.Fatal("NeedsConsent must reject a nil store before delegating to Status")
 	}
 }
 

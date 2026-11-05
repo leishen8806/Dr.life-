@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -162,6 +163,52 @@ func TestConsentMigrationAndCurrentVersionEnforcement(t *testing.T) {
 	}
 	if deleteTag.RowsAffected() != 1 {
 		t.Fatalf("deleted unpublished draft rows=%d, want 1", deleteTag.RowsAffected())
+	}
+	var beforeBodyZH, beforeBodyEN, beforeBodyKM, beforeApprovalRef string
+	var beforePublishedBy int64
+	var beforePublishedAt time.Time
+	if err := pool.QueryRow(ctx, `
+		SELECT body_zh, body_en, body_km, published_by, published_at, approval_ref
+		FROM ops.legal_doc WHERE kind='terms' AND version='v1.0'`).Scan(
+		&beforeBodyZH, &beforeBodyEN, &beforeBodyKM, &beforePublishedBy, &beforePublishedAt, &beforeApprovalRef,
+	); err != nil {
+		t.Fatal(err)
+	}
+	for name, statement := range map[string]string{
+		"delete":              `DELETE FROM ops.legal_doc WHERE kind='terms' AND version='v1.0'`,
+		"update body":         `UPDATE ops.legal_doc SET body_zh='tampered' WHERE kind='terms' AND version='v1.0'`,
+		"update published_by": `UPDATE ops.legal_doc SET published_by=published_by WHERE kind='terms' AND version='v1.0'`,
+		"update published_at": `UPDATE ops.legal_doc SET published_at=published_at + interval '1 minute' WHERE kind='terms' AND version='v1.0'`,
+		"update approval_ref": `UPDATE ops.legal_doc SET approval_ref='tampered' WHERE kind='terms' AND version='v1.0'`,
+	} {
+		t.Run("published terms are immutable/"+name, func(t *testing.T) {
+			_, err := pool.Exec(ctx, statement)
+			var pgErr *pgconn.PgError
+			if !errors.As(err, &pgErr) || pgErr.Code != "P0001" {
+				t.Fatalf("error=%v, want SQLSTATE P0001", err)
+			}
+		})
+	}
+	var publishedRows int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM ops.legal_doc WHERE kind='terms' AND version='v1.0'`).Scan(&publishedRows); err != nil {
+		t.Fatal(err)
+	}
+	if publishedRows != 1 {
+		t.Fatalf("published terms rows=%d, want 1", publishedRows)
+	}
+	var afterBodyZH, afterBodyEN, afterBodyKM, afterApprovalRef string
+	var afterPublishedBy int64
+	var afterPublishedAt time.Time
+	if err := pool.QueryRow(ctx, `
+		SELECT body_zh, body_en, body_km, published_by, published_at, approval_ref
+		FROM ops.legal_doc WHERE kind='terms' AND version='v1.0'`).Scan(
+		&afterBodyZH, &afterBodyEN, &afterBodyKM, &afterPublishedBy, &afterPublishedAt, &afterApprovalRef,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if afterBodyZH != beforeBodyZH || afterBodyEN != beforeBodyEN || afterBodyKM != beforeBodyKM ||
+		afterPublishedBy != beforePublishedBy || !afterPublishedAt.Equal(beforePublishedAt) || afterApprovalRef != beforeApprovalRef {
+		t.Fatal("published terms changed after rejected mutations")
 	}
 	current, err := service.CurrentDocument(ctx, iam.LegalDocumentTerms)
 	if err != nil || current.Version != "v1.0" {
