@@ -89,9 +89,12 @@
 ### `trade`
 | 表 | 关键字段与约束 |
 |---|---|
-| `order` | id, order_no unique, buyer_account_id, merchant_id, status (`unpaid/paid_proof/shipped/arrived/closed/problem/cancelled`), total_e4, delivery_mode (`zto/self`), delivery_fee_hold_txn_id, delivery_fee_release_txn_id, problem_note, closed_at |
-| `order_item` | order_id, product_id, qty, unit_price_e4（下单时快照，含阶梯匹配结果）, vol_m3 |
-| `payment_proof` | id, order_id / plan_batch_id, amount_e4, ref, proof_file_id, recorded_by, created_at | **货款凭证，不进账务分录**（线下付款，只留痕）；流水页通过视图并列显示 |
+| `buyer_order` | id, public_id, buyer_account_id, total_e4；一个买家一次提交产生一个父订单，金额等于其子订单金额之和 |
+| `merchant_order` | id, public_id, buyer_order_id, merchant_id, external_order_id=`DRL-<public_id>`, status, total_e4, version；每个子订单只属于一个商家，`UNIQUE(buyer_order_id, merchant_id)` |
+| `order_line` | merchant_order_id, sku_public_id, quantity, unit_price_e4, line_total_e4；SKU 与单价均为下单快照，`line_total_e4=quantity*unit_price_e4` |
+| `order_event` | merchant_order_id, from_status, to_status, source_type (`kess_result/routefit_event/system`), source_ref, created_at；来源组合唯一、只追加，禁止 UPDATE/DELETE |
+
+子订单主线状态为 `awaiting_payment → paid → submitted → accepted → in_fulfillment → shipped → delivered_verified → settled`；本阶段还允许 `awaiting_payment → cancelled` 与 `submitted → rejected`。`rejected/cancelled/delivery_failed/returning/returned/exception` 为旁路状态，其他迁移由后续任务实现。以上模型取代旧 `order` 的 `unpaid/paid_proof/shipped/arrived/closed/problem/cancelled` 状态和 `order_item`；线下 `payment_proof` 已取消，不再作为订单领域模型。
 | `rfq` | id, buyer_account_id, name, area/loc, category_id, qty_text, budget_e4, due_date, target_merchant_id, status |
 | `quote` | id, rfq_id, merchant_id, price_e4, lead_days, valid_until, note, selected boolean；`UNIQUE(rfq_id,merchant_id)` |
 | `project` | id, buyer_account_id, company_merchant_id, name, area, budget_e4, status |
