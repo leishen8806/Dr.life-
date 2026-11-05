@@ -19,8 +19,13 @@ test -d "$staging"
 test ! -e "$staged"
 test ! -e "$new"
 test ! -e "$releases/$release_id"
+rm -rf "$site_root/.current.next"
 
 validate_release_tree() {
+  if find "$1" -type f -links +1 -print -quit | grep -q .; then
+    printf '%s\n' 'release contains a multiply linked file' >&2
+    return 1
+  fi
   if find "$1" ! -type d ! -type f -print -quit | grep -q .; then
     printf '%s\n' 'release contains a symbolic link or special file' >&2
     return 1
@@ -51,7 +56,6 @@ find "$new" -type d -exec chmod 0755 {} +
 find "$new" -type f -exec chmod 0644 {} +
 mv "$new" "$releases/$release_id"
 rm -rf "$staged"
-rm -f "$site_root/.current.next"
 ln -s "releases/$release_id" "$site_root/.current.next"
 mv -Tf "$site_root/.current.next" "$site_root/current"
 ls -1dt "$releases"/* | tail -n +6 | xargs -r rm -rf
