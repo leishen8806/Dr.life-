@@ -106,7 +106,7 @@ http { include /etc/nginx/mime.types; include /work/settlecore.org.conf; }
   $symlink = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: settlecore.org', 'http://127.0.0.1:18081/escape.txt')
   Write-Host $symlink
   if ($symlink -match '200 OK') { throw 'nginx followed a release symlink outside the document root' }
-  $rollbackCommand = 'set -eu; mkdir -p /tmp/test-bin; printf "#!/bin/sh\nexit 66\n" >/tmp/test-bin/find; chmod 0755 /tmp/test-bin/find; ln -s releases/' + $third + ' /srv/settlecore/current; ln -s releases/' + $first + ' /srv/settlecore/.current.next; PATH=/tmp/test-bin:$PATH sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $second + '; sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $first + '; if sh /rollback-current.sh; then exit 1; fi; test $(readlink /srv/settlecore/current) = releases/' + $first
+  $rollbackCommand = 'set -eu; mkdir -p /tmp/test-bin; printf ''#!/bin/sh\nexit 66\n'' >/tmp/test-bin/find; chmod 0755 /tmp/test-bin/find; ln -s releases/' + $third + ' /srv/settlecore/current; ln -s releases/' + $first + ' /srv/settlecore/.current.next; PATH=/tmp/test-bin:$PATH sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $second + '; sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $first + '; if sh /rollback-current.sh; then exit 1; fi; test $(readlink /srv/settlecore/current) = releases/' + $first
   Invoke-Docker run --rm --network none -v "${temp}/site:/srv/settlecore" -v "${rollback}:/rollback-current.sh:ro" alpine:3.20 sh -c $rollbackCommand
   $publishSecurityCommand = @'
 set -eu
