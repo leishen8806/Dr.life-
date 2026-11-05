@@ -1,5 +1,15 @@
 # 官网发布与回滚（VPS nginx）
 
+## 第 3 步 sudoers 前置校验（必须先执行）
+
+在安装 sudoers 示例行之前，先仅作只读校验：
+
+```sh
+sudo grep -n -- 'secure_path' /etc/sudoers /etc/sudoers.d/*
+```
+
+预期必须有输出；若没有输出，立即停止，不继续后续步骤，并把命令输出交给项目负责人。服务器为 Debian/Ubuntu，发布脚本以 GNU `cp -R --no-dereference` 复制；复制前后都会校验非常规文件，任一失败会删除临时目录、写入 stderr 并非零退出，且不改动 `releases/` 或 `current`。Nginx 另以 `disable_symlinks on from=$document_root;` 拒绝跟随站点根目录下的符号链接。
+
 适用 `apps/website` 的 Astro 静态产物。页面仍按“草案上线”发布，方括号占位与草案横幅不得在本流程中替换。站点为独立 nginx 站点：`settlecore.org` 提供静态文件，`www` 保留路径和查询参数并 301 到主域名。
 
 ## 架构与安全

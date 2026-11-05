@@ -10,22 +10,28 @@ $temp = Join-Path ([IO.Path]::GetTempPath()) ("settlecore-nginx-" + [guid]::NewG
 function Invoke-Docker { & docker @args; if ($LASTEXITCODE -ne 0) { throw 'docker command failed' } }
 function Invoke-Curl { param([string[]]$CurlArgs); $output = & curl.exe @CurlArgs; if ($LASTEXITCODE -ne 0) { throw 'curl command failed' }; $output }
 function Assert-Contains { param([string]$Output, [string]$Expected); if ($Output -notmatch [regex]::Escape($Expected)) { throw "missing expected output: $Expected`n$Output" } }
+function Assert-Equal { param([string]$Actual, [string]$Expected); if ($Actual -cne $Expected) { throw "expected: $Expected`nactual: $Actual" } }
 
 try {
+  Assert-Equal (Get-Content -LiteralPath $publish -TotalCount 1) '#!/bin/sh'
+  Assert-Equal (Get-Content -LiteralPath $rollback -TotalCount 1) '#!/bin/sh'
+  Assert-Contains (Get-Content -Raw -LiteralPath $siteConfig) 'disable_symlinks on from=$document_root;'
   $first = '20261104T000001Z-first'; $second = '20261104T000002Z-second'; $third = '20261104T000003Z-third'
   New-Item -ItemType Directory -Path "$temp/site/releases/$first", "$temp/site/releases/$second", "$temp/site/releases/$third", "$temp/snippets" | Out-Null
   Copy-Item -Recurse "$dist/*" "$temp/site/releases/$first/"
   Copy-Item -Recurse "$dist/*" "$temp/site/releases/$second/"
   Copy-Item -Recurse "$dist/*" "$temp/site/releases/$third/"
-  Set-Content -NoNewline "$temp/site/releases/$first/version.txt" 'first'
-  Set-Content -NoNewline "$temp/site/releases/$second/version.txt" 'second'
-  Set-Content -NoNewline "$temp/site/releases/$third/version.txt" 'third'
+  Set-Content -NoNewline -LiteralPath "$temp/site/releases/$first/version.txt" -Value 'first'
+  Set-Content -NoNewline -LiteralPath "$temp/site/releases/$second/version.txt" -Value 'second'
+  Set-Content -NoNewline -LiteralPath "$temp/site/releases/$third/version.txt" -Value 'third'
+  Set-Content -NoNewline -LiteralPath "$temp/site/escape.txt" -Value 'outside-root'
+  Invoke-Docker run --rm --network none -v "${temp}:/work" alpine:3.20 ln -s ../../escape.txt "/work/site/releases/$first/escape.txt"
   Copy-Item $headers "$temp/snippets/settlecore-security-headers.conf"
-  (Get-Content -Raw $siteConfig).Replace('listen 443 ssl;', 'listen 8080;').Replace('listen [::]:443 ssl;', 'listen [::]:8080;').Replace('ssl_certificate     /etc/nginx/tls/settlecore-origin.crt;', '').Replace('ssl_certificate_key /etc/nginx/tls/settlecore-origin.key;', '').Replace('ssl_protocols TLSv1.2 TLSv1.3;', '').Replace('/srv/settlecore/current', "/work/site/releases/$first").Replace('/etc/nginx/snippets/', '/work/snippets/') | Set-Content -NoNewline "$temp/settlecore.org.conf"
+  (Get-Content -Raw $siteConfig).Replace('listen 443 ssl;', 'listen 8080;').Replace('listen [::]:443 ssl;', 'listen [::]:8080;').Replace('ssl_certificate     /etc/nginx/tls/settlecore-origin.crt;', '').Replace('ssl_certificate_key /etc/nginx/tls/settlecore-origin.key;', '').Replace('ssl_protocols TLSv1.2 TLSv1.3;', '').Replace('/srv/settlecore/current', "/work/site/releases/$first").Replace('/etc/nginx/snippets/', '/work/snippets/') | Set-Content -NoNewline -LiteralPath "$temp/settlecore.org.conf"
   @'
 events {}
 http { include /etc/nginx/mime.types; include /work/settlecore.org.conf; }
-'@ | Set-Content -NoNewline "$temp/nginx.conf"
+'@ | Set-Content -NoNewline -LiteralPath "$temp/nginx.conf"
   Invoke-Docker run --rm --network none -v "${temp}:/work:ro" nginx:1.27-alpine nginx -c /work/nginx.conf -t
   Invoke-Docker run --rm -d --name settlecore-nginx-test -p 18080:80 -p 18081:8080 -v "${temp}:/work:ro" nginx:1.27-alpine nginx -c /work/nginx.conf -g 'daemon off;'
   Start-Sleep -Seconds 1
@@ -58,11 +64,25 @@ http { include /etc/nginx/mime.types; include /work/settlecore.org.conf; }
   $hidden = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: settlecore.org', 'http://127.0.0.1:18081/.env')
   Write-Host $hidden
   Assert-Contains $hidden '403 Forbidden'
+  $symlink = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: settlecore.org', 'http://127.0.0.1:18081/escape.txt')
+  Write-Host $symlink
+  if ($symlink -match '200 OK') { throw 'nginx followed a release symlink outside the document root' }
   $rollbackCommand = 'set -eu; ln -s releases/' + $third + ' /srv/settlecore/current; sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $second + '; sh /rollback-current.sh; test $(readlink /srv/settlecore/current) = releases/' + $first + '; if sh /rollback-current.sh; then exit 1; fi; test $(readlink /srv/settlecore/current) = releases/' + $first
   Invoke-Docker run --rm --network none -v "${temp}/site:/srv/settlecore" -v "${rollback}:/rollback-current.sh:ro" alpine:3.20 sh -c $rollbackCommand
   $publishSecurityCommand = @'
 set -eu
-useradd --create-home --uid 1001 deploy
+mkdir -p /tmp/test-bin
+cat >/tmp/test-bin/cp <<'EOF'
+#!/bin/sh
+if test "$1" = -R && test "$2" = --no-dereference; then
+  shift 2
+  exec /bin/cp -R -P "$@"
+fi
+exec /bin/cp "$@"
+EOF
+chmod 0755 /tmp/test-bin/cp
+PATH=/tmp/test-bin:$PATH
+adduser -D -u 1001 deploy
 install -d -o deploy -g deploy -m 0700 /srv/settlecore/incoming
 install -d -o root -g root -m 0700 /srv/settlecore/staging
 install -d -o root -g root -m 0755 /srv/settlecore/releases
@@ -87,11 +107,45 @@ rm -f /tmp/fd-open /tmp/fd-go
 su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/bad-release; ln -s /etc/passwd /srv/settlecore/incoming/bad-release/not-allowed' deploy
 if sh /publish-release.sh bad-release; then exit 1; fi
 test ! -e /srv/settlecore/staging/bad-release
+cat >/tmp/test-bin/find <<'EOF'
+#!/bin/sh
+/usr/bin/find "$@"
+result=$?
+if test "$1" = /srv/settlecore/staging/window-release; then
+  ln -s /etc/passwd /srv/settlecore/staging/window-release/after-validation
+fi
+exit "$result"
+EOF
+chmod 0755 /tmp/test-bin/find
+su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/window-release; printf safe > /srv/settlecore/incoming/window-release/index.html' deploy
+current_before=$(readlink /srv/settlecore/current)
+if sh /publish-release.sh window-release; then exit 1; fi
+test ! -e /srv/settlecore/releases/window-release
+test "$(readlink /srv/settlecore/current)" = "$current_before"
+rm -f /tmp/test-bin/find
+cat >/tmp/test-bin/cp <<'EOF'
+#!/bin/sh
+if test "$1" = -R && test "$2" = --no-dereference; then
+  shift 2
+  /bin/cp -R -P "$@"
+  result=$?
+  if test "$result" -eq 0 && test "$2" = /srv/settlecore/staging/.new-postcopy-release/; then
+    ln -s /etc/passwd /srv/settlecore/staging/.new-postcopy-release/after-copy
+  fi
+  exit "$result"
+fi
+exec /bin/cp "$@"
+EOF
+chmod 0755 /tmp/test-bin/cp
+su -s /bin/sh -c 'mkdir /srv/settlecore/incoming/postcopy-release; printf safe > /srv/settlecore/incoming/postcopy-release/index.html' deploy
+if sh /publish-release.sh postcopy-release; then exit 1; fi
+test ! -e /srv/settlecore/releases/postcopy-release
+test "$(readlink /srv/settlecore/current)" = "$current_before"
 '@
   $publishSecurityEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($publishSecurityCommand))
-  Invoke-Docker run --rm --network none -v "${publish}:/publish-release.sh:ro" node:22-bookworm-slim sh -c "printf '%s' $publishSecurityEncoded | base64 -d | sh"
+  Invoke-Docker run --rm --network none -v "${publish}:/publish-release.sh:ro" alpine:3.20 sh -c "printf '%s' $publishSecurityEncoded | base64 -d | sh"
   Write-Host 'AC-2 and AC-3 container verification passed.'
 } finally {
-  docker rm -f settlecore-nginx-test 2>$null
+  if (Get-Command docker -ErrorAction SilentlyContinue) { docker rm -f settlecore-nginx-test 2>$null }
   Remove-Item -Recurse -Force $temp -ErrorAction SilentlyContinue
 }
