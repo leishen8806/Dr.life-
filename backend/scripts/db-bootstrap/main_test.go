@@ -27,6 +27,28 @@ func TestCatalogLoginGrantsAreNarrow(t *testing.T) {
 	}
 }
 
+func TestIAMLoginConsentGrantsAreNarrow(t *testing.T) {
+	grants := extraGrants["app_iam"]
+	if len(grants) != 5 {
+		t.Fatalf("app_iam grants = %d, want 5", len(grants))
+	}
+	legalDocGrants := 0
+	for _, grant := range grants {
+		if !strings.HasSuffix(grant, " TO app_iam") {
+			t.Errorf("app_iam extra grant targets another login: %q", grant)
+		}
+		if strings.Contains(grant, " ON ops.legal_doc ") {
+			legalDocGrants++
+			if !strings.HasPrefix(grant, "GRANT SELECT ") {
+				t.Errorf("app_iam legal_doc grant is too broad: %q", grant)
+			}
+		}
+	}
+	if legalDocGrants != 1 {
+		t.Errorf("app_iam legal_doc grants = %d, want 1", legalDocGrants)
+	}
+}
+
 func TestFileWorkerLoginUsesOnlyThePromotionRole(t *testing.T) {
 	var found *role
 	for i := range roles {

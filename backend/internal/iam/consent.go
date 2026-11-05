@@ -88,6 +88,9 @@ func (s *ConsentService) Revoke(ctx context.Context, accountID string, kind Lega
 }
 
 func (s *ConsentService) Status(ctx context.Context, accountID string) ([]ConsentStatus, error) {
+	if s == nil || s.store == nil {
+		return nil, ErrInvalidLegalDocumentKind
+	}
 	statuses := make([]ConsentStatus, 0, 2)
 	for _, kind := range []LegalDocumentKind{LegalDocumentPrivacy, LegalDocumentTerms} {
 		current, err := s.store.Current(ctx, kind, s.now().UTC())
@@ -129,6 +132,9 @@ func (s *ConsentService) UnpublishedKinds(ctx context.Context, _ string) ([]stri
 }
 
 func (s *ConsentService) NeedsConsent(ctx context.Context, accountID string) (bool, error) {
+	if s == nil || s.store == nil {
+		return false, ErrInvalidLegalDocumentKind
+	}
 	statuses, err := s.Status(ctx, accountID)
 	if err != nil {
 		return false, err

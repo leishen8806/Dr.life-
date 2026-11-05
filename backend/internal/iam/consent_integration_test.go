@@ -156,6 +156,13 @@ func TestConsentMigrationAndCurrentVersionEnforcement(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO ops.legal_doc (kind,version,effective_at,body_zh,body_en,body_km) VALUES ('terms','v1.1',$1,'draft zh','draft en','draft km')`, now.Add(-time.Second)); err != nil {
 		t.Fatal(err)
 	}
+	deleteTag, err := pool.Exec(ctx, `DELETE FROM ops.legal_doc WHERE kind='terms' AND version='v1.1'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleteTag.RowsAffected() != 1 {
+		t.Fatalf("deleted unpublished draft rows=%d, want 1", deleteTag.RowsAffected())
+	}
 	current, err := service.CurrentDocument(ctx, iam.LegalDocumentTerms)
 	if err != nil || current.Version != "v1.0" {
 		t.Fatalf("current terms = %#v, %v; want published v1.0", current, err)

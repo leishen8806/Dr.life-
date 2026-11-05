@@ -53,6 +53,22 @@ func TestConsentServicePreservesNoPublishedDocumentSentinel(t *testing.T) {
 	}
 }
 
+func TestConsentServiceStatusRejectsNilReceiver(t *testing.T) {
+	var service *ConsentService
+
+	if _, err := service.Status(context.Background(), "account-1"); !errors.Is(err, ErrInvalidLegalDocumentKind) {
+		t.Fatalf("Status error = %v, want ErrInvalidLegalDocumentKind", err)
+	}
+}
+
+func TestConsentServiceNeedsConsentRejectsNilReceiver(t *testing.T) {
+	var service *ConsentService
+
+	if _, err := service.NeedsConsent(context.Background(), "account-1"); !errors.Is(err, ErrInvalidLegalDocumentKind) {
+		t.Fatalf("NeedsConsent error = %v, want ErrInvalidLegalDocumentKind", err)
+	}
+}
+
 type fakeConsentStore struct {
 	current    map[LegalDocumentKind]LegalDocument
 	accepted   map[LegalDocumentKind]string

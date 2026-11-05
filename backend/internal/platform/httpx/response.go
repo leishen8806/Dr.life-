@@ -36,7 +36,7 @@ const (
 	CodeTelegramLoginFailed  ErrorCode = 2005
 	CodeAccountBlocked       ErrorCode = 2006
 	CodeLoginTooManyAttempts ErrorCode = 2007
-	CodeConsentRequired      ErrorCode = 2009
+	CodeConsentRequired      ErrorCode = 2008
 	CodeWebhookInvalid       ErrorCode = 7001
 )
 

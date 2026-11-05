@@ -48,6 +48,9 @@ BEGIN
             RAISE EXCEPTION 'published legal document version must increase' USING ERRCODE = 'P0001';
         END IF;
     END IF;
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
     RETURN NEW;
 END;
 $$;

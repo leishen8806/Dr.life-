@@ -248,7 +248,7 @@ func (e ConsentKind) Valid() bool {
 const (
 	ErrorCodeAccountBlocked       ErrorCode = 2006
 	ErrorCodeAlreadyProcessed     ErrorCode = 1011
-	ErrorCodeConsentRequired      ErrorCode = 2009
+	ErrorCodeConsentRequired      ErrorCode = 2008
 	ErrorCodeIdempotencyConflict  ErrorCode = 1009
 	ErrorCodeIdempotencyPending   ErrorCode = 1010
 	ErrorCodeInternalError        ErrorCode = 1001
