@@ -14,6 +14,29 @@
 1. 安装 nginx 和 rsync；不要安装 Brotli 模块。创建根目录、`releases`、`incoming`、`staging` 和占位 release：`/srv/settlecore`、`/srv/settlecore/releases` 由 `root:root` 所有且为 `0755`；`/srv/settlecore/incoming` 由 `settlecore-deploy:settlecore-deploy` 所有且为 `0700`；`/srv/settlecore/staging` 由 `root:root` 所有且为 `0700`，部署账号不得进入。创建仅含临时 `index.html` 与 `404.html` 的 `/srv/settlecore/releases/bootstrap`，由 `root:root` 所有、目录 `0755`、文件 `0644`；把 `current` 建为指向 `releases/bootstrap` 的符号链接。这样 reload 到首次批准发布之间不会全站 404。
 2. 安装 nginx 站点配置和安全头 include；放置 Origin CA 证书与私钥；先执行 `nginx -t`，再由获批变更执行 reload。不要改后端站点。裸 `/privacy` 预期为 301 到 `/privacy/`，配置已关闭绝对主机和端口重写。
 3. 将 `publish-release.sh`、`rollback-current.sh` 分别安装为 `/usr/local/sbin/settlecore-website-publish`、`/usr/local/sbin/settlecore-website-rollback`，均为 `root:root`、`0755`；部署账号对两脚本、`/srv/settlecore`、`staging` 和 `releases` 无写权限。sudoers 示例：`settlecore-deploy ALL=(root) NOPASSWD: /usr/local/sbin/settlecore-website-publish *, /usr/local/sbin/settlecore-website-rollback`。不得配置 `env_keep` 或使用 `sudo -E`；两个脚本都固定 `/srv/settlecore`，不接受环境变量覆盖。
+
+## 第 3 步 sudoers 生效值信息核对（安装 sudoers 示例行后）
+
+安装上一步的 sudoers 示例行后，执行下列**信息性核对**并记录输出。两个发布脚本已自行固定 `PATH`，因此这不是上线的安全前提；它用于发现 sudoers 被显式关闭或污染的配置。
+
+```sh
+# sudoers-check-start
+sudo_list=$(sudo -l -U settlecore-deploy || true)
+items=$(printf '%s\n' "$sudo_list" | tr -d '\\' | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -E '^!?secure_path' || true)
+if test -z "$items"; then
+  if printf '%s\n' "$sudo_list" | grep -q 'Matching Defaults entries'; then
+    printf '%s\n' 'secure_path missing or commented out' >&2
+    exit 1
+  fi
+  printf '%s\n' 'secure_path=unknown (not reported by sudo)'
+else
+  printf '%s\n' "$items"
+  test "$(printf '%s\n' "$items" | wc -l)" = 1 && printf '%s\n' "$items" | grep -qE '^secure_path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin(:/snap/bin)?$'
+fi
+# sudoers-check-end
+```
+
+仅一项固定 `secure_path`（允许 Ubuntu 的 `:/snap/bin` 变体）表示记录正常；`!secure_path`、被注释/缺失的条目（仍有 `Matching Defaults entries` 段）或被污染的值会非零退出，必须停止并把输出交给项目负责人。无 sudoers 条目或 sudo-rs 不报告 Defaults 时输出 `unknown` 且不拦上线；同样记录输出。`env_keep+=PATH` 不是此信息性核对的独立阻断条件，因为脚本内部固定 PATH。服务器为 Debian/Ubuntu，发布脚本以 GNU `cp -R --no-dereference` 复制；复制前后都会校验非常规文件，任一失败会删除临时目录、写入 stderr 并非零退出，且不改动 `releases/` 或 `current`。Nginx 另以 `disable_symlinks on from=$document_root;` 拒绝跟随站点根目录下的符号链接。
 4. GitHub Environment 创建 `website-production`，配置 required reviewers，禁止自行审批。
 5. 部署公钥仅允许部署账号；项目负责人必须在 VPS 本机用 `ssh-keygen -lf` 核验主机公钥指纹，再把已核验的 known-hosts 条目写入 GitHub secret。禁止在 runner 上使用 `ssh-keyscan`。
 6. 保持两条官网 A 记录为 Cloudflare 代理状态。完成 nginx 校验、reload 和占位 `current` 后，才将 Cloudflare SSL/TLS 切到 Full (strict)；首次真实发布仍须等待合并及 Environment 人工批准。

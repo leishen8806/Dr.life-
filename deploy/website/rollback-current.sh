@@ -1,5 +1,6 @@
-#!/usr/bin/env sh
+#!/bin/sh
 set -eu
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export PATH
 
 site_root=/srv/settlecore
 current="$site_root/current"
@@ -29,6 +30,7 @@ if test -z "$previous"; then
   printf '%s\n' 'no earlier release is available' >&2
   exit 1
 fi
+rm -f "$site_root/.current.next"
 ln -s "releases/$(basename "$previous")" "$site_root/.current.next"
 mv -Tf "$site_root/.current.next" "$current"
 printf 'rolled back to %s\n' "$(readlink "$current")"
