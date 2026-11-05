@@ -13,6 +13,7 @@ import (
 	api "github.com/leishen8806/Dr.life-/backend/internal/api"
 	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
@@ -57,6 +58,7 @@ type GatewayOptions struct {
 	Sessions          api.SessionManagement
 	AccountProfiles   api.AccountProfileManagement
 	AccountLinks      api.AccountLinkManagement
+	Consents          *iam.ConsentService
 	Ledger            api.LedgerReader
 	Directory         api.AccountDirectory
 	AdminPermissions  api.AdminPermissionChecker
@@ -101,6 +103,13 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.Use(gateway.VerifyWebhooks(options.WebhookPrefix, options.WebhookMaxBody, options.WebhookBindings))
 	router.Use(gateway.Authenticate(options.Authenticator, options.WebhookPrefix))
 	router.Use(gateway.Authorize(options.WebhookPrefix))
+	if options.Consents != nil {
+		consentLogger := options.Logger
+		if consentLogger == nil {
+			consentLogger = logger
+		}
+		router.Use(gateway.RequireCurrentConsent(options.Consents, consentLogger))
+	}
 	router.Use(gateway.LimitRequestBody(options.BodyPolicy))
 	router.Use(gateway.LimitByAccount(options.Limiter, options.AccountRules))
 	router.Use(gateway.RequireIdempotency(options.IdempotencyExempt))
@@ -115,7 +124,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	if auditWriter == nil {
 		auditWriter = options.Audit
 	}
-	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, Sessions: options.Sessions, AccountProfiles: options.AccountProfiles, AccountLinks: options.AccountLinks, ClientIP: options.ClientIP, Audit: options.Audit, AuditWriter: auditWriter, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions, Files: options.Files}, router)
+	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, Sessions: options.Sessions, AccountProfiles: options.AccountProfiles, AccountLinks: options.AccountLinks, Consents: options.Consents, ClientIP: options.ClientIP, Audit: options.Audit, AuditWriter: auditWriter, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions, Files: options.Files}, router)
 	if options.RouteFit != nil {
 		router.Post(routeFitEventsPath, options.RouteFit.ServeHTTP)
 	}

@@ -36,6 +36,7 @@ const (
 	CodeTelegramLoginFailed  ErrorCode = 2005
 	CodeAccountBlocked       ErrorCode = 2006
 	CodeLoginTooManyAttempts ErrorCode = 2007
+	CodeConsentRequired      ErrorCode = 2008
 	CodeWebhookInvalid       ErrorCode = 7001
 )
 
@@ -74,6 +75,7 @@ var appErrors = map[ErrorCode]AppError{
 	CodeTelegramLoginFailed:  {Code: CodeTelegramLoginFailed, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "登录验证失败", EN: "Login validation failed", KM: "Login validation failed"}},
 	CodeAccountBlocked:       {Code: CodeAccountBlocked, StatusCode: http.StatusForbidden, Message: Messages{ZH: "账号暂不可用", EN: "Account is unavailable", KM: "Account is unavailable"}},
 	CodeLoginTooManyAttempts: {Code: CodeLoginTooManyAttempts, StatusCode: http.StatusTooManyRequests, Message: Messages{ZH: "登录尝试过于频繁", EN: "Too many login attempts", KM: "Too many login attempts"}},
+	CodeConsentRequired:      {Code: CodeConsentRequired, StatusCode: http.StatusForbidden, Message: Messages{ZH: "请先阅读并同意当前协议", EN: "Current legal documents must be accepted", KM: "សូមយល់ព្រមលើឯកសារផ្លូវច្បាប់បច្ចុប្បន្នជាមុន"}},
 	CodeWebhookInvalid:       {Code: CodeWebhookInvalid, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "回调验证失败", EN: "Webhook verification failed", KM: "Webhook verification failed"}},
 }
 

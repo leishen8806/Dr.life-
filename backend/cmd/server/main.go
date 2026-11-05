@@ -262,6 +262,7 @@ func main() {
 	var sessionService *iam.SessionService
 	var accountProfileService *iam.AccountProfileService
 	var accountLinkService *iam.AccountLinkService
+	var consentService *iam.ConsentService
 	var accountDirectory *iam.AccountDirectory
 	var authenticator gateway.Authenticator
 	checks := []server.ReadinessCheck{database.Ping}
@@ -316,6 +317,7 @@ func main() {
 		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}}
 		accountProfileService = &iam.AccountProfileService{DB: iamDatabase}
 		accountLinkService = iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: iamDatabase}, ids.NewULID)
+		consentService = iam.NewConsentService(iam.PostgresConsentRepository{DB: iamDatabase}, nil)
 		loginService = &iam.Service{
 			DB:       iamDatabase,
 			Verifier: telegram.PoolVerifier{Validator: telegram.NewValidator(cfg.TelegramInitDataMaxAge), Source: &telegram.DBPoolSource{DB: iamDatabase, Envelope: envelope, TTL: cfg.BotTokenCacheTTL}},
@@ -370,6 +372,7 @@ func main() {
 		Sessions:        sessionService,
 		AccountProfiles: accountProfileService,
 		AccountLinks:    accountLinkService,
+		Consents:        consentService,
 		Ledger:          ledgerReader,
 		Directory:       accountDirectory,
 		Files:           fileService,

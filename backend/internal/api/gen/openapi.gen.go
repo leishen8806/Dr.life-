@@ -226,10 +226,29 @@ func (e CategoryListSuccessResponseOk) Valid() bool {
 	}
 }
 
+// Defines values for ConsentKind.
+const (
+	Privacy ConsentKind = "privacy"
+	Terms   ConsentKind = "terms"
+)
+
+// Valid indicates whether the value is a known member of the ConsentKind enum.
+func (e ConsentKind) Valid() bool {
+	switch e {
+	case Privacy:
+		return true
+	case Terms:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ErrorCode.
 const (
 	ErrorCodeAccountBlocked       ErrorCode = 2006
 	ErrorCodeAlreadyProcessed     ErrorCode = 1011
+	ErrorCodeConsentRequired      ErrorCode = 2008
 	ErrorCodeIdempotencyConflict  ErrorCode = 1009
 	ErrorCodeIdempotencyPending   ErrorCode = 1010
 	ErrorCodeInternalError        ErrorCode = 1001
@@ -255,6 +274,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeAccountBlocked:
 		return true
 	case ErrorCodeAlreadyProcessed:
+		return true
+	case ErrorCodeConsentRequired:
 		return true
 	case ErrorCodeIdempotencyConflict:
 		return true
@@ -961,6 +982,81 @@ func (e StatusFilter) Valid() bool {
 	}
 }
 
+// Defines values for ConsentStatusSucceededOk.
+const (
+	ConsentStatusSucceededOkTrue ConsentStatusSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the ConsentStatusSucceededOk enum.
+func (e ConsentStatusSucceededOk) Valid() bool {
+	switch e {
+	case ConsentStatusSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LegalDocumentSucceededOk.
+const (
+	LegalDocumentSucceededOkTrue LegalDocumentSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the LegalDocumentSucceededOk enum.
+func (e LegalDocumentSucceededOk) Valid() bool {
+	switch e {
+	case LegalDocumentSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetBuyerMeConsents200JSONResponseBodyOk.
+const (
+	GetBuyerMeConsents200JSONResponseBodyOkTrue GetBuyerMeConsents200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetBuyerMeConsents200JSONResponseBodyOk enum.
+func (e GetBuyerMeConsents200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetBuyerMeConsents200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetDriverMeConsents200JSONResponseBodyOk.
+const (
+	GetDriverMeConsents200JSONResponseBodyOkTrue GetDriverMeConsents200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetDriverMeConsents200JSONResponseBodyOk enum.
+func (e GetDriverMeConsents200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetDriverMeConsents200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetMerchantMeConsents200JSONResponseBodyOk.
+const (
+	GetMerchantMeConsents200JSONResponseBodyOkTrue GetMerchantMeConsents200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetMerchantMeConsents200JSONResponseBodyOk enum.
+func (e GetMerchantMeConsents200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetMerchantMeConsents200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListMerchantProductsParamsStatus.
 const (
 	ListMerchantProductsParamsStatusDraft    ListMerchantProductsParamsStatus = "draft"
@@ -982,6 +1078,21 @@ func (e ListMerchantProductsParamsStatus) Valid() bool {
 	case ListMerchantProductsParamsStatusRejected:
 		return true
 	case ListMerchantProductsParamsStatusReview:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetPublicLegal200JSONResponseBodyOk.
+const (
+	GetPublicLegal200JSONResponseBodyOkTrue GetPublicLegal200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetPublicLegal200JSONResponseBodyOk enum.
+func (e GetPublicLegal200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetPublicLegal200JSONResponseBodyOkTrue:
 		return true
 	default:
 		return false
@@ -1203,6 +1314,33 @@ type CategoryListSuccessResponse struct {
 // CategoryListSuccessResponseOk defines model for CategoryListSuccessResponse.Ok.
 type CategoryListSuccessResponseOk bool
 
+// ConsentAcceptRequest defines model for ConsentAcceptRequest.
+type ConsentAcceptRequest struct {
+	Kind    ConsentKind `json:"kind"`
+	Version string      `json:"version"`
+}
+
+// ConsentKind defines model for ConsentKind.
+type ConsentKind string
+
+// ConsentRevokeRequest defines model for ConsentRevokeRequest.
+type ConsentRevokeRequest struct {
+	Kind ConsentKind `json:"kind"`
+}
+
+// ConsentStatus defines model for ConsentStatus.
+type ConsentStatus struct {
+	Accepted      bool        `json:"accepted"`
+	Kind          ConsentKind `json:"kind"`
+	NeedsReaccept bool        `json:"needs_reaccept"`
+	Version       string      `json:"version"`
+}
+
+// ConsentStatusData defines model for ConsentStatusData.
+type ConsentStatusData struct {
+	Items []ConsentStatus `json:"items"`
+}
+
 // ErrorBody defines model for ErrorBody.
 type ErrorBody struct {
 	// Code Documented application error code; ranges are described in the API description.
@@ -1355,6 +1493,15 @@ type LedgerReadSuccessResponse struct {
 
 // LedgerReadSuccessResponseOk defines model for LedgerReadSuccessResponse.Ok.
 type LedgerReadSuccessResponseOk bool
+
+// LegalDocument defines model for LegalDocument.
+type LegalDocument struct {
+	// Body Trilingual text; every language must be present before a product can be published.
+	Body        LocalizedText `json:"body"`
+	EffectiveAt time.Time     `json:"effective_at"`
+	Kind        ConsentKind   `json:"kind"`
+	Version     string        `json:"version"`
+}
 
 // LocalizedText Trilingual text; every language must be present before a product can be published.
 type LocalizedText struct {
@@ -1778,6 +1925,16 @@ type BadRequest = ErrorEnvelope
 // Conflict defines model for Conflict.
 type Conflict = ErrorEnvelope
 
+// ConsentStatusSucceeded defines model for ConsentStatusSucceeded.
+type ConsentStatusSucceeded struct {
+	Data      ConsentStatusData        `json:"data"`
+	Ok        ConsentStatusSucceededOk `json:"ok"`
+	RequestId string                   `json:"request_id"`
+}
+
+// ConsentStatusSucceededOk defines model for ConsentStatusSucceeded.Ok.
+type ConsentStatusSucceededOk bool
+
 // Forbidden defines model for Forbidden.
 type Forbidden = ErrorEnvelope
 
@@ -1786,6 +1943,16 @@ type InternalServerError = ErrorEnvelope
 
 // LedgerReadSucceeded defines model for LedgerReadSucceeded.
 type LedgerReadSucceeded = LedgerReadSuccessResponse
+
+// LegalDocumentSucceeded defines model for LegalDocumentSucceeded.
+type LegalDocumentSucceeded struct {
+	Data      LegalDocument            `json:"data"`
+	Ok        LegalDocumentSucceededOk `json:"ok"`
+	RequestId string                   `json:"request_id"`
+}
+
+// LegalDocumentSucceededOk defines model for LegalDocumentSucceeded.Ok.
+type LegalDocumentSucceededOk bool
 
 // LoginFailed defines model for LoginFailed.
 type LoginFailed = ErrorEnvelope
@@ -1854,6 +2021,21 @@ type PostBuyerAuthLogoutParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// GetBuyerMeConsents200JSONResponseBodyOk defines parameters for GetBuyerMeConsents.
+type GetBuyerMeConsents200JSONResponseBodyOk bool
+
+// PostBuyerMeConsentsParams defines parameters for PostBuyerMeConsents.
+type PostBuyerMeConsentsParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PostBuyerMeConsentRevokeParams defines parameters for PostBuyerMeConsentRevoke.
+type PostBuyerMeConsentRevokeParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // PutBuyerMeLanguageParams defines parameters for PutBuyerMeLanguage.
 type PutBuyerMeLanguageParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
@@ -1868,6 +2050,21 @@ type DeleteBuyerMeSessionParams struct {
 
 // PostDriverAuthLogoutParams defines parameters for PostDriverAuthLogout.
 type PostDriverAuthLogoutParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// GetDriverMeConsents200JSONResponseBodyOk defines parameters for GetDriverMeConsents.
+type GetDriverMeConsents200JSONResponseBodyOk bool
+
+// PostDriverMeConsentsParams defines parameters for PostDriverMeConsents.
+type PostDriverMeConsentsParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PostDriverMeConsentRevokeParams defines parameters for PostDriverMeConsentRevoke.
+type PostDriverMeConsentRevokeParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
@@ -1898,6 +2095,21 @@ type PostFileCompleteParams struct {
 
 // PostMerchantAuthLogoutParams defines parameters for PostMerchantAuthLogout.
 type PostMerchantAuthLogoutParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// GetMerchantMeConsents200JSONResponseBodyOk defines parameters for GetMerchantMeConsents.
+type GetMerchantMeConsents200JSONResponseBodyOk bool
+
+// PostMerchantMeConsentsParams defines parameters for PostMerchantMeConsents.
+type PostMerchantMeConsentsParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PostMerchantMeConsentRevokeParams defines parameters for PostMerchantMeConsentRevoke.
+type PostMerchantMeConsentRevokeParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
@@ -1974,6 +2186,9 @@ type ListPublicCategoriesParams struct {
 	Sort *Sort `form:"sort,omitempty" json:"sort,omitempty"`
 }
 
+// GetPublicLegal200JSONResponseBodyOk defines parameters for GetPublicLegal.
+type GetPublicLegal200JSONResponseBodyOk bool
+
 // ListPublicProductsParams defines parameters for ListPublicProducts.
 type ListPublicProductsParams struct {
 	// Page One-based page number.
@@ -2012,14 +2227,32 @@ type SuggestPublicProductsParams struct {
 	Q string `form:"q" json:"q"`
 }
 
+// PostBuyerMeConsentsJSONRequestBody defines body for PostBuyerMeConsents for application/json ContentType.
+type PostBuyerMeConsentsJSONRequestBody = ConsentAcceptRequest
+
+// PostBuyerMeConsentRevokeJSONRequestBody defines body for PostBuyerMeConsentRevoke for application/json ContentType.
+type PostBuyerMeConsentRevokeJSONRequestBody = ConsentRevokeRequest
+
 // PutBuyerMeLanguageJSONRequestBody defines body for PutBuyerMeLanguage for application/json ContentType.
 type PutBuyerMeLanguageJSONRequestBody = LanguageUpdateRequest
+
+// PostDriverMeConsentsJSONRequestBody defines body for PostDriverMeConsents for application/json ContentType.
+type PostDriverMeConsentsJSONRequestBody = ConsentAcceptRequest
+
+// PostDriverMeConsentRevokeJSONRequestBody defines body for PostDriverMeConsentRevoke for application/json ContentType.
+type PostDriverMeConsentRevokeJSONRequestBody = ConsentRevokeRequest
 
 // PutDriverMeLanguageJSONRequestBody defines body for PutDriverMeLanguage for application/json ContentType.
 type PutDriverMeLanguageJSONRequestBody = LanguageUpdateRequest
 
 // PostFilePresignJSONRequestBody defines body for PostFilePresign for application/json ContentType.
 type PostFilePresignJSONRequestBody = FilePresignRequest
+
+// PostMerchantMeConsentsJSONRequestBody defines body for PostMerchantMeConsents for application/json ContentType.
+type PostMerchantMeConsentsJSONRequestBody = ConsentAcceptRequest
+
+// PostMerchantMeConsentRevokeJSONRequestBody defines body for PostMerchantMeConsentRevoke for application/json ContentType.
+type PostMerchantMeConsentRevokeJSONRequestBody = ConsentRevokeRequest
 
 // PutMerchantMeLanguageJSONRequestBody defines body for PutMerchantMeLanguage for application/json ContentType.
 type PutMerchantMeLanguageJSONRequestBody = LanguageUpdateRequest
@@ -2065,6 +2298,15 @@ type ServerInterface interface {
 	// GetBuyerMe Get the current buyer account profile
 	// (GET /v1/buyer/me)
 	GetBuyerMe(w http.ResponseWriter, r *http.Request)
+	// GetBuyerMeConsents Get consent state
+	// (GET /v1/buyer/me/consents)
+	GetBuyerMeConsents(w http.ResponseWriter, r *http.Request)
+	// PostBuyerMeConsents Accept the current legal document
+	// (POST /v1/buyer/me/consents)
+	PostBuyerMeConsents(w http.ResponseWriter, r *http.Request, params PostBuyerMeConsentsParams)
+	// PostBuyerMeConsentRevoke Revoke consent
+	// (POST /v1/buyer/me/consents/revoke)
+	PostBuyerMeConsentRevoke(w http.ResponseWriter, r *http.Request, params PostBuyerMeConsentRevokeParams)
 	// GetBuyerMeDevices List the current buyer account devices
 	// (GET /v1/buyer/me/devices)
 	GetBuyerMeDevices(w http.ResponseWriter, r *http.Request)
@@ -2089,6 +2331,15 @@ type ServerInterface interface {
 	// GetDriverMe Get the current driver account profile
 	// (GET /v1/driver/me)
 	GetDriverMe(w http.ResponseWriter, r *http.Request)
+	// GetDriverMeConsents Get consent state
+	// (GET /v1/driver/me/consents)
+	GetDriverMeConsents(w http.ResponseWriter, r *http.Request)
+	// PostDriverMeConsents Accept the current legal document
+	// (POST /v1/driver/me/consents)
+	PostDriverMeConsents(w http.ResponseWriter, r *http.Request, params PostDriverMeConsentsParams)
+	// PostDriverMeConsentRevoke Revoke consent
+	// (POST /v1/driver/me/consents/revoke)
+	PostDriverMeConsentRevoke(w http.ResponseWriter, r *http.Request, params PostDriverMeConsentRevokeParams)
 	// GetDriverMeDevices List the current driver account devices
 	// (GET /v1/driver/me/devices)
 	GetDriverMeDevices(w http.ResponseWriter, r *http.Request)
@@ -2122,6 +2373,15 @@ type ServerInterface interface {
 	// GetMerchantMe Get the current merchant account profile
 	// (GET /v1/merchant/me)
 	GetMerchantMe(w http.ResponseWriter, r *http.Request)
+	// GetMerchantMeConsents Get consent state
+	// (GET /v1/merchant/me/consents)
+	GetMerchantMeConsents(w http.ResponseWriter, r *http.Request)
+	// PostMerchantMeConsents Accept the current legal document
+	// (POST /v1/merchant/me/consents)
+	PostMerchantMeConsents(w http.ResponseWriter, r *http.Request, params PostMerchantMeConsentsParams)
+	// PostMerchantMeConsentRevoke Revoke consent
+	// (POST /v1/merchant/me/consents/revoke)
+	PostMerchantMeConsentRevoke(w http.ResponseWriter, r *http.Request, params PostMerchantMeConsentRevokeParams)
 	// GetMerchantMeDevices List the current merchant account devices
 	// (GET /v1/merchant/me/devices)
 	GetMerchantMeDevices(w http.ResponseWriter, r *http.Request)
@@ -2173,6 +2433,9 @@ type ServerInterface interface {
 	// ListPublicCategories List enabled product categories in display order
 	// (GET /v1/public/categories)
 	ListPublicCategories(w http.ResponseWriter, r *http.Request, params ListPublicCategoriesParams)
+	// GetPublicLegal Get the current effective legal document
+	// (GET /v1/public/legal/{kind})
+	GetPublicLegal(w http.ResponseWriter, r *http.Request, kind ConsentKind)
 	// GetPublicPing Check public API availability
 	// (GET /v1/public/ping)
 	GetPublicPing(w http.ResponseWriter, r *http.Request)
@@ -2239,6 +2502,24 @@ func (_ Unimplemented) GetBuyerMe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// GetBuyerMeConsents Get consent state
+// (GET /v1/buyer/me/consents)
+func (_ Unimplemented) GetBuyerMeConsents(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostBuyerMeConsents Accept the current legal document
+// (POST /v1/buyer/me/consents)
+func (_ Unimplemented) PostBuyerMeConsents(w http.ResponseWriter, r *http.Request, params PostBuyerMeConsentsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostBuyerMeConsentRevoke Revoke consent
+// (POST /v1/buyer/me/consents/revoke)
+func (_ Unimplemented) PostBuyerMeConsentRevoke(w http.ResponseWriter, r *http.Request, params PostBuyerMeConsentRevokeParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetBuyerMeDevices List the current buyer account devices
 // (GET /v1/buyer/me/devices)
 func (_ Unimplemented) GetBuyerMeDevices(w http.ResponseWriter, r *http.Request) {
@@ -2284,6 +2565,24 @@ func (_ Unimplemented) PostDriverAuthLogout(w http.ResponseWriter, r *http.Reque
 // GetDriverMe Get the current driver account profile
 // (GET /v1/driver/me)
 func (_ Unimplemented) GetDriverMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetDriverMeConsents Get consent state
+// (GET /v1/driver/me/consents)
+func (_ Unimplemented) GetDriverMeConsents(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostDriverMeConsents Accept the current legal document
+// (POST /v1/driver/me/consents)
+func (_ Unimplemented) PostDriverMeConsents(w http.ResponseWriter, r *http.Request, params PostDriverMeConsentsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostDriverMeConsentRevoke Revoke consent
+// (POST /v1/driver/me/consents/revoke)
+func (_ Unimplemented) PostDriverMeConsentRevoke(w http.ResponseWriter, r *http.Request, params PostDriverMeConsentRevokeParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2350,6 +2649,24 @@ func (_ Unimplemented) PostMerchantAuthLogout(w http.ResponseWriter, r *http.Req
 // GetMerchantMe Get the current merchant account profile
 // (GET /v1/merchant/me)
 func (_ Unimplemented) GetMerchantMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetMerchantMeConsents Get consent state
+// (GET /v1/merchant/me/consents)
+func (_ Unimplemented) GetMerchantMeConsents(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostMerchantMeConsents Accept the current legal document
+// (POST /v1/merchant/me/consents)
+func (_ Unimplemented) PostMerchantMeConsents(w http.ResponseWriter, r *http.Request, params PostMerchantMeConsentsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostMerchantMeConsentRevoke Revoke consent
+// (POST /v1/merchant/me/consents/revoke)
+func (_ Unimplemented) PostMerchantMeConsentRevoke(w http.ResponseWriter, r *http.Request, params PostMerchantMeConsentRevokeParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2452,6 +2769,12 @@ func (_ Unimplemented) PostTelegramAuth(w http.ResponseWriter, r *http.Request) 
 // ListPublicCategories List enabled product categories in display order
 // (GET /v1/public/categories)
 func (_ Unimplemented) ListPublicCategories(w http.ResponseWriter, r *http.Request, params ListPublicCategoriesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetPublicLegal Get the current effective legal document
+// (GET /v1/public/legal/{kind})
+func (_ Unimplemented) GetPublicLegal(w http.ResponseWriter, r *http.Request, kind ConsentKind) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2797,6 +3120,110 @@ func (siw *ServerInterfaceWrapper) GetBuyerMe(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetBuyerMeConsents operation middleware
+func (siw *ServerInterfaceWrapper) GetBuyerMeConsents(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBuyerMeConsents(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostBuyerMeConsents operation middleware
+func (siw *ServerInterfaceWrapper) PostBuyerMeConsents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostBuyerMeConsentsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostBuyerMeConsents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostBuyerMeConsentRevoke operation middleware
+func (siw *ServerInterfaceWrapper) PostBuyerMeConsentRevoke(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostBuyerMeConsentRevokeParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostBuyerMeConsentRevoke(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetBuyerMeDevices operation middleware
 func (siw *ServerInterfaceWrapper) GetBuyerMeDevices(w http.ResponseWriter, r *http.Request) {
 
@@ -3014,6 +3441,110 @@ func (siw *ServerInterfaceWrapper) GetDriverMe(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetDriverMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDriverMeConsents operation middleware
+func (siw *ServerInterfaceWrapper) GetDriverMeConsents(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDriverMeConsents(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostDriverMeConsents operation middleware
+func (siw *ServerInterfaceWrapper) PostDriverMeConsents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostDriverMeConsentsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostDriverMeConsents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostDriverMeConsentRevoke operation middleware
+func (siw *ServerInterfaceWrapper) PostDriverMeConsentRevoke(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostDriverMeConsentRevokeParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostDriverMeConsentRevoke(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3365,6 +3896,110 @@ func (siw *ServerInterfaceWrapper) GetMerchantMe(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMerchantMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMerchantMeConsents operation middleware
+func (siw *ServerInterfaceWrapper) GetMerchantMeConsents(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMerchantMeConsents(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostMerchantMeConsents operation middleware
+func (siw *ServerInterfaceWrapper) PostMerchantMeConsents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostMerchantMeConsentsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostMerchantMeConsents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostMerchantMeConsentRevoke operation middleware
+func (siw *ServerInterfaceWrapper) PostMerchantMeConsentRevoke(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostMerchantMeConsentRevokeParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostMerchantMeConsentRevoke(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3992,6 +4627,32 @@ func (siw *ServerInterfaceWrapper) ListPublicCategories(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// GetPublicLegal operation middleware
+func (siw *ServerInterfaceWrapper) GetPublicLegal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "kind" -------------
+	var kind ConsentKind
+
+	err = runtime.BindStyledParameterWithOptions("simple", "kind", chi.URLParam(r, "kind"), &kind, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPublicLegal(w, r, kind)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetPublicPing operation middleware
 func (siw *ServerInterfaceWrapper) GetPublicPing(w http.ResponseWriter, r *http.Request) {
 
@@ -4432,7 +5093,37 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/v1/driver/wallet/transactions/{txn_no}", wrapper.GetDriverWalletTransaction)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/public/legal/{kind}", wrapper.GetPublicLegal)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/public/ping", wrapper.GetPublicPing)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/me/consents", wrapper.GetBuyerMeConsents)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/buyer/me/consents", wrapper.PostBuyerMeConsents)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/buyer/me/consents/revoke", wrapper.PostBuyerMeConsentRevoke)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/me/consents", wrapper.GetMerchantMeConsents)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/merchant/me/consents", wrapper.PostMerchantMeConsents)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/merchant/me/consents/revoke", wrapper.PostMerchantMeConsentRevoke)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/driver/me/consents", wrapper.GetDriverMeConsents)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/driver/me/consents", wrapper.PostDriverMeConsents)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/driver/me/consents/revoke", wrapper.PostDriverMeConsentRevoke)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/public/categories", wrapper.ListPublicCategories)

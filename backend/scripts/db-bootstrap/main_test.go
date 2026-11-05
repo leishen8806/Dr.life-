@@ -27,6 +27,30 @@ func TestCatalogLoginGrantsAreNarrow(t *testing.T) {
 	}
 }
 
+func TestIAMLoginConsentGrantsAreNarrow(t *testing.T) {
+	grants := extraGrants["app_iam"]
+	if len(grants) != 5 {
+		t.Fatalf("app_iam grants = %d, want 5", len(grants))
+	}
+	joined := strings.Join(grants, "\n")
+	for _, want := range []string{
+		"GRANT USAGE ON SCHEMA ops TO app_iam",
+		"GRANT SELECT ON ops.legal_doc TO app_iam",
+		"GRANT SELECT, INSERT ON ops.consent TO app_iam",
+		"GRANT UPDATE (revoked_at) ON ops.consent TO app_iam",
+		"GRANT USAGE, SELECT ON SEQUENCE ops.consent_id_seq TO app_iam",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	for _, banned := range []string{"GRANT ALL ON", "GRANT UPDATE ON ops.consent", "GRANT DELETE ON ops.consent"} {
+		if strings.Contains(joined, banned) {
+			t.Errorf("app_iam consent grant is too broad: %q", banned)
+		}
+	}
+}
+
 func TestFileWorkerLoginUsesOnlyThePromotionRole(t *testing.T) {
 	var found *role
 	for i := range roles {
