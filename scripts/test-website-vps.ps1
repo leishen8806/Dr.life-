@@ -14,9 +14,15 @@ function Invoke-Curl { param([string[]]$CurlArgs); $output = & curl.exe @CurlArg
 function Assert-Contains { param([string]$Output, [string]$Expected); if ($Output -notmatch [regex]::Escape($Expected)) { throw "missing expected output: $Expected`n$Output" } }
 function Assert-Equal { param([string]$Actual, [string]$Expected); if ($Actual -cne $Expected) { throw "expected: $Expected`nactual: $Actual" } }
 function Test-GuideSudoersCase {
-  param([string]$Pipeline, [string]$SudoList)
+  param([string]$GuideScript, [string]$SudoList)
   $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($SudoList))
-  & $dockerExe run --rm --network none alpine:3.20 sh -c "printf '%s' $encoded | base64 -d | $Pipeline" *> $null
+  $fixtureCommand = "printf '%s' $encoded | base64 -d"
+  $caseScript = $GuideScript.Replace('sudo -l -U settlecore-deploy', $fixtureCommand)
+  $caseEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($caseScript))
+  $priorErrorAction = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  & $dockerExe run --rm --network none alpine:3.20 sh -c "printf '%s' $caseEncoded | base64 -d | sh" 1>$null 2>$null
+  $ErrorActionPreference = $priorErrorAction
   return $LASTEXITCODE -eq 0
 }
 
@@ -24,20 +30,31 @@ try {
   Assert-Equal (Get-Content -LiteralPath $publish -TotalCount 1) '#!/bin/sh'
   Assert-Equal (Get-Content -LiteralPath $rollback -TotalCount 1) '#!/bin/sh'
   Assert-Contains (Get-Content -Raw -LiteralPath $siteConfig) 'disable_symlinks on from=$document_root;'
-  $guideCommand = Get-Content -LiteralPath $releaseGuide | Where-Object { $_ -like 'sudo -l -U settlecore-deploy*' }
-  Assert-Equal ([string]$guideCommand.Count) '1'
-  $guidePipeline = $guideCommand.Substring($guideCommand.IndexOf('|') + 1).Trim()
+  $guideText = Get-Content -Raw -LiteralPath $releaseGuide
+  $guideMatch = [regex]::Match($guideText, '(?s)# sudoers-check-start\r?\n(.*?)# sudoers-check-end')
+  if (-not $guideMatch.Success) { throw 'missing sudoers-check markers in release guide' }
+  $guideScript = $guideMatch.Groups[1].Value.Trim()
+  $legacyGuideScript = @'
+sudo -l -U settlecore-deploy | tr -d '\\' | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -qE '^secure_path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin(:/snap/bin)?$'
+'@
   $securePath = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
   $sudoCases = @(
-    @{ Name = 'effective'; Output = "Matching Defaults entries for settlecore-deploy on host:`n    env_reset, mail_badpass, secure_path=$($securePath -replace ':', '\\:'), use_pty"; Expected = $true }
-    @{ Name = 'commented'; Output = "# secure_path=$securePath"; Expected = $false }
-    @{ Name = 'disabled'; Output = 'Defaults !secure_path'; Expected = $false }
-    @{ Name = 'missing'; Output = 'Matching Defaults entries for settlecore-deploy on host:'; Expected = $false }
+    @{ Name = 'debian'; Output = "Matching Defaults entries for settlecore-deploy on host:`n    env_reset, mail_badpass, secure_path=$($securePath -replace ':', '\\:'), use_pty"; Expected = $true }
+    @{ Name = 'ubuntu-snap'; Output = "Matching Defaults entries for settlecore-deploy on host:`n    env_reset, secure_path=$($securePath -replace ':', '\\:')\\:/snap/bin, use_pty"; Expected = $true }
+    @{ Name = 'commented'; Output = "Matching Defaults entries for settlecore-deploy on host:`n    env_reset, mail_badpass, use_pty"; Expected = $false }
+    @{ Name = 'disabled'; Output = "Matching Defaults entries for settlecore-deploy on host:`n    env_reset, secure_path=$($securePath -replace ':', '\\:'), !secure_path, use_pty"; Expected = $false }
+    @{ Name = 'env-keep'; Output = "Matching Defaults entries for settlecore-deploy on host:`n    env_reset, secure_path=$($securePath -replace ':', '\\:'), env_keep+=PATH, use_pty"; Expected = $true }
+    @{ Name = 'polluted'; Output = 'Matching Defaults entries for settlecore-deploy on host:`n    env_reset, secure_path=/tmp/evil\:/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin, use_pty'; Expected = $false }
+    @{ Name = 'no-entry'; Output = 'User settlecore-deploy is not allowed to run sudo on host.'; Expected = $true }
+    @{ Name = 'sudo-rs'; Output = "User settlecore-deploy may run the following commands on host:`n    (root) NOPASSWD: /usr/local/sbin/settlecore-website-publish *"; Expected = $true }
   )
+  $disabled = $sudoCases | Where-Object Name -eq 'disabled' | Select-Object -First 1
+  Assert-Equal ([string](Test-GuideSudoersCase $legacyGuideScript $disabled.Output)) 'True'
   foreach ($case in $sudoCases) {
-    Assert-Equal ([string](Test-GuideSudoersCase $guidePipeline $case.Output)) ([string]$case.Expected)
+    Assert-Equal ([string](Test-GuideSudoersCase $guideScript $case.Output)) ([string]$case.Expected)
   }
-  Write-Host 'R1 guide-command sudoers fixture verification passed.'
+  Write-Host 'R1 legacy disabled-fixture mutation became green as expected.'
+  Write-Host 'R1 guide-command real sudoers fixture verification passed.'
   $first = '20261104T000001Z-first'; $second = '20261104T000002Z-second'; $third = '20261104T000003Z-third'
   New-Item -ItemType Directory -Path "$temp/site/releases/$first", "$temp/site/releases/$second", "$temp/site/releases/$third", "$temp/snippets" | Out-Null
   Copy-Item -Recurse "$dist/*" "$temp/site/releases/$first/"
