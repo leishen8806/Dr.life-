@@ -1,7 +1,10 @@
 package kess
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +32,15 @@ func TestHTTPClientRejectsMissingConfigAndNonSandboxEndpointWithoutLeakingSecret
 		if strings.Contains(err.Error(), secret) {
 			t.Fatalf("configuration error leaked secret: %v", err)
 		}
+	}
+}
+
+func TestHTTPClientRejectsDisabledCertificateVerification(t *testing.T) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- verifies the client rejects this configuration.
+	_, err := NewHTTPClient(validConfig(CreateServiceLower), &http.Client{Transport: transport})
+	if !errors.Is(err, ErrConfig) {
+		t.Fatalf("NewHTTPClient error = %v, want ErrConfig", err)
 	}
 }
 
@@ -65,6 +77,7 @@ func TestHTTPClientUsesOAuthBearerAndConfiguredCreateService(t *testing.T) {
 }
 
 func TestHTTPClientRejectsTamperedNestedDataWithValidTopLevelSignature(t *testing.T) {
+	var logs bytes.Buffer
 	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
 		case "/oauth/token":
@@ -76,13 +89,18 @@ func TestHTTPClientRejectsTamperedNestedDataWithValidTopLevelSignature(t *testin
 		}
 	}))
 	defer server.Close()
-	client, err := NewHTTPClient(validConfig(CreateServiceLower), sandboxHTTPClient(t, server))
+	config := validConfig(CreateServiceLower)
+	config.Logger = slog.New(slog.NewTextHandler(&logs, nil))
+	client, err := NewHTTPClient(config, sandboxHTTPClient(t, server))
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = client.Create(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 123400, Currency: "USD", ExpectedSellerCode: "seller"})
 	if !errors.Is(err, ErrInvalidChannel) {
 		t.Fatalf("Create error = %v, want ErrInvalidChannel", err)
+	}
+	if !strings.Contains(logs.String(), "KESS response order rejected") {
+		t.Fatalf("missing sanitized mismatch alert log: %s", logs.String())
 	}
 }
 
@@ -195,7 +213,9 @@ func validConfig(service string) Config {
 func sandboxHTTPClient(t *testing.T, server *httptest.Server) *http.Client {
 	t.Helper()
 	transport := server.Client().Transport.(*http.Transport).Clone()
-	transport.TLSClientConfig.InsecureSkipVerify = true // #nosec G402 -- test-only local TLS server
+	roots := x509.NewCertPool()
+	roots.AddCert(server.Certificate())
+	transport.TLSClientConfig = &tls.Config{RootCAs: roots, ServerName: "example.com", MinVersion: tls.VersionTLS12}
 	transport.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
 		return (&net.Dialer{}).DialContext(ctx, network, server.Listener.Addr().String())
 	}

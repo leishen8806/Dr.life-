@@ -89,6 +89,9 @@ func NewHTTPClient(config Config, client *http.Client) (*HTTPClient, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	} else {
+		if transport, ok := client.Transport.(*http.Transport); ok && transport.TLSClientConfig != nil && transport.TLSClientConfig.InsecureSkipVerify {
+			return nil, ErrConfig
+		}
 		copy := *client
 		copy.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 		client = &copy
@@ -108,7 +111,11 @@ func (c *HTTPClient) Create(ctx context.Context, intent Intent) (ChannelOrder, e
 	if err != nil {
 		return ChannelOrder{}, err
 	}
-	return decodeAndValidateOrder(data, intent, true)
+	order, err := decodeAndValidateOrder(data, intent, true)
+	if err != nil {
+		c.config.Logger.ErrorContext(ctx, "KESS response order rejected", "operation", "createorder")
+	}
+	return order, err
 }
 
 func (c *HTTPClient) Query(ctx context.Context, intent Intent) (ChannelOrder, error) {
@@ -116,7 +123,11 @@ func (c *HTTPClient) Query(ctx context.Context, intent Intent) (ChannelOrder, er
 	if err != nil {
 		return ChannelOrder{}, err
 	}
-	return decodeAndValidateOrder(data, intent, false)
+	order, err := decodeAndValidateOrder(data, intent, false)
+	if err != nil {
+		c.config.Logger.ErrorContext(ctx, "KESS response order rejected", "operation", "queryorder")
+	}
+	return order, err
 }
 
 func (c *HTTPClient) gateway(ctx context.Context, fields map[string]string) (json.RawMessage, error) {
