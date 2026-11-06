@@ -1,16 +1,22 @@
 import type { LocalizedText } from "./types";
 
 export type OrderStatus =
-  | "pendingPayment"
+  | "awaiting_payment"
   | "paid"
   | "submitted"
   | "accepted"
-  | "fulfilling"
+  | "in_fulfillment"
   | "shipped"
-  | "delivered"
+  | "delivered_verified"
   | "settled"
   | "cancelled"
-  | "rejected";
+  | "rejected"
+  | "delivery_failed"
+  | "returning"
+  | "returned"
+  | "exception";
+
+export type PaymentStatus = "pending" | "confirming" | "succeeded" | "failed" | "refunded";
 
 export interface OrderLine {
   publicId: string;
@@ -26,15 +32,21 @@ export interface OrderEvent {
   at: string;
 }
 
-export interface BuyerOrder {
+export interface BuyerSubOrder {
   publicId: string;
-  status: OrderStatus;
-  createdAt: string;
   merchantName: LocalizedText;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
   lines: readonly OrderLine[];
   totalE4: bigint;
-  deliveryStatus: OrderStatus;
   events: readonly OrderEvent[];
+}
+
+export interface BuyerOrder {
+  publicId: string;
+  createdAt: string;
+  totalE4: bigint;
+  subOrders: readonly BuyerSubOrder[];
 }
 
 function line(
@@ -48,25 +60,34 @@ function line(
   return { publicId, name, quantity, unit, unitPriceE4, totalE4 };
 }
 
-function order(
+function subOrder(
   publicId: string,
   status: OrderStatus,
+  paymentStatus: PaymentStatus,
   merchantName: LocalizedText,
   productName: LocalizedText,
   quantity: string,
   unitPriceE4: bigint,
   day: string
-): BuyerOrder {
+): BuyerSubOrder {
   const lines = [line(`${publicId}-line`, productName, quantity, "m2", unitPriceE4)];
   return {
     publicId,
     status,
-    createdAt: `2026-11-${day}T09:30:00Z`,
+    paymentStatus,
     merchantName,
     lines,
     totalE4: lines.reduce((total, item) => total + item.totalE4, 0n),
-    deliveryStatus: status,
     events: [{ label: status, at: `2026-11-${day}T09:30:00Z` }]
+  };
+}
+
+function order(publicId: string, day: string, subOrders: readonly BuyerSubOrder[]): BuyerOrder {
+  return {
+    publicId,
+    createdAt: `2026-11-${day}T09:30:00Z`,
+    totalE4: subOrders.reduce((total, item) => total + item.totalE4, 0n),
+    subOrders
   };
 }
 
@@ -77,16 +98,24 @@ const paint = { zh: "乳胶漆 18L", en: "Latex paint 18 L", km: "ថ្នា�
 
 /** Interface-stub data: deliberately covers every buyer-visible order state. */
 export const mockOrders: readonly BuyerOrder[] = [
-  order("ORD-1001", "pendingPayment", chinaMerchant, tile, "12", 95_000n, "01"),
-  order("ORD-1002", "paid", localMerchant, paint, "4", 380_000n, "02"),
-  order("ORD-1003", "submitted", chinaMerchant, tile, "100", 88_000n, "03"),
-  order("ORD-1004", "accepted", localMerchant, paint, "6", 380_000n, "04"),
-  order("ORD-1005", "fulfilling", chinaMerchant, tile, "20", 95_000n, "05"),
-  order("ORD-1006", "shipped", localMerchant, paint, "8", 380_000n, "06"),
-  order("ORD-1007", "delivered", chinaMerchant, tile, "50", 95_000n, "07"),
-  order("ORD-1008", "settled", localMerchant, paint, "10", 380_000n, "08"),
-  order("ORD-1009", "cancelled", chinaMerchant, tile, "1", 95_000n, "09"),
-  order("ORD-1010", "rejected", localMerchant, paint, "2", 380_000n, "10")
+  order("ORD-1001", "01", [subOrder("SUB-1001-CN", "awaiting_payment", "pending", chinaMerchant, tile, "12", 95_000n, "01")]),
+  order("ORD-1002", "02", [subOrder("SUB-1002-LC", "paid", "succeeded", localMerchant, paint, "4", 380_000n, "02")]),
+  order("ORD-1003", "03", [subOrder("SUB-1003-CN", "submitted", "succeeded", chinaMerchant, tile, "100", 88_000n, "03")]),
+  order("ORD-1004", "04", [subOrder("SUB-1004-LC", "accepted", "succeeded", localMerchant, paint, "6", 380_000n, "04")]),
+  order("ORD-1005", "05", [subOrder("SUB-1005-CN", "in_fulfillment", "succeeded", chinaMerchant, tile, "20", 95_000n, "05")]),
+  order("ORD-1006", "06", [subOrder("SUB-1006-LC", "shipped", "succeeded", localMerchant, paint, "8", 380_000n, "06")]),
+  order("ORD-1007", "07", [subOrder("SUB-1007-CN", "delivered_verified", "succeeded", chinaMerchant, tile, "50", 95_000n, "07")]),
+  order("ORD-1008", "08", [subOrder("SUB-1008-LC", "settled", "succeeded", localMerchant, paint, "10", 380_000n, "08")]),
+  order("ORD-1009", "09", [subOrder("SUB-1009-CN", "cancelled", "refunded", chinaMerchant, tile, "1", 95_000n, "09")]),
+  order("ORD-1010", "10", [subOrder("SUB-1010-LC", "rejected", "failed", localMerchant, paint, "2", 380_000n, "10")]),
+  order("ORD-1011", "11", [
+    subOrder("SUB-1011-CN", "paid", "confirming", chinaMerchant, tile, "2", 95_000n, "11"),
+    subOrder("SUB-1011-LC", "submitted", "confirming", localMerchant, paint, "1", 380_000n, "11")
+  ]),
+  order("ORD-1012", "12", [subOrder("SUB-1012-CN", "delivery_failed", "succeeded", chinaMerchant, tile, "3", 95_000n, "12")]),
+  order("ORD-1013", "13", [subOrder("SUB-1013-LC", "returning", "succeeded", localMerchant, paint, "3", 380_000n, "13")]),
+  order("ORD-1014", "14", [subOrder("SUB-1014-CN", "returned", "refunded", chinaMerchant, tile, "2", 95_000n, "14")]),
+  order("ORD-1015", "15", [subOrder("SUB-1015-LC", "exception", "succeeded", localMerchant, paint, "2", 380_000n, "15")])
 ];
 
 export function findOrder(

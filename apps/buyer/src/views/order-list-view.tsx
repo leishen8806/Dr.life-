@@ -3,11 +3,15 @@ import { AppHeader, EmptyState, ErrorState, Loading } from "@drlife/ui";
 import { localized } from "../localized";
 import { formatPriceE4 } from "../money";
 import type { Resource } from "../resource";
-import type { BuyerOrder, OrderStatus } from "../orders";
+import type { BuyerOrder, BuyerSubOrder, OrderStatus } from "../orders";
 import type { LocaleProps } from "./common";
 
 function statusKey(status: OrderStatus) {
-  return `order.status.${status}` as const;
+  return `order.buyerStatus.${status}` as const;
+}
+
+function statusSummary(subOrders: readonly BuyerSubOrder[], t: LocaleProps["t"]) {
+  return subOrders.map((item) => t(statusKey(item.status))).join(" · ");
 }
 
 export function OrderListView({
@@ -48,11 +52,15 @@ export function OrderListView({
               <button type="button" className="buyer-order-card" key={item.publicId} onClick={() => onOpen(item)}>
                 <span className="buyer-order-card__header">
                   <strong>{item.publicId}</strong>
-                  <span className="buyer-order-status">{t(statusKey(item.status))}</span>
+                  <span className="buyer-order-status">{statusSummary(item.subOrders, t)}</span>
                 </span>
-                <span className="buyer-order-card__merchant">{localized(item.merchantName, language)}</span>
+                <span className="buyer-order-card__merchant">
+                  {item.subOrders.map((subOrder) => localized(subOrder.merchantName, language)).join(" · ")}
+                </span>
                 <span className="buyer-order-card__summary">
-                  {localized(item.lines[0]?.name, language)} · {t("order.items", { count: item.lines.length })}
+                  {t("order.subOrderCount", { count: item.subOrders.length })} · {t("order.items", {
+                    count: item.subOrders.reduce((total, subOrder) => total + subOrder.lines.length, 0)
+                  })}
                 </span>
                 <span className="buyer-order-card__footer">
                   <strong>{formatPriceE4(item.totalE4)}</strong>

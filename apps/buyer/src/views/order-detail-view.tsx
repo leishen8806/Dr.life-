@@ -20,36 +20,45 @@ export function OrderDetailView({
         <Card>
           <div className="buyer-order-detail__heading">
             <h1 className="buyer-section__title">{order.publicId}</h1>
-            <span className="buyer-order-status">{t(`order.status.${order.status}` as const)}</span>
+            <span className="buyer-order-status">{t("order.parentSummary")}</span>
           </div>
-          <p className="buyer-order-detail__meta">{t("order.merchant")}: {localized(order.merchantName, language)}</p>
           <p className="buyer-order-detail__meta">{t("order.createdAt")}: {order.createdAt.slice(0, 10)}</p>
         </Card>
-        <Card>
-          <h2 className="buyer-section__title">{t("order.itemsTitle")}</h2>
-          <div className="buyer-order-lines">
-            {order.lines.map((line) => (
-              <div className="buyer-order-line" key={line.publicId}>
-                <div>
-                  <strong lang={language}>{localized(line.name, language)}</strong>
-                  <small>{line.quantity} {line.unit} × {formatPriceE4(line.unitPriceE4)}</small>
+        {order.subOrders.map((subOrder) => (
+          <Card key={subOrder.publicId}>
+            <div className="buyer-order-detail__heading">
+              <h2 className="buyer-section__title">{localized(subOrder.merchantName, language)}</h2>
+              <span className="buyer-order-status">{t(`order.buyerStatus.${subOrder.status}` as const)}</span>
+            </div>
+            <p className="buyer-order-detail__meta">{t("order.subOrder")}: {subOrder.publicId}</p>
+            <p className="buyer-order-detail__meta">{t("order.paymentStatus")}: {t(`order.payment.${subOrder.paymentStatus}` as const)}</p>
+            {subOrder.paymentStatus === "confirming" && <p className="buyer-order-warning">{t("order.paymentConfirming")}</p>}
+            <h3 className="buyer-section__title">{t("order.itemsTitle")}</h3>
+            <div className="buyer-order-lines">
+              {subOrder.lines.map((line) => (
+                <div className="buyer-order-line" key={line.publicId}>
+                  <div>
+                    <strong lang={language}>{localized(line.name, language)}</strong>
+                    <small>{line.quantity} {line.unit} × {formatPriceE4(line.unitPriceE4)}</small>
+                  </div>
+                  <strong>{formatPriceE4(line.totalE4)}</strong>
                 </div>
-                <strong>{formatPriceE4(line.totalE4)}</strong>
-              </div>
-            ))}
-          </div>
-          <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(order.totalE4)}</strong></p>
-        </Card>
+              ))}
+            </div>
+            <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(subOrder.totalE4)}</strong></p>
+            <h3 className="buyer-section__title">{t("order.delivery")}</h3>
+            <ol className="buyer-order-events">
+              {subOrder.events.map((event) => (
+                <li key={`${event.label}-${event.at}`}>
+                  <strong>{t(`order.buyerStatus.${event.label}` as const)}</strong>
+                  <small>{event.at.slice(0, 10)}</small>
+                </li>
+              ))}
+            </ol>
+          </Card>
+        ))}
         <Card>
-          <h2 className="buyer-section__title">{t("order.delivery")}</h2>
-          <ol className="buyer-order-events">
-            {order.events.map((event) => (
-              <li key={`${event.label}-${event.at}`}>
-                <strong>{t(`order.status.${event.label}` as const)}</strong>
-                <small>{event.at.slice(0, 10)}</small>
-              </li>
-            ))}
-          </ol>
+          <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(order.totalE4)}</strong></p>
         </Card>
         <p className="buyer-order-note">{t("order.mockNote")}</p>
       </main>

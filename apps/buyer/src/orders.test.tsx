@@ -22,7 +22,7 @@ function text(markup: string): string[] {
 }
 
 describe("buyer order mock flow", () => {
-  it("covers every order status in the list and keeps the interface-stub label", () => {
+  it("covers parent orders, split merchants, payment confirmation and the interface-stub label", () => {
     const markup = renderToStaticMarkup(
       <OrderListView
         t={translator("en")}
@@ -33,10 +33,10 @@ describe("buyer order mock flow", () => {
         onOpen={() => undefined}
       />
     );
-    expect(mockOrders).toHaveLength(10);
+    expect(mockOrders).toHaveLength(15);
     expect(text(markup)).toContain("Interface-stub data for the buyer order flow");
-    expect(text(markup)).toContain("Pending payment");
-    expect(text(markup)).toContain("Rejected");
+    expect(text(markup)).toContain("Awaiting payment confirmation");
+    expect(text(markup)).toContain("Warehouse processing, awaiting acceptance");
     expect(text(markup)).toContain("$114.00");
   });
 
@@ -64,8 +64,21 @@ describe("buyer order mock flow", () => {
       />
     );
     expect(text(markup)).toContain("订单详情");
-    expect(text(markup)).toContain("已提交");
+    expect(text(markup)).toContain("仓库处理中，等待受理");
     expect(text(markup)).toContain("$880.00");
     expect(text(markup)).toContain("配送进度");
+  });
+
+  it("shows the confirming payment guard without a payment action", () => {
+    const markup = renderToStaticMarkup(
+      <OrderDetailView
+        t={translator("en")}
+        language="en"
+        order={mockOrders[10]!}
+        onBack={() => undefined}
+      />
+    );
+    expect(text(markup)).toContain("Payment result is being confirmed. Please do not pay again.");
+    expect(text(markup)).not.toContain("Pay now");
   });
 });

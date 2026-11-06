@@ -224,7 +224,7 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
   const openOrders = useCallback(() => push({ name: "orders" }), [push]);
   const openOrder = useCallback((order: BuyerOrder) => push({ name: "order", order }), [push]);
   const loadOrders = useCallback(
-    async () => mockOrders,
+    async () => (import.meta.env.DEV ? mockOrders : []),
     []
   );
   const [orders, retryOrders] = useLoaded(loadOrders);
