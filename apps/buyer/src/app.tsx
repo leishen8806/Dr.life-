@@ -9,16 +9,21 @@ import {
   loadProducts
 } from "./api";
 import { appendFeed, firstFeed, nextPage, type ProductFeed } from "./feed";
+import { mockOrders, type BuyerOrder } from "./orders";
 import { errorMessageKey, type Resource } from "./resource";
 import type { Category, Product } from "./types";
 import { CategoryView } from "./views/category-view";
 import { HomeView } from "./views/home-view";
 import { ProductDetailView } from "./views/product-detail-view";
+import { OrderDetailView } from "./views/order-detail-view";
+import { OrderListView } from "./views/order-list-view";
 
 type Route =
   | { name: "home" }
   | { name: "category"; code?: string }
-  | { name: "product"; product: Product };
+  | { name: "product"; product: Product }
+  | { name: "orders" }
+  | { name: "order"; order: BuyerOrder };
 
 const featuredPageSize = 6;
 
@@ -216,9 +221,47 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
     (product: Product) => push({ name: "product", product }),
     [push]
   );
+  const openOrders = useCallback(() => push({ name: "orders" }), [push]);
+  const openOrder = useCallback((order: BuyerOrder) => push({ name: "order", order }), [push]);
+  const loadOrders = useCallback(
+    async () => mockOrders,
+    []
+  );
+  const [orders, retryOrders] = useLoaded(loadOrders);
 
-  const actions = <LanguageSwitcher />;
+  const actions = (
+    <>
+      <LanguageSwitcher />
+      <button type="button" className="buyer-orders-action" onClick={openOrders}>
+        {t("order.pageTitle")}
+      </button>
+    </>
+  );
   const knownCategories = categories.status === "ready" ? categories.value : [];
+
+  if (route.name === "order")
+    return (
+      <OrderDetailView
+        t={t}
+        language={language}
+        order={route.order}
+        actions={actions}
+        onBack={back}
+      />
+    );
+
+  if (route.name === "orders")
+    return (
+      <OrderListView
+        t={t}
+        language={language}
+        orders={orders}
+        actions={actions}
+        onBack={back}
+        onRetry={retryOrders}
+        onOpen={openOrder}
+      />
+    );
 
   if (route.name === "product")
     return (
