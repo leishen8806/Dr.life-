@@ -2,12 +2,19 @@ package trade
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
+	"sort"
+	"strconv"
 )
 
 var (
 	ErrBuyerInactive            = errors.New("trade: buyer account is not active")
 	ErrInsufficientAvailability = errors.New("trade: insufficient availability")
+	ErrIdempotencyRequired      = errors.New("trade: idempotency key is required")
+	ErrIdempotencyConflict      = errors.New("trade: idempotency key conflicts with another request")
 	// ErrOrderNotVisible intentionally covers both a missing order and a
 	// foreign order, so callers cannot use reads to enumerate order IDs.
 	ErrOrderNotVisible = errors.New("trade: order is not visible to caller")
@@ -16,13 +23,19 @@ var (
 type AccountDirectory interface {
 	Status(context.Context, int64) (string, error)
 }
-type Availability interface {
-	Available(context.Context, string) (int64, error)
-	Reserve(context.Context, string, int64) error
-	Release(context.Context, string, int64) error
+type Catalog interface {
+	// ResolveAndReserve must resolve current server-side facts and reserve stock
+	// atomically. reservationKey makes retries idempotent; abandoned keys must be
+	// reclaimed by the catalog timeout worker. Reusing a key with different
+	// lines must fail without changing the existing reservation.
+	ResolveAndReserve(context.Context, string, []OrderLineInput) ([]CatalogLine, error)
+	Release(context.Context, string) error
 }
 type Store interface {
-	Create(context.Context, CreateOrder) error
+	Create(context.Context, string, string, CreateOrder) (CreateOrder, error)
+	QueueReservationRelease(context.Context, string, string) error
+	ReservationForRelease(context.Context, string) (Reservation, error)
+	MarkReservationReleased(context.Context, string) (bool, error)
 }
 
 // OrderReader is deliberately scoped by the caller's account/merchant ID.
@@ -48,16 +61,24 @@ type ChildOrder struct {
 }
 type CreateOrder struct {
 	BuyerAccountID, TotalE4 int64
+	PublicID                string
+	IdempotencyKey          string
+	RequestHash             string
 	Children                []ChildOrder
 }
+type Reservation struct {
+	Key      string
+	Status   OrderStatus
+	Released bool
+}
 type Service struct {
-	store        Store
-	accounts     AccountDirectory
-	availability Availability
+	store    Store
+	accounts AccountDirectory
+	catalog  Catalog
 }
 
-func NewService(store Store, accounts AccountDirectory, availability Availability) *Service {
-	return &Service{store, accounts, availability}
+func NewService(store Store, accounts AccountDirectory, catalog Catalog) *Service {
+	return &Service{store, accounts, catalog}
 }
 
 // BuyerOrder returns a parent order only when it belongs to buyerID.
@@ -77,7 +98,10 @@ func (s *Service) MerchantOrder(ctx context.Context, merchantID int64, publicID 
 	}
 	return reader.FindMerchantOrder(ctx, merchantID, publicID)
 }
-func (s *Service) Place(ctx context.Context, buyer int64, lines []OrderLineInput) (CreateOrder, error) {
+func (s *Service) Place(ctx context.Context, buyer int64, idempotencyKey string, lines []OrderLineInput) (CreateOrder, error) {
+	if idempotencyKey == "" {
+		return CreateOrder{}, ErrIdempotencyRequired
+	}
 	status, err := s.accounts.Status(ctx, buyer)
 	if err != nil {
 		return CreateOrder{}, err
@@ -85,32 +109,21 @@ func (s *Service) Place(ctx context.Context, buyer int64, lines []OrderLineInput
 	if status != "active" {
 		return CreateOrder{}, ErrBuyerInactive
 	}
-	items, total, err := BuildOrderItems(lines)
+	normalized, err := normalizeOrderLines(lines)
 	if err != nil {
 		return CreateOrder{}, err
 	}
-	reserved := make([]OrderItem, 0, len(items))
-	for _, item := range items {
-		available, e := s.availability.Available(ctx, item.SKUPublicID)
-		if e != nil {
-			err = e
-			break
-		}
-		if available < item.Quantity {
-			err = ErrInsufficientAvailability
-			break
-		}
-		if e = s.availability.Reserve(ctx, item.SKUPublicID, item.Quantity); e != nil {
-			err = e
-			break
-		}
-		reserved = append(reserved, item)
-	}
+	reservationKey := fmt.Sprintf("%d:%s", buyer, idempotencyKey)
+	snapshots, err := s.catalog.ResolveAndReserve(ctx, reservationKey, normalized)
 	if err != nil {
-		for _, item := range reserved {
-			_ = s.availability.Release(ctx, item.SKUPublicID, item.Quantity)
-		}
 		return CreateOrder{}, err
+	}
+	if err := validateCatalogSnapshot(normalized, snapshots); err != nil {
+		return CreateOrder{}, errors.Join(err, s.releaseOrQueue(ctx, reservationKey, "invalid_snapshot"))
+	}
+	items, total, err := BuildOrderItems(snapshots)
+	if err != nil {
+		return CreateOrder{}, errors.Join(err, s.releaseOrQueue(ctx, reservationKey, "invalid_order"))
 	}
 	children := map[int64]int{}
 	order := CreateOrder{BuyerAccountID: buyer, TotalE4: total}
@@ -125,26 +138,84 @@ func (s *Service) Place(ctx context.Context, buyer int64, lines []OrderLineInput
 		child.Lines = append(child.Lines, item)
 		child.TotalE4 += item.LineTotalE4
 	}
-	if err = s.store.Create(ctx, order); err != nil {
-		for _, item := range reserved {
-			_ = s.availability.Release(ctx, item.SKUPublicID, item.Quantity)
+	order.IdempotencyKey = idempotencyKey
+	order.RequestHash = requestHash(buyer, normalized)
+	stored, err := s.store.Create(ctx, idempotencyKey, order.RequestHash, order)
+	if err != nil {
+		if errors.Is(err, ErrIdempotencyConflict) {
+			return CreateOrder{}, err
 		}
-		return CreateOrder{}, err
+		return CreateOrder{}, errors.Join(err, s.releaseOrQueue(ctx, reservationKey, "create_failed"))
 	}
-	return order, nil
+	return stored, nil
 }
 
-// ReleaseReservations releases local stock reservations when an order is
-// cancelled or expires before payment. It consumes the order-line snapshot and
-// therefore never needs current catalog data.
-func ReleaseReservations(ctx context.Context, availability Availability, items []OrderItem) error {
-	for _, item := range items {
-		if item.SKUPublicID == "" || item.Quantity <= 0 {
+func validateCatalogSnapshot(requested []OrderLineInput, snapshots []CatalogLine) error {
+	if len(requested) != len(snapshots) {
+		return ErrInvalidOrderLine
+	}
+	want := make(map[string]int64, len(requested))
+	for _, line := range requested {
+		want[line.SKUPublicID] = line.Quantity
+	}
+	for _, snapshot := range snapshots {
+		if want[snapshot.SKUPublicID] != snapshot.Quantity {
 			return ErrInvalidOrderLine
 		}
-		if err := availability.Release(ctx, item.SKUPublicID, item.Quantity); err != nil {
-			return err
-		}
+		delete(want, snapshot.SKUPublicID)
+	}
+	if len(want) != 0 {
+		return ErrInvalidOrderLine
 	}
 	return nil
+}
+
+func (s *Service) ReleaseReservations(ctx context.Context, buyerOrderPublicID string) error {
+	reservation, err := s.store.ReservationForRelease(ctx, buyerOrderPublicID)
+	if err != nil || reservation.Released {
+		return err
+	}
+	if reservation.Status != AwaitingPayment && reservation.Status != Cancelled {
+		return ErrInvalidTransition
+	}
+	if err := s.catalog.Release(ctx, reservation.Key); err != nil {
+		return errors.Join(err, s.store.QueueReservationRelease(ctx, reservation.Key, "release_failed"))
+	}
+	_, err = s.store.MarkReservationReleased(ctx, buyerOrderPublicID)
+	return err
+}
+
+func (s *Service) releaseOrQueue(ctx context.Context, key, reason string) error {
+	if err := s.catalog.Release(ctx, key); err != nil {
+		return errors.Join(err, s.store.QueueReservationRelease(ctx, key, reason))
+	}
+	return nil
+}
+
+func normalizeOrderLines(lines []OrderLineInput) ([]OrderLineInput, error) {
+	quantities := make(map[string]int64, len(lines))
+	for _, line := range lines {
+		if line.SKUPublicID == "" || line.Quantity <= 0 || quantities[line.SKUPublicID] > maxInt64-line.Quantity {
+			return nil, ErrInvalidOrderLine
+		}
+		quantities[line.SKUPublicID] += line.Quantity
+	}
+	if len(quantities) == 0 {
+		return nil, ErrInvalidOrderLine
+	}
+	normalized := make([]OrderLineInput, 0, len(quantities))
+	for sku, quantity := range quantities {
+		normalized = append(normalized, OrderLineInput{SKUPublicID: sku, Quantity: quantity})
+	}
+	sort.Slice(normalized, func(i, j int) bool { return normalized[i].SKUPublicID < normalized[j].SKUPublicID })
+	return normalized, nil
+}
+
+func requestHash(buyer int64, lines []OrderLineInput) string {
+	hash := sha256.New()
+	_, _ = hash.Write([]byte(strconv.FormatInt(buyer, 10)))
+	for _, line := range lines {
+		_, _ = hash.Write([]byte("\x00" + line.SKUPublicID + "\x00" + strconv.FormatInt(line.Quantity, 10)))
+	}
+	return hex.EncodeToString(hash.Sum(nil))
 }

@@ -6,18 +6,18 @@ import (
 )
 
 func TestSplitLinesSnapshotsTierPriceAndTotals(t *testing.T) {
-	items, total, err := BuildOrderItems([]OrderLineInput{
-		{SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAW", MerchantID: 10, Quantity: 12, Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: 120}, {MinQuantity: 10, UnitPriceE4: 100}}},
-		{SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAX", MerchantID: 10, Quantity: 2, Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: 50}}},
-		{SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAY", MerchantID: 20, Quantity: 3, Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: 70}}},
+	items, total, err := BuildOrderItems([]CatalogLine{
+		{SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAW", MerchantID: 10, Quantity: 12, Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: 1200}, {MinQuantity: 10, UnitPriceE4: 1000}}, OnSale: true},
+		{SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAX", MerchantID: 10, Quantity: 2, Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: 500}}, OnSale: true},
+		{SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAY", MerchantID: 20, Quantity: 3, Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: 700}}, OnSale: true},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if total != 1510 {
-		t.Fatalf("total=%d, want 1510", total)
+	if total != 15100 {
+		t.Fatalf("total=%d, want 15100", total)
 	}
-	if len(items) != 3 || items[0].UnitPriceE4 != 100 || items[0].LineTotalE4 != 1200 {
+	if len(items) != 3 || items[0].UnitPriceE4 != 1000 || items[0].LineTotalE4 != 12000 {
 		t.Fatalf("items=%+v", items)
 	}
 }

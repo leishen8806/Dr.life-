@@ -49,23 +49,28 @@ type Tier struct {
 	UnitPriceE4 int64
 }
 type OrderLineInput struct {
+	SKUPublicID string
+	Quantity    int64
+}
+type CatalogLine struct {
 	SKUPublicID          string
 	MerchantID, Quantity int64
 	Tiers                []Tier
+	OnSale               bool
 }
 type OrderItem struct {
 	SKUPublicID                                    string
 	MerchantID, Quantity, UnitPriceE4, LineTotalE4 int64
 }
 
-func BuildOrderItems(lines []OrderLineInput) ([]OrderItem, int64, error) {
+func BuildOrderItems(lines []CatalogLine) ([]OrderItem, int64, error) {
 	if len(lines) == 0 {
 		return nil, 0, ErrInvalidOrderLine
 	}
 	items := make([]OrderItem, 0, len(lines))
 	var total int64
 	for _, line := range lines {
-		if line.SKUPublicID == "" || line.MerchantID <= 0 || line.Quantity <= 0 {
+		if line.SKUPublicID == "" || line.MerchantID <= 0 || line.Quantity <= 0 || !line.OnSale {
 			return nil, 0, ErrInvalidOrderLine
 		}
 		price, ok := tierPrice(line.Quantity, line.Tiers)
@@ -88,8 +93,16 @@ func BuildOrderItems(lines []OrderLineInput) ([]OrderItem, int64, error) {
 func tierPrice(quantity int64, tiers []Tier) (int64, bool) {
 	var price, bestMinimum int64
 	found := false
+	seen := make(map[int64]struct{}, len(tiers))
 	for _, tier := range tiers {
-		if tier.MinQuantity > 0 && tier.MinQuantity <= quantity && tier.UnitPriceE4 >= 0 && (!found || tier.MinQuantity > bestMinimum) {
+		if tier.MinQuantity <= 0 || tier.UnitPriceE4 < 0 || tier.UnitPriceE4%100 != 0 {
+			return 0, false
+		}
+		if _, duplicate := seen[tier.MinQuantity]; duplicate {
+			return 0, false
+		}
+		seen[tier.MinQuantity] = struct{}{}
+		if tier.MinQuantity <= quantity && (!found || tier.MinQuantity > bestMinimum) {
 			price, bestMinimum, found = tier.UnitPriceE4, tier.MinQuantity, true
 		}
 	}
