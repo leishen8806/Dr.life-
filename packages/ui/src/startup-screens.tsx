@@ -1,7 +1,15 @@
+import { useCallback, useEffect, useState } from "react";
 import type { Language } from "@drlife/i18n";
-import { ErrorState } from "./foundation";
+import { ErrorState, Loading } from "./foundation";
 import { languageKeys, languages } from "./language-switcher";
-import { throttleWaiting, type Translate } from "./startup";
+import {
+  throttleWaiting,
+  type ConsentKind,
+  type LegalDocument,
+  type StartupAccount,
+  type StartupGateway,
+  type Translate
+} from "./startup";
 
 /**
  * Brand load: small mark plus halo, about 1.5s. The skip button is only offered while
@@ -142,5 +150,132 @@ export function LoginFailedView({
       retryLabel={translate("startup.signInAgain")}
       onRetry={onRetry}
     />
+  );
+}
+
+const consentKinds: ConsentKind[] = ["privacy", "terms"];
+
+/** A-09. Business screens never render while a current document still needs consent. */
+export function ConsentView({
+  translate,
+  language,
+  gateway,
+  account,
+  onComplete
+}: {
+  translate: Translate;
+  language: Language;
+  gateway: StartupGateway;
+  account: StartupAccount;
+  onComplete: (account: StartupAccount) => void;
+}) {
+  const [documents, setDocuments] = useState<LegalDocument[]>([]);
+  const [statuses, setStatuses] = useState<import("./startup").ConsentStatus[]>([]);
+  const [required, setRequired] = useState<ConsentKind[]>([]);
+  const [checked, setChecked] = useState<Partial<Record<ConsentKind, boolean>>>({});
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<"load" | "accept">();
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    Promise.all([gateway.getConsentState(), gateway.getLegalDocuments()]).then(
+      ([statuses, currentDocuments]) => {
+        if (!live) return;
+        setStatuses(statuses);
+        setRequired(statuses.filter((status) => status.needsReaccept).map((status) => status.kind));
+        setChecked(
+          Object.fromEntries(
+            statuses.filter((status) => status.accepted && !status.needsReaccept).map((status) => [status.kind, true])
+          )
+        );
+        setDocuments(currentDocuments);
+        setLoading(false);
+      },
+      () => {
+        if (!live) return;
+        setLoading(false);
+        setFailed("load");
+      }
+    );
+    return () => {
+      live = false;
+    };
+  }, [gateway, attempt]);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    setFailed(undefined);
+    setAttempt((value) => value + 1);
+  }, []);
+
+  if (loading) return <Loading label={translate("common.loading")} />;
+  if (failed === "load")
+    return (
+      <ErrorState
+        title={translate("consent.title")}
+        description={translate("consent.loadFailed")}
+        retryLabel={translate("common.retry")}
+        onRetry={load}
+      />
+    );
+
+  const canContinue = required.every((kind) => checked[kind] === true);
+  const accept = async () => {
+    if (!canContinue || busy) return;
+    setBusy(true);
+    setFailed(undefined);
+    try {
+      let acceptedAccount: StartupAccount | undefined;
+      for (const kind of required) {
+        const status = statuses.find((item) => item.kind === kind);
+        if (!status) throw new Error("The current consent status is unavailable");
+        acceptedAccount = await gateway.acceptConsent(kind, status.version);
+      }
+      onComplete(acceptedAccount ?? { ...account, needsConsent: false });
+    } catch {
+      setBusy(false);
+      setFailed("accept");
+    }
+  };
+
+  return (
+    <section className="drl-consent" role="dialog" aria-modal="true" aria-labelledby="drl-consent-title">
+      <h1 id="drl-consent-title">{translate("consent.title")}</h1>
+      <p>{translate("consent.description")}</p>
+      {failed === "accept" && <p className="drl-consent__failure" role="alert">{translate("consent.acceptFailed")}</p>}
+      <div className="drl-consent__documents">
+        {consentKinds.map((kind) => {
+          const document = documents.find((item) => item.kind === kind);
+          const isRequired = required.includes(kind);
+          if (!document) return null;
+          return (
+            <article className="drl-consent__document" key={kind}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={checked[kind] === true}
+                  disabled={!isRequired || busy}
+                  onChange={(event) => setChecked((current) => ({ ...current, [kind]: event.target.checked }))}
+                />
+                <span>
+                  <strong>{translate(`consent.${kind}`)}</strong>
+                  <small>{translate("consent.version", { version: document.version })}</small>
+                </span>
+                {isRequired && <em>{translate("consent.required")}</em>}
+              </label>
+              <details>
+                <summary>{translate("consent.read")}</summary>
+                <p>{document.body[language]}</p>
+              </details>
+            </article>
+          );
+        })}
+      </div>
+      <button type="button" disabled={!canContinue || busy} onClick={accept}>
+        {translate("consent.accept")}
+      </button>
+    </section>
   );
 }

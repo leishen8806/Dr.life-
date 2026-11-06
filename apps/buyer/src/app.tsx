@@ -10,9 +10,11 @@ import {
 } from "./api";
 import { appendFeed, firstFeed, nextPage, type ProductFeed } from "./feed";
 import { mockOrders, type BuyerOrder } from "./orders";
+import { addProduct, cartCount, stepQuantity, updateQuantity, type CartItem } from "./cart";
 import { errorMessageKey, type Resource } from "./resource";
 import type { Category, Product } from "./types";
 import { CategoryView } from "./views/category-view";
+import { CartView } from "./views/cart-view";
 import { HomeView } from "./views/home-view";
 import { ProductDetailView } from "./views/product-detail-view";
 import { OrderDetailView } from "./views/order-detail-view";
@@ -23,7 +25,8 @@ type Route =
   | { name: "category"; code?: string }
   | { name: "product"; product: Product }
   | { name: "orders" }
-  | { name: "order"; order: BuyerOrder };
+  | { name: "order"; order: BuyerOrder }
+  | { name: "cart" };
 
 const featuredPageSize = 6;
 
@@ -182,6 +185,8 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
   const client = useBuyerClient(language);
 
   const [stack, setStack] = useState<Route[]>([{ name: "home" }]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartError, setCartError] = useState<ReturnType<typeof addProduct>["error"]>();
   const route = stack[stack.length - 1] ?? { name: "home" };
   const push = useCallback(
     (next: Route) => setStack((current) => [...current, next]),
@@ -229,11 +234,35 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
   );
   const [orders, retryOrders] = useLoaded(loadOrders);
 
+  const addToCart = useCallback((product: Product) => {
+    const result = addProduct(cart, product);
+    setCart(result.cart);
+    setCartError(result.error);
+  }, [cart]);
+  const openCart = useCallback(() => push({ name: "cart" }), [push]);
+  const updateCartQuantity = useCallback((item: CartItem, quantity: string) => {
+    const result = updateQuantity(cart, item.product.public_id, quantity);
+    setCart(result.cart);
+    setCartError(result.error);
+  }, [cart]);
+  const stepCartQuantity = useCallback((item: CartItem, delta: -1 | 1) => {
+    const result = stepQuantity(cart, item.product.public_id, delta);
+    setCart(result.cart);
+    setCartError(result.error);
+  }, [cart]);
+  const removeFromCart = useCallback((item: CartItem) => {
+    setCart((current) => current.filter((entry) => entry.product.public_id !== item.product.public_id));
+    setCartError(undefined);
+  }, []);
+
   const actions = (
     <>
       <LanguageSwitcher />
       <button type="button" className="buyer-orders-action" onClick={openOrders}>
         {t("order.pageTitle")}
+      </button>
+      <button type="button" className="buyer-cart-action" onClick={openCart}>
+        {t("mall.cart")} <span aria-label={t("mall.cartCount", { count: cartCount(cart) })}>{cartCount(cart)}</span>
       </button>
     </>
   );
@@ -263,6 +292,21 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
       />
     );
 
+  if (route.name === "cart")
+    return (
+      <CartView
+        t={t}
+        language={language}
+        items={cart}
+        error={cartError}
+        actions={actions}
+        onBack={back}
+        onUpdateQuantity={updateCartQuantity}
+        onStepQuantity={stepCartQuantity}
+        onRemove={removeFromCart}
+      />
+    );
+
   if (route.name === "product")
     return (
       <ProductDetailView
@@ -271,6 +315,7 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
         product={route.product}
         actions={actions}
         onBack={back}
+        onAddToCart={() => addToCart(route.product)}
       />
     );
 

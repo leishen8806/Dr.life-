@@ -55,6 +55,16 @@
   "error.2007": "Too many login attempts. Please wait a moment.",
   "error.2007.countdown": "Too many login attempts. Wait {seconds}s.",
   "error.2008": "Please accept the current agreement to continue.",
+  "consent.title": "Review and accept the agreements",
+  "consent.description": "You must accept the current legal documents before continuing.",
+  "consent.privacy": "Privacy policy",
+  "consent.terms": "User agreement",
+  "consent.version": "Version {version}",
+  "consent.read": "Read document",
+  "consent.required": "Required",
+  "consent.accept": "Accept and continue",
+  "consent.loadFailed": "The current agreements could not be loaded.",
+  "consent.acceptFailed": "The agreement could not be saved. Please try again.",
   "error.7001": "The external service could not complete the request.",
   "error.circuitOpen": "The service is temporarily unavailable. Try again later.",
   "order.count.one": "{count} order",
@@ -173,6 +183,22 @@
 ,"mall.leadDays": "{days} days"
 ,"mall.tiers": "Tier pricing (more = cheaper)"
 ,"mall.tierQuantity": "{quantity} and up"
+,"mall.cart": "Purchase list"
+,"mall.cartCount": "{count} items"
+,"mall.cartEmpty": "Your purchase list is empty."
+,"mall.browseProducts": "Browse products"
+,"mall.cartQuantity": "Quantity"
+,"mall.cartAvailable": "Available: {quantity}"
+,"mall.cartOutOfStock": "Quantity exceeds available stock."
+,"mall.cartBelowMoq": "Quantity is below the minimum order quantity."
+,"mall.cartRemove": "Remove"
+,"mall.cartSubtotal": "Subtotal"
+,"mall.cartTotal": "Total"
+,"mall.cartSplitPreview": "Split-order preview"
+,"mall.cartMerchantCn": "China supplier"
+,"mall.cartMerchantLocal": "Local supplier"
+,"mall.cartPlaceOrder": "Submit order"
+,"mall.cartEstimateNote": "Amounts are estimates; the server response is authoritative at submission."
 ,"mall.supplier": "Supplier"
 ,"mall.categoriesEmpty": "No categories yet"
 ,"mall.productsEmpty": "No products on sale"
