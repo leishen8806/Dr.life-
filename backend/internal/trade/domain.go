@@ -38,6 +38,8 @@ var (
 	ErrEventSourceRequired = errors.New("trade: event source is required")
 	ErrInvalidOrderLine    = errors.New("trade: invalid order line")
 	ErrNoMatchingTier      = errors.New("trade: no matching price tier")
+	ErrReservationReleased = errors.New("trade: order reservation was released")
+	ErrPaymentAmount       = errors.New("trade: paid amount does not match order total")
 )
 
 type EventSource struct {
@@ -113,7 +115,7 @@ func Advance(from, to OrderStatus, source EventSource) (OrderStatus, error) {
 	if source.Reference == "" || (source.Type != SourceKESSResult && source.Type != SourceRouteFitEvent && source.Type != SourceSystem) {
 		return "", ErrEventSourceRequired
 	}
-	allowed := (from == AwaitingPayment && (to == Paid || to == Cancelled)) ||
+	allowed := (from == AwaitingPayment && to == Cancelled) ||
 		(from == Paid && to == Submitted) || (from == Submitted && (to == Accepted || to == Rejected)) ||
 		(from == Accepted && to == InFulfillment) || (from == InFulfillment && to == Shipped) ||
 		(from == Shipped && to == DeliveredVerified) || (from == DeliveredVerified && to == Settled)

@@ -110,7 +110,7 @@ func findMigration(t *testing.T, directory, suffix string) string {
 
 func assertTradeTables(t *testing.T, db *sql.DB, want bool) {
 	t.Helper()
-	for _, table := range []string{"buyer_order", "reservation_release_outbox", "merchant_order", "order_line", "order_event_source", "order_event"} {
+	for _, table := range []string{"buyer_order", "reservation_release_outbox", "merchant_order", "order_line", "order_event_source", "order_event", "payment_transition_guard"} {
 		var exists bool
 		if err := db.QueryRow(`SELECT to_regclass('trade.' || $1) IS NOT NULL`, table).Scan(&exists); err != nil {
 			t.Fatal(err)
@@ -172,6 +172,9 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 		t.Fatalf("foreign merchant read error = %v", err)
 	}
 	source := EventSource{Type: SourceKESSResult, Reference: "payment-1"}
+	if applied, err := store.Advance(ctx, 1, AwaitingPayment, Paid, source); !errors.Is(err, ErrInvalidTransition) || applied {
+		t.Fatalf("single-child payment applied=%v err=%v", applied, err)
+	}
 	start := make(chan struct{})
 	results := make(chan bool, 2)
 	errs := make(chan error, 2)
@@ -181,7 +184,7 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			applied, err := store.Advance(ctx, 1, AwaitingPayment, Paid, source)
+			_, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FAV", 100, source)
 			results <- applied
 			errs <- err
 		}()
@@ -198,13 +201,13 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	}
 	for err := range errs {
 		if err != nil {
-			t.Fatalf("concurrent Advance error: %v", err)
+			t.Fatalf("concurrent ConfirmPayment error: %v", err)
 		}
 	}
 	if applied != 1 {
 		t.Fatalf("applied=%d, want 1", applied)
 	}
-	if applied, err := store.Advance(ctx, 1, AwaitingPayment, Paid, source); err != nil || applied {
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FAV", 100, source); err != nil || applied {
 		t.Fatalf("replay applied=%v err=%v", applied, err)
 	}
 	if got, err := store.FindBuyerOrder(ctx, 1, "01ARZ3NDEKTSV4RRFFQ69G5FAV"); err != nil || got.Status != string(Paid) {
@@ -216,7 +219,7 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	if _, err := db.Exec(`UPDATE trade.merchant_order SET status='awaiting_payment' WHERE id=1`); err == nil {
 		t.Fatal("direct status rollback unexpectedly succeeded")
 	}
-	if applied, err := store.Advance(ctx, 1, AwaitingPayment, Paid, source); err != nil || applied {
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FAV", 100, source); err != nil || applied {
 		t.Fatalf("replay after state rollback applied=%v err=%v", applied, err)
 	}
 	if _, err := db.Exec(`UPDATE trade.merchant_order SET status='submitted' WHERE id=1`); err == nil {
@@ -252,12 +255,14 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAY', 2, 'idem-2', repeat('1',64), 100); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAZ', 2, 10, 100); INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES (2,'01ARZ3NDEKTSV4RRFFQ69G5FB0',1,100,100)`); err != nil {
 		t.Fatal(err)
 	}
-	if applied, err := store.Advance(ctx, 2, AwaitingPayment, Paid, source); !errors.Is(err, ErrInvalidTransition) || applied {
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FAY", 100, source); !errors.Is(err, ErrInvalidTransition) || applied {
 		t.Fatalf("cross-order replay applied=%v err=%v", applied, err)
 	}
 
 	assertAmountConstraints(t, ctx, pool)
 	assertSharedSourceWithinBuyer(t, ctx, pool, store)
+	assertPaymentReleaseGuards(t, ctx, pool, store)
+	assertReservationReleaseOutbox(t, ctx, pool, store)
 	assertDifferentSourcesSerialize(t, ctx, db, pool, store)
 	assertTradeRWCreateIsIdempotent(t, ctx, dsn)
 }
@@ -289,6 +294,16 @@ func assertTradeRWCreateIsIdempotent(t *testing.T, ctx context.Context, dsn stri
 	}
 	if _, err := store.Create(ctx, "rw-idem", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", input); !errors.Is(err, ErrIdempotencyConflict) {
 		t.Fatalf("conflicting replay error=%v", err)
+	}
+	var merchantOrderID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM trade.merchant_order WHERE buyer_order_id=(SELECT id FROM trade.buyer_order WHERE public_id=$1)`, first.PublicID).Scan(&merchantOrderID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE trade.merchant_order SET status='paid',version=version+1 WHERE id=$1`, merchantOrderID); err == nil {
+		t.Fatal("trade_rw direct child payment unexpectedly succeeded")
+	}
+	if key, applied, err := store.ConfirmPayment(ctx, first.PublicID, 200, EventSource{Type: SourceKESSResult, Reference: "rw-payment"}); err != nil || !applied || key != "88:rw-idem" {
+		t.Fatalf("trade_rw parent payment key=%q applied=%v err=%v", key, applied, err)
 	}
 }
 
@@ -325,6 +340,9 @@ func assertDifferentSourcesSerialize(t *testing.T, ctx context.Context, db *sql.
 	if err := db.QueryRow(`WITH buyer AS (INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB3', 4, 'idem-5', repeat('4',64), 100) RETURNING id), merchant AS (INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FB4', id, 12, 100 FROM buyer RETURNING id) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FB5',1,100,100 FROM merchant RETURNING merchant_order_id`).Scan(&merchantOrderID); err != nil {
 		t.Fatal(err)
 	}
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB3", 100, EventSource{Type: SourceKESSResult, Reference: "payment-before-serialize"}); err != nil || !applied {
+		t.Fatalf("prepare paid order applied=%v err=%v", applied, err)
+	}
 	if _, err := db.Exec(`CREATE FUNCTION trade.test_block_order_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(540054); RETURN NEW; END $$; CREATE TRIGGER trg_test_block_order_event BEFORE INSERT ON trade.order_event FOR EACH ROW EXECUTE FUNCTION trade.test_block_order_event()`); err != nil {
 		t.Fatal(err)
 	}
@@ -345,7 +363,7 @@ func assertDifferentSourcesSerialize(t *testing.T, ctx context.Context, db *sql.
 	}
 	results := make(chan result, 2)
 	go func() {
-		applied, err := store.Advance(ctx, merchantOrderID, AwaitingPayment, Paid, EventSource{Type: SourceKESSResult, Reference: "payment-a"})
+		applied, err := store.Advance(ctx, merchantOrderID, Paid, Submitted, EventSource{Type: SourceSystem, Reference: "submit-a"})
 		results <- result{applied, err}
 	}()
 	deadline := time.Now().Add(5 * time.Second)
@@ -363,7 +381,7 @@ func assertDifferentSourcesSerialize(t *testing.T, ctx context.Context, db *sql.
 		time.Sleep(10 * time.Millisecond)
 	}
 	go func() {
-		applied, err := store.Advance(ctx, merchantOrderID, AwaitingPayment, Cancelled, EventSource{Type: SourceSystem, Reference: "cancel-b"})
+		applied, err := store.Advance(ctx, merchantOrderID, Paid, Submitted, EventSource{Type: SourceSystem, Reference: "submit-b"})
 		results <- result{applied, err}
 	}()
 	time.Sleep(200 * time.Millisecond)
@@ -410,8 +428,8 @@ func assertSharedSourceWithinBuyer(t *testing.T, ctx context.Context, pool *pgxp
 		t.Fatal(err)
 	}
 	sharedSource := EventSource{Type: SourceKESSResult, Reference: "buyer-payment-shared"}
-	if applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB9", sharedSource); err != nil || !applied {
-		t.Fatalf("parent payment applied=%v err=%v", applied, err)
+	if key, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB9", 200, sharedSource); err != nil || !applied || key != "5:idem-6" {
+		t.Fatalf("parent payment key=%q applied=%v err=%v", key, applied, err)
 	}
 	var paidChildren, paymentEvents int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.merchant_order WHERE buyer_order_id=$1 AND status='paid'`, buyerOrderID).Scan(&paidChildren); err != nil {
@@ -423,7 +441,127 @@ func assertSharedSourceWithinBuyer(t *testing.T, ctx context.Context, pool *pgxp
 	if paidChildren != 2 || paymentEvents != 2 {
 		t.Fatalf("paid children=%d payment events=%d, want 2/2", paidChildren, paymentEvents)
 	}
-	if applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB9", sharedSource); err != nil || applied {
-		t.Fatalf("parent payment replay applied=%v err=%v", applied, err)
+	if _, err := pool.Exec(ctx, `INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref) VALUES ($1,'system','stale-submit')`, buyerOrderID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref)
+		VALUES ($1,$2,'paid','submitted','system','stale-submit')`, firstMerchantOrderID, buyerOrderID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE trade.merchant_order SET status='submitted',version=version+1 WHERE id=$1`, firstMerchantOrderID); err == nil {
+		t.Fatal("historical matching event authorized a later transition")
+	}
+	if key, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB9", 200, sharedSource); err != nil || applied || key != "5:idem-6" {
+		t.Fatalf("parent payment replay key=%q applied=%v err=%v", key, applied, err)
+	}
+}
+
+func assertPaymentReleaseGuards(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
+	t.Helper()
+	createOrder := func(parentID, childID, skuID, key string, buyerID int64) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, `WITH buyer AS (
+			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
+			VALUES ($1,$2,$3,repeat('6',64),100) RETURNING id
+		), merchant AS (
+			INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
+			SELECT $4,id,$2+100,100 FROM buyer RETURNING id
+		) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
+		SELECT id,$5,1,100,100 FROM merchant`, parentID, buyerID, key, childID, skuID); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	createOrder("01ARZ3NDEKTSV4RRFFQ69G5FC0", "01ARZ3NDEKTSV4RRFFQ69G5FC1", "01ARZ3NDEKTSV4RRFFQ69G5FC2", "idem-amount", 20)
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FC0", 99, EventSource{Type: SourceKESSResult, Reference: "wrong-amount"}); !errors.Is(err, ErrPaymentAmount) || applied {
+		t.Fatalf("wrong amount applied=%v err=%v", applied, err)
+	}
+
+	createOrder("01ARZ3NDEKTSV4RRFFQ69G5FC3", "01ARZ3NDEKTSV4RRFFQ69G5FC4", "01ARZ3NDEKTSV4RRFFQ69G5FC5", "idem-release", 21)
+	reservation, claimed, err := store.ClaimReservationRelease(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FC3")
+	if err != nil || !claimed || reservation.Key != "21:idem-release" {
+		t.Fatalf("claim release=%+v claimed=%v err=%v", reservation, claimed, err)
+	}
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FC3", 100, EventSource{Type: SourceKESSResult, Reference: "released-payment"}); !errors.Is(err, ErrReservationReleased) || applied {
+		t.Fatalf("released payment applied=%v err=%v", applied, err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE trade.buyer_order SET reservation_released_at=NULL WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FC3'`); err == nil {
+		t.Fatal("clearing reservation_released_at unexpectedly succeeded")
+	}
+
+	createOrder("01ARZ3NDEKTSV4RRFFQ69G5FC6", "01ARZ3NDEKTSV4RRFFQ69G5FC7", "01ARZ3NDEKTSV4RRFFQ69G5FC8", "idem-race", 22)
+	start := make(chan struct{})
+	type outcome struct {
+		kind    string
+		applied bool
+		claimed bool
+		err     error
+	}
+	outcomes := make(chan outcome, 2)
+	go func() {
+		<-start
+		_, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FC6", 100, EventSource{Type: SourceKESSResult, Reference: "race-payment"})
+		outcomes <- outcome{kind: "payment", applied: applied, err: err}
+	}()
+	go func() {
+		<-start
+		_, claimed, err := store.ClaimReservationRelease(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FC6")
+		outcomes <- outcome{kind: "release", claimed: claimed, err: err}
+	}()
+	close(start)
+	first, second := <-outcomes, <-outcomes
+	results := map[string]outcome{first.kind: first, second.kind: second}
+	payment, release := results["payment"], results["release"]
+	if payment.applied {
+		if payment.err != nil || !errors.Is(release.err, ErrInvalidTransition) || release.claimed {
+			t.Fatalf("payment won: payment=%+v release=%+v", payment, release)
+		}
+	} else if release.claimed {
+		if release.err != nil || !errors.Is(payment.err, ErrReservationReleased) {
+			t.Fatalf("release won: payment=%+v release=%+v", payment, release)
+		}
+	} else {
+		t.Fatalf("neither race path won: payment=%+v release=%+v", payment, release)
+	}
+}
+
+func assertReservationReleaseOutbox(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
+	t.Helper()
+	var pendingCommits int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.reservation_release_outbox WHERE action='commit'`).Scan(&pendingCommits); err != nil || pendingCommits == 0 {
+		t.Fatalf("pending payment commits=%d err=%v", pendingCommits, err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE action='commit'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.QueueReservationRelease(ctx, "31:outbox", "test"); err != nil {
+		t.Fatal(err)
+	}
+	items, err := store.ClaimReservationActions(ctx, 10)
+	if err != nil || len(items) != 1 || items[0].Key != "31:outbox" || items[0].Action != "release" {
+		t.Fatalf("first claim=%+v err=%v", items, err)
+	}
+	if again, err := store.ClaimReservationActions(ctx, 10); err != nil || len(again) != 0 {
+		t.Fatalf("concurrent claim=%+v err=%v", again, err)
+	}
+	if err := store.FailReservationAction(ctx, items[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if immediate, err := store.ClaimReservationActions(ctx, 10); err != nil || len(immediate) != 0 {
+		t.Fatalf("immediate retry=%+v err=%v", immediate, err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE trade.reservation_release_outbox SET next_attempt_at=clock_timestamp() WHERE id=$1`, items[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	items, err = store.ClaimReservationActions(ctx, 10)
+	if err != nil || len(items) != 1 {
+		t.Fatalf("retry claim=%+v err=%v", items, err)
+	}
+	if err := store.CompleteReservationAction(ctx, items[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	var remaining int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.reservation_release_outbox WHERE reservation_key='31:outbox'`).Scan(&remaining); err != nil || remaining != 0 {
+		t.Fatalf("remaining=%d err=%v", remaining, err)
 	}
 }

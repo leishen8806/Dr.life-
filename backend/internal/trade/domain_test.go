@@ -28,8 +28,8 @@ func TestAdvanceOnlyAllowsContractTransitionsAndRequiresSource(t *testing.T) {
 	}
 	statuses := []OrderStatus{AwaitingPayment, Paid, Submitted, Accepted, InFulfillment, Shipped, DeliveredVerified, Settled, Rejected, Cancelled, DeliveryFailed, Returning, Returned, Exception}
 	allowed := map[[2]OrderStatus]bool{
-		{AwaitingPayment, Paid}: true, {AwaitingPayment, Cancelled}: true,
-		{Paid, Submitted}: true, {Submitted, Accepted}: true, {Submitted, Rejected}: true,
+		{AwaitingPayment, Cancelled}: true,
+		{Paid, Submitted}:            true, {Submitted, Accepted}: true, {Submitted, Rejected}: true,
 		{Accepted, InFulfillment}: true, {InFulfillment, Shipped}: true,
 		{Shipped, DeliveredVerified}: true, {DeliveredVerified, Settled}: true,
 	}

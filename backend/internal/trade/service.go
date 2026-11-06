@@ -29,13 +29,22 @@ type Catalog interface {
 	// reclaimed by the catalog timeout worker. Reusing a key with different
 	// lines must fail without changing the existing reservation.
 	ResolveAndReserve(context.Context, string, []OrderLineInput) ([]CatalogLine, error)
+	// Release is idempotent for one reservation key.
 	Release(context.Context, string) error
+	// Commit makes a paid reservation ineligible for timeout reclamation.
+	// It must be idempotent because payment confirmation may be replayed.
+	Commit(context.Context, string) error
 }
 type Store interface {
+	FindByIdempotency(context.Context, int64, string, string) (CreateOrder, bool, error)
 	Create(context.Context, string, string, CreateOrder) (CreateOrder, error)
 	QueueReservationRelease(context.Context, string, string) error
-	ReservationForRelease(context.Context, string) (Reservation, error)
-	MarkReservationReleased(context.Context, string) (bool, error)
+	ClaimReservationRelease(context.Context, string) (Reservation, bool, error)
+	ClaimReservationActions(context.Context, int) ([]ReservationAction, error)
+	CompleteReservationAction(context.Context, int64) error
+	FailReservationAction(context.Context, int64) error
+	CompleteReservationCommit(context.Context, string) error
+	ConfirmPayment(context.Context, string, int64, EventSource) (string, bool, error)
 }
 
 // OrderReader is deliberately scoped by the caller's account/merchant ID.
@@ -70,6 +79,11 @@ type Reservation struct {
 	Key      string
 	Status   OrderStatus
 	Released bool
+}
+type ReservationAction struct {
+	ID     int64
+	Key    string
+	Action string
 }
 type Service struct {
 	store    Store
@@ -113,6 +127,10 @@ func (s *Service) Place(ctx context.Context, buyer int64, idempotencyKey string,
 	if err != nil {
 		return CreateOrder{}, err
 	}
+	hash := requestHash(buyer, normalized)
+	if existing, found, err := s.store.FindByIdempotency(ctx, buyer, idempotencyKey, hash); err != nil || found {
+		return existing, err
+	}
 	reservationKey := fmt.Sprintf("%d:%s", buyer, idempotencyKey)
 	snapshots, err := s.catalog.ResolveAndReserve(ctx, reservationKey, normalized)
 	if err != nil {
@@ -139,7 +157,7 @@ func (s *Service) Place(ctx context.Context, buyer int64, idempotencyKey string,
 		child.TotalE4 += item.LineTotalE4
 	}
 	order.IdempotencyKey = idempotencyKey
-	order.RequestHash = requestHash(buyer, normalized)
+	order.RequestHash = hash
 	stored, err := s.store.Create(ctx, idempotencyKey, order.RequestHash, order)
 	if err != nil {
 		if errors.Is(err, ErrIdempotencyConflict) {
@@ -171,18 +189,50 @@ func validateCatalogSnapshot(requested []OrderLineInput, snapshots []CatalogLine
 }
 
 func (s *Service) ReleaseReservations(ctx context.Context, buyerOrderPublicID string) error {
-	reservation, err := s.store.ReservationForRelease(ctx, buyerOrderPublicID)
-	if err != nil || reservation.Released {
+	reservation, claimed, err := s.store.ClaimReservationRelease(ctx, buyerOrderPublicID)
+	if err != nil || !claimed {
 		return err
-	}
-	if reservation.Status != AwaitingPayment && reservation.Status != Cancelled {
-		return ErrInvalidTransition
 	}
 	if err := s.catalog.Release(ctx, reservation.Key); err != nil {
 		return errors.Join(err, s.store.QueueReservationRelease(ctx, reservation.Key, "release_failed"))
 	}
-	_, err = s.store.MarkReservationReleased(ctx, buyerOrderPublicID)
-	return err
+	return nil
+}
+
+// ConfirmPayment atomically pays every child order, then commits the catalog
+// reservation. A replay retries Commit without paying twice.
+func (s *Service) ConfirmPayment(ctx context.Context, buyerOrderPublicID string, paidAmountE4 int64, source EventSource) (bool, error) {
+	key, applied, err := s.store.ConfirmPayment(ctx, buyerOrderPublicID, paidAmountE4, source)
+	if err != nil {
+		return false, err
+	}
+	if err := s.catalog.Commit(ctx, key); err != nil {
+		return applied, err
+	}
+	return applied, s.store.CompleteReservationCommit(ctx, key)
+}
+
+// ProcessReservationActions drains durable release and commit compensation.
+func (s *Service) ProcessReservationActions(ctx context.Context, limit int) error {
+	items, err := s.store.ClaimReservationActions(ctx, limit)
+	if err != nil {
+		return err
+	}
+	var result error
+	for _, item := range items {
+		var actionErr error
+		if item.Action == "commit" {
+			actionErr = s.catalog.Commit(ctx, item.Key)
+		} else {
+			actionErr = s.catalog.Release(ctx, item.Key)
+		}
+		if actionErr != nil {
+			result = errors.Join(result, actionErr, s.store.FailReservationAction(ctx, item.ID))
+			continue
+		}
+		result = errors.Join(result, s.store.CompleteReservationAction(ctx, item.ID))
+	}
+	return result
 }
 
 func (s *Service) releaseOrQueue(ctx context.Context, key, reason string) error {

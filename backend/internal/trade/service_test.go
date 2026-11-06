@@ -16,10 +16,14 @@ type stubCatalog struct {
 	reservations map[string]bool
 	releases     int
 	releaseErr   error
+	commitErr    error
 	lastInput    []OrderLineInput
+	resolveCalls int
+	commits      []string
 }
 
 func (s *stubCatalog) ResolveAndReserve(_ context.Context, key string, input []OrderLineInput) ([]CatalogLine, error) {
+	s.resolveCalls++
 	s.lastInput = append([]OrderLineInput(nil), input...)
 	result := make([]CatalogLine, 0, len(input))
 	for _, line := range input {
@@ -47,6 +51,10 @@ func (s *stubCatalog) Release(_ context.Context, key string) error {
 	}
 	return nil
 }
+func (s *stubCatalog) Commit(_ context.Context, key string) error {
+	s.commits = append(s.commits, key)
+	return s.commitErr
+}
 
 type stubOrders struct {
 	created     CreateOrder
@@ -54,6 +62,23 @@ type stubOrders struct {
 	reservation Reservation
 	marked      int
 	createErr   error
+	paymentKey  string
+	paymentOK   bool
+	paymentErr  error
+	outbox      []ReservationAction
+	completed   []int64
+	failed      []int64
+	commitDone  []string
+}
+
+func (s *stubOrders) FindByIdempotency(_ context.Context, _ int64, _ string, hash string) (CreateOrder, bool, error) {
+	if s.created.PublicID == "" {
+		return CreateOrder{}, false, nil
+	}
+	if s.created.RequestHash != hash {
+		return CreateOrder{}, false, ErrIdempotencyConflict
+	}
+	return s.created, true, nil
 }
 
 func (s *stubOrders) Create(_ context.Context, key, hash string, input CreateOrder) (CreateOrder, error) {
@@ -74,16 +99,31 @@ func (s *stubOrders) QueueReservationRelease(_ context.Context, key, reason stri
 	s.queued = append(s.queued, key+":"+reason)
 	return nil
 }
-func (s *stubOrders) ReservationForRelease(context.Context, string) (Reservation, error) {
-	return s.reservation, nil
-}
-func (s *stubOrders) MarkReservationReleased(context.Context, string) (bool, error) {
+func (s *stubOrders) ClaimReservationRelease(context.Context, string) (Reservation, bool, error) {
 	if s.reservation.Released {
-		return false, nil
+		return s.reservation, true, nil
 	}
 	s.reservation.Released = true
 	s.marked++
-	return true, nil
+	return s.reservation, true, nil
+}
+func (s *stubOrders) ClaimReservationActions(context.Context, int) ([]ReservationAction, error) {
+	return append([]ReservationAction(nil), s.outbox...), nil
+}
+func (s *stubOrders) CompleteReservationAction(_ context.Context, id int64) error {
+	s.completed = append(s.completed, id)
+	return nil
+}
+func (s *stubOrders) FailReservationAction(_ context.Context, id int64) error {
+	s.failed = append(s.failed, id)
+	return nil
+}
+func (s *stubOrders) CompleteReservationCommit(_ context.Context, key string) error {
+	s.commitDone = append(s.commitDone, key)
+	return nil
+}
+func (s *stubOrders) ConfirmPayment(context.Context, string, int64, EventSource) (string, bool, error) {
+	return s.paymentKey, s.paymentOK, s.paymentErr
 }
 
 type scopedOrders struct {
@@ -129,8 +169,8 @@ func TestPlaceUsesServerFactsMergesDuplicateSKUAndIsIdempotent(t *testing.T) {
 		t.Fatalf("catalog input=%+v, want sorted merged SKUs", got)
 	}
 	replayed, err := svc.Place(context.Background(), 1, "request-1", input)
-	if err != nil || replayed.PublicID != order.PublicID || len(catalog.reservations) != 1 {
-		t.Fatalf("replay=%+v err=%v reservations=%v", replayed, err, catalog.reservations)
+	if err != nil || replayed.PublicID != order.PublicID || len(catalog.reservations) != 1 || catalog.resolveCalls != 1 {
+		t.Fatalf("replay=%+v err=%v reservations=%v resolve_calls=%d", replayed, err, catalog.reservations, catalog.resolveCalls)
 	}
 	if _, err := svc.Place(context.Background(), 1, "request-1", []OrderLineInput{{SKUPublicID: "A", Quantity: 3}}); !errors.Is(err, ErrIdempotencyConflict) || !catalog.reservations["1:request-1"] {
 		t.Fatalf("conflicting replay err=%v reservations=%v", err, catalog.reservations)
@@ -212,6 +252,39 @@ func TestCreateFailureQueuesReleaseWhenImmediateReleaseFails(t *testing.T) {
 	_, err := NewService(store, stubAccounts{"active"}, catalog).Place(context.Background(), 1, "key", []OrderLineInput{{"A", 1}})
 	if err == nil || len(store.queued) != 1 || store.queued[0] != "1:key:create_failed" {
 		t.Fatalf("err=%v queued=%v", err, store.queued)
+	}
+}
+
+func TestConfirmPaymentCommitsReservationOnFirstCallAndReplay(t *testing.T) {
+	store := &stubOrders{paymentKey: "1:key", paymentOK: true}
+	catalog := catalogFixture()
+	svc := NewService(store, stubAccounts{"active"}, catalog)
+	if applied, err := svc.ConfirmPayment(context.Background(), "buyer-order", 500, EventSource{Type: SourceKESSResult, Reference: "payment"}); err != nil || !applied {
+		t.Fatalf("first payment applied=%v err=%v", applied, err)
+	}
+	store.paymentOK = false
+	if applied, err := svc.ConfirmPayment(context.Background(), "buyer-order", 500, EventSource{Type: SourceKESSResult, Reference: "payment"}); err != nil || applied {
+		t.Fatalf("replay applied=%v err=%v", applied, err)
+	}
+	if len(catalog.commits) != 2 || catalog.commits[0] != "1:key" || catalog.commits[1] != "1:key" || len(store.commitDone) != 2 {
+		t.Fatalf("commits=%v completed=%v", catalog.commits, store.commitDone)
+	}
+}
+
+func TestProcessReservationActionsCompletesSuccessAndReschedulesFailure(t *testing.T) {
+	store := &stubOrders{outbox: []ReservationAction{{ID: 1, Key: "1:ok", Action: "release"}, {ID: 3, Key: "1:commit", Action: "commit"}}}
+	catalog := catalogFixture()
+	catalog.reservations = map[string]bool{"1:ok": true, "1:fail": true}
+	if err := NewService(store, stubAccounts{"active"}, catalog).ProcessReservationActions(context.Background(), 2); err != nil {
+		t.Fatal(err)
+	}
+	store.outbox = []ReservationAction{{ID: 2, Key: "1:fail", Action: "release"}}
+	catalog.releaseErr = errors.New("catalog unavailable")
+	if err := NewService(store, stubAccounts{"active"}, catalog).ProcessReservationActions(context.Background(), 1); err == nil {
+		t.Fatal("expected release failure")
+	}
+	if len(store.completed) != 2 || store.completed[0] != 1 || store.completed[1] != 3 || len(store.failed) != 1 || store.failed[0] != 2 || len(catalog.commits) != 1 || catalog.commits[0] != "1:commit" {
+		t.Fatalf("completed=%v failed=%v commits=%v", store.completed, store.failed, catalog.commits)
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 type tradeDB interface {
 	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
@@ -21,13 +22,39 @@ type PostgresStore struct{ db tradeDB }
 
 type EventStore interface {
 	Advance(ctx context.Context, merchantOrderID int64, from, to OrderStatus, source EventSource) (bool, error)
-	ConfirmPayment(ctx context.Context, buyerOrderPublicID string, source EventSource) (bool, error)
+	ConfirmPayment(ctx context.Context, buyerOrderPublicID string, paidAmountE4 int64, source EventSource) (string, bool, error)
 }
 
 var _ Store = (*PostgresStore)(nil)
 var _ OrderReader = (*PostgresStore)(nil)
 
 func NewPostgresStore(db tradeDB) *PostgresStore { return &PostgresStore{db: db} }
+
+func (s *PostgresStore) FindByIdempotency(ctx context.Context, buyerID int64, key, requestHash string) (CreateOrder, bool, error) {
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return CreateOrder{}, false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var id, total int64
+	var publicID, existingHash string
+	err = tx.QueryRow(ctx, `SELECT id,public_id,request_hash,total_e4 FROM trade.buyer_order WHERE buyer_account_id=$1 AND idempotency_key=$2`, buyerID, key).
+		Scan(&id, &publicID, &existingHash, &total)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return CreateOrder{}, false, nil
+	}
+	if err != nil {
+		return CreateOrder{}, false, err
+	}
+	if existingHash != requestHash {
+		return CreateOrder{}, false, ErrIdempotencyConflict
+	}
+	order, err := loadCreateOrder(ctx, tx, id, publicID, buyerID, key, existingHash, total)
+	if err != nil {
+		return CreateOrder{}, false, err
+	}
+	return order, true, tx.Commit(ctx)
+}
 
 func (s *PostgresStore) FindBuyerOrder(ctx context.Context, buyerID int64, publicID string) (BuyerOrderView, error) {
 	var order BuyerOrderView
@@ -110,8 +137,8 @@ func (s *PostgresStore) Create(ctx context.Context, idempotencyKey, requestHash 
 }
 
 func (s *PostgresStore) QueueReservationRelease(ctx context.Context, reservationKey, reason string) error {
-	_, err := s.db.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,reason)
-		VALUES ($1,$2) ON CONFLICT (reservation_key) DO UPDATE SET reason=EXCLUDED.reason,updated_at=clock_timestamp()`, reservationKey, reason)
+	_, err := s.db.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
+		VALUES ($1,'release',$2) ON CONFLICT (reservation_key,action) DO UPDATE SET reason=EXCLUDED.reason,claimed_at=NULL,next_attempt_at=clock_timestamp(),updated_at=clock_timestamp()`, reservationKey, reason)
 	return err
 }
 
@@ -164,37 +191,85 @@ func loadCreateOrder(ctx context.Context, tx pgx.Tx, buyerOrderID int64, publicI
 	return order, nil
 }
 
-func (s *PostgresStore) ReservationForRelease(ctx context.Context, publicID string) (Reservation, error) {
+func (s *PostgresStore) ClaimReservationRelease(ctx context.Context, publicID string) (Reservation, bool, error) {
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return Reservation{}, false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 	var reservation Reservation
+	var buyerOrderID int64
 	var allowed, allCancelled bool
-	err := s.db.QueryRow(ctx, `
-		SELECT buyer.buyer_account_id || ':' || buyer.idempotency_key,
-		       bool_and(child.status IN ('awaiting_payment','cancelled')),
-		       bool_and(child.status='cancelled'), buyer.reservation_released_at IS NOT NULL
-		FROM trade.buyer_order buyer JOIN trade.merchant_order child ON child.buyer_order_id=buyer.id
-		WHERE buyer.public_id=$1 GROUP BY buyer.id`, publicID).Scan(&reservation.Key, &allowed, &allCancelled, &reservation.Released)
+	err = tx.QueryRow(ctx, `SELECT id,buyer_account_id || ':' || idempotency_key,reservation_released_at IS NOT NULL
+		FROM trade.buyer_order WHERE public_id=$1 FOR UPDATE`, publicID).Scan(&buyerOrderID, &reservation.Key, &reservation.Released)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Reservation{}, ErrOrderNotVisible
+		return Reservation{}, false, ErrOrderNotVisible
 	}
 	if err != nil {
-		return Reservation{}, err
+		return Reservation{}, false, err
+	}
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(bool_and(status IN ('awaiting_payment','cancelled')),false),COALESCE(bool_and(status='cancelled'),false)
+		FROM trade.merchant_order WHERE buyer_order_id=$1`, buyerOrderID).Scan(&allowed, &allCancelled); err != nil {
+		return Reservation{}, false, err
+	}
+	if reservation.Released {
+		return reservation, true, tx.Commit(ctx)
+	}
+	if !allowed {
+		return Reservation{}, false, ErrInvalidTransition
 	}
 	if allCancelled {
 		reservation.Status = Cancelled
-	} else if allowed {
-		reservation.Status = AwaitingPayment
 	} else {
-		reservation.Status = Paid
+		reservation.Status = AwaitingPayment
 	}
-	return reservation, nil
+	if _, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET reservation_released_at=clock_timestamp(),updated_at=clock_timestamp() WHERE public_id=$1`, publicID); err != nil {
+		return Reservation{}, false, err
+	}
+	return reservation, true, tx.Commit(ctx)
 }
 
-func (s *PostgresStore) MarkReservationReleased(ctx context.Context, publicID string) (bool, error) {
-	result, err := s.db.Exec(ctx, `UPDATE trade.buyer_order SET reservation_released_at=clock_timestamp(),updated_at=clock_timestamp() WHERE public_id=$1 AND reservation_released_at IS NULL`, publicID)
-	if err != nil {
-		return false, err
+func (s *PostgresStore) ClaimReservationActions(ctx context.Context, limit int) ([]ReservationAction, error) {
+	if limit <= 0 {
+		return nil, nil
 	}
-	return result.RowsAffected() == 1, nil
+	rows, err := s.db.Query(ctx, `
+		WITH due AS (
+			SELECT id FROM trade.reservation_release_outbox
+			WHERE claimed_at IS NULL AND next_attempt_at <= clock_timestamp()
+			ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED
+		)
+		UPDATE trade.reservation_release_outbox outbox
+		SET claimed_at=clock_timestamp(),attempts=attempts+1,updated_at=clock_timestamp()
+		FROM due WHERE outbox.id=due.id RETURNING outbox.id,outbox.reservation_key,outbox.action`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReservationAction
+	for rows.Next() {
+		var item ReservationAction
+		if err := rows.Scan(&item.ID, &item.Key, &item.Action); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *PostgresStore) CompleteReservationAction(ctx context.Context, id int64) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE id=$1`, id)
+	return err
+}
+
+func (s *PostgresStore) FailReservationAction(ctx context.Context, id int64) error {
+	_, err := s.db.Exec(ctx, `UPDATE trade.reservation_release_outbox SET claimed_at=NULL,next_attempt_at=clock_timestamp()+interval '30 seconds',updated_at=clock_timestamp() WHERE id=$1`, id)
+	return err
+}
+
+func (s *PostgresStore) CompleteReservationCommit(ctx context.Context, key string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE reservation_key=$1 AND action='commit'`, key)
+	return err
 }
 
 // Advance locks the suborder and binds each external source reference to one
@@ -246,79 +321,28 @@ func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from
 	return true, tx.Commit(ctx)
 }
 
-// ConfirmPayment advances every child of one parent order in one transaction.
-func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID string, source EventSource) (bool, error) {
+// ConfirmPayment delegates the parent-wide payment transition to the only
+// database entry point allowed to mark child orders paid.
+func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID string, paidAmountE4 int64, source EventSource) (string, bool, error) {
 	if source.Type != SourceKESSResult || source.Reference == "" {
-		return false, ErrEventSourceRequired
+		return "", false, ErrEventSourceRequired
 	}
-	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return false, err
+	var key string
+	var applied bool
+	err := s.db.QueryRow(ctx, `SELECT reservation_key,applied FROM trade.confirm_order_payment($1,$2,$3)`, buyerOrderPublicID, source.Reference, paidAmountE4).Scan(&key, &applied)
+	if err == nil {
+		return key, applied, nil
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	var buyerOrderID int64
-	if err := tx.QueryRow(ctx, `SELECT id FROM trade.buyer_order WHERE public_id=$1 FOR UPDATE`, buyerOrderPublicID).Scan(&buyerOrderID); err != nil {
-		return false, err
-	}
-	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref) VALUES ($1,$2,$3) ON CONFLICT (source_type,source_ref) DO NOTHING`, buyerOrderID, string(source.Type), source.Reference); err != nil {
-		return false, err
-	}
-	var sourceBuyerOrderID int64
-	if err := tx.QueryRow(ctx, `SELECT buyer_order_id FROM trade.order_event_source WHERE source_type=$1 AND source_ref=$2`, string(source.Type), source.Reference).Scan(&sourceBuyerOrderID); err != nil {
-		return false, err
-	}
-	if sourceBuyerOrderID != buyerOrderID {
-		return false, ErrInvalidTransition
-	}
-	rows, err := tx.Query(ctx, `SELECT id,status FROM trade.merchant_order WHERE buyer_order_id=$1 ORDER BY id FOR UPDATE`, buyerOrderID)
-	if err != nil {
-		return false, err
-	}
-	type childState struct {
-		id     int64
-		status OrderStatus
-	}
-	var children []childState
-	for rows.Next() {
-		var child childState
-		if err := rows.Scan(&child.id, &child.status); err != nil {
-			rows.Close()
-			return false, err
-		}
-		children = append(children, child)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return false, err
-	}
-	rows.Close()
-	if len(children) == 0 {
-		return false, ErrInvalidTransition
-	}
-	allPaid := true
-	for _, child := range children {
-		if child.status != Paid {
-			allPaid = false
-		}
-		if child.status != Paid && child.status != AwaitingPayment {
-			return false, ErrInvalidTransition
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "P0001":
+			return "", false, ErrReservationReleased
+		case "22003":
+			return "", false, ErrPaymentAmount
+		case "23514", "55000":
+			return "", false, ErrInvalidTransition
 		}
 	}
-	if allPaid {
-		return false, tx.Commit(ctx)
-	}
-	for _, child := range children {
-		if child.status != AwaitingPayment {
-			return false, ErrInvalidTransition
-		}
-	}
-	for _, child := range children {
-		if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) VALUES ($1,$2,$3,$4,$5,$6)`, child.id, buyerOrderID, string(AwaitingPayment), string(Paid), string(source.Type), source.Reference); err != nil {
-			return false, err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE trade.merchant_order SET status=$2,version=version+1,updated_at=clock_timestamp() WHERE id=$1`, child.id, string(Paid)); err != nil {
-			return false, err
-		}
-	}
-	return true, tx.Commit(ctx)
+	return "", false, err
 }

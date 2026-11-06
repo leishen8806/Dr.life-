@@ -89,12 +89,12 @@
 ### `trade`
 | 表 | 关键字段与约束 |
 |---|---|
-| `buyer_order` | id, public_id, buyer_account_id, idempotency_key, request_hash, total_e4, reservation_released_at；`UNIQUE(buyer_account_id,idempotency_key)`，一个买家一次提交产生一个父订单，金额等于其子订单金额之和 |
+| `buyer_order` | id, public_id, buyer_account_id, idempotency_key, request_hash, total_e4, reservation_released_at；`UNIQUE(buyer_account_id,idempotency_key)`，一个买家一次提交产生一个父订单，金额等于其子订单金额之和；预留释放只允许从空值写入一次且仅限全部子订单未付款/已取消，禁止清空 |
 | `merchant_order` | id, public_id, buyer_order_id, merchant_id, external_order_id=`DRL-<public_id>`, status, total_e4, version；每个子订单只属于一个商家，`UNIQUE(buyer_order_id, merchant_id)` |
 | `order_line` | merchant_order_id, sku_public_id, quantity, unit_price_e4, line_total_e4；SKU 与单价均为下单快照，单价必须为整分，`line_total_e4=quantity*unit_price_e4`；仅允许在子订单 `awaiting_payment` 时插入 |
-| `reservation_release_outbox` | reservation_key, reason, attempts, created_at, updated_at；预占释放失败时持久化补偿，按 reservation_key 幂等重试 |
+| `reservation_release_outbox` | reservation_key, action (`release/commit`), reason, attempts, claimed_at, next_attempt_at, created_at, updated_at；预占释放失败或付款后的预占提交均在数据库事务内持久化，消费者以 `SKIP LOCKED` 领取并按 `(reservation_key,action)` 幂等重试 |
 | `order_event_source` | buyer_order_id, source_type (`kess_result/routefit_event/system`), source_ref；来源引用全局唯一并绑定一个买家订单，同一来源可推进该父订单下的多个子订单 |
-| `order_event` | merchant_order_id, buyer_order_id, from_status, to_status, source_type, source_ref, created_at；来源必须已登记且属于同一买家订单；子订单内来源组合唯一、只追加，禁止 UPDATE/DELETE/TRUNCATE |
+| `order_event` | merchant_order_id, buyer_order_id, from_status, to_status, source_type, source_ref, created_txid, created_at；来源必须已登记且属于同一买家订单；状态变更只能使用同一数据库事务写入的匹配事件；子订单内来源组合唯一、只追加，禁止 UPDATE/DELETE/TRUNCATE |
 | `rfq` | id, buyer_account_id, name, area/loc, category_id, qty_text, budget_e4, due_date, target_merchant_id, status |
 | `quote` | id, rfq_id, merchant_id, price_e4, lead_days, valid_until, note, selected boolean；`UNIQUE(rfq_id,merchant_id)` |
 | `project` | id, buyer_account_id, company_merchant_id, name, area, budget_e4, status |
@@ -102,6 +102,10 @@
 | `after_sale` | id, merchant_order_id（指向子订单）, kind (`refund/return/damage`), status, initiator, decided_by, amount_e4, ledger_txn_id |
 
 子订单主线状态为 `awaiting_payment → paid → submitted → accepted → in_fulfillment → shipped → delivered_verified → settled`；本阶段还允许 `awaiting_payment → cancelled` 与 `submitted → rejected`。`rejected/cancelled/delivery_failed/returning/returned/exception` 为旁路状态，其他迁移由后续任务实现。以上模型取代旧 `order` 的 `unpaid/paid_proof/shipped/arrived/closed/problem/cancelled` 状态和 `order_item`；线下 `payment_proof` 已取消，不再作为订单领域模型。父订单金额由延迟约束校验为子订单金额之和，子订单金额同样校验为订单行金额之和。
+
+付款成功必须调用受限的父订单批量入口 `trade.confirm_order_payment`：先锁父订单，核对实付金额等于 `buyer_order.total_e4` 且预留未释放，再在同一事务中写入 `commit` 补偿动作、为全部子订单写事件并转为 `paid`。普通子订单状态入口不得执行 `awaiting_payment → paid`，历史事件也不能授权后续事务。数据库付款成功后必须幂等提交目录预留，使超时回收只处理仍未付款且未提交的预留；即时提交失败由持久化消费者或付款结果重放继续重试，不得重复付款。
+
+本阶段已提供 `ProcessReservationActions` 消费入口与重试/并发领取测试，但正式 worker 的定时接线要等目录适配器进入应用装配后完成。在此之前，即时提交与付款结果重放可以完成 `commit`；即时 `release` 失败会持久化待处理，但不能声称已具备无人值守自动恢复，运维须监控该表积压。
 
 ### `wms`
 | 表 | 关键字段与约束 |
