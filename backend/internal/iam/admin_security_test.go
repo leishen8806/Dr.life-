@@ -2,6 +2,8 @@ package iam
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -37,10 +39,25 @@ func TestRedisAdminSecurityStateIsShared(t *testing.T) {
 	}
 	defer second.Close()
 
-	for range adminLoginFailureLimit {
-		if err := first.RecordFailure(ctx, "admin@example.test", "192.0.2.1"); err != nil {
-			t.Fatal(err)
-		}
+	var allowed atomic.Int32
+	var wg sync.WaitGroup
+	for range adminLoginFailureLimit * 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ok, reserveErr := first.ReserveAttempt(ctx, "admin@example.test", "192.0.2.1")
+			if reserveErr != nil {
+				t.Errorf("reserve attempt: %v", reserveErr)
+				return
+			}
+			if ok {
+				allowed.Add(1)
+			}
+		}()
+	}
+	wg.Wait()
+	if got := allowed.Load(); got != adminLoginFailureLimit {
+		t.Fatalf("allowed attempts=%d, want %d", got, adminLoginFailureLimit)
 	}
 	if locked, err := second.Locked(ctx, "admin@example.test", "192.0.2.2"); err != nil || !locked {
 		t.Fatalf("shared account lock locked=%v err=%v", locked, err)

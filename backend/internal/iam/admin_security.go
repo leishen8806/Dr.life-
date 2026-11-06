@@ -14,8 +14,7 @@ import (
 // AdminSecurityStore keeps administrator failure and TOTP replay state shared
 // across all application instances. Authentication fails closed on store errors.
 type AdminSecurityStore interface {
-	Locked(context.Context, string, string) (bool, error)
-	RecordFailure(context.Context, string, string) error
+	ReserveAttempt(context.Context, string, string) (bool, error)
 	ClearFailures(context.Context, string, string) error
 	ConsumeTOTP(context.Context, string, int64, time.Duration) (bool, error)
 }
@@ -46,15 +45,18 @@ func (s *RedisAdminSecurityStore) Locked(ctx context.Context, account, ip string
 	return false, nil
 }
 
-func (s *RedisAdminSecurityStore) RecordFailure(ctx context.Context, account, ip string) error {
-	_, err := s.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
-		for _, key := range adminFailureKeys(account, ip) {
-			pipe.Incr(ctx, key)
-			pipe.Expire(ctx, key, adminLoginFailureWindow)
-		}
-		return nil
-	})
-	return err
+func (s *RedisAdminSecurityStore) ReserveAttempt(ctx context.Context, account, ip string) (bool, error) {
+	keys := adminFailureKeys(account, ip)
+	result, err := s.client.Eval(ctx, `
+local account_count = redis.call('INCR', KEYS[1])
+local ip_count = redis.call('INCR', KEYS[2])
+redis.call('PEXPIRE', KEYS[1], ARGV[2])
+redis.call('PEXPIRE', KEYS[2], ARGV[2])
+if account_count > tonumber(ARGV[1]) or ip_count > tonumber(ARGV[1]) then
+  return 0
+end
+return 1`, keys, adminLoginFailureLimit, adminLoginFailureWindow.Milliseconds()).Int()
+	return result == 1, err
 }
 
 func (s *RedisAdminSecurityStore) ClearFailures(ctx context.Context, account, ip string) error {

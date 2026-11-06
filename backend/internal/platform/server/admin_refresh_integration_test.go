@@ -40,9 +40,10 @@ type serverAdminSecurity struct {
 	used map[int64]bool
 }
 
-func (*serverAdminSecurity) Locked(context.Context, string, string) (bool, error) { return false, nil }
-func (*serverAdminSecurity) RecordFailure(context.Context, string, string) error  { return nil }
-func (*serverAdminSecurity) ClearFailures(context.Context, string, string) error  { return nil }
+func (*serverAdminSecurity) ReserveAttempt(context.Context, string, string) (bool, error) {
+	return true, nil
+}
+func (*serverAdminSecurity) ClearFailures(context.Context, string, string) error { return nil }
 func (s *serverAdminSecurity) ConsumeTOTP(_ context.Context, _ string, step int64, _ time.Duration) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -3,6 +3,7 @@ package iam
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -10,6 +11,19 @@ import (
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	platformids "github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 )
+
+func enqueueAdminAudit(ctx context.Context, db *pgxpool.Pool, entry platformaudit.Entry) (string, error) {
+	tx, err := db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	publicID, err := queueAdminAudit(ctx, tx, entry)
+	if err != nil {
+		return "", err
+	}
+	return publicID, tx.Commit(ctx)
+}
 
 func queueAdminAudit(ctx context.Context, tx pgx.Tx, entry platformaudit.Entry) (string, error) {
 	publicID, err := platformids.NewULID()
@@ -26,22 +40,39 @@ func deliverAdminAudit(ctx context.Context, db *pgxpool.Pool, writer platformaud
 	if db == nil || writer == nil || publicID == "" {
 		return nil
 	}
+	tx, err := db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 	var entry platformaudit.Entry
 	var detail []byte
-	err := db.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		SELECT occurred_at,actor_id,actor_role,action,target,detail,COALESCE(host(ip),''),request_id
-		FROM iam.admin_audit_outbox WHERE public_id=$1 AND delivered_at IS NULL`, publicID).
+		FROM iam.admin_audit_outbox WHERE public_id=$1 AND delivered_at IS NULL
+		FOR UPDATE SKIP LOCKED`, publicID).
 		Scan(&entry.Time, &entry.ActorID, &entry.ActorRole, &entry.Action, &entry.Target, &detail, &entry.IP, &entry.RequestID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 	entry.Detail = json.RawMessage(detail)
-	if _, err := writer.Append(ctx, entry); err != nil {
-		_, _ = db.Exec(ctx, `UPDATE iam.admin_audit_outbox SET attempts=attempts+1,last_error=$2 WHERE public_id=$1`, publicID, err.Error())
+	if idempotent, ok := writer.(platformaudit.IdempotentWriter); ok {
+		_, err = idempotent.AppendOnce(ctx, publicID, entry)
+	} else {
+		_, err = writer.Append(ctx, entry)
+	}
+	if err != nil {
+		_, _ = tx.Exec(ctx, `UPDATE iam.admin_audit_outbox SET attempts=attempts+1,last_error=$2 WHERE public_id=$1`, publicID, err.Error())
+		_ = tx.Commit(ctx)
 		return err
 	}
-	_, err = db.Exec(ctx, `UPDATE iam.admin_audit_outbox SET delivered_at=clock_timestamp(),attempts=attempts+1,last_error=NULL WHERE public_id=$1`, publicID)
-	return err
+	if _, err = tx.Exec(ctx, `UPDATE iam.admin_audit_outbox SET delivered_at=clock_timestamp(),attempts=attempts+1,last_error=NULL WHERE public_id=$1`, publicID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // RunAdminAuditOutbox retries durable administrator audit records until shutdown.
@@ -77,4 +108,7 @@ func flushAdminAuditOutbox(ctx context.Context, db *pgxpool.Pool, writer platfor
 	for _, publicID := range publicIDs {
 		_ = deliverAdminAudit(ctx, db, writer, publicID)
 	}
+	_, _ = db.Exec(ctx, `DELETE FROM iam.admin_audit_outbox WHERE id IN (
+		SELECT id FROM iam.admin_audit_outbox WHERE delivered_at < clock_timestamp()-interval '30 days' ORDER BY id LIMIT 1000
+	)`)
 }

@@ -194,11 +194,14 @@ func MaskPhone(phone string, sensitive Permission) string {
 }
 
 const (
-	argonMemory  uint32 = 64 * 1024
-	argonTime    uint32 = 3
-	argonThreads uint8  = 4
-	argonKeyLen  uint32 = 32
+	argonMemory            uint32 = 64 * 1024
+	argonTime              uint32 = 3
+	argonThreads           uint8  = 4
+	argonKeyLen            uint32 = 32
+	argon2ConcurrencyLimit        = 8
 )
+
+var argon2Slots = make(chan struct{}, argon2ConcurrencyLimit)
 
 var ErrInvalidPasswordHash = errors.New("iam: invalid password hash")
 
@@ -240,7 +243,9 @@ func HashPassword(password string) (string, error) {
 	if _, err := rand.Read(salt); err != nil {
 		return "", errors.New("iam: password salt source failed")
 	}
-	hash := argon2.IDKey([]byte(password), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
+	hash := withArgon2Slot(func() []byte {
+		return argon2.IDKey([]byte(password), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
+	})
 	defer zero(hash)
 	return fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s", argonMemory, argonTime, argonThreads, base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(hash)), nil
 }
@@ -250,9 +255,17 @@ func VerifyPassword(encoded, password string) bool {
 	if err != nil || len(password) == 0 {
 		return false
 	}
-	actual := argon2.IDKey([]byte(password), salt, params.time, params.memory, params.threads, uint32(len(expected)))
+	actual := withArgon2Slot(func() []byte {
+		return argon2.IDKey([]byte(password), salt, params.time, params.memory, params.threads, uint32(len(expected)))
+	})
 	defer zero(actual)
 	return subtle.ConstantTimeCompare(actual, expected) == 1
+}
+
+func withArgon2Slot(work func() []byte) []byte {
+	argon2Slots <- struct{}{}
+	defer func() { <-argon2Slots }()
+	return work()
 }
 
 type argonParams struct {

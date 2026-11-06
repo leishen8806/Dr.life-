@@ -4,11 +4,53 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 )
+
+func TestArgon2WorkHasIndependentConcurrencyLimit(t *testing.T) {
+	var active atomic.Int32
+	var peak atomic.Int32
+	started := make(chan struct{}, argon2ConcurrencyLimit*2)
+	release := make(chan struct{})
+	var wg sync.WaitGroup
+	for range argon2ConcurrencyLimit * 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			withArgon2Slot(func() []byte {
+				current := active.Add(1)
+				for {
+					old := peak.Load()
+					if current <= old || peak.CompareAndSwap(old, current) {
+						break
+					}
+				}
+				started <- struct{}{}
+				<-release
+				active.Add(-1)
+				return nil
+			})
+		}()
+	}
+	for range argon2ConcurrencyLimit {
+		<-started
+	}
+	select {
+	case <-started:
+		t.Fatal("more Argon2 work entered than the independent limit")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	wg.Wait()
+	if got := peak.Load(); got != argon2ConcurrencyLimit {
+		t.Fatalf("peak Argon2 work=%d, want %d", got, argon2ConcurrencyLimit)
+	}
+}
 
 func TestDefaultAdminMatrixMatchesPolicyAndIsSeparationSafe(t *testing.T) {
 	matrix := DefaultAdminMatrix()

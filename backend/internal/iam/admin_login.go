@@ -57,7 +57,7 @@ type AdminLoginService struct {
 }
 
 func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (AdminLoginResult, error) {
-	if s == nil || s.DB == nil || s.Cipher == nil || strings.TrimSpace(input.Email) == "" || input.Password == "" || input.TOTPCode == "" || (input.DeviceID != "" && !devicePattern.MatchString(input.DeviceID)) || net.ParseIP(input.IP) == nil {
+	if s == nil || s.DB == nil || s.Cipher == nil || strings.TrimSpace(input.Email) == "" || input.Password == "" || input.TOTPCode == "" || strings.TrimSpace(input.RequestID) == "" || (input.DeviceID != "" && !devicePattern.MatchString(input.DeviceID)) || net.ParseIP(input.IP) == nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
 	email := strings.ToLower(strings.TrimSpace(input.Email))
@@ -65,11 +65,11 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 	if s.Security == nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
-	locked, err := s.Security.Locked(ctx, email, input.IP)
+	allowed, err := s.Security.ReserveAttempt(ctx, email, input.IP)
 	if err != nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
-	if locked {
+	if !allowed {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
 
@@ -102,10 +102,9 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 	}
 	if !authenticated {
 		if err == nil {
-			s.appendAudit(ctx, id, credential.PublicID, "failed", input, now)
-		}
-		if failureErr := s.Security.RecordFailure(ctx, email, input.IP); failureErr != nil {
-			return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+			if _, auditErr := enqueueAdminAudit(ctx, s.DB, adminLoginAuditEntry(id, credential.PublicID, "failed", input, now)); auditErr != nil {
+				return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+			}
 		}
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
@@ -133,6 +132,10 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 	if _, err = tx.Exec(ctx, `UPDATE iam.admin_user SET last_login_at=$1,updated_at=$1 WHERE id=$2`, now, id); err != nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
+	auditOutboxID, err := queueAdminAudit(ctx, tx, adminLoginAuditEntry(id, credential.PublicID, "ok", input, now))
+	if err != nil {
+		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
@@ -152,7 +155,7 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 		}
 		_ = s.SessionCache.Put(ctx, credential.PublicID, sessionID, 0, cacheTTL(now, now.Add(ttl), now.Add(idle)))
 	}
-	s.appendAudit(ctx, id, credential.PublicID, "ok", input, now)
+	_ = deliverAdminAudit(ctx, s.DB, s.Audit, auditOutboxID)
 	return AdminLoginResult{AccessToken: access, AccessExpiresIn: int64(s.Tokens.AccessTTL / time.Second), RefreshToken: refresh}, nil
 }
 
@@ -162,10 +165,7 @@ func (s *AdminLoginService) now() time.Time {
 	}
 	return time.Now()
 }
-func (s *AdminLoginService) appendAudit(ctx context.Context, id int64, target, result string, input AdminLoginInput, at time.Time) {
-	if s.Audit == nil || id <= 0 || target == "" || input.RequestID == "" {
-		return
-	}
+func adminLoginAuditEntry(id int64, target, result string, input AdminLoginInput, at time.Time) platformaudit.Entry {
 	detail, _ := json.Marshal(map[string]string{"result": result})
-	_, _ = s.Audit.Append(ctx, platformaudit.Entry{Time: at, ActorID: id, ActorRole: "admin", Action: platformaudit.ActionLogin, Target: "admin:" + target, Detail: detail, IP: input.IP, RequestID: input.RequestID})
+	return platformaudit.Entry{Time: at, ActorID: id, ActorRole: "admin", Action: platformaudit.ActionLogin, Target: "admin:" + target, Detail: detail, IP: input.IP, RequestID: input.RequestID}
 }

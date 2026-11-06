@@ -37,7 +37,9 @@ func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, sessionPu
 		var id int64
 		if s != nil && s.DB != nil && adminPublicID != "" {
 			_ = s.DB.QueryRow(ctx, `SELECT id FROM iam.admin_user WHERE public_id=$1`, adminPublicID).Scan(&id)
-			s.appendAudit(ctx, id, adminPublicID, "unknown", "failed", ip, requestID)
+			if err := s.queueAudit(ctx, id, adminPublicID, "unknown", "failed", ip, requestID); err != nil {
+				return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+			}
 		}
 		if s != nil && s.Security == nil {
 			return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
@@ -60,7 +62,9 @@ func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, sessionPu
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 	if !can {
-		s.appendAudit(ctx, id, adminPublicID, scope, "denied", ip, requestID)
+		if err := s.queueAudit(ctx, id, adminPublicID, scope, "denied", ip, requestID); err != nil {
+			return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+		}
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodePermissionDenied)
 	}
 	secret, err := s.Cipher.Decrypt(ctx, secretEnc, adminTOTPAAD(adminPublicID))
@@ -72,11 +76,11 @@ func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, sessionPu
 	if s.Now != nil {
 		now = s.Now()
 	}
-	locked, err := s.Security.Locked(ctx, email, ip)
+	allowedAttempt, err := s.Security.ReserveAttempt(ctx, email, ip)
 	if err != nil {
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
-	if locked {
+	if !allowedAttempt {
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
 	fresh := false
@@ -87,10 +91,9 @@ func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, sessionPu
 		}
 	}
 	if !fresh {
-		if err := s.Security.RecordFailure(ctx, email, ip); err != nil {
+		if err := s.queueAudit(ctx, id, adminPublicID, scope, "failed", ip, requestID); err != nil {
 			return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 		}
-		s.appendAudit(ctx, id, adminPublicID, scope, "failed", ip, requestID)
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
 	if err := s.Security.ClearFailures(ctx, email, ip); err != nil {
@@ -100,19 +103,25 @@ func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, sessionPu
 	if err != nil {
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
-	s.appendAudit(ctx, id, adminPublicID, scope, "ok", ip, requestID)
+	if err := s.queueAudit(ctx, id, adminPublicID, scope, "ok", ip, requestID); err != nil {
+		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+	}
 	return AdminStepUpResult{Token: token, Scope: scope, ExpiresAt: expiresAt}, nil
 }
 
-func (s *AdminStepUpService) appendAudit(ctx context.Context, id int64, publicID, scope, result, ip, requestID string) {
-	if s == nil || s.Audit == nil || id <= 0 || publicID == "" || requestID == "" {
-		return
+func (s *AdminStepUpService) queueAudit(ctx context.Context, id int64, publicID, scope, result, ip, requestID string) error {
+	if s == nil || s.DB == nil || id <= 0 || publicID == "" || requestID == "" {
+		return nil
 	}
 	if _, allowed := adminStepUpScopes[scope]; !allowed {
 		scope = "unknown"
 	}
 	detail, _ := json.Marshal(map[string]string{"result": result, "scope": scope})
-	_, _ = s.Audit.Append(ctx, platformaudit.Entry{Time: s.now(), ActorID: id, ActorRole: "admin", Action: platformaudit.ActionStepUp, Target: "admin:" + publicID, Detail: detail, IP: ip, RequestID: requestID})
+	outboxID, err := enqueueAdminAudit(ctx, s.DB, platformaudit.Entry{Time: s.now(), ActorID: id, ActorRole: "admin", Action: platformaudit.ActionStepUp, Target: "admin:" + publicID, Detail: detail, IP: ip, RequestID: requestID})
+	if err == nil {
+		_ = deliverAdminAudit(ctx, s.DB, s.Audit, outboxID)
+	}
+	return err
 }
 
 func (s *AdminStepUpService) now() time.Time {

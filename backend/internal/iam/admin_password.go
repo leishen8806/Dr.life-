@@ -62,11 +62,11 @@ func (s *AdminPasswordService) Change(ctx context.Context, input AdminPasswordCh
 	if err != nil {
 		return err
 	}
-	locked, err := s.Security.Locked(ctx, email, input.IP)
+	allowedAttempt, err := s.Security.ReserveAttempt(ctx, email, input.IP)
 	if err != nil {
 		return httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
-	if locked {
+	if !allowedAttempt {
 		return httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
 	authenticated := AuthenticateAdmin(ctx, s.Cipher, credential, input.CurrentPassword, input.TOTPCode, now) == nil
@@ -78,11 +78,13 @@ func (s *AdminPasswordService) Change(ctx context.Context, input AdminPasswordCh
 		authenticated = fresh
 	}
 	if !authenticated {
-		if err := s.Security.RecordFailure(ctx, email, input.IP); err != nil {
+		detail, _ := json.Marshal(map[string]string{"result": "failed"})
+		if _, err := queueAdminAudit(ctx, tx, platformaudit.Entry{Time: now, ActorID: adminID, ActorRole: "admin", Action: platformaudit.ActionAccountChanged, Target: "admin:" + credential.PublicID, Detail: detail, IP: input.IP, RequestID: input.RequestID}); err != nil {
 			return httpx.NewAppError(httpx.CodeServiceUnavailable)
 		}
-		detail, _ := json.Marshal(map[string]string{"result": "failed"})
-		_, _ = s.Audit.Append(ctx, platformaudit.Entry{Time: now, ActorID: adminID, ActorRole: "admin", Action: platformaudit.ActionAccountChanged, Target: "admin:" + credential.PublicID, Detail: detail, IP: input.IP, RequestID: input.RequestID})
+		if err := tx.Commit(ctx); err != nil {
+			return httpx.NewAppError(httpx.CodeServiceUnavailable)
+		}
 		return httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
 	if err := s.Security.ClearFailures(ctx, email, input.IP); err != nil {
