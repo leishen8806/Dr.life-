@@ -121,17 +121,54 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 	})
 
 	t.Run("module and report roles have narrowed privileges", func(t *testing.T) {
-		var canMutateReceivable, canRecordStatus, reportReadsSeller bool
+		var canMutateReceivable, canRecordStatus, canDelete, canTruncate, reportReadsSeller bool
 		if err := pool.QueryRow(ctx, `
 			SELECT has_column_privilege('trade_rw', 'trade.kess_payment_intent', 'amount_minor', 'UPDATE'),
 			       has_column_privilege('trade_rw', 'trade.kess_payment_intent', 'status', 'UPDATE'),
-			       has_column_privilege('report_ro', 'trade.kess_payment_intent', 'seller_code', 'SELECT')`).Scan(&canMutateReceivable, &canRecordStatus, &reportReadsSeller); err != nil {
+			       has_table_privilege('trade_rw', 'trade.kess_payment_intent', 'DELETE'),
+			       has_table_privilege('trade_rw', 'trade.kess_payment_intent', 'TRUNCATE'),
+			       has_column_privilege('report_ro', 'trade.kess_payment_intent', 'seller_code', 'SELECT')`).Scan(&canMutateReceivable, &canRecordStatus, &canDelete, &canTruncate, &reportReadsSeller); err != nil {
 			t.Fatal(err)
 		}
-		if canMutateReceivable || !canRecordStatus || reportReadsSeller {
-			t.Fatalf("privileges amount=%v status=%v seller=%v; want false/true/false", canMutateReceivable, canRecordStatus, reportReadsSeller)
+		if canMutateReceivable || !canRecordStatus || canDelete || canTruncate || reportReadsSeller {
+			t.Fatalf("privileges amount=%v status=%v delete=%v truncate=%v seller=%v; want false/true/false/false/false", canMutateReceivable, canRecordStatus, canDelete, canTruncate, reportReadsSeller)
+		}
+		var publicPrivileges int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.table_privileges WHERE table_schema = 'trade' AND table_name = 'kess_payment_intent' AND grantee = 'PUBLIC'`).Scan(&publicPrivileges); err != nil {
+			t.Fatal(err)
+		}
+		if publicPrivileges != 0 {
+			t.Fatalf("PUBLIC privileges = %d, want 0", publicPrivileges)
 		}
 	})
+
+	t.Run("receivable facts and status transitions are guarded", func(t *testing.T) {
+		_, err := pool.Exec(ctx, `UPDATE trade.kess_payment_intent SET amount_minor = amount_minor + 1 WHERE id = $1`, intent.ID)
+		assertPGError(t, err, "P0001", "kess payment intent receivable facts are immutable")
+
+		const pendingID = "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+		if _, err := pool.Exec(ctx, `INSERT INTO trade.kess_payment_intent (public_id, company_id, channel, trade_no, amount_minor, currency, seller_code, status) VALUES ($1, 12, 'kess', $2, 1, 'USD', 'seller', 'PENDING')`, pendingID, "DRL-"+pendingID); err != nil {
+			t.Fatal(err)
+		}
+		_, err = pool.Exec(ctx, `UPDATE trade.kess_payment_intent SET status = 'SUCCESS' WHERE public_id = $1`, pendingID)
+		assertPGError(t, err, "P0001", "invalid kess payment intent status transition")
+
+		const successID = "01ARZ3NDEKTSV4RRFFQ69G5FAX"
+		if _, err := pool.Exec(ctx, `INSERT INTO trade.kess_payment_intent (public_id, company_id, channel, trade_no, amount_minor, currency, seller_code, status) VALUES ($1, 12, 'kess', $2, 1, 'USD', 'seller', 'SUCCESS')`, successID, "DRL-"+successID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `UPDATE trade.kess_payment_intent SET status = 'REFUND' WHERE public_id = $1`, successID); err != nil {
+			t.Fatalf("SUCCESS -> REFUND: %v", err)
+		}
+	})
+}
+
+func assertPGError(t *testing.T, err error, code, message string) {
+	t.Helper()
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != code || pgErr.Message != message {
+		t.Fatalf("error = %v, want PostgreSQL %s %q", err, code, message)
+	}
 }
 
 type persistedThenTimeout struct {
