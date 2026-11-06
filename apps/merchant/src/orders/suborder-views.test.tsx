@@ -15,15 +15,15 @@ describe("merchant sub-order views", () => {
     const markup = renderToStaticMarkup(
       <SuborderListView language="en" translate={tr} selected="shipped" onSelectStatus={() => undefined} onOpen={() => undefined} />
     );
-    expect(text(markup)).toContain("SUB-2003");
+    expect(text(markup)).toContain("SUB-2006");
     expect(text(markup)).not.toContain("SUB-2001");
   });
 
   it("renders item, exact amount, and delivery status in detail", () => {
-    const order = mockSuborders[2]!;
+    const order = mockSuborders[5]!;
     const markup = renderToStaticMarkup(<SuborderDetailView order={order} language="en" translate={tr} onBack={() => undefined} />);
-    expect(text(markup)).toContain("SUB-2003");
-    expect(text(markup)).toContain("$880.00");
-    expect(text(markup).some((item) => item.includes("in_transit"))).toBe(true);
+    expect(text(markup)).toContain("SUB-2006");
+    expect(text(markup)).toContain("$304.00");
+    expect(text(markup).some((item) => item.includes("RouteFit shipped, in delivery"))).toBe(true);
   });
 });

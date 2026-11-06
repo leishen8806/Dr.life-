@@ -10,7 +10,7 @@ function formatPriceE4(value: bigint): string {
 }
 
 function statusKey(status: SuborderStatus): TranslationKey {
-  return `order.status.${status}` as TranslationKey;
+  return `order.merchantStatus.${status}` as TranslationKey;
 }
 
 export function SuborderListView({
@@ -43,7 +43,7 @@ export function SuborderListView({
                 <button type="button" className="merchant-order-item" onClick={() => onOpen(order)}>
                   <ListItem
                     title={order.publicId}
-                    description={`${order.buyerName} · ${order.productName[language]}`}
+                    description={`${order.buyerName[language]} · ${order.productName[language]}`}
                     trailing={<StatusTag tone="neutral">{translate(statusKey(order.status))}</StatusTag>}
                   />
                   <span className="merchant-order-item__total">{formatPriceE4(order.totalE4)}</span>
@@ -63,8 +63,8 @@ export function SuborderDetailView({ order, language, translate, onBack }: { ord
       <button type="button" className="merchant-back" onClick={onBack}>{translate("common.back")}</button>
       <Card>
         <div className="merchant-order-detail__heading"><h2>{order.publicId}</h2><StatusTag tone="neutral">{translate(statusKey(order.status))}</StatusTag></div>
-        <p>{translate("order.buyer")}: {order.buyerName}</p>
-        <p>{translate("order.delivery")}: {order.deliveryStatus}</p>
+        <p>{translate("order.buyer")}: {order.buyerName[language]}</p>
+        <p>{translate("order.delivery")}: {translate(`order.merchantStatus.${order.fulfillmentStatus}` as TranslationKey)}</p>
       </Card>
       <Card>
         <h2>{translate("order.itemsTitle")}</h2>
