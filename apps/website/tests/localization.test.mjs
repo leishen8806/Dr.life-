@@ -66,6 +66,10 @@ test("confirmed mobile layout keeps hero stats and ecosystem nodes compact", () 
   assert.match(styles, /@media\(max-width:520px\).*\.hero h1\{font-size:60px/s);
 });
 
+test("mobile language links stay on one line beside the menu", () => {
+  assert.match(styles, /@media\(max-width:520px\).*\.languages a\{padding:10px 6px;white-space:nowrap\}.*\.mobile-menu\{margin-left:0\}/s);
+});
+
 test("homepage and legal visible copy are i18n-backed", () => {
   for (const name of ["index", "merchant"]) {
     assert.doesNotMatch(page(name), cjk, `${name} page retains Chinese hard-coded copy`);

@@ -17,3 +17,4 @@
 .mobile-menu nav a:focus-visible{outline-offset:-3px}
 @media(max-width:900px){.main-nav,.shop-link{display:none}.mobile-menu{display:block;margin-left:auto;position:relative}}
 @media(max-width:520px){.hero h1{font-size:60px;line-height:1.1}}
+@media(max-width:520px){.site-header{gap:12px}.header-actions{margin-left:auto}.languages{gap:2px}.languages a{padding:10px 6px;white-space:nowrap}.mobile-menu{margin-left:0}}
