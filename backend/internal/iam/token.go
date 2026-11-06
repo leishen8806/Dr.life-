@@ -40,6 +40,7 @@ type AccessClaims struct {
 
 type StepUpClaims struct {
 	Scope string `json:"scope"`
+	SID   string `json:"sid"`
 	jwt.RegisteredClaims
 }
 
@@ -94,8 +95,8 @@ func (m TokenManager) IssueRestrictedAdminAccess(ctx context.Context, adminPubli
 	return m.signAccessWithRestriction(adminPublicID, "admin", sessionPublicID, kid, key, now, jti, true)
 }
 
-func (m TokenManager) IssueStepUp(ctx context.Context, adminPublicID, scope string) (string, time.Time, error) {
-	if m.Keys == nil || adminPublicID == "" || scope == "" {
+func (m TokenManager) IssueStepUp(ctx context.Context, adminPublicID, sessionPublicID, scope string) (string, time.Time, error) {
+	if m.Keys == nil || adminPublicID == "" || sessionPublicID == "" || scope == "" {
 		return "", time.Time{}, ErrInvalidToken
 	}
 	now := time.Now()
@@ -116,7 +117,7 @@ func (m TokenManager) IssueStepUp(ctx context.Context, adminPublicID, scope stri
 		issuer = "drlife"
 	}
 	expiresAt := now.Add(5 * time.Minute)
-	claims := StepUpClaims{Scope: scope, RegisteredClaims: jwt.RegisteredClaims{Issuer: issuer, Subject: adminPublicID, Audience: jwt.ClaimStrings{"drlife:admin"}, IssuedAt: jwt.NewNumericDate(now), ExpiresAt: jwt.NewNumericDate(expiresAt), ID: jti}}
+	claims := StepUpClaims{Scope: scope, SID: sessionPublicID, RegisteredClaims: jwt.RegisteredClaims{Issuer: issuer, Subject: adminPublicID, Audience: jwt.ClaimStrings{"drlife:admin"}, IssuedAt: jwt.NewNumericDate(now), ExpiresAt: jwt.NewNumericDate(expiresAt), ID: jti}}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	token.Header["kid"] = kid
 	token.Header["typ"] = "su+jwt"
@@ -127,8 +128,8 @@ func (m TokenManager) IssueStepUp(ctx context.Context, adminPublicID, scope stri
 	return raw, expiresAt, nil
 }
 
-func (m TokenManager) VerifyStepUp(ctx context.Context, raw, expectedScope, expectedAdminID string) (string, error) {
-	if m.Keys == nil || raw == "" || expectedScope == "" || expectedAdminID == "" {
+func (m TokenManager) VerifyStepUp(ctx context.Context, raw, expectedScope, expectedAdminID, expectedSessionID string) (string, error) {
+	if m.Keys == nil || raw == "" || expectedScope == "" || expectedAdminID == "" || expectedSessionID == "" {
 		return "", ErrInvalidToken
 	}
 	claims := new(StepUpClaims)
@@ -152,7 +153,7 @@ func (m TokenManager) VerifyStepUp(ctx context.Context, raw, expectedScope, expe
 	if issuer == "" {
 		issuer = "drlife"
 	}
-	if err != nil || !parsed.Valid || tokenType != "su+jwt" || claims.Issuer != issuer || len(claims.Audience) != 1 || claims.Audience[0] != "drlife:admin" || claims.Subject != expectedAdminID || claims.Scope != expectedScope || claims.ID == "" {
+	if err != nil || !parsed.Valid || tokenType != "su+jwt" || claims.Issuer != issuer || len(claims.Audience) != 1 || claims.Audience[0] != "drlife:admin" || claims.Subject != expectedAdminID || claims.SID != expectedSessionID || claims.Scope != expectedScope || claims.ID == "" {
 		return "", ErrInvalidToken
 	}
 	return claims.ID, nil

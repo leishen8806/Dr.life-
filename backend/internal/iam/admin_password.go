@@ -2,6 +2,7 @@ package iam
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -32,12 +33,16 @@ type AdminPasswordService struct {
 	Cipher       TOTPSecretCipher
 	Audit        platformaudit.Writer
 	SessionCache SessionCache
+	Security     AdminSecurityStore
 	Now          func() time.Time
 }
 
 func (s *AdminPasswordService) Change(ctx context.Context, input AdminPasswordChangeInput) error {
 	if s == nil || s.DB == nil || s.Cipher == nil || s.Audit == nil || strings.TrimSpace(input.AdminPublicID) == "" || strings.TrimSpace(input.SessionPublicID) == "" || input.CurrentPassword == "" || len(input.NewPassword) < 20 || input.TOTPCode == "" || strings.TrimSpace(input.RequestID) == "" {
 		return httpx.NewAppError(httpx.CodeInvalidArgument)
+	}
+	if s.Security == nil {
+		return httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 	now := s.now()
 	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
@@ -47,17 +52,41 @@ func (s *AdminPasswordService) Change(ctx context.Context, input AdminPasswordCh
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	var adminID int64
+	var email string
 	var credential AdminCredentials
-	err = tx.QueryRow(ctx, `SELECT id,public_id,password_hash,totp_secret_enc,status FROM iam.admin_user WHERE public_id=$1 FOR UPDATE`, strings.TrimSpace(input.AdminPublicID)).
-		Scan(&adminID, &credential.PublicID, &credential.PasswordHash, &credential.TOTPSecretEnc, &credential.Status)
+	err = tx.QueryRow(ctx, `SELECT id,public_id,email,password_hash,totp_secret_enc,status FROM iam.admin_user WHERE public_id=$1 FOR UPDATE`, strings.TrimSpace(input.AdminPublicID)).
+		Scan(&adminID, &credential.PublicID, &email, &credential.PasswordHash, &credential.TOTPSecretEnc, &credential.Status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return httpx.NewAppError(httpx.CodeUnauthenticated)
 	}
 	if err != nil {
 		return err
 	}
-	if AuthenticateAdmin(ctx, s.Cipher, credential, input.CurrentPassword, input.TOTPCode, now) != nil {
+	locked, err := s.Security.Locked(ctx, email, input.IP)
+	if err != nil {
+		return httpx.NewAppError(httpx.CodeServiceUnavailable)
+	}
+	if locked {
 		return httpx.NewAppError(httpx.CodeTelegramLoginFailed)
+	}
+	authenticated := AuthenticateAdmin(ctx, s.Cipher, credential, input.CurrentPassword, input.TOTPCode, now) == nil
+	if authenticated {
+		fresh, consumeErr := s.Security.ConsumeTOTP(ctx, credential.PublicID, now.Unix()/30, 90*time.Second)
+		if consumeErr != nil {
+			return httpx.NewAppError(httpx.CodeServiceUnavailable)
+		}
+		authenticated = fresh
+	}
+	if !authenticated {
+		if err := s.Security.RecordFailure(ctx, email, input.IP); err != nil {
+			return httpx.NewAppError(httpx.CodeServiceUnavailable)
+		}
+		detail, _ := json.Marshal(map[string]string{"result": "failed"})
+		_, _ = s.Audit.Append(ctx, platformaudit.Entry{Time: now, ActorID: adminID, ActorRole: "admin", Action: platformaudit.ActionAccountChanged, Target: "admin:" + credential.PublicID, Detail: detail, IP: input.IP, RequestID: input.RequestID})
+		return httpx.NewAppError(httpx.CodeTelegramLoginFailed)
+	}
+	if err := s.Security.ClearFailures(ctx, email, input.IP); err != nil {
+		return httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 	hash, err := HashPassword(input.NewPassword)
 	if err != nil {
@@ -84,6 +113,11 @@ func (s *AdminPasswordService) Change(ctx context.Context, input AdminPasswordCh
 		return err
 	}
 	rows.Close()
+	detail, _ := json.Marshal(map[string]string{"result": "ok"})
+	outboxID, err := queueAdminAudit(ctx, tx, platformaudit.Entry{Time: now, ActorID: adminID, ActorRole: "admin", Action: platformaudit.ActionAccountChanged, Target: "admin:" + credential.PublicID, Detail: detail, IP: input.IP, RequestID: input.RequestID})
+	if err != nil {
+		return err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return err
 	}
@@ -92,8 +126,8 @@ func (s *AdminPasswordService) Change(ctx context.Context, input AdminPasswordCh
 			_ = s.SessionCache.Revoke(ctx, item.ID, positiveTTL(now, item.ExpiresAt))
 		}
 	}
-	_, err = s.Audit.Append(ctx, platformaudit.Entry{Time: now, ActorID: adminID, ActorRole: "admin", Action: platformaudit.ActionAccountChanged, Target: "admin:" + credential.PublicID, Detail: []byte(`{"result":"ok"}`), IP: input.IP, RequestID: input.RequestID})
-	return err
+	_ = deliverAdminAudit(ctx, s.DB, s.Audit, outboxID)
+	return nil
 }
 
 func (s *AdminPasswordService) now() time.Time {

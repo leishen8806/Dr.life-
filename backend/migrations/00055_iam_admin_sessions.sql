@@ -17,7 +17,26 @@ ALTER TABLE iam.session
 
 CREATE INDEX ix_session_admin_user_id ON iam.session (admin_user_id) WHERE admin_user_id IS NOT NULL;
 
+CREATE TABLE iam.admin_audit_outbox (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    public_id text NOT NULL UNIQUE CHECK (public_id ~ '^[0-9A-HJKMNP-TV-Z]{26}$'),
+    occurred_at timestamptz NOT NULL,
+    actor_id bigint NOT NULL,
+    actor_role text NOT NULL,
+    action text NOT NULL,
+    target text NOT NULL,
+    detail jsonb NOT NULL,
+    ip inet,
+    request_id text NOT NULL,
+    attempts integer NOT NULL DEFAULT 0,
+    last_error text,
+    delivered_at timestamptz
+);
+
+CREATE INDEX ix_admin_audit_outbox_pending ON iam.admin_audit_outbox (id) WHERE delivered_at IS NULL;
+
 -- +goose Down
+DROP TABLE iam.admin_audit_outbox;
 DROP INDEX iam.ix_session_admin_user_id;
 ALTER TABLE iam.session DROP CONSTRAINT ck_session_owner;
 DELETE FROM iam.session WHERE admin_user_id IS NOT NULL;

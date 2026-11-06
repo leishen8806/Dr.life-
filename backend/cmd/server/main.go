@@ -34,8 +34,8 @@ import (
 
 type adminStepUpVerifier struct{ tokens iam.TokenManager }
 
-func (v adminStepUpVerifier) Verify(ctx context.Context, raw, scope, adminID string) (string, error) {
-	return v.tokens.VerifyStepUp(ctx, raw, scope, adminID)
+func (v adminStepUpVerifier) Verify(ctx context.Context, raw, scope, adminID, sessionID string) (string, error) {
+	return v.tokens.VerifyStepUp(ctx, raw, scope, adminID, sessionID)
 }
 
 func main() {
@@ -328,7 +328,7 @@ func main() {
 		}
 		checker := iam.DBSessionChecker{DB: iamDatabase, Cache: sessionCache, IdleTTL: cfg.SessionIdleTTL}
 		tokens := iam.TokenManager{Keys: jwtKeys, AccessTTL: cfg.AccessTokenTTL, Issuer: cfg.TokenIssuer, LegacyAcceptUntil: cfg.TokenLegacyAcceptUntil, Checker: checker}
-		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}}
+		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}, Audit: auditStore}
 		accountProfileService = &iam.AccountProfileService{DB: iamDatabase}
 		accountLinkService = iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: iamDatabase}, ids.NewULID)
 		consentService = iam.NewConsentService(iam.PostgresConsentRepository{DB: iamDatabase}, nil)
@@ -343,11 +343,23 @@ func main() {
 		adminTokens := tokens
 		adminTokens.AccessTTL = 10 * time.Minute
 		sessionService.AdminTokens = adminTokens
-		adminFailures := &iam.AdminFailureGuard{}
-		adminLoginService = &iam.AdminLoginService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Audit: auditStore, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: sessionCache, Failures: adminFailures}
-		adminStepUpService = &iam.AdminStepUpService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Permissions: *adminPermissions, Audit: auditStore, Failures: adminFailures}
-		adminPasswordService = &iam.AdminPasswordService{DB: iamDatabase, Cipher: envelope, Audit: auditStore, SessionCache: sessionCache}
+		var adminSecurity iam.AdminSecurityStore
+		if cfg.RedisURL != "" {
+			redisAdminSecurity, redisErr := iam.NewRedisAdminSecurityStore(cfg.RedisURL)
+			if redisErr != nil {
+				logger.Error("Redis administrator security configuration failed", "error", redisErr)
+			} else {
+				defer redisAdminSecurity.Close()
+				adminSecurity = redisAdminSecurity
+			}
+		}
+		adminLoginService = &iam.AdminLoginService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Audit: auditStore, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: sessionCache, Security: adminSecurity}
+		adminStepUpService = &iam.AdminStepUpService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Permissions: *adminPermissions, Audit: auditStore, Security: adminSecurity}
+		adminPasswordService = &iam.AdminPasswordService{DB: iamDatabase, Cipher: envelope, Audit: auditStore, SessionCache: sessionCache, Security: adminSecurity}
 		adminManagementService = &iam.AdminManagementService{DB: iamDatabase, Cipher: envelope, Audit: auditStore, SessionCache: sessionCache}
+		if auditStore != nil {
+			go iam.RunAdminAuditOutbox(ctx, iamDatabase, auditStore)
+		}
 		stepUpVerifier = adminStepUpVerifier{tokens: adminTokens}
 		if cfg.RedisURL != "" {
 			jtiStore, redisErr := gateway.NewRedisJTIStore(cfg.RedisURL)

@@ -57,7 +57,7 @@
 | `account_bot` | account_id, bot_id, bound_at, write_access boolean, unreachable_at | 用户在哪些 Bot 点过开始/允许私信；发送时据此选 Bot（第二章） |
 | `login_event` | id, person_id, bot_id, valid_by_bot_id, tried_count, auth_date, ip, device_id, result, created_at | 登录审计；`result` 含 `ambiguous_account`；`iam_rw` 仅可 SELECT/INSERT，禁止 UPDATE/DELETE/TRUNCATE/TRIGGER/REFERENCES，校验命中的 Bot、尝试次数 |
 | `account_status_log` | id, public_id, account_id, from_status, to_status, reason, actor_type, actor_id, created_at | 账号状态变更只追加日志；冻结、停用及恢复均须填写原因；`iam_rw` 仅可 SELECT/INSERT，拒绝修改、删除和截断；`report_ro` 不可读取 `reason` |
-| `session` | id, account_id, family_id, refresh_token_hash, previous_hash, rotated_at, rotation, refresh_kid, device_id, ip, expires_at, last_used_at, revoked_at, revoked_reason | 刷新令牌只存哈希；旋转使用前一哈希和时间实现宽限期重放，冻结/停用时按 family 批量作废 |
+| `session` | id, account_id / admin_user_id（二选一）, family_id, refresh_token_hash, previous_hash, rotated_at, rotation, refresh_kid, device_id, ip, expires_at, last_used_at, revoked_at, revoked_reason | 刷新令牌只存哈希；买家/商家等账号与管理员复用旋转链，但会话类型不可混用；管理员固定 15 分钟空闲、8 小时绝对有效期；冻结/停用时按 family 批量作废 |
 | `security_event` | account_id, session_family_id, event, reason, created_at | 会话安全事件；不含令牌或哈希 |
 | `merchant` | id, public_id, name jsonb, type, area, svc jsonb, description jsonb, phone_enc, address_enc, contact_enc, kind (`self/verified/pending`), status, owner_account_id | 商户资料；电话、地址、联系人由应用层加密后存放；`kind=verified` 须核验 |
 | `merchant_staff` | id, public_id, merchant_id, account_id(可空,未接受前), name, phone_enc, phone_hash, tg_username, note, role (`manager/sales/warehouse/finance`), status (`invited/active/off`), invite_code unique, invited_by, last_login_at | 员工上限 10（应用层校验）；`phone_enc` 存密文，`phone_hash` 存规范化手机号的不可逆摘要并用于同一商户内唯一性 |
@@ -66,6 +66,7 @@
 | `merchant_op_log` | id, merchant_id, actor_account_id, action, detail, created_at | 员工操作记录（只追加） |
 | `account_link` | id, buyer_account_id, merchant_account_id, linked_at, unlinked_at | 一键关联；`UNIQUE(buyer,merchant)` 且仅一条未解除；**只保存关联，不改变任何资金/订单归属** |
 | `admin_user` | id, public_id, name, email, password_hash(argon2), totp_secret_enc, role, data_scope text[], status, last_login_at | 密码只存 Argon2 哈希，TOTP 密钥由应用层信封加密后存放（AAD=`admin_totp:<public_id>`）；平台与物流仓储 Web 账号；超级管理员至少 1 位启用（应用层 + 数据库触发器 + 定期审计） |
+| `admin_audit_outbox` | id, public_id, occurred_at, actor_id, actor_role, action, target, detail jsonb, ip, request_id, attempts, last_error, delivered_at | 管理员创建、停用和角色变更与业务写入同事务落箱；后台投递到只追加审计链，失败保留并重试，避免业务已成功但审计丢失 |
 | `admin_role_perm` | role (`super/ops/finance/logi/cs/auditor`), module(17 个), level | 对应《权限与审计规范》矩阵；`super` 固定全 `edit` |
 | `actor` | id, kind (`account/admin/system/external`), ref_id | 统一"操作人"，供 `created_by`、审计、流水引用 |
 

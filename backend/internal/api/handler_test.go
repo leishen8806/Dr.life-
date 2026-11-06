@@ -74,10 +74,10 @@ type fakeAdminStepUp struct {
 type adminStepUpAuthenticator struct{}
 
 func (adminStepUpAuthenticator) Authenticate(*http.Request) (gateway.Identity, bool, error) {
-	return gateway.Identity{AccountID: "admin-account", Role: gateway.RoleAdmin}, true, nil
+	return gateway.Identity{AccountID: "admin-account", Role: gateway.RoleAdmin, SessionID: "admin-session"}, true, nil
 }
 
-func (f *fakeAdminStepUp) Issue(_ context.Context, adminID, code, scope, ip, requestID string) (iam.AdminStepUpResult, error) {
+func (f *fakeAdminStepUp) Issue(_ context.Context, adminID, _ string, code, scope, ip, requestID string) (iam.AdminStepUpResult, error) {
 	f.adminID, f.code, f.scope, f.ip, f.requestID = adminID, code, scope, ip, requestID
 	return f.result, f.err
 }
@@ -85,6 +85,10 @@ func (f *fakeAdminStepUp) Issue(_ context.Context, adminID, code, scope, ip, req
 func (f *fakeAdminRefresh) Refresh(_ context.Context, token, ip string) (iam.RefreshResult, error) {
 	f.input, f.ip = token, ip
 	return f.result, f.err
+}
+
+func (f *fakeAdminRefresh) RefreshEndpoint(ctx context.Context, token, ip string, _ bool) (iam.RefreshResult, error) {
+	return f.Refresh(ctx, token, ip)
 }
 
 func (*fakeAdminRefresh) ListSessions(context.Context, string) ([]iam.SessionInfo, error) {
@@ -159,6 +163,13 @@ func TestAdminStepUpHandlerRequiresAdminIdentityAndNeverLeaksTokenOnFailure(t *t
 	endpoint.ServeHTTP(w, request)
 	if w.Code != http.StatusUnauthorized || strings.Contains(w.Body.String(), "step-up-token") {
 		t.Fatalf("failure body=%s", w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/v1/admin/auth/step-up", strings.NewReader(`{"totp_code":"","scope":""}`))
+	request.RemoteAddr = "198.51.100.7:42"
+	endpoint.ServeHTTP(w, request)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("empty step-up fields status=%d body=%s", w.Code, w.Body.String())
 	}
 }
 
@@ -646,10 +657,11 @@ func (f fakeAdminPermissions) HasDataScope(context.Context, string) (bool, error
 }
 
 type fakeAdminManagement struct {
-	users    []iam.AdminUser
-	created  iam.AdminCreateResult
-	createIn iam.AdminCreateInput
-	auditIn  iam.AdminAuditInput
+	users       []iam.AdminUser
+	created     iam.AdminCreateResult
+	createIn    iam.AdminCreateInput
+	auditIn     iam.AdminAuditInput
+	createCalls int
 }
 
 type fakeAdminPassword struct {
@@ -676,6 +688,7 @@ func (f fakeAdminManagement) Get(_ context.Context, publicID string) (iam.AdminU
 }
 
 func (f *fakeAdminManagement) CreateWithAudit(_ context.Context, input iam.AdminCreateInput, auditInput iam.AdminAuditInput) (iam.AdminCreateResult, error) {
+	f.createCalls++
 	f.createIn = input
 	f.auditIn = auditInput
 	return f.created, nil
@@ -716,7 +729,7 @@ func (f *fakeAdminManagement) UpdateRoleWithAudit(_ context.Context, publicID st
 
 type fakeStepUpVerifier struct{ scope string }
 
-func (f fakeStepUpVerifier) Verify(_ context.Context, token, scope, _ string) (string, error) {
+func (f fakeStepUpVerifier) Verify(_ context.Context, token, scope, _, _ string) (string, error) {
 	if scope != f.scope {
 		return "", errors.New("unexpected scope")
 	}
@@ -824,6 +837,21 @@ func TestAdminManagementCreateRequiresEditStepUpAndIdempotency(t *testing.T) {
 	got := serve(t, newHandler(true), request("valid", "create-success"))
 	if got.Code != http.StatusCreated || !strings.Contains(got.Body.String(), "bootstrap-password-only") || !strings.Contains(got.Body.String(), "otpauth://") || manager.createIn.Role != iam.RoleSupport || manager.auditIn.ActorPublicID != "admin" || manager.auditIn.RequestID == "" {
 		t.Fatalf("create status=%d input=%+v body=%s", got.Code, manager.createIn, got.Body.String())
+	}
+	store := gateway.NewMemoryIdempotencyStore()
+	jti := gateway.NewMemoryJTIStore()
+	handler := server.NewHandlerWithGateway(nil, server.GatewayOptions{
+		AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+		Authenticator:    stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin, SessionID: "admin-session"}},
+		AdminPermissions: fakeAdminPermissions{allowed: true}, AdminManagement: manager,
+		AdminStepUpVerifier: fakeStepUpVerifier{scope: "permission_change"}, AdminStepUpJTIStore: jti,
+		Idempotency: gateway.IdempotencyOptions{Store: store},
+	})
+	manager.createCalls = 0
+	first := serve(t, handler, request("stepup_1", "create-replay"))
+	replay := serve(t, handler, request("stepup_2", "create-replay"))
+	if first.Code != http.StatusCreated || replay.Code != http.StatusConflict || replay.Header().Get("Idempotent-Replayed") != "true" || strings.Contains(replay.Body.String(), "bootstrap-password-only") || strings.Contains(replay.Body.String(), "otpauth://") || manager.createCalls != 1 {
+		t.Fatalf("first=%d replay=%d calls=%d replay_body=%s", first.Code, replay.Code, manager.createCalls, replay.Body.String())
 	}
 }
 

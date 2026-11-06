@@ -354,6 +354,31 @@ func TestIdempotencyFiveXXCanRetryAndLargeResponseIsNotReplayed(t *testing.T) {
 	}
 }
 
+func TestIdempotencyCompletedWithoutCachingSensitiveResponse(t *testing.T) {
+	store := NewMemoryIdempotencyStore()
+	final := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"initial_password":"secret","totp_provisioning_uri":"otpauth://secret"}`))
+	})
+	handler := RequireIdempotency(nil)(BindIdempotency(IdempotencyOptions{
+		Store:              store,
+		DoNotCacheResponse: func(*http.Request) bool { return true },
+	})(final))
+	r := httptest.NewRequest(http.MethodPost, "/v1/admin/admins", strings.NewReader(`{}`))
+	r.Header.Set("Idempotency-Key", "sensitive_response")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	for _, item := range store.items {
+		if !item.entry.Truncated || len(item.entry.Body) != 0 || item.entry.ContentType != "" {
+			t.Fatalf("sensitive idempotency entry=%+v", item.entry)
+		}
+		return
+	}
+	t.Fatal("sensitive idempotency entry missing")
+}
+
 func TestMemoryIdempotencyExpiry(t *testing.T) {
 	now := time.Unix(100, 0)
 	store := NewMemoryIdempotencyStore()
@@ -416,8 +441,8 @@ func TestRedisSecurityStores(t *testing.T) {
 
 type fakeStepUpVerifier struct{}
 
-func (fakeStepUpVerifier) Verify(_ context.Context, token, scope, account string) (string, error) {
-	if token != "valid" || scope != "withdraw" || account != "a" {
+func (fakeStepUpVerifier) Verify(_ context.Context, token, scope, account, session string) (string, error) {
+	if token != "valid" || scope != "withdraw" || account != "a" || session != "s" {
 		return "", errors.New("invalid")
 	}
 	return "jti_1", nil
@@ -433,7 +458,7 @@ func TestStepUpCannotBeSpoofedAndJTIIsSingleUse(t *testing.T) {
 	}))
 	call := func(token string, spoof bool) int {
 		r := httptest.NewRequest(http.MethodPost, "/v1/buyer/withdrawals", nil)
-		withIdentity(r, Identity{AccountID: "a", Role: RoleBuyer})
+		withIdentity(r, Identity{AccountID: "a", Role: RoleBuyer, SessionID: "s"})
 		r.Header.Set("X-Step-Up-Token", token)
 		if spoof {
 			r.Header.Set("X-Step-Up-Verified", "true")
@@ -457,7 +482,7 @@ func TestIdempotentReplayDoesNotConsumeAnotherStepUp(t *testing.T) {
 	handler := RequireIdempotency(nil)(BindIdempotency(IdempotencyOptions{Store: NewMemoryIdempotencyStore()})(final))
 	call := func() *httptest.ResponseRecorder {
 		r := httptest.NewRequest(http.MethodPost, "/v1/buyer/withdrawals", strings.NewReader(`{}`))
-		withIdentity(r, Identity{AccountID: "a", Role: RoleBuyer})
+		withIdentity(r, Identity{AccountID: "a", Role: RoleBuyer, SessionID: "s"})
 		r.Header.Set("Idempotency-Key", "withdraw_one")
 		r.Header.Set("X-Step-Up-Token", "valid")
 		w := httptest.NewRecorder()

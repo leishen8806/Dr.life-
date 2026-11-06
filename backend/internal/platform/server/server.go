@@ -121,8 +121,13 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	router.Use(gateway.LimitRequestBody(options.BodyPolicy))
 	router.Use(gateway.LimitByAccount(options.Limiter, options.AccountRules))
 	router.Use(gateway.RequireIdempotency(options.IdempotencyExempt))
-	router.Use(gateway.BindIdempotency(options.Idempotency))
 	router.Use(requireAdminManagementStepUp(options.AdminStepUpVerifier, options.AdminStepUpJTIStore))
+	idempotency := options.Idempotency
+	configuredNoCache := idempotency.DoNotCacheResponse
+	idempotency.DoNotCacheResponse = func(r *http.Request) bool {
+		return r.Method == http.MethodPost && r.URL.Path == "/v1/admin/admins" || configuredNoCache != nil && configuredNoCache(r)
+	}
+	router.Use(gateway.BindIdempotency(idempotency))
 	router.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
 	})

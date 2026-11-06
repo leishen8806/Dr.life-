@@ -83,16 +83,16 @@ func (s *AdminManagementService) DisableWithAudit(ctx context.Context, publicID,
 	if strings.TrimSpace(reason) == "" {
 		return AdminUser{}, errors.New("iam: administrator disable reason is required")
 	}
-	return s.changeStatusWithAudit(ctx, publicID, AdminStatus("disabled"), auditInput)
+	return s.changeStatusWithAudit(ctx, publicID, AdminStatus("disabled"), reason, auditInput)
 }
 
 // EnableWithAudit enables an administrator. Existing sessions remain revoked;
 // the administrator must sign in again.
 func (s *AdminManagementService) EnableWithAudit(ctx context.Context, publicID string, auditInput AdminAuditInput) (AdminUser, error) {
-	return s.changeStatusWithAudit(ctx, publicID, AdminStatusActive, auditInput)
+	return s.changeStatusWithAudit(ctx, publicID, AdminStatusActive, "", auditInput)
 }
 
-func (s *AdminManagementService) changeStatusWithAudit(ctx context.Context, publicID string, status AdminStatus, auditInput AdminAuditInput) (AdminUser, error) {
+func (s *AdminManagementService) changeStatusWithAudit(ctx context.Context, publicID string, status AdminStatus, reason string, auditInput AdminAuditInput) (AdminUser, error) {
 	if status != AdminStatusActive && status != AdminStatus("disabled") {
 		return AdminUser{}, errors.New("iam: invalid administrator status")
 	}
@@ -139,13 +139,19 @@ func (s *AdminManagementService) changeStatusWithAudit(ctx context.Context, publ
 		}
 		rows.Close()
 	}
+	auditEntry, err := s.managementAuditEntry(actorID, actorPublicID, before, after, reason, auditInput)
+	if err != nil {
+		return AdminUser{}, err
+	}
+	outboxID, err := queueAdminAudit(ctx, tx, auditEntry)
+	if err != nil {
+		return AdminUser{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return AdminUser{}, err
 	}
 	s.revokeCachedAdminSessions(ctx, before.PublicID, revoked)
-	if err := s.appendManagementAudit(ctx, actorID, actorPublicID, before, after, auditInput); err != nil {
-		return AdminUser{}, err
-	}
+	_ = deliverAdminAudit(ctx, s.DB, s.Audit, outboxID)
 	return after, nil
 }
 
@@ -199,13 +205,19 @@ func (s *AdminManagementService) UpdateRoleWithAudit(ctx context.Context, public
 		return AdminUser{}, err
 	}
 	rows.Close()
+	auditEntry, err := s.managementAuditEntry(actorID, actorPublicID, before, after, "", auditInput)
+	if err != nil {
+		return AdminUser{}, err
+	}
+	outboxID, err := queueAdminAudit(ctx, tx, auditEntry)
+	if err != nil {
+		return AdminUser{}, err
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return AdminUser{}, err
 	}
 	s.revokeCachedAdminSessions(ctx, before.PublicID, revoked)
-	if err := s.appendManagementAudit(ctx, actorID, actorPublicID, before, after, auditInput); err != nil {
-		return AdminUser{}, err
-	}
+	_ = deliverAdminAudit(ctx, s.DB, s.Audit, outboxID)
 	return after, nil
 }
 
@@ -264,18 +276,18 @@ func (s *AdminManagementService) auditActor(ctx context.Context, input AdminAudi
 	return actorID, actorPublicID, nil
 }
 
-func (s *AdminManagementService) appendManagementAudit(ctx context.Context, actorID int64, actorPublicID string, before, after AdminUser, input AdminAuditInput) error {
+func (s *AdminManagementService) managementAuditEntry(actorID int64, actorPublicID string, before, after AdminUser, reason string, input AdminAuditInput) (platformaudit.Entry, error) {
 	detail, err := json.Marshal(struct {
 		ActorPublicID  string    `json:"actor_public_id"`
 		TargetPublicID string    `json:"target_public_id"`
 		Before         adminView `json:"before"`
 		After          adminView `json:"after"`
-	}{ActorPublicID: actorPublicID, TargetPublicID: after.PublicID, Before: auditAdminView(before), After: auditAdminView(after)})
+		Reason         string    `json:"reason,omitempty"`
+	}{ActorPublicID: actorPublicID, TargetPublicID: after.PublicID, Before: auditAdminView(before), After: auditAdminView(after), Reason: strings.TrimSpace(reason)})
 	if err != nil {
-		return err
+		return platformaudit.Entry{}, err
 	}
-	_, err = s.Audit.Append(ctx, platformaudit.Entry{Time: s.now(), ActorID: actorID, ActorRole: "admin", Action: platformaudit.ActionPermissionChanged, Target: "admin:" + after.PublicID, Detail: detail, IP: input.IP, RequestID: input.RequestID})
-	return err
+	return platformaudit.Entry{Time: s.now(), ActorID: actorID, ActorRole: "admin", Action: platformaudit.ActionPermissionChanged, Target: "admin:" + after.PublicID, Detail: detail, IP: input.IP, RequestID: input.RequestID}, nil
 }
 
 type adminView struct {
@@ -295,54 +307,76 @@ func scanAdminUser(row pgx.Row) (AdminUser, error) {
 }
 
 func (s *AdminManagementService) Create(ctx context.Context, input AdminCreateInput) (AdminCreateResult, error) {
-	if s == nil || s.DB == nil || s.Cipher == nil || strings.TrimSpace(input.Name) == "" || !validAdminRole(input.Role) {
-		return AdminCreateResult{}, errors.New("iam: invalid administrator creation input")
-	}
-	email := strings.ToLower(strings.TrimSpace(input.Email))
-	if !strings.Contains(email, "@") || len(email) > 320 {
-		return AdminCreateResult{}, errors.New("iam: invalid administrator email")
-	}
-	publicID, err := ids.NewULID()
+	prepared, err := s.prepareAdminCreate(ctx, input)
 	if err != nil {
 		return AdminCreateResult{}, err
 	}
-	password, err := newInitialAdminPassword()
-	if err != nil {
-		return AdminCreateResult{}, err
-	}
-	hash, err := HashPassword(password)
-	if err != nil {
-		return AdminCreateResult{}, err
-	}
-	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Dr.life+", AccountName: email, SecretSize: 32, Period: 30})
-	if err != nil {
-		return AdminCreateResult{}, err
-	}
-	secret := key.Secret()
-	enc, err := EncryptTOTPSecret(ctx, s.Cipher, publicID, secret)
-	if err != nil {
-		return AdminCreateResult{}, err
-	}
-
 	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return AdminCreateResult{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	var user AdminUser
-	err = tx.QueryRow(ctx, `
-		INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,data_scope,status,password_change_required,created_at,updated_at)
-		VALUES($1,$2,$3,$4,$5,$6,$7,'active',true,$8,$8)
-		RETURNING public_id,name,email,role,data_scope,status,last_login_at,created_at`,
-		publicID, strings.TrimSpace(input.Name), email, hash, enc, input.Role, input.DataScope, s.now(),
-	).Scan(&user.PublicID, &user.Name, &user.Email, &user.Role, &user.DataScope, &user.Status, &user.LastLoginAt, &user.CreatedAt)
+	user, err := insertPreparedAdmin(ctx, tx, prepared)
 	if err != nil {
 		return AdminCreateResult{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return AdminCreateResult{}, err
 	}
-	return AdminCreateResult{Admin: user, InitialPassword: password, TOTPProvisioningURI: key.URL()}, nil
+	return AdminCreateResult{Admin: user, InitialPassword: prepared.password, TOTPProvisioningURI: prepared.provisioningURI}, nil
+}
+
+type preparedAdminCreate struct {
+	publicID, name, email, passwordHash, password, provisioningURI string
+	totpSecretEnc                                                  []byte
+	role                                                           Role
+	dataScope                                                      []string
+	at                                                             time.Time
+}
+
+func (s *AdminManagementService) prepareAdminCreate(ctx context.Context, input AdminCreateInput) (preparedAdminCreate, error) {
+	if s == nil || s.DB == nil || s.Cipher == nil || strings.TrimSpace(input.Name) == "" || !validAdminRole(input.Role) {
+		return preparedAdminCreate{}, errors.New("iam: invalid administrator creation input")
+	}
+	email := strings.ToLower(strings.TrimSpace(input.Email))
+	if !strings.Contains(email, "@") || len(email) > 320 {
+		return preparedAdminCreate{}, errors.New("iam: invalid administrator email")
+	}
+	publicID, err := ids.NewULID()
+	if err != nil {
+		return preparedAdminCreate{}, err
+	}
+	password, err := newInitialAdminPassword()
+	if err != nil {
+		return preparedAdminCreate{}, err
+	}
+	hash, err := HashPassword(password)
+	if err != nil {
+		return preparedAdminCreate{}, err
+	}
+	key, err := totp.Generate(totp.GenerateOpts{Issuer: "Dr.life+", AccountName: email, SecretSize: 32, Period: 30})
+	if err != nil {
+		return preparedAdminCreate{}, err
+	}
+	enc, err := EncryptTOTPSecret(ctx, s.Cipher, publicID, key.Secret())
+	if err != nil {
+		return preparedAdminCreate{}, err
+	}
+	if input.DataScope == nil {
+		input.DataScope = []string{}
+	}
+	return preparedAdminCreate{publicID: publicID, name: strings.TrimSpace(input.Name), email: email, passwordHash: hash, password: password, provisioningURI: key.URL(), totpSecretEnc: enc, role: input.Role, dataScope: input.DataScope, at: s.now()}, nil
+}
+
+func insertPreparedAdmin(ctx context.Context, tx pgx.Tx, prepared preparedAdminCreate) (AdminUser, error) {
+	var user AdminUser
+	err := tx.QueryRow(ctx, `
+		INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,data_scope,status,password_change_required,created_at,updated_at)
+		VALUES($1,$2,$3,$4,$5,$6,$7,'active',true,$8,$8)
+		RETURNING public_id,name,email,role,data_scope,status,last_login_at,created_at`,
+		prepared.publicID, prepared.name, prepared.email, prepared.passwordHash, prepared.totpSecretEnc, prepared.role, prepared.dataScope, prepared.at,
+	).Scan(&user.PublicID, &user.Name, &user.Email, &user.Role, &user.DataScope, &user.Status, &user.LastLoginAt, &user.CreatedAt)
+	return user, err
 }
 
 // CreateWithAudit creates an administrator and records the permitted metadata
@@ -355,15 +389,24 @@ func (s *AdminManagementService) CreateWithAudit(ctx context.Context, input Admi
 	if actorPublicID == "" || strings.TrimSpace(auditInput.RequestID) == "" {
 		return AdminCreateResult{}, errors.New("iam: administrator creation audit context is required")
 	}
-	var actorID int64
-	if err := s.DB.QueryRow(ctx, `SELECT id FROM iam.admin_user WHERE public_id=$1 AND status='active'`, actorPublicID).Scan(&actorID); err != nil {
-		return AdminCreateResult{}, err
-	}
-
-	created, err := s.Create(ctx, input)
+	prepared, err := s.prepareAdminCreate(ctx, input)
 	if err != nil {
 		return AdminCreateResult{}, err
 	}
+	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return AdminCreateResult{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var actorID int64
+	if err := tx.QueryRow(ctx, `SELECT id FROM iam.admin_user WHERE public_id=$1 AND status='active'`, actorPublicID).Scan(&actorID); err != nil {
+		return AdminCreateResult{}, err
+	}
+	createdUser, err := insertPreparedAdmin(ctx, tx, prepared)
+	if err != nil {
+		return AdminCreateResult{}, err
+	}
+	created := AdminCreateResult{Admin: createdUser, InitialPassword: prepared.password, TOTPProvisioningURI: prepared.provisioningURI}
 	detail, err := json.Marshal(struct {
 		ActorPublicID  string `json:"actor_public_id"`
 		TargetPublicID string `json:"target_public_id"`
@@ -384,12 +427,17 @@ func (s *AdminManagementService) CreateWithAudit(ctx context.Context, input Admi
 	if err != nil {
 		return AdminCreateResult{}, err
 	}
-	if _, err := s.Audit.Append(ctx, platformaudit.Entry{
+	outboxID, err := queueAdminAudit(ctx, tx, platformaudit.Entry{
 		Time: s.now(), ActorID: actorID, ActorRole: "admin", Action: platformaudit.ActionPermissionChanged,
 		Target: "admin:" + created.Admin.PublicID, Detail: detail, IP: auditInput.IP, RequestID: auditInput.RequestID,
-	}); err != nil {
+	})
+	if err != nil {
 		return AdminCreateResult{}, err
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return AdminCreateResult{}, err
+	}
+	_ = deliverAdminAudit(ctx, s.DB, s.Audit, outboxID)
 	return created, nil
 }
 

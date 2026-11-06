@@ -2,9 +2,9 @@ package iam
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +17,8 @@ import (
 const adminLoginFailureLimit = 5
 
 var adminLoginFailureWindow = 15 * time.Minute
+
+const dummyAdminPasswordHash = "$argon2id$v=19$m=65536,t=3,p=4$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 
 // AdminLoginInput deliberately keeps credential values out of errors and logs.
 type AdminLoginInput struct {
@@ -40,46 +42,6 @@ type AdminStepUpResult struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-type adminFailure struct {
-	attempts int
-	first    time.Time
-}
-
-// AdminFailureGuard is shared by administrator login and step-up verification.
-type AdminFailureGuard struct {
-	mu       sync.Mutex
-	failures map[string]adminFailure
-}
-
-func (g *AdminFailureGuard) locked(key string, now time.Time) bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	f, ok := g.failures[key]
-	if !ok || now.Sub(f.first) >= adminLoginFailureWindow {
-		delete(g.failures, key)
-		return false
-	}
-	return f.attempts >= adminLoginFailureLimit
-}
-func (g *AdminFailureGuard) recordFailure(key string, now time.Time) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.failures == nil {
-		g.failures = make(map[string]adminFailure)
-	}
-	f := g.failures[key]
-	if f.first.IsZero() || now.Sub(f.first) >= adminLoginFailureWindow {
-		f = adminFailure{first: now}
-	}
-	f.attempts++
-	g.failures[key] = f
-}
-func (g *AdminFailureGuard) clear(key string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	delete(g.failures, key)
-}
-
 // AdminLoginService authenticates a web administrator and uses the shared iam.session chain.
 // Failed-attempt state is intentionally keyed by the normalized account identifier and source IP.
 type AdminLoginService struct {
@@ -91,10 +53,7 @@ type AdminLoginService struct {
 	IdleTTL      time.Duration
 	SessionCache SessionCache
 	Now          func() time.Time
-	Failures     *AdminFailureGuard
-
-	mu       sync.Mutex
-	failures map[string]adminFailure
+	Security     AdminSecurityStore
 }
 
 func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (AdminLoginResult, error) {
@@ -103,22 +62,55 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 	}
 	email := strings.ToLower(strings.TrimSpace(input.Email))
 	now := s.now()
-	key := email + "\x00" + input.IP
-	if s.locked(key, now) {
+	if s.Security == nil {
+		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+	}
+	locked, err := s.Security.Locked(ctx, email, input.IP)
+	if err != nil {
+		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+	}
+	if locked {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
 
 	var id int64
 	var passwordChangeRequired bool
 	var credential AdminCredentials
-	err := s.DB.QueryRow(ctx, `SELECT id,public_id,password_hash,totp_secret_enc,status,password_change_required FROM iam.admin_user WHERE email=$1`, email).
+	err = s.DB.QueryRow(ctx, `SELECT id,public_id,password_hash,totp_secret_enc,status,password_change_required FROM iam.admin_user WHERE email=$1`, email).
 		Scan(&id, &credential.PublicID, &credential.PasswordHash, &credential.TOTPSecretEnc, &credential.Status, &passwordChangeRequired)
-	if err != nil || AuthenticateAdmin(ctx, s.Cipher, credential, input.Password, input.TOTPCode, now) != nil {
+	passwordHash := dummyAdminPasswordHash
+	if err == nil && credential.Status == AdminStatusActive {
+		passwordHash = credential.PasswordHash
+	}
+	passwordOK := VerifyPassword(passwordHash, input.Password)
+	authenticated := err == nil && credential.Status == AdminStatusActive && passwordOK
+	if authenticated {
+		secret, decryptErr := s.Cipher.Decrypt(ctx, credential.TOTPSecretEnc, adminTOTPAAD(credential.PublicID))
+		if decryptErr != nil {
+			authenticated = false
+		} else {
+			authenticated = ValidateTOTP(string(secret), input.TOTPCode, now)
+			zero(secret)
+		}
+	}
+	if authenticated {
+		fresh, consumeErr := s.Security.ConsumeTOTP(ctx, credential.PublicID, now.Unix()/30, 90*time.Second)
+		if consumeErr != nil {
+			return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+		}
+		authenticated = fresh
+	}
+	if !authenticated {
 		if err == nil {
 			s.appendAudit(ctx, id, credential.PublicID, "failed", input, now)
 		}
-		s.recordFailure(key, now)
+		if failureErr := s.Security.RecordFailure(ctx, email, input.IP); failureErr != nil {
+			return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+		}
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
+	}
+	if err := s.Security.ClearFailures(ctx, email, input.IP); err != nil {
+		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 
 	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
@@ -134,10 +126,7 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 	if err != nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
-	ttl := s.RefreshTTL
-	if ttl <= 0 {
-		ttl = 8 * time.Hour
-	}
+	ttl := 8 * time.Hour
 	if _, err = tx.Exec(ctx, `INSERT INTO iam.session(public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,device_id,ip,expires_at,last_used_at) VALUES($1,$2,$1,$3,$4,$5,$6,$7,$8)`, sessionID, id, refreshHash, refreshKID, input.DeviceID, input.IP, now.Add(ttl), now); err != nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeInternalError)
 	}
@@ -163,7 +152,6 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 		}
 		_ = s.SessionCache.Put(ctx, credential.PublicID, sessionID, 0, cacheTTL(now, now.Add(ttl), now.Add(idle)))
 	}
-	s.clearFailure(key)
 	s.appendAudit(ctx, id, credential.PublicID, "ok", input, now)
 	return AdminLoginResult{AccessToken: access, AccessExpiresIn: int64(s.Tokens.AccessTTL / time.Second), RefreshToken: refresh}, nil
 }
@@ -174,49 +162,10 @@ func (s *AdminLoginService) now() time.Time {
 	}
 	return time.Now()
 }
-func (s *AdminLoginService) locked(key string, now time.Time) bool {
-	if s.Failures != nil {
-		return s.Failures.locked(key, now)
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	f, ok := s.failures[key]
-	if !ok || now.Sub(f.first) >= adminLoginFailureWindow {
-		delete(s.failures, key)
-		return false
-	}
-	return f.attempts >= adminLoginFailureLimit
-}
-func (s *AdminLoginService) recordFailure(key string, now time.Time) {
-	if s.Failures != nil {
-		s.Failures.recordFailure(key, now)
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.failures == nil {
-		s.failures = make(map[string]adminFailure)
-	}
-	f := s.failures[key]
-	if f.first.IsZero() || now.Sub(f.first) >= adminLoginFailureWindow {
-		f = adminFailure{first: now}
-	}
-	f.attempts++
-	s.failures[key] = f
-}
-func (s *AdminLoginService) clearFailure(key string) {
-	if s.Failures != nil {
-		s.Failures.clear(key)
-		return
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.failures, key)
-}
-
 func (s *AdminLoginService) appendAudit(ctx context.Context, id int64, target, result string, input AdminLoginInput, at time.Time) {
 	if s.Audit == nil || id <= 0 || target == "" || input.RequestID == "" {
 		return
 	}
-	_, _ = s.Audit.Append(ctx, platformaudit.Entry{Time: at, ActorID: id, ActorRole: "admin", Action: platformaudit.ActionLogin, Target: "admin:" + target, Detail: []byte(`{"result":"` + result + `"}`), IP: input.IP, RequestID: input.RequestID})
+	detail, _ := json.Marshal(map[string]string{"result": result})
+	_, _ = s.Audit.Append(ctx, platformaudit.Entry{Time: at, ActorID: id, ActorRole: "admin", Action: platformaudit.ActionLogin, Target: "admin:" + target, Detail: detail, IP: input.IP, RequestID: input.RequestID})
 }

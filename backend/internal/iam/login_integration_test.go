@@ -38,6 +38,51 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 )
 
+type testAdminSecurity struct {
+	mu     sync.Mutex
+	counts map[string]int
+	used   map[string]bool
+}
+
+func (s *testAdminSecurity) Locked(_ context.Context, account, ip string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.counts["a:"+account] >= adminLoginFailureLimit || s.counts["i:"+ip] >= adminLoginFailureLimit, nil
+}
+
+func (s *testAdminSecurity) RecordFailure(_ context.Context, account, ip string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.counts == nil {
+		s.counts = make(map[string]int)
+	}
+	s.counts["a:"+account]++
+	s.counts["i:"+ip]++
+	return nil
+}
+
+func (s *testAdminSecurity) ClearFailures(_ context.Context, account, ip string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.counts, "a:"+account)
+	delete(s.counts, "i:"+ip)
+	return nil
+}
+
+func (s *testAdminSecurity) ConsumeTOTP(_ context.Context, adminID string, step int64, _ time.Duration) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.used == nil {
+		s.used = make(map[string]bool)
+	}
+	key := fmt.Sprintf("%s:%d", adminID, step)
+	if s.used[key] {
+		return false, nil
+	}
+	s.used[key] = true
+	return true, nil
+}
+
 type loginFixture struct {
 	pool     *pgxpool.Pool
 	dsn      string
@@ -55,6 +100,12 @@ type stepUpAuditWriter struct{ entries []platformaudit.Entry }
 func (w *stepUpAuditWriter) Append(_ context.Context, entry platformaudit.Entry) (platformaudit.Record, error) {
 	w.entries = append(w.entries, entry)
 	return platformaudit.Record{}, nil
+}
+
+type failingAdminAuditWriter struct{}
+
+func (failingAdminAuditWriter) Append(context.Context, platformaudit.Entry) (platformaudit.Record, error) {
+	return platformaudit.Record{}, errors.New("audit unavailable")
 }
 
 func TestTelegramLoginIntegration(t *testing.T) {
@@ -249,6 +300,15 @@ func (f *loginFixture) testAdminManagementCreate(t *testing.T) {
 	if len(audit.entries) != 1 || audit.entries[0].Action != platformaudit.ActionPermissionChanged || audit.entries[0].Target != "admin:"+created.Admin.PublicID || audit.entries[0].RequestID != "admin-create-audit" {
 		t.Fatalf("unexpected administrator creation audit entries: %#v", audit.entries)
 	}
+	durable := &AdminManagementService{DB: f.pool, Cipher: f.envelope, Audit: failingAdminAuditWriter{}, Now: func() time.Time { return f.now }}
+	queued, err := durable.CreateWithAudit(ctx, AdminCreateInput{Name: "Queued Admin", Email: "queued-admin@example.test", Role: RoleSupport}, AdminAuditInput{ActorPublicID: actor.Admin.PublicID, IP: "198.51.100.20", RequestID: "admin-create-queued"})
+	if err != nil || queued.Admin.PublicID == "" {
+		t.Fatalf("durable create result=%+v err=%v", queued, err)
+	}
+	var pending int
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.admin_audit_outbox WHERE request_id='admin-create-queued' AND delivered_at IS NULL`).Scan(&pending); err != nil || pending != 1 {
+		t.Fatalf("pending audit=%d err=%v, want durable outbox row", pending, err)
+	}
 	detail := string(audit.entries[0].Detail)
 	if !strings.Contains(detail, actor.Admin.PublicID) || !strings.Contains(detail, created.Admin.PublicID) || strings.Contains(detail, created.InitialPassword) || strings.Contains(detail, created.TOTPProvisioningURI) || strings.Contains(detail, "password_hash") || strings.Contains(detail, "totp_secret") {
 		t.Fatalf("administrator creation audit leaked credentials or omitted identities: %s", detail)
@@ -299,7 +359,7 @@ func (f *loginFixture) testAdminManagementStatusAndRole(t *testing.T) {
 	if err := f.pool.QueryRow(ctx, `SELECT revoked_at FROM iam.session WHERE public_id=$1`, "01ARZ3NDEKTSV4RRFFQ69G5FD2").Scan(&revokedAt); err != nil || revokedAt == nil {
 		t.Fatalf("role changed admin session remained active: revoked_at=%v err=%v", revokedAt, err)
 	}
-	if len(audit.entries) != 3 || strings.Contains(string(audit.entries[0].Detail), "security review") {
+	if len(audit.entries) != 3 || !strings.Contains(string(audit.entries[0].Detail), "security review") {
 		t.Fatalf("unexpected status/role audit: %#v", audit.entries)
 	}
 	if _, err := service.DisableWithAudit(ctx, actor.Admin.PublicID, "self", input); !errors.Is(err, ErrAdminSelfMutation) {
@@ -344,25 +404,25 @@ func (f *loginFixture) testAdminStepUp(t *testing.T) {
 		t.Fatal(err)
 	}
 	audit := &stepUpAuditWriter{}
-	guard := &AdminFailureGuard{}
-	service := &AdminStepUpService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, Permissions: AdminPermissionStore{DB: f.pool}, Audit: audit, Failures: guard, Now: func() time.Time { return f.now }}
-	result, err := service.Issue(ctx, adminID, code, "withdrawal_review", "198.51.100.5", "step-up-test")
+	security := &testAdminSecurity{}
+	service := &AdminStepUpService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, Permissions: AdminPermissionStore{DB: f.pool}, Audit: audit, Security: security, Now: func() time.Time { return f.now }}
+	result, err := service.Issue(ctx, adminID, "admin-session", code, "withdrawal_review", "198.51.100.5", "step-up-test")
 	if err != nil || result.Token == "" || result.Scope != "withdrawal_review" {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
-	if _, err := service.Issue(ctx, adminID, code, "withdrawal_review", "198.51.100.5", "step-up-replay"); err == nil {
+	if _, err := service.Issue(ctx, adminID, "admin-session", code, "withdrawal_review", "198.51.100.5", "step-up-replay"); err == nil {
 		t.Fatal("replayed TOTP accepted")
 	}
-	if _, err := service.Issue(ctx, adminID, code, "withdraw", "198.51.100.5", "step-up-invalid"); err == nil {
+	if _, err := service.Issue(ctx, adminID, "admin-session", code, `x","result":"ok`, "198.51.100.5", "step-up-invalid"); err == nil {
 		t.Fatal("non-whitelisted scope accepted")
 	}
-	if len(audit.entries) != 3 || string(audit.entries[0].Detail) != `{"result":"ok","scope":"withdrawal_review"}` || string(audit.entries[0].Detail) == code || audit.entries[0].Action != platformaudit.ActionStepUp {
+	if len(audit.entries) != 3 || string(audit.entries[0].Detail) != `{"result":"ok","scope":"withdrawal_review"}` || string(audit.entries[2].Detail) != `{"result":"failed","scope":"unknown"}` || string(audit.entries[0].Detail) == code || audit.entries[0].Action != platformaudit.ActionStepUp {
 		t.Fatalf("unexpected audit entries: %#v", audit.entries)
 	}
 	for i := 0; i < adminLoginFailureLimit; i++ {
-		_, _ = service.Issue(ctx, adminID, "000000", "withdrawal_review", "198.51.100.5", "step-up-limit")
+		_, _ = service.Issue(ctx, adminID, "admin-session", "000000", "withdrawal_review", "198.51.100.5", "step-up-limit")
 	}
-	if !guard.locked("step-up-admin@example.test\x00198.51.100.5", f.now) {
+	if locked, _ := security.Locked(ctx, "step-up-admin@example.test", "198.51.100.5"); !locked {
 		t.Fatal("step-up failures did not use the administrator login limiter")
 	}
 }
@@ -390,7 +450,7 @@ func (f *loginFixture) testAdminPasswordLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := &AdminLoginService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: f.cache, Now: func() time.Time { return f.now }}
+	service := &AdminLoginService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: f.cache, Security: &testAdminSecurity{}, Now: func() time.Time { return f.now }}
 	input := AdminLoginInput{Email: "login-admin@example.test", Password: password, TOTPCode: code, IP: "198.51.100.4", DeviceID: "web:1", RequestID: "admin-login-test"}
 	result, err := service.Login(ctx, input)
 	if err != nil || result.AccessToken == "" || result.RefreshToken == "" || result.AccessExpiresIn != 600 {
@@ -434,7 +494,7 @@ func (f *loginFixture) testAdminFirstPasswordLogin(t *testing.T) {
 		t.Fatal(err)
 	}
 	tokens := TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}
-	service := &AdminLoginService{DB: f.pool, Tokens: tokens, Cipher: f.envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: f.cache, Now: func() time.Time { return f.now }}
+	service := &AdminLoginService{DB: f.pool, Tokens: tokens, Cipher: f.envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: f.cache, Security: &testAdminSecurity{}, Now: func() time.Time { return f.now }}
 	result, err := service.Login(ctx, AdminLoginInput{Email: "first-password-admin@example.test", Password: password, TOTPCode: code, IP: "198.51.100.6", DeviceID: "web:1", RequestID: "first-password-login"})
 	if err != nil {
 		t.Fatalf("login: %v", err)
@@ -453,13 +513,30 @@ func (f *loginFixture) testAdminFirstPasswordLogin(t *testing.T) {
 		Cache:       f.cache, IdleTTL: 15 * time.Minute, AbsoluteTTL: 8 * time.Hour,
 		Now: func() time.Time { return f.now },
 	}
-	refreshed, err := refreshService.Refresh(ctx, result.RefreshToken, "198.51.100.6")
+	if _, err := refreshService.RefreshEndpoint(ctx, result.RefreshToken, "198.51.100.6", false); err == nil {
+		t.Fatal("administrator refresh token accepted by public endpoint")
+	}
+	refreshed, err := refreshService.RefreshEndpoint(ctx, result.RefreshToken, "198.51.100.6", true)
 	if err != nil {
 		t.Fatalf("refresh: %v", err)
 	}
 	refreshedIdentity, _, err := tokens.ParseAccess(ctx, refreshed.AccessToken)
 	if err != nil || !refreshedIdentity.PasswordChangeOnly || refreshed.AccessExpiresIn != int64((10*time.Minute)/time.Second) {
 		t.Fatalf("refreshed identity=%+v expires=%d err=%v, want restricted 10-minute access", refreshedIdentity, refreshed.AccessExpiresIn, err)
+	}
+	var sessionID string
+	if err := f.pool.QueryRow(ctx, `SELECT public_id FROM iam.session WHERE admin_user_id=(SELECT id FROM iam.admin_user WHERE public_id=$1)`, adminID).Scan(&sessionID); err != nil {
+		t.Fatal(err)
+	}
+	f.cache.mu.Lock()
+	cacheTTL := f.cache.sessions[sessionID].ttl
+	f.cache.mu.Unlock()
+	if cacheTTL > adminSessionIdleTTL || cacheTTL < adminSessionIdleTTL-time.Second {
+		t.Fatalf("administrator cache ttl=%s, want 15m", cacheTTL)
+	}
+	refreshService.Now = func() time.Time { return f.now.Add(adminSessionIdleTTL + time.Second) }
+	if _, err := refreshService.RefreshEndpoint(ctx, refreshed.RefreshToken, "198.51.100.6", true); err == nil {
+		t.Fatal("administrator session accepted after 15 minutes idle")
 	}
 	protected := gateway.Authenticate(Authenticator{Tokens: tokens}, "")(gateway.Authorize("")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -508,7 +585,7 @@ func (f *loginFixture) testAdminPasswordChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	audit := &stepUpAuditWriter{}
-	service := &AdminPasswordService{DB: f.pool, Cipher: f.envelope, Audit: audit, SessionCache: f.cache, Now: func() time.Time { return f.now }}
+	service := &AdminPasswordService{DB: f.pool, Cipher: f.envelope, Audit: audit, SessionCache: f.cache, Security: &testAdminSecurity{}, Now: func() time.Time { return f.now }}
 	err = service.Change(ctx, AdminPasswordChangeInput{AdminPublicID: adminID, SessionPublicID: currentSession, CurrentPassword: oldPassword, NewPassword: newPassword, TOTPCode: code, IP: "198.51.100.7", RequestID: "admin-password-change"})
 	if err != nil {
 		t.Fatalf("change password: %v", err)

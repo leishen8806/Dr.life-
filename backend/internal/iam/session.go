@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/netip"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 )
@@ -53,6 +55,7 @@ type SessionService struct {
 	AbsoluteTTL time.Duration
 	Metrics     SessionMetrics
 	Alerter     SecurityAlerter
+	Audit       platformaudit.Writer
 	Now         func() time.Time
 }
 
@@ -62,6 +65,8 @@ type DBSessionChecker struct {
 	IdleTTL time.Duration
 	Now     func() time.Time
 }
+
+const adminSessionIdleTTL = 15 * time.Minute
 
 func (c DBSessionChecker) Active(ctx context.Context, accountID, sessionID string) (bool, error) {
 	if c.Cache == nil {
@@ -82,12 +87,16 @@ func (c DBSessionChecker) Active(ctx context.Context, accountID, sessionID strin
 	var epoch int64
 	var expiresAt, lastUsedAt time.Time
 	var status string
+	var admin bool
 	err = c.DB.QueryRow(ctx, `
-		SELECT COALESCE(a.token_epoch,0),COALESCE(a.status,u.status),s.expires_at,s.last_used_at
+		SELECT COALESCE(a.token_epoch,0),COALESCE(a.status,u.status),s.expires_at,s.last_used_at,s.admin_user_id IS NOT NULL
 		FROM iam.session s
 		LEFT JOIN iam.account a ON a.id=s.account_id
 		LEFT JOIN iam.admin_user u ON u.id=s.admin_user_id
-		WHERE s.public_id=$1 AND COALESCE(a.public_id,u.public_id)=$2 AND s.revoked_at IS NULL`, sessionID, accountID).Scan(&epoch, &status, &expiresAt, &lastUsedAt)
+		WHERE s.public_id=$1 AND COALESCE(a.public_id,u.public_id)=$2 AND s.revoked_at IS NULL`, sessionID, accountID).Scan(&epoch, &status, &expiresAt, &lastUsedAt, &admin)
+	if admin {
+		idleTTL = adminSessionIdleTTL
+	}
 	if errors.Is(err, pgx.ErrNoRows) || err == nil && (status != "active" || !now.Before(expiresAt) || !now.Before(lastUsedAt.Add(idleTTL))) {
 		return false, nil
 	}
@@ -112,6 +121,14 @@ type refreshRow struct {
 }
 
 func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (RefreshResult, error) {
+	return s.refresh(ctx, refreshToken, ip, nil)
+}
+
+func (s *SessionService) RefreshEndpoint(ctx context.Context, refreshToken, ip string, adminEndpoint bool) (RefreshResult, error) {
+	return s.refresh(ctx, refreshToken, ip, &adminEndpoint)
+}
+
+func (s *SessionService) refresh(ctx context.Context, refreshToken, ip string, adminEndpoint *bool) (RefreshResult, error) {
 	if s.DB == nil || refreshToken == "" || len(refreshToken) > 512 {
 		return RefreshResult{}, httpx.NewAppError(httpx.CodeUnauthenticated)
 	}
@@ -137,11 +154,15 @@ func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (
 		return RefreshResult{}, httpx.NewAppError(httpx.CodeUnauthenticated)
 	}
 	endpoint := gatewayRole(row.Role)
+	if adminEndpoint != nil && row.Admin != *adminEndpoint {
+		s.metric(endpoint, "endpoint_mismatch")
+		return RefreshResult{}, httpx.NewAppError(httpx.CodeUnauthenticated)
+	}
 	if row.Status != "active" {
 		s.metric(endpoint, "blocked")
 		return RefreshResult{}, httpx.NewAppError(httpx.CodeAccountBlocked)
 	}
-	if !now.Before(row.ExpiresAt) || !now.Before(row.LastUsedAt.Add(s.idleTTL())) {
+	if !now.Before(row.ExpiresAt) || !now.Before(row.LastUsedAt.Add(s.idleTTLFor(row.Admin))) {
 		s.metric(endpoint, "expired")
 		return RefreshResult{}, httpx.NewAppError(httpx.CodeUnauthenticated)
 	}
@@ -158,7 +179,8 @@ func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (
 			s.metric(endpoint, "replayed")
 			return result, nil
 		}
-		if err := s.revokeFamilyForReuse(ctx, tx, row, now); err != nil {
+		outboxID, err := s.revokeFamilyForReuse(ctx, tx, row, now, ip)
+		if err != nil {
 			return RefreshResult{}, httpx.NewAppError(httpx.CodeInternalError)
 		}
 		if err := tx.Commit(ctx); err != nil {
@@ -170,6 +192,7 @@ func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (
 		if s.Alerter != nil {
 			s.Alerter.SessionReuseDetected(ctx, row.AccountPublicID, row.FamilyID)
 		}
+		_ = deliverAdminAudit(ctx, s.DB, s.Audit, outboxID)
 		s.metric(endpoint, "reuse")
 		return RefreshResult{}, httpx.NewAppError(httpx.CodeUnauthenticated)
 	}
@@ -195,7 +218,7 @@ func (s *SessionService) Refresh(ctx context.Context, refreshToken, ip string) (
 		return RefreshResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 	if s.Cache != nil {
-		_ = s.Cache.Put(ctx, row.AccountPublicID, row.PublicID, row.Epoch, cacheTTL(now, row.ExpiresAt, now.Add(s.idleTTL())))
+		_ = s.Cache.Put(ctx, row.AccountPublicID, row.PublicID, row.Epoch, cacheTTL(now, row.ExpiresAt, now.Add(s.idleTTLFor(row.Admin))))
 	}
 	s.metric(endpoint, "success")
 	return RefreshResult{AccessToken: access, AccessExpiresIn: int64(accessTTL / time.Second), RefreshToken: refresh, RefreshExpiresIn: int64(row.ExpiresAt.Sub(now) / time.Second)}, nil
@@ -223,14 +246,14 @@ func (s *SessionService) issueRotatedAccess(ctx context.Context, row refreshRow,
 	return access, s.AdminTokens.AccessTTL, err
 }
 
-func (s *SessionService) revokeFamilyForReuse(ctx context.Context, tx pgx.Tx, row refreshRow, now time.Time) error {
+func (s *SessionService) revokeFamilyForReuse(ctx context.Context, tx pgx.Tx, row refreshRow, now time.Time, ip string) (string, error) {
 	rows, err := tx.Query(ctx, `
 		UPDATE iam.session
 		SET revoked_at=$1,revoked_reason='refresh_reuse',updated_at=$1
 		WHERE family_id=$2 AND revoked_at IS NULL
 		RETURNING public_id,expires_at`, now, row.FamilyID)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer rows.Close()
 	type revokedSession struct {
@@ -241,34 +264,39 @@ func (s *SessionService) revokeFamilyForReuse(ctx context.Context, tx pgx.Tx, ro
 	for rows.Next() {
 		var item revokedSession
 		if err := rows.Scan(&item.publicID, &item.expiresAt); err != nil {
-			return err
+			return "", err
 		}
 		revoked = append(revoked, item)
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return "", err
 	}
 	if s.Cache != nil {
 		for _, item := range revoked {
 			if err := s.Cache.Revoke(ctx, item.publicID, positiveTTL(now, item.expiresAt)); err != nil {
-				return err
+				return "", err
 			}
 		}
 	}
 	if !row.Admin {
 		if _, err := tx.Exec(ctx, `UPDATE iam.account SET token_epoch=token_epoch+1,updated_at=$1 WHERE id=$2`, now, row.AccountID); err != nil {
-			return err
+			return "", err
 		}
 	}
 	if row.Admin {
-		return nil
+		detail, _ := json.Marshal(map[string]string{"result": "failed", "reason": "refresh_reuse"})
+		requestID := httpx.RequestIDFromContext(ctx)
+		if requestID == "" {
+			requestID = "refresh-reuse-" + row.PublicID
+		}
+		return queueAdminAudit(ctx, tx, platformaudit.Entry{Time: now, ActorID: row.AccountID, ActorRole: "admin", Action: platformaudit.ActionLogin, Target: "admin:" + row.AccountPublicID, Detail: detail, IP: ip, RequestID: requestID})
 	}
 	publicID, err := ids.NewULID()
 	if err != nil {
-		return err
+		return "", err
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO iam.security_event(public_id,account_id,session_family_id,event,reason) VALUES($1,$2,$3,'refresh_reuse','token_reused_outside_grace')`, publicID, row.AccountID, row.FamilyID)
-	return err
+	return "", err
 }
 
 func (s *SessionService) ListSessions(ctx context.Context, accountID string) ([]SessionInfo, error) {
@@ -382,6 +410,12 @@ func (s *SessionService) idleTTL() time.Duration {
 		return s.IdleTTL
 	}
 	return 24 * time.Hour
+}
+func (s *SessionService) idleTTLFor(admin bool) time.Duration {
+	if admin {
+		return adminSessionIdleTTL
+	}
+	return s.idleTTL()
 }
 func (s *SessionService) absoluteTTL() time.Duration {
 	if s.AbsoluteTTL > 0 {

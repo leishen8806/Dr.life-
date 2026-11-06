@@ -43,7 +43,7 @@ type AdminLogin interface {
 }
 
 type AdminStepUp interface {
-	Issue(context.Context, string, string, string, string, string) (iam.AdminStepUpResult, error)
+	Issue(context.Context, string, string, string, string, string, string) (iam.AdminStepUpResult, error)
 }
 
 type AdminPassword interface {
@@ -52,6 +52,7 @@ type AdminPassword interface {
 
 type SessionManagement interface {
 	Refresh(context.Context, string, string) (iam.RefreshResult, error)
+	RefreshEndpoint(context.Context, string, string, bool) (iam.RefreshResult, error)
 	ListSessions(context.Context, string) ([]iam.SessionInfo, error)
 	RevokeSession(context.Context, string, string, string) error
 }
@@ -676,7 +677,7 @@ func (h Handler) PostAdminAuthRefresh(w http.ResponseWriter, r *http.Request, _ 
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
 		return
 	}
-	result, err := h.Sessions.Refresh(r.Context(), cookie.Value, h.ClientIP.Resolve(r))
+	result, err := h.Sessions.RefreshEndpoint(r.Context(), cookie.Value, h.ClientIP.Resolve(r), true)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -693,9 +694,12 @@ func (h Handler) PostAdminAuthStepUp(w http.ResponseWriter, r *http.Request) {
 	}
 	body, valid := decodeJSON[adminStepUpRequest](w, r)
 	if !valid || body.TOTPCode == "" || body.Scope == "" {
+		if valid {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
 		return
 	}
-	result, err := h.AdminStepUp.Issue(r.Context(), identity.AccountID, body.TOTPCode, body.Scope, h.ClientIP.Resolve(r), httpx.RequestIDFromContext(r.Context()))
+	result, err := h.AdminStepUp.Issue(r.Context(), identity.AccountID, identity.SessionID, body.TOTPCode, body.Scope, h.ClientIP.Resolve(r), httpx.RequestIDFromContext(r.Context()))
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -744,7 +748,7 @@ func (h Handler) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	result, err := h.Sessions.Refresh(r.Context(), body.RefreshToken, h.ClientIP.Resolve(r))
+	result, err := h.Sessions.RefreshEndpoint(r.Context(), body.RefreshToken, h.ClientIP.Resolve(r), false)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return

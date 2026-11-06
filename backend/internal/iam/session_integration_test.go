@@ -19,6 +19,7 @@ type cachedTestSession struct {
 	account string
 	epoch   int64
 	revoked bool
+	ttl     time.Duration
 }
 
 type testSessionCache struct {
@@ -42,7 +43,7 @@ func (c *testSessionCache) Get(_ context.Context, accountID, sessionID string) (
 	item, ok := c.sessions[sessionID]
 	return ok && !item.revoked && item.account == accountID && item.epoch == c.epochs[accountID], ok, nil
 }
-func (c *testSessionCache) Put(_ context.Context, accountID, sessionID string, epoch int64, _ time.Duration) error {
+func (c *testSessionCache) Put(_ context.Context, accountID, sessionID string, epoch int64, ttl time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.unavailable {
@@ -51,7 +52,7 @@ func (c *testSessionCache) Put(_ context.Context, accountID, sessionID string, e
 	if c.epochs[accountID] <= epoch {
 		c.epochs[accountID] = epoch
 	}
-	c.sessions[sessionID] = cachedTestSession{account: accountID, epoch: epoch}
+	c.sessions[sessionID] = cachedTestSession{account: accountID, epoch: epoch, ttl: ttl}
 	return nil
 }
 func (c *testSessionCache) Revoke(_ context.Context, sessionID string, _ time.Duration) error {
@@ -102,6 +103,9 @@ func (f *loginFixture) testSessionLifecycle(t *testing.T) {
 	}
 	metrics, alert := &testSessionMetrics{}, &testAlerter{}
 	sessions := &SessionService{DB: f.pool, Tokens: f.service.Tokens, Cache: f.cache, Grace: 10 * time.Second, IdleTTL: 24 * time.Hour, AbsoluteTTL: 7 * 24 * time.Hour, Metrics: metrics, Alerter: alert, Now: func() time.Time { return f.now }}
+	if _, err := sessions.RefreshEndpoint(ctx, login.RefreshToken, "203.0.113.43", true); err == nil {
+		t.Fatal("buyer refresh token accepted by administrator endpoint")
+	}
 
 	const count = 50
 	results := make(chan RefreshResult, count)

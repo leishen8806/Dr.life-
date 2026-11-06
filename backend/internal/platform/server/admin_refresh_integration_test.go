@@ -35,6 +35,27 @@ type memorySessionCache struct {
 	entries map[string]bool
 }
 
+type serverAdminSecurity struct {
+	mu   sync.Mutex
+	used map[int64]bool
+}
+
+func (*serverAdminSecurity) Locked(context.Context, string, string) (bool, error) { return false, nil }
+func (*serverAdminSecurity) RecordFailure(context.Context, string, string) error  { return nil }
+func (*serverAdminSecurity) ClearFailures(context.Context, string, string) error  { return nil }
+func (s *serverAdminSecurity) ConsumeTOTP(_ context.Context, _ string, step int64, _ time.Duration) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.used == nil {
+		s.used = make(map[int64]bool)
+	}
+	if s.used[step] {
+		return false, nil
+	}
+	s.used[step] = true
+	return true, nil
+}
+
 func (c *memorySessionCache) Get(_ context.Context, _, sessionID string) (bool, bool, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -115,7 +136,7 @@ func TestRestrictedAdminRefreshHTTPAndReplayRemainRestricted(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status,password_change_required) VALUES($1,'Restricted Admin','restricted-admin@example.com',$2,$3,'super','active',true)`, adminID, hash, secretEnc); err != nil {
 		t.Fatal(err)
 	}
-	login := &iam.AdminLoginService{DB: pool, Tokens: tokens, Cipher: cipher, RefreshTTL: time.Hour, IdleTTL: 15 * time.Minute, SessionCache: cache, Now: func() time.Time { return now }}
+	login := &iam.AdminLoginService{DB: pool, Tokens: tokens, Cipher: cipher, RefreshTTL: time.Hour, IdleTTL: 15 * time.Minute, SessionCache: cache, Security: &serverAdminSecurity{}, Now: func() time.Time { return now }}
 	sessions := &iam.SessionService{DB: pool, Tokens: iam.TokenManager{Keys: jwtKeys, AccessTTL: 15 * time.Minute, Now: func() time.Time { return now }}, AdminTokens: tokens, Cache: cache, Grace: time.Minute, IdleTTL: 15 * time.Minute, AbsoluteTTL: time.Hour, Now: func() time.Time { return now }}
 	tokens.Checker = iam.DBSessionChecker{DB: pool, Cache: cache, IdleTTL: 15 * time.Minute, Now: func() time.Time { return now }}
 	rule := gateway.Rule{Limit: 1000, Window: time.Minute}
@@ -264,7 +285,7 @@ func TestAdminRefreshReuseRevokesCachedAccessToken(t *testing.T) {
 	if _, err := pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status,password_change_required) VALUES($1,'Active Admin','active-admin@example.com',$2,$3,'super','active',false)`, adminID, hash, secretEnc); err != nil {
 		t.Fatal(err)
 	}
-	login := &iam.AdminLoginService{DB: pool, Tokens: tokens, Cipher: cipher, RefreshTTL: time.Hour, IdleTTL: 15 * time.Minute, SessionCache: cache, Now: func() time.Time { return now }}
+	login := &iam.AdminLoginService{DB: pool, Tokens: tokens, Cipher: cipher, RefreshTTL: time.Hour, IdleTTL: 15 * time.Minute, SessionCache: cache, Security: &serverAdminSecurity{}, Now: func() time.Time { return now }}
 	sessions := &iam.SessionService{DB: pool, Tokens: iam.TokenManager{Keys: jwtKeys, AccessTTL: 15 * time.Minute, Now: func() time.Time { return now }}, AdminTokens: tokens, Cache: cache, Grace: time.Minute, IdleTTL: 15 * time.Minute, AbsoluteTTL: time.Hour, Now: func() time.Time { return now }}
 	tokens.Checker = iam.DBSessionChecker{DB: pool, Cache: cache, IdleTTL: 15 * time.Minute, Now: func() time.Time { return now }}
 	rule := gateway.Rule{Limit: 1000, Window: time.Minute}

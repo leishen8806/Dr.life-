@@ -69,7 +69,7 @@ func TestIAMMigration(t *testing.T) {
 	}
 
 	t.Run("up down up is reversible", func(t *testing.T) {
-		assertIAMTableCount(t, database, 18)
+		assertIAMTableCount(t, database, 19)
 		if err := goose.DownTo(database, migrationsDir, 2); err != nil {
 			t.Fatal(err)
 		}
@@ -77,7 +77,7 @@ func TestIAMMigration(t *testing.T) {
 		if err := goose.Up(database, migrationsDir); err != nil {
 			t.Fatal(err)
 		}
-		assertIAMTableCount(t, database, 18)
+		assertIAMTableCount(t, database, 19)
 	})
 
 	admin, err := pgx.Connect(ctx, dsn)
@@ -96,7 +96,7 @@ func TestIAMMigration(t *testing.T) {
 			FROM information_schema.columns c WHERE c.table_schema = 'iam'`).Scan(&identityCount, &publicIDCount, &badTimestamp); err != nil {
 			t.Fatal(err)
 		}
-		if identityCount != 15 || publicIDCount != 15 || badTimestamp != 0 {
+		if identityCount != 16 || publicIDCount != 16 || badTimestamp != 0 {
 			t.Fatalf("identity columns=%d, public IDs=%d, bad timestamps=%d", identityCount, publicIDCount, badTimestamp)
 		}
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.person (public_id, tg_user_id) VALUES ('bad-ulid', 1)`)
