@@ -1,4 +1,4 @@
-import type { Product, ProductTier } from "./types";
+import type { LocalizedText, Product, ProductTier } from "./types";
 import { compareQuantity, sortedTiers } from "./money";
 
 const quantityScale = 10_000n;
@@ -9,7 +9,8 @@ export interface CartItem {
   product: Product;
   quantity: string;
   availableQuantity: string;
-  merchantKey: "china" | "local";
+  merchantId: string;
+  merchantName: LocalizedText;
 }
 
 export interface CartUpdate {
@@ -48,7 +49,10 @@ export function lineUnitPrice(item: CartItem): number {
 export function lineTotalE4(item: CartItem): bigint {
   const units = quantityUnits(item.quantity);
   if (units === undefined) return 0n;
-  return (BigInt(lineUnitPrice(item)) * units) / quantityScale;
+  const rawE4 = (BigInt(lineUnitPrice(item)) * units) / quantityScale;
+  // Cart totals are estimates until the server prices the order. Keep mock values
+  // on whole cents (e4 % 100 === 0); #139 remains the source of truth.
+  return rawE4 - (rawE4 % 100n);
 }
 
 export function cartTotalE4(cart: readonly CartItem[]): bigint {
@@ -62,7 +66,8 @@ export function cartCount(cart: readonly CartItem[]): string {
 export function addProduct(
   cart: readonly CartItem[],
   product: Product,
-  availableQuantity = "100"
+  availableQuantity = "100",
+  merchant: { id: string; name: LocalizedText } = mockMerchantFor(product)
 ): CartUpdate {
   const minimum = sortedTiers(product.tiers)[0]?.min_qty ?? "0";
   const existing = cart.find((item) => item.product.public_id === product.public_id);
@@ -79,7 +84,8 @@ export function addProduct(
           product,
           quantity: minimum,
           availableQuantity,
-          merchantKey: product.origin === "cn" ? "china" : "local"
+          merchantId: merchant.id,
+          merchantName: merchant.name
         }
       ]
     };
@@ -90,8 +96,15 @@ export function addProduct(
     product.public_id,
     nextQuantity,
     existing?.availableQuantity ?? availableQuantity,
-    existing?.merchantKey ?? (product.origin === "cn" ? "china" : "local")
+    existing?.merchantId,
+    existing?.merchantName
   );
+}
+
+function mockMerchantFor(product: Product): { id: string; name: LocalizedText } {
+  return product.origin === "cn"
+    ? { id: "merchant-cn-demo", name: { zh: "中国供应商", en: "China supplier", km: "អ្នកផ្គត់ផ្គង់ចិន" } }
+    : { id: "merchant-local-demo", name: { zh: "本地供应商", en: "Local supplier", km: "អ្នកផ្គត់ផ្គង់ក្នុងស្រុក" } };
 }
 
 export function updateQuantity(
@@ -99,7 +112,8 @@ export function updateQuantity(
   publicId: string,
   quantity: string,
   availableQuantity?: string,
-  merchantKey?: CartItem["merchantKey"]
+  merchantId?: string,
+  merchantName?: LocalizedText
 ): CartUpdate {
   const item = cart.find((entry) => entry.product.public_id === publicId);
   if (!item) return { cart: [...cart], error: "invalidQuantity" };
@@ -117,7 +131,8 @@ export function updateQuantity(
             ...entry,
             quantity: displayQuantity(next),
             availableQuantity: availableQuantity ?? entry.availableQuantity,
-            merchantKey: merchantKey ?? entry.merchantKey
+            merchantId: merchantId ?? entry.merchantId,
+            merchantName: merchantName ?? entry.merchantName
           }
         : entry
     )

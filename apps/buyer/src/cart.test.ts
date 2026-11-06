@@ -39,13 +39,20 @@ describe("buyer cart pricing and quantity guards", () => {
     const result = addProduct([], product);
     expect(result.error).toBeUndefined();
     expect(result.cart[0]?.quantity).toBe("1");
-    expect(result.cart[0]?.merchantKey).toBe("china");
+    expect(result.cart[0]?.merchantId).toBe("merchant-cn-demo");
     expect(lineTotalE4(result.cart[0]!)).toBe(95_000n);
 
     const hundred = updateQuantity(result.cart, product.public_id, "100");
     expect(lineTotalE4(hundred.cart[0]!)).toBe(8_800_000n);
     expect(cartTotalE4(hundred.cart)).toBe(8_800_000n);
     expect(cartCount(hundred.cart)).toBe("100");
+  });
+
+  it("keeps fractional quantity estimates on whole cents", () => {
+    const result = addProduct([], product);
+    const fractional = updateQuantity(result.cart, product.public_id, "1.5");
+    expect(lineTotalE4(fractional.cart[0]!)).toBe(142_500n);
+    expect(lineTotalE4(fractional.cart[0]!) % 100n).toBe(0n);
   });
 
   it("removes at quantity zero and rejects below MOQ or over available", () => {

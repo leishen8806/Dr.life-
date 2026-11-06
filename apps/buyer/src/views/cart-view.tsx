@@ -6,10 +6,11 @@ import { formatPriceE4 } from "../money";
 import type { LocaleProps } from "./common";
 
 function groupItems(items: readonly CartItem[]) {
-  return ["china", "local"]
-    .map((merchantKey) => ({
-      merchantKey: merchantKey as CartItem["merchantKey"],
-      items: items.filter((item) => item.merchantKey === merchantKey)
+  return [...new Set(items.map((item) => item.merchantId))]
+    .map((merchantId) => ({
+      merchantId,
+      merchantName: items.find((item) => item.merchantId === merchantId)!.merchantName,
+      items: items.filter((item) => item.merchantId === merchantId)
     }))
     .filter((group) => group.items.length > 0);
 }
@@ -58,10 +59,9 @@ export function CartView({
             {error && <p className="buyer-cart-error" role="alert">{errorLabel(t, error)}</p>}
             {groups.map((group) => {
               const subtotal = group.items.reduce((total, item) => total + lineTotalE4(item), 0n);
-              const merchantLabel = group.merchantKey === "china" ? t("mall.cartMerchantCn") : t("mall.cartMerchantLocal");
               return (
-                <Card key={group.merchantKey}>
-                  <h2 className="buyer-section__title">{merchantLabel}</h2>
+                <Card key={group.merchantId}>
+                  <h2 className="buyer-section__title">{localized(group.merchantName, language)}</h2>
                   <div className="buyer-cart-lines">
                     {group.items.map((item) => (
                       <article className="buyer-cart-line" key={item.product.public_id}>
@@ -96,7 +96,7 @@ export function CartView({
             })}
             <Card>
               <p className="buyer-cart-total"><span>{t("mall.cartTotal")}</span><strong>{formatPriceE4(cartTotalE4(items))}</strong></p>
-              <p className="buyer-cart-note">{t("mall.cartMockNote")}</p>
+              <p className="buyer-cart-note">{t("mall.cartEstimateNote")}</p>
               <button type="button" className="buyer-cart-primary" disabled>{t("mall.cartPlaceOrder")}</button>
             </Card>
           </>
