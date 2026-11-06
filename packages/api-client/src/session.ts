@@ -12,6 +12,21 @@ import {
 type ApiClient = ReturnType<typeof createApiClient>;
 type AuthData = components["schemas"]["TelegramAuthData"];
 type ProfileData = components["schemas"]["AccountProfileData"];
+export type ConsentKind = components["schemas"]["ConsentKind"];
+
+export interface ConsentStatus {
+  kind: ConsentKind;
+  version: string;
+  accepted: boolean;
+  needsReaccept: boolean;
+}
+
+export interface LegalDocument {
+  kind: ConsentKind;
+  version: string;
+  effectiveAt: string;
+  body: components["schemas"]["LocalizedText"];
+}
 
 /** The Mini App ends that sign in with Telegram initData; the role is part of the path. */
 export type SessionEnd = "buyer" | "merchant" | "driver";
@@ -23,6 +38,7 @@ export interface SessionAccount {
   lang: Language | null;
   status: "active" | "frozen" | "disabled";
   needsLanguage: boolean;
+  needsConsent: boolean;
 }
 
 export interface TelegramSessionOptions
@@ -41,6 +57,9 @@ export interface TelegramSession {
   login(): Promise<SessionAccount>;
   /** First-time language registration: the server stores one language per account. */
   registerLanguage(language: Language): Promise<SessionAccount>;
+  getConsentState(): Promise<ConsentStatus[]>;
+  getLegalDocuments(): Promise<LegalDocument[]>;
+  acceptConsent(kind: ConsentKind, version: string): Promise<SessionAccount>;
 }
 
 /** A success envelope is mandatory; a missing one means something other than our API answered. */
@@ -49,23 +68,25 @@ function required<T>(data: T | undefined): T {
   return data;
 }
 
-function fromAuth(data: AuthData): SessionAccount {
+function fromAuth(data: AuthData, needsConsent = false): SessionAccount {
   return {
     publicId: data.account.public_id,
     role: data.account.role,
     lang: data.account.lang ?? null,
     status: data.account.status,
-    needsLanguage: data.needs_language
+    needsLanguage: data.needs_language,
+    needsConsent
   };
 }
 
-function fromProfile(data: ProfileData): SessionAccount {
+function fromProfile(data: ProfileData, needsConsent = false): SessionAccount {
   return {
     publicId: data.public_id,
     role: data.role,
     lang: data.lang ?? null,
     status: data.status,
-    needsLanguage: data.needs_language
+    needsLanguage: data.needs_language,
+    needsConsent
   };
 }
 
@@ -85,6 +106,12 @@ function postLogout(client: ApiClient, end: SessionEnd) {
   if (end === "merchant")
     return client.POST("/v1/merchant/auth/logout", { params });
   return client.POST("/v1/driver/auth/logout", { params });
+}
+
+function consentPath(end: SessionEnd) {
+  if (end === "buyer") return "/v1/buyer/me/consents" as const;
+  if (end === "merchant") return "/v1/merchant/me/consents" as const;
+  return "/v1/driver/me/consents" as const;
 }
 
 /**
@@ -110,6 +137,7 @@ export function createTelegramSession(
     resilience: { retry: { maxAttempts: 1 } }
   });
   let account: SessionAccount | undefined;
+  let consentItems: ConsentStatus[] = [];
 
   const provider: AuthProvider = {
     async login() {
@@ -144,17 +172,61 @@ export function createTelegramSession(
 
   const store = createTokenStore(provider);
   const client = createApiClient({ ...shared, auth: { store } });
+  const getConsentState = async () => {
+    const { data } = await client.GET(consentPath(options.end));
+    const payload = required(data);
+    const state = required(payload.data);
+    consentItems = state.items.map((item) => ({
+      kind: item.kind,
+      version: item.version,
+      accepted: item.accepted,
+      needsReaccept: item.needs_reaccept
+    }));
+    return consentItems;
+  };
 
   return {
     client,
     store,
     async login() {
       await store.login();
-      return required(account);
+      consentItems = await getConsentState();
+      account = { ...required(account), needsConsent: consentItems.some((item) => item.needsReaccept) };
+      return account;
     },
     async registerLanguage(language) {
       const { data } = await putLanguage(client, options.end, language);
-      account = fromProfile(required(data).data);
+      account = fromProfile(required(data).data, consentItems.some((item) => item.needsReaccept));
+      return account;
+    },
+    async getConsentState() {
+      return getConsentState();
+    },
+    async getLegalDocuments() {
+      const documents = await Promise.all(
+        (["privacy", "terms"] as const).map(async (kind) => {
+          const { data } = await client.GET("/v1/public/legal/{kind}", {
+            params: { path: { kind } }
+          });
+          const document = required(required(data).data);
+          return {
+            kind: document.kind,
+            version: document.version,
+            effectiveAt: document.effective_at,
+            body: document.body
+          };
+        })
+      );
+      return documents;
+    },
+    async acceptConsent(kind, version) {
+      const { data } = await client.POST(consentPath(options.end), {
+        params: { header: withIdempotencyKey() },
+        body: { kind, version }
+      });
+      required(data);
+      consentItems = await getConsentState();
+      account = { ...required(account), needsConsent: consentItems.some((item) => item.needsReaccept) };
       return account;
     }
   };

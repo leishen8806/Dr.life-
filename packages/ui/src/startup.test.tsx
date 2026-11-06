@@ -60,6 +60,7 @@ const account = (patch: Partial<StartupAccount> = {}): StartupAccount => ({
   lang: "en",
   status: "active",
   needsLanguage: false,
+  needsConsent: false,
   ...patch
 });
 
@@ -117,6 +118,7 @@ describe("startup phases", () => {
       name: "ready",
       account: account({ lang: "km" })
     });
+    expect(accountPhase(account({ needsConsent: true }))).toEqual({ name: "consent" });
   });
 
   it("counts the lockout down to zero and no further", () => {
