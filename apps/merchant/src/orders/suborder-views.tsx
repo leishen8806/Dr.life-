@@ -30,12 +30,12 @@ export function SuborderListView({
   return (
     <>
       <div className="merchant-order-filters">
-        <button type="button" aria-pressed={selected === undefined} onClick={() => onSelectStatus()}>{translate("order.all")}</button>
+        <button type="button" aria-pressed={selected === undefined} onClick={() => onSelectStatus()}>{translate("order.merchant.all")}</button>
         {suborderStatuses.map((status) => (
           <button key={status} type="button" aria-pressed={selected === status} onClick={() => onSelectStatus(status)}>{translate(statusKey(status))}</button>
         ))}
       </div>
-      {orders.length === 0 ? <EmptyState title={translate("order.listEmpty")} /> : (
+      {orders.length === 0 ? <EmptyState title={translate("order.merchant.listEmpty")} /> : (
         <Card>
           <ul className="merchant-orders">
             {orders.map((order) => (
@@ -64,15 +64,15 @@ export function SuborderDetailView({ order, language, translate, onBack }: { ord
       <Card>
         <div className="merchant-order-detail__heading"><h2>{order.publicId}</h2><StatusTag tone="neutral">{translate(statusKey(order.status))}</StatusTag></div>
         <p>{translate("order.buyer")}: {order.buyerName[language]}</p>
-        <p>{translate("order.delivery")}: {translate(`order.merchantStatus.${order.fulfillmentStatus}` as TranslationKey)}</p>
+        <p>{translate("order.merchant.delivery")}: {translate(`order.merchantStatus.${order.status}` as TranslationKey)}</p>
       </Card>
       <Card>
-        <h2>{translate("order.itemsTitle")}</h2>
+        <h2>{translate("order.merchant.itemsTitle")}</h2>
         <div className="merchant-order-line">
           <span lang={language}>{order.productName[language]} · {order.quantity} {order.unit} × {formatPriceE4(order.unitPriceE4)}</span>
           <strong>{formatPriceE4(order.totalE4)}</strong>
         </div>
-        <p className="merchant-order-total"><span>{translate("order.total")}</span><strong>{formatPriceE4(order.totalE4)}</strong></p>
+        <p className="merchant-order-total"><span>{translate("order.merchant.total")}</span><strong>{formatPriceE4(order.totalE4)}</strong></p>
       </Card>
     </>
   );
