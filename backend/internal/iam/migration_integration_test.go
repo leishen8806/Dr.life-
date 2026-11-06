@@ -245,6 +245,11 @@ func TestIAMMigration(t *testing.T) {
 		if count != 11 {
 			t.Fatalf("sensitive bytea column count=%d, want 11", count)
 		}
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FC0','Session Owner','session-owner@example.test','hash','ops')`); err != nil {
+			t.Fatal(err)
+		}
+		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.session (public_id,account_id,admin_user_id,family_id,refresh_token_hash,expires_at) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FC1',a.id,u.id,'01ARZ3NDEKTSV4RRFFQ69G5FC1','\x01',now()+interval '1 hour' FROM iam.account a,iam.admin_user u WHERE a.public_id='`+buyerPublicID+`' AND u.email='session-owner@example.test'`)
+		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.session (public_id,account_id,admin_user_id,family_id,refresh_token_hash,expires_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FC2',NULL,NULL,'01ARZ3NDEKTSV4RRFFQ69G5FC2','\x02',now()+interval '1 hour')`)
 	})
 
 	t.Run("administrators default to no forced password change", func(t *testing.T) {
