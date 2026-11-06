@@ -92,14 +92,15 @@
 | `buyer_order` | id, public_id, buyer_account_id, total_e4；一个买家一次提交产生一个父订单，金额等于其子订单金额之和 |
 | `merchant_order` | id, public_id, buyer_order_id, merchant_id, external_order_id=`DRL-<public_id>`, status, total_e4, version；每个子订单只属于一个商家，`UNIQUE(buyer_order_id, merchant_id)` |
 | `order_line` | merchant_order_id, sku_public_id, quantity, unit_price_e4, line_total_e4；SKU 与单价均为下单快照，`line_total_e4=quantity*unit_price_e4` |
-| `order_event` | merchant_order_id, from_status, to_status, source_type (`kess_result/routefit_event/system`), source_ref, created_at；来源组合唯一、只追加，禁止 UPDATE/DELETE |
-
-子订单主线状态为 `awaiting_payment → paid → submitted → accepted → in_fulfillment → shipped → delivered_verified → settled`；本阶段还允许 `awaiting_payment → cancelled` 与 `submitted → rejected`。`rejected/cancelled/delivery_failed/returning/returned/exception` 为旁路状态，其他迁移由后续任务实现。以上模型取代旧 `order` 的 `unpaid/paid_proof/shipped/arrived/closed/problem/cancelled` 状态和 `order_item`；线下 `payment_proof` 已取消，不再作为订单领域模型。
+| `order_event_source` | buyer_order_id, source_type (`kess_result/routefit_event/system`), source_ref；来源引用全局唯一并绑定一个买家订单，同一来源可推进该父订单下的多个子订单 |
+| `order_event` | merchant_order_id, buyer_order_id, from_status, to_status, source_type, source_ref, created_at；来源必须已登记且属于同一买家订单；子订单内来源组合唯一、只追加，禁止 UPDATE/DELETE/TRUNCATE |
 | `rfq` | id, buyer_account_id, name, area/loc, category_id, qty_text, budget_e4, due_date, target_merchant_id, status |
 | `quote` | id, rfq_id, merchant_id, price_e4, lead_days, valid_until, note, selected boolean；`UNIQUE(rfq_id,merchant_id)` |
 | `project` | id, buyer_account_id, company_merchant_id, name, area, budget_e4, status |
 | `pay_plan` / `pay_plan_batch` | plan: id, project_id, total_e4, status；batch: id, plan_id, seq, payee_merchant_id, amount_e4, condition, status (`planned/frozen/released/disputed/refunded`), freeze_txn_id, release_txn_id；**`SUM(batch.amount)=plan.total`（应用层 + 触发器）** |
 | `after_sale` | id, order_id, kind (`refund/return/damage`), status, initiator, decided_by, amount_e4, ledger_txn_id |
+
+子订单主线状态为 `awaiting_payment → paid → submitted → accepted → in_fulfillment → shipped → delivered_verified → settled`；本阶段还允许 `awaiting_payment → cancelled` 与 `submitted → rejected`。`rejected/cancelled/delivery_failed/returning/returned/exception` 为旁路状态，其他迁移由后续任务实现。以上模型取代旧 `order` 的 `unpaid/paid_proof/shipped/arrived/closed/problem/cancelled` 状态和 `order_item`；线下 `payment_proof` 已取消，不再作为订单领域模型。父订单金额由延迟约束校验为子订单金额之和，子订单金额同样校验为订单行金额之和。
 
 ### `wms`
 | 表 | 关键字段与约束 |

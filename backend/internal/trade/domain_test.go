@@ -26,10 +26,23 @@ func TestAdvanceOnlyAllowsContractTransitionsAndRequiresSource(t *testing.T) {
 	if _, err := Advance(AwaitingPayment, Paid, EventSource{}); !errors.Is(err, ErrEventSourceRequired) {
 		t.Fatalf("missing source error=%v", err)
 	}
-	if _, err := Advance(AwaitingPayment, Submitted, EventSource{Type: SourceSystem, Reference: "job-1"}); !errors.Is(err, ErrInvalidTransition) {
-		t.Fatalf("skipped state error=%v", err)
+	statuses := []OrderStatus{AwaitingPayment, Paid, Submitted, Accepted, InFulfillment, Shipped, DeliveredVerified, Settled, Rejected, Cancelled, DeliveryFailed, Returning, Returned, Exception}
+	allowed := map[[2]OrderStatus]bool{
+		{AwaitingPayment, Paid}: true, {AwaitingPayment, Cancelled}: true,
+		{Paid, Submitted}: true, {Submitted, Accepted}: true, {Submitted, Rejected}: true,
+		{Accepted, InFulfillment}: true, {InFulfillment, Shipped}: true,
+		{Shipped, DeliveredVerified}: true, {DeliveredVerified, Settled}: true,
 	}
-	if got, err := Advance(AwaitingPayment, Paid, EventSource{Type: SourceKESSResult, Reference: "kess-1"}); err != nil || got != Paid {
-		t.Fatalf("Advance()=%q,%v", got, err)
+	for _, from := range statuses {
+		for _, to := range statuses {
+			got, err := Advance(from, to, EventSource{Type: SourceSystem, Reference: "job-1"})
+			if allowed[[2]OrderStatus{from, to}] {
+				if err != nil || got != to {
+					t.Fatalf("Advance(%q,%q)=%q,%v", from, to, got, err)
+				}
+			} else if !errors.Is(err, ErrInvalidTransition) {
+				t.Fatalf("Advance(%q,%q) error=%v, want ErrInvalidTransition", from, to, err)
+			}
+		}
 	}
 }

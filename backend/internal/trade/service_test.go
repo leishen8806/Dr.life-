@@ -3,6 +3,7 @@ package trade
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"testing"
 )
 
@@ -70,6 +71,44 @@ func TestPlaceOrderSplitsByMerchantAndReserves(t *testing.T) {
 	}
 	if order.TotalE4 != 70 || len(order.Children) != 2 || availability.reserved["A"] != 2 {
 		t.Fatalf("order=%+v reserved=%v", order, availability.reserved)
+	}
+	var childTotal, lineTotal int64
+	for _, child := range order.Children {
+		childTotal += child.TotalE4
+		for _, line := range child.Lines {
+			lineTotal += line.LineTotalE4
+		}
+	}
+	if childTotal != order.TotalE4 || lineTotal != order.TotalE4 {
+		t.Fatalf("parent=%d children=%d lines=%d", order.TotalE4, childTotal, lineTotal)
+	}
+}
+
+func TestPlaceOrderAmountSumsForVariedLineCounts(t *testing.T) {
+	random := rand.New(rand.NewSource(1))
+	for attempt := 0; attempt < 100; attempt++ {
+		lineCount := 1 + random.Intn(50)
+		lines := make([]OrderLineInput, 0, lineCount)
+		availability := &stubAvailability{available: map[string]int64{}, reserved: map[string]int64{}}
+		for i := 0; i < lineCount; i++ {
+			sku := string(rune('A' + i))
+			availability.available[sku] = 100
+			lines = append(lines, OrderLineInput{SKUPublicID: sku, MerchantID: int64(1 + random.Intn(5)), Quantity: int64(1 + random.Intn(10)), Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: int64(random.Intn(1000))}}})
+		}
+		order, err := NewService(&stubOrders{}, stubAccounts{status: "active"}, availability).Place(context.Background(), 1, lines)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var childTotal, lineTotal int64
+		for _, child := range order.Children {
+			childTotal += child.TotalE4
+			for _, line := range child.Lines {
+				lineTotal += line.LineTotalE4
+			}
+		}
+		if childTotal != order.TotalE4 || lineTotal != order.TotalE4 {
+			t.Fatalf("attempt=%d parent=%d children=%d lines=%d", attempt, order.TotalE4, childTotal, lineTotal)
+		}
 	}
 }
 func TestPlaceOrderRejectsFrozenAndInsufficientWithoutWriting(t *testing.T) {

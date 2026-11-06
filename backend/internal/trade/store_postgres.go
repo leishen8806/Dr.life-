@@ -79,8 +79,8 @@ func (s *PostgresStore) Create(ctx context.Context, order CreateOrder) error {
 	return tx.Commit(ctx)
 }
 
-// Advance locks the suborder, validates the domain transition, and uses the
-// source-key uniqueness constraint as the idempotency boundary.
+// Advance locks the suborder and binds each external source reference to one
+// buyer order before recording the transition.
 func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from, to OrderStatus, source EventSource) (bool, error) {
 	if _, err := Advance(from, to, source); err != nil {
 		return false, err
@@ -91,28 +91,36 @@ func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	var current string
-	if err := tx.QueryRow(ctx, `SELECT status FROM trade.merchant_order WHERE id=$1 FOR UPDATE`, merchantOrderID).Scan(&current); err != nil {
+	var buyerOrderID int64
+	if err := tx.QueryRow(ctx, `SELECT status,buyer_order_id FROM trade.merchant_order WHERE id=$1 FOR UPDATE`, merchantOrderID).Scan(&current, &buyerOrderID); err != nil {
 		return false, err
 	}
-	if OrderStatus(current) != from {
-		// A concurrent/retried delivery of the identical source event is an
-		// idempotent no-op even though the first delivery already advanced the
-		// state. Check only this order's source-key inside the row lock.
-		var seen bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM trade.order_event WHERE merchant_order_id=$1 AND source_type=$2 AND source_ref=$3)`, merchantOrderID, string(source.Type), source.Reference).Scan(&seen); err != nil {
-			return false, err
-		}
-		if seen {
+	var seenFrom, seenTo string
+	err = tx.QueryRow(ctx, `SELECT from_status,to_status FROM trade.order_event WHERE merchant_order_id=$1 AND source_type=$2 AND source_ref=$3`, merchantOrderID, string(source.Type), source.Reference).Scan(&seenFrom, &seenTo)
+	if err == nil {
+		if OrderStatus(seenFrom) == from && OrderStatus(seenTo) == to {
 			return false, tx.Commit(ctx)
 		}
 		return false, ErrInvalidTransition
 	}
-	ct, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,from_status,to_status,source_type,source_ref) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (merchant_order_id,source_type,source_ref) DO NOTHING`, merchantOrderID, string(from), string(to), string(source.Type), source.Reference)
-	if err != nil {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		return false, err
 	}
-	if ct.RowsAffected() == 0 {
-		return false, tx.Commit(ctx)
+	if OrderStatus(current) != from {
+		return false, ErrInvalidTransition
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref) VALUES ($1,$2,$3) ON CONFLICT (source_type,source_ref) DO NOTHING`, buyerOrderID, string(source.Type), source.Reference); err != nil {
+		return false, err
+	}
+	var sourceBuyerOrderID int64
+	if err := tx.QueryRow(ctx, `SELECT buyer_order_id FROM trade.order_event_source WHERE source_type=$1 AND source_ref=$2`, string(source.Type), source.Reference).Scan(&sourceBuyerOrderID); err != nil {
+		return false, err
+	}
+	if sourceBuyerOrderID != buyerOrderID {
+		return false, ErrInvalidTransition
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) VALUES ($1,$2,$3,$4,$5,$6)`, merchantOrderID, buyerOrderID, string(from), string(to), string(source.Type), source.Reference); err != nil {
+		return false, err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE trade.merchant_order SET status=$2,version=version+1,updated_at=clock_timestamp() WHERE id=$1`, merchantOrderID, string(to)); err != nil {
 		return false, err
