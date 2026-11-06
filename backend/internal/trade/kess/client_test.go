@@ -2,14 +2,17 @@ package kess
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestHTTPClientRejectsMissingConfigAndNonSandboxEndpointWithoutLeakingSecrets(t *testing.T) {
@@ -45,7 +48,7 @@ func TestHTTPClientUsesOAuthBearerAndConfiguredCreateService(t *testing.T) {
 			if !strings.Contains(string(body), `"service":"webpay.acquire.createOrder"`) || !strings.Contains(string(body), `"sign"`) {
 				t.Fatalf("gateway body missing configured service/sign: %s", body)
 			}
-			_, _ = io.WriteString(writer, gatewayResponse(t, `{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"12.34","currency":"USD","status":"WAITING","payment_link":"https://devwebpayment.kesspay.io/pay/a"}`))
+			_, _ = io.WriteString(writer, `{"success":"true","data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"12.34","currency":"USD","status":"WAITING","payment_link":"https://devwebpayment.kesspay.io/pay/a"}}`)
 		default:
 			t.Fatalf("unexpected path %s", request.URL.Path)
 		}
@@ -55,8 +58,8 @@ func TestHTTPClientUsesOAuthBearerAndConfiguredCreateService(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	order, err := client.Create(context.Background(), Intent{TradeNo: "DRL-01", Amount: 1234, Currency: "USD", ExpectedSellerCode: "seller"})
-	if err != nil || order.Amount != 1234 || order.Status != "WAITING" {
+	order, err := client.Create(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 123400, Currency: "USD", ExpectedSellerCode: "seller"})
+	if err != nil || order.AmountE4 != 123400 || order.Status != "WAITING" {
 		t.Fatalf("Create = %+v, %v", order, err)
 	}
 }
@@ -67,9 +70,7 @@ func TestHTTPClientRejectsTamperedNestedDataWithValidTopLevelSignature(t *testin
 		case "/oauth/token":
 			_, _ = io.WriteString(writer, `{"access_token":"token","token_type":"Bearer","expires_in":60}`)
 		case "/api/mch/v2/gateway":
-			// The envelope still has a valid signature because data is intentionally
-			// excluded from the official scalar signing set.
-			_, _ = io.WriteString(writer, gatewayResponse(t, `{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"99.99","currency":"USD","status":"SUCCESS","transaction_id":"forged"}`))
+			_, _ = io.WriteString(writer, `{"success":true,"data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"99.99","currency":"USD","status":"SUCCESS","transaction_id":"forged"}}`)
 		default:
 			t.Fatalf("unexpected path %s", request.URL.Path)
 		}
@@ -79,33 +80,42 @@ func TestHTTPClientRejectsTamperedNestedDataWithValidTopLevelSignature(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = client.Create(context.Background(), Intent{TradeNo: "DRL-01", Amount: 1234, Currency: "USD", ExpectedSellerCode: "seller"})
+	_, err = client.Create(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 123400, Currency: "USD", ExpectedSellerCode: "seller"})
 	if !errors.Is(err, ErrInvalidChannel) {
 		t.Fatalf("Create error = %v, want ErrInvalidChannel", err)
 	}
 }
 
-func TestHTTPClientRejectsMissingOrInvalidGatewaySignature(t *testing.T) {
-	for _, body := range []string{
-		`{"success":true,"data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"12.34","currency":"USD","status":"WAITING","payment_link":"https://devwebpayment.kesspay.io/pay/a"}}`,
-		`{"success":true,"sign":"invalid","data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"12.34","currency":"USD","status":"WAITING","payment_link":"https://devwebpayment.kesspay.io/pay/a"}}`,
+func TestHTTPClientAllowsUnsignedResponseButRejectsInvalidProvidedSignature(t *testing.T) {
+	validSign := signScalars(map[string]string{"success": "true"}, "signing-key", SignMD5)
+	for _, test := range []struct {
+		name    string
+		body    string
+		wantErr bool
+	}{
+		{name: "unsigned string success", body: `{"success":"true","data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"12.34","currency":"USD","status":"WAITING","payment_link":"https://devwebpayment.kesspay.io/pay/a"}}`},
+		{name: "valid provided signature", body: fmt.Sprintf(`{"success":true,"sign":"%s","data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"12.34","currency":"USD","status":"WAITING","payment_link":"https://devwebpayment.kesspay.io/pay/a"}}`, validSign)},
+		{name: "invalid provided signature", body: `{"success":true,"sign":"invalid","data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"12.34","currency":"USD","status":"WAITING","payment_link":"https://devwebpayment.kesspay.io/pay/a"}}`, wantErr: true},
 	} {
-		t.Run("reject", func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				if request.URL.Path == "/oauth/token" {
 					_, _ = io.WriteString(writer, `{"access_token":"token","token_type":"Bearer","expires_in":60}`)
 					return
 				}
-				_, _ = io.WriteString(writer, body)
+				_, _ = io.WriteString(writer, test.body)
 			}))
 			defer server.Close()
 			client, err := NewHTTPClient(validConfig(CreateServiceLower), sandboxHTTPClient(t, server))
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = client.Create(context.Background(), Intent{TradeNo: "DRL-01", Amount: 1234, Currency: "USD", ExpectedSellerCode: "seller"})
-			if !errors.Is(err, ErrInvalidChannel) {
+			_, err = client.Create(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 123400, Currency: "USD", ExpectedSellerCode: "seller"})
+			if test.wantErr && !errors.Is(err, ErrInvalidChannel) {
 				t.Fatalf("Create error = %v, want ErrInvalidChannel", err)
+			}
+			if !test.wantErr && err != nil {
+				t.Fatalf("Create error = %v, want nil", err)
 			}
 		})
 	}
@@ -119,22 +129,64 @@ func TestSignScalarsExcludesEmptyAndNestedData(t *testing.T) {
 	}
 }
 
-func validConfig(service string) Config {
-	return Config{ClientID: "id", ClientSecret: "client-secret", Username: "user", Password: "password", SigningKey: "signing-key", SellerCode: "seller", CreateService: service}
+func TestKESSMD5SignatureUsesSortedRequestFieldsAndAppendedKey(t *testing.T) {
+	if got := signScalars(map[string]string{"b": "2", "a": "1"}, "key", SignMD5); got != "735a0bafc42420a9b223ce31415e043a" {
+		t.Fatalf("MD5 signature = %s", got)
+	}
 }
 
-func gatewayResponse(t *testing.T, data string) string {
-	t.Helper()
-	var raw json.RawMessage
-	if err := json.Unmarshal([]byte(data), &raw); err != nil {
-		t.Fatal(err)
-	}
-	response := map[string]any{"success": true, "sign": SignScalars(map[string]string{"success": "true"}, "signing-key"), "data": raw}
-	encoded, err := json.Marshal(response)
+func TestHTTPClientRetriesOnlyDialFailure(t *testing.T) {
+	var calls atomic.Int32
+	transport := roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		call := calls.Add(1)
+		if call == 1 {
+			return nil, &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("test dial failure")}
+		}
+		body := `{"access_token":"token","token_type":"Bearer","expires_in":60}`
+		if request.URL.Path != "/oauth/token" {
+			body = `{"success":true,"data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"1.00","currency":"USD","status":"WAITING","payment_link":"https://devwebpayment.kesspay.io/pay/a"}}`
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
+	})
+	config := validConfig(CreateServiceLower)
+	config.MaxRetries = 1
+	client, err := NewHTTPClient(config, &http.Client{Transport: transport})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(encoded)
+	if _, err := client.Create(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"}); err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("HTTP calls = %d, want 3 (dial failure + token retry + gateway)", calls.Load())
+	}
+}
+
+func TestHTTPClientCircuitOpensAfterRepeatedSentFailures(t *testing.T) {
+	var calls atomic.Int32
+	transport := roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return &http.Response{StatusCode: http.StatusBadGateway, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("bad gateway")), Request: request}, nil
+	})
+	config := validConfig(CreateServiceLower)
+	config.CircuitFailures = 2
+	config.CircuitOpenFor = time.Minute
+	config.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	client, err := NewHTTPClient(config, &http.Client{Transport: transport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent := Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"}
+	for range 3 {
+		_, _ = client.Create(context.Background(), intent)
+	}
+	if calls.Load() != 2 {
+		t.Fatalf("HTTP calls = %d, want 2 before circuit opens", calls.Load())
+	}
+}
+
+func validConfig(service string) Config {
+	return Config{ClientID: "id", ClientSecret: "client-secret", Username: "user", Password: "password", SigningKey: "signing-key", SellerCode: "seller", CreateService: service}
 }
 
 // sandboxHTTPClient routes the fixed sandbox host to a local TLS server. The
@@ -149,3 +201,7 @@ func sandboxHTTPClient(t *testing.T, server *httptest.Server) *http.Client {
 	}
 	return &http.Client{Transport: transport}
 }
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) { return f(request) }

@@ -3,26 +3,20 @@ package kess
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
 
 var ErrInvalidAmount = errors.New("invalid KESS amount or currency")
 
-// FormatAmount converts an integer minor amount to KESS's textual amount. It
-// never exchanges currencies: USD is cents and KHR is already an integer.
-func FormatAmount(amount int64, currency string) (string, error) {
-	if amount <= 0 {
+// FormatAmount converts USD e4 to KESS's two-decimal amount without rounding.
+func FormatAmount(amountE4 int64, currency string) (string, error) {
+	if amountE4 <= 0 || amountE4%100 != 0 || currency != "USD" {
 		return "", ErrInvalidAmount
 	}
-	switch currency {
-	case "USD":
-		return fmt.Sprintf("%d.%02d", amount/100, amount%100), nil
-	case "KHR":
-		return strconv.FormatInt(amount, 10), nil
-	default:
-		return "", ErrInvalidAmount
-	}
+	cents := amountE4 / 100
+	return fmt.Sprintf("%d.%02d", cents/100, cents%100), nil
 }
 
 func ParseAmount(raw, currency string) (int64, error) {
@@ -36,24 +30,18 @@ func ParseAmount(raw, currency string) (int64, error) {
 			return 0, ErrInvalidAmount
 		}
 		whole, err := strconv.ParseInt(parts[0], 10, 64)
-		if err != nil || whole > (1<<63-1)/100 {
+		if err != nil {
 			return 0, ErrInvalidAmount
 		}
 		fraction, _ := strconv.ParseInt(parts[1], 10, 64)
-		amount := whole*100 + fraction
-		if amount <= 0 {
+		if whole > (math.MaxInt64-fraction*100)/10000 {
 			return 0, ErrInvalidAmount
 		}
-		return amount, nil
-	case "KHR":
-		if !digits(raw) {
+		amountE4 := whole*10000 + fraction*100
+		if amountE4 <= 0 {
 			return 0, ErrInvalidAmount
 		}
-		amount, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || amount <= 0 {
-			return 0, ErrInvalidAmount
-		}
-		return amount, nil
+		return amountE4, nil
 	default:
 		return 0, ErrInvalidAmount
 	}

@@ -3,7 +3,7 @@ package kess
 import (
 	"context"
 	"errors"
-	"net"
+	"time"
 )
 
 type Client interface {
@@ -12,33 +12,41 @@ type Client interface {
 }
 
 type Worker struct {
-	store  Store
-	client Client
+	store          Store
+	client         Client
+	now            func() time.Time
+	recoveryWindow time.Duration
 }
 
-func NewWorker(store Store, client Client) *Worker { return &Worker{store: store, client: client} }
+func NewWorker(store Store, client Client, recoveryWindow time.Duration) *Worker {
+	return &Worker{store: store, client: client, now: time.Now, recoveryWindow: recoveryWindow}
+}
 
 // Create runs outside the intent persistence transaction. A timeout deliberately
 // keeps the original trade number and defers recovery to Query.
 func (w *Worker) Create(ctx context.Context, id int64) error {
-	intent, err := w.store.Intent(ctx, id)
+	intent, claimed, err := w.store.ClaimPending(ctx, id)
 	if err != nil {
 		return err
 	}
-	if intent.Status != StatusPending {
+	if !claimed {
 		return nil
-	}
-	if err := w.store.RecordCreateAttempt(ctx, id); err != nil {
-		return err
 	}
 	order, err := w.client.Create(ctx, intent)
 	if err != nil {
-		if isTimeout(err) {
-			if recordErr := w.store.RecordChannelResult(ctx, id, ChannelResult{Status: StatusUnknown}); recordErr != nil {
-				return recordErr
+		if definitelyNotSent(err) {
+			if releaseErr := w.store.ReleasePendingClaim(ctx, id); releaseErr != nil {
+				return releaseErr
 			}
+			return err
+		}
+		if recordErr := w.store.RecordChannelResult(ctx, id, StatusPending, ChannelResult{Status: StatusUnknown}); recordErr != nil {
+			return recordErr
 		}
 		return err
+	}
+	if order.Status != "WAITING" {
+		return w.store.RecordChannelResult(ctx, id, StatusPending, ChannelResult{Status: StatusUnknown, ChannelStatus: order.Status, TransactionID: order.TransactionID})
 	}
 	return w.recordValidated(ctx, intent, order, true)
 }
@@ -55,6 +63,9 @@ func (w *Worker) RecoverUnknown(ctx context.Context, id int64) error {
 	}
 	order, err := w.client.Query(ctx, intent)
 	if err != nil {
+		if errors.Is(err, ErrChannelMissing) && !intent.CreatedAt.IsZero() && w.now().Sub(intent.CreatedAt) >= w.recoveryWindow {
+			return w.store.RecordChannelResult(ctx, id, StatusUnknown, ChannelResult{Status: StatusClosed, ChannelStatus: "NOT_FOUND"})
+		}
 		return err
 	}
 	return w.recordValidated(ctx, intent, order, false)
@@ -65,13 +76,13 @@ func (w *Worker) recordValidated(ctx context.Context, intent Intent, order Chann
 	if err != nil {
 		return err
 	}
-	return w.store.RecordChannelResult(ctx, intent.ID, ChannelResult{
+	return w.store.RecordChannelResult(ctx, intent.ID, intent.Status, ChannelResult{
 		Status: status, ChannelStatus: order.Status, TransactionID: order.TransactionID, PaymentURL: order.PaymentURL,
 	})
 }
 
 func validateOrder(intent Intent, order ChannelOrder, requireURL bool) (Status, error) {
-	if order.TradeNo != intent.TradeNo || order.SellerCode != intent.ExpectedSellerCode || order.Amount != intent.Amount || order.Currency != intent.Currency {
+	if order.TradeNo != intent.TradeNo || order.SellerCode != intent.ExpectedSellerCode || order.AmountE4 != intent.AmountE4 || order.Currency != intent.Currency {
 		return "", ErrInvalidChannel
 	}
 	switch order.Status {
@@ -85,18 +96,9 @@ func validateOrder(intent Intent, order ChannelOrder, requireURL bool) (Status, 
 			return "", ErrInvalidChannel
 		}
 		return StatusSuccess, nil
-	case "FAILED":
-		return StatusFailed, nil
 	case "CLOSED":
 		return StatusClosed, nil
-	case "REFUND", "REFUNDING", "REFUNDED", "PENDING_REFUNDED", "PARTIAL_REFUNDED":
-		return StatusRefund, nil
 	default:
 		return "", ErrInvalidChannel
 	}
-}
-
-func isTimeout(err error) bool {
-	var networkErr net.Error
-	return errors.Is(err, context.DeadlineExceeded) || errors.As(err, &networkErr) && networkErr.Timeout()
 }

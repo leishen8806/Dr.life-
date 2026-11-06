@@ -7,7 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -18,33 +21,62 @@ var ErrConfig = errors.New("KESS configuration is incomplete or unsafe")
 const (
 	CreateServiceLower = "webpay.acquire.createorder"
 	CreateServiceCamel = "webpay.acquire.createOrder"
-	QueryService       = "webpay.acquire.queryOrder"
+	QueryService       = "webpay.acquire.queryorder"
 )
 
 // Config must be assembled from protected server environment variables. The
 // create-service spelling stays explicit until KESS confirms the sandbox form.
 type Config struct {
-	BaseURL       string
-	ClientID      string
-	ClientSecret  string
-	Username      string
-	Password      string
-	SigningKey    string
-	SellerCode    string
-	CreateService string
+	BaseURL         string
+	ClientID        string
+	ClientSecret    string
+	Username        string
+	Password        string
+	SigningKey      string
+	SellerCode      string
+	CreateService   string
+	SignType        string
+	Logger          *slog.Logger
+	MaxRetries      int
+	CircuitFailures int
+	CircuitOpenFor  time.Duration
 }
 
 type HTTPClient struct {
-	config Config
-	http   *http.Client
-	mu     sync.Mutex
-	token  string
-	expiry time.Time
+	config    Config
+	http      *http.Client
+	tokenMu   sync.Mutex
+	stateMu   sync.Mutex
+	token     string
+	expiry    time.Time
+	failures  int
+	openUntil time.Time
 }
 
 func NewHTTPClient(config Config, client *http.Client) (*HTTPClient, error) {
 	if config.BaseURL == "" {
 		config.BaseURL = "https://" + sandboxHost
+	}
+	if config.SignType == "" {
+		config.SignType = SignMD5 // Pending confirmation against the KESS sandbox account.
+	}
+	if config.MaxRetries == 0 {
+		config.MaxRetries = 1
+	}
+	if config.SignType != SignMD5 && config.SignType != SignHMACSHA256 || config.MaxRetries < 0 {
+		return nil, ErrConfig
+	}
+	if config.CircuitFailures == 0 {
+		config.CircuitFailures = 3
+	}
+	if config.CircuitOpenFor == 0 {
+		config.CircuitOpenFor = 30 * time.Second
+	}
+	if config.CircuitFailures < 1 || config.CircuitOpenFor < 0 {
+		return nil, ErrConfig
+	}
+	if config.Logger == nil {
+		config.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	if config.BaseURL != "https://"+sandboxHost || config.CreateService != CreateServiceLower && config.CreateService != CreateServiceCamel {
 		return nil, ErrConfig
@@ -56,17 +88,21 @@ func NewHTTPClient(config Config, client *http.Client) (*HTTPClient, error) {
 	}
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	} else {
+		copy := *client
+		copy.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		client = &copy
 	}
 	return &HTTPClient{config: config, http: client}, nil
 }
 
 func (c *HTTPClient) Create(ctx context.Context, intent Intent) (ChannelOrder, error) {
-	amount, err := FormatAmount(intent.Amount, intent.Currency)
+	amount, err := FormatAmount(intent.AmountE4, intent.Currency)
 	if err != nil {
 		return ChannelOrder{}, err
 	}
 	data, err := c.gateway(ctx, map[string]string{
-		"service": c.config.CreateService, "sign_type": "HMAC-SHA256", "seller_code": c.config.SellerCode,
+		"service": c.config.CreateService, "sign_type": c.config.SignType, "seller_code": c.config.SellerCode,
 		"out_trade_no": intent.TradeNo, "body": "Dr.life+ order", "total_amount": amount, "currency": intent.Currency, "login_type": "ANONYMOUS",
 	})
 	if err != nil {
@@ -76,7 +112,7 @@ func (c *HTTPClient) Create(ctx context.Context, intent Intent) (ChannelOrder, e
 }
 
 func (c *HTTPClient) Query(ctx context.Context, intent Intent) (ChannelOrder, error) {
-	data, err := c.gateway(ctx, map[string]string{"service": QueryService, "sign_type": "HMAC-SHA256", "out_trade_no": intent.TradeNo})
+	data, err := c.gateway(ctx, map[string]string{"service": QueryService, "sign_type": c.config.SignType, "out_trade_no": intent.TradeNo})
 	if err != nil {
 		return ChannelOrder{}, err
 	}
@@ -88,17 +124,17 @@ func (c *HTTPClient) gateway(ctx context.Context, fields map[string]string) (jso
 	if err != nil {
 		return nil, err
 	}
-	fields["sign"] = SignScalars(fields, c.config.SigningKey)
+	fields["sign"] = signScalars(fields, c.config.SigningKey, c.config.SignType)
 	var response json.RawMessage
 	if err := c.post(ctx, "/api/mch/v2/gateway", fields, token, &response); err != nil {
 		return nil, err
 	}
-	return verifyGatewayResponse(response, c.config.SigningKey)
+	return verifyGatewayResponse(response, c.config.SigningKey, c.config.SignType, c.config.Logger)
 }
 
 func (c *HTTPClient) accessToken(ctx context.Context) (string, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.tokenMu.Lock()
+	defer c.tokenMu.Unlock()
 	if c.token != "" && time.Now().Add(30*time.Second).Before(c.expiry) {
 		return c.token, nil
 	}
@@ -118,31 +154,83 @@ func (c *HTTPClient) accessToken(ctx context.Context) (string, error) {
 }
 
 func (c *HTTPClient) post(ctx context.Context, path string, body any, bearer string, output any) error {
+	if err := c.circuitReady(); err != nil {
+		return err
+	}
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+path, bytes.NewReader(payload))
-	if err != nil {
-		return err
+	var resp *http.Response
+	for attempt := 0; ; attempt++ {
+		req, requestErr := http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+path, bytes.NewReader(payload))
+		if requestErr != nil {
+			return requestErr
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if bearer != "" {
+			req.Header.Set("Authorization", "Bearer "+bearer)
+		}
+		resp, err = c.http.Do(req)
+		if err == nil || !definitelyNotSent(err) || attempt >= c.config.MaxRetries {
+			break
+		}
+		c.config.Logger.WarnContext(ctx, "KESS request retry", "operation", path, "attempt", attempt+1)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	if bearer != "" {
-		req.Header.Set("Authorization", "Bearer "+bearer)
-	}
-	resp, err := c.http.Do(req)
 	if err != nil {
+		c.recordFailure()
+		c.config.Logger.WarnContext(ctx, "KESS request failed", "operation", path, "definitely_not_sent", definitelyNotSent(err))
 		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		c.recordFailure()
+		c.config.Logger.WarnContext(ctx, "KESS response failed", "operation", path, "status_code", resp.StatusCode)
+		if resp.StatusCode == http.StatusNotFound {
+			return ErrChannelMissing
+		}
 		return fmt.Errorf("KESS request failed: HTTP %d", resp.StatusCode)
 	}
 	decoder := json.NewDecoder(io.LimitReader(resp.Body, 1<<20))
 	if err := decoder.Decode(output); err != nil {
+		c.recordFailure()
+		c.config.Logger.WarnContext(ctx, "KESS response decode failed", "operation", path)
 		return ErrInvalidChannel
 	}
+	c.recordSuccess()
+	c.config.Logger.DebugContext(ctx, "KESS request completed", "operation", path, "status_code", resp.StatusCode)
 	return nil
+}
+
+func (c *HTTPClient) circuitReady() error {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	if time.Now().Before(c.openUntil) {
+		return fmt.Errorf("KESS circuit open: %w", ErrInvalidChannel)
+	}
+	return nil
+}
+
+func (c *HTTPClient) recordFailure() {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.failures++
+	if c.failures >= c.config.CircuitFailures {
+		c.openUntil = time.Now().Add(c.config.CircuitOpenFor)
+	}
+}
+
+func (c *HTTPClient) recordSuccess() {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	c.failures = 0
+	c.openUntil = time.Time{}
+}
+
+func definitelyNotSent(err error) bool {
+	var urlErr *url.Error
+	var opErr *net.OpError
+	return errors.As(err, &urlErr) && errors.As(urlErr.Err, &opErr) && opErr.Op == "dial"
 }
 
 func decodeOrder(raw json.RawMessage) (ChannelOrder, error) {
@@ -164,38 +252,41 @@ func decodeOrder(raw json.RawMessage) (ChannelOrder, error) {
 	if err != nil {
 		return ChannelOrder{}, err
 	}
-	return ChannelOrder{TradeNo: response.TradeNo, SellerCode: response.Seller.Code, Amount: amount, Currency: response.Currency, Status: response.Status, TransactionID: response.TransactionID, PaymentURL: response.PaymentLink}, nil
+	return ChannelOrder{TradeNo: response.TradeNo, SellerCode: response.Seller.Code, AmountE4: amount, Currency: response.Currency, Status: response.Status, TransactionID: response.TransactionID, PaymentURL: response.PaymentLink}, nil
 }
 
 // verifyGatewayResponse authenticates the signed scalar response envelope.
 // Its nested data remains separately validated against the persisted intent.
-func verifyGatewayResponse(raw json.RawMessage, signingKey string) (json.RawMessage, error) {
+func verifyGatewayResponse(raw json.RawMessage, signingKey, configuredSignType string, logger *slog.Logger) (json.RawMessage, error) {
 	var envelope map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &envelope); err != nil {
 		return nil, ErrInvalidChannel
 	}
-	signRaw, ok := envelope["sign"]
-	if !ok {
-		return nil, ErrInvalidChannel
-	}
-	var sign string
-	if err := json.Unmarshal(signRaw, &sign); err != nil || sign == "" {
-		return nil, ErrInvalidChannel
-	}
-	fields := map[string]string{"sign": sign}
-	for name, value := range envelope {
-		if name == "sign" || name == "data" {
-			continue
+	if signRaw, ok := envelope["sign"]; ok {
+		var sign string
+		if err := json.Unmarshal(signRaw, &sign); err != nil || sign == "" {
+			return nil, ErrInvalidChannel
 		}
-		if scalar, ok := gatewayScalar(value); ok {
-			fields[name] = scalar
+		fields := map[string]string{"sign": sign}
+		for name, value := range envelope {
+			if name == "sign" || name == "data" {
+				continue
+			}
+			if scalar, scalarOK := gatewayScalar(value); scalarOK {
+				fields[name] = scalar
+			}
 		}
+		signType := configuredSignType
+		if value, exists := fields["sign_type"]; exists && value != "" {
+			signType = value
+		}
+		if signType != SignMD5 && signType != SignHMACSHA256 || !verifyScalars(fields, signingKey, signType) {
+			return nil, ErrInvalidChannel
+		}
+	} else {
+		logger.Warn("KESS response omitted signature")
 	}
-	if !VerifyScalars(fields, signingKey) {
-		return nil, ErrInvalidChannel
-	}
-	var success bool
-	if value, ok := envelope["success"]; !ok || json.Unmarshal(value, &success) != nil || !success {
+	if !gatewaySuccess(envelope["success"]) {
 		return nil, ErrInvalidChannel
 	}
 	data, ok := envelope["data"]
@@ -203,6 +294,15 @@ func verifyGatewayResponse(raw json.RawMessage, signingKey string) (json.RawMess
 		return nil, ErrInvalidChannel
 	}
 	return data, nil
+}
+
+func gatewaySuccess(raw json.RawMessage) bool {
+	var boolean bool
+	if json.Unmarshal(raw, &boolean) == nil {
+		return boolean
+	}
+	var text string
+	return json.Unmarshal(raw, &text) == nil && strings.EqualFold(text, "true")
 }
 
 func gatewayScalar(raw json.RawMessage) (string, bool) {
