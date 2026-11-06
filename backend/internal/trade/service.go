@@ -8,6 +8,9 @@ import (
 var (
 	ErrBuyerInactive            = errors.New("trade: buyer account is not active")
 	ErrInsufficientAvailability = errors.New("trade: insufficient availability")
+	// ErrOrderNotVisible intentionally covers both a missing order and a
+	// foreign order, so callers cannot use reads to enumerate order IDs.
+	ErrOrderNotVisible = errors.New("trade: order is not visible to caller")
 )
 
 type AccountDirectory interface {
@@ -20,6 +23,24 @@ type Availability interface {
 }
 type Store interface {
 	Create(context.Context, CreateOrder) error
+}
+
+// OrderReader is deliberately scoped by the caller's account/merchant ID.
+// Its implementations must apply this predicate in SQL, before returning any
+// order data.
+type OrderReader interface {
+	FindBuyerOrder(context.Context, int64, string) (BuyerOrderView, error)
+	FindMerchantOrder(context.Context, int64, string) (MerchantOrderView, error)
+}
+type BuyerOrderView struct {
+	PublicID, Status string
+	BuyerAccountID   int64
+	TotalE4          int64
+}
+type MerchantOrderView struct {
+	PublicID, Status string
+	MerchantID       int64
+	TotalE4          int64
 }
 type ChildOrder struct {
 	MerchantID, TotalE4 int64
@@ -37,6 +58,24 @@ type Service struct {
 
 func NewService(store Store, accounts AccountDirectory, availability Availability) *Service {
 	return &Service{store, accounts, availability}
+}
+
+// BuyerOrder returns a parent order only when it belongs to buyerID.
+func (s *Service) BuyerOrder(ctx context.Context, buyerID int64, publicID string) (BuyerOrderView, error) {
+	reader, ok := s.store.(OrderReader)
+	if !ok || buyerID <= 0 || publicID == "" {
+		return BuyerOrderView{}, ErrOrderNotVisible
+	}
+	return reader.FindBuyerOrder(ctx, buyerID, publicID)
+}
+
+// MerchantOrder returns a suborder only when it belongs to merchantID.
+func (s *Service) MerchantOrder(ctx context.Context, merchantID int64, publicID string) (MerchantOrderView, error) {
+	reader, ok := s.store.(OrderReader)
+	if !ok || merchantID <= 0 || publicID == "" {
+		return MerchantOrderView{}, ErrOrderNotVisible
+	}
+	return reader.FindMerchantOrder(ctx, merchantID, publicID)
 }
 func (s *Service) Place(ctx context.Context, buyer int64, lines []OrderLineInput) (CreateOrder, error) {
 	status, err := s.accounts.Status(ctx, buyer)

@@ -40,6 +40,26 @@ func (s *stubOrders) Create(_ context.Context, input CreateOrder) error {
 	return nil
 }
 
+type scopedOrders struct {
+	stubOrders
+	buyer    BuyerOrderView
+	merchant MerchantOrderView
+}
+
+func (s *scopedOrders) FindBuyerOrder(_ context.Context, buyerID int64, publicID string) (BuyerOrderView, error) {
+	if buyerID != s.buyer.BuyerAccountID || publicID != s.buyer.PublicID {
+		return BuyerOrderView{}, ErrOrderNotVisible
+	}
+	return s.buyer, nil
+}
+
+func (s *scopedOrders) FindMerchantOrder(_ context.Context, merchantID int64, publicID string) (MerchantOrderView, error) {
+	if merchantID != s.merchant.MerchantID || publicID != s.merchant.PublicID {
+		return MerchantOrderView{}, ErrOrderNotVisible
+	}
+	return s.merchant, nil
+}
+
 func TestPlaceOrderSplitsByMerchantAndReserves(t *testing.T) {
 	availability := &stubAvailability{available: map[string]int64{"A": 5, "B": 5, "C": 5}, reserved: map[string]int64{}}
 	store := &stubOrders{}
@@ -79,5 +99,23 @@ func TestReleaseReservationsReturnsEachLine(t *testing.T) {
 	}
 	if a.reserved["A"] != 0 || a.reserved["B"] != 0 {
 		t.Fatalf("reservations not released: %v", a.reserved)
+	}
+}
+
+func TestReadScopesDoNotExposeOtherOrders(t *testing.T) {
+	store := &scopedOrders{
+		buyer:    BuyerOrderView{PublicID: "buyer-order", BuyerAccountID: 11, TotalE4: 99},
+		merchant: MerchantOrderView{PublicID: "merchant-order", MerchantID: 22, TotalE4: 99},
+	}
+	svc := NewService(store, stubAccounts{status: "active"}, &stubAvailability{})
+
+	if _, err := svc.BuyerOrder(context.Background(), 12, "buyer-order"); !errors.Is(err, ErrOrderNotVisible) {
+		t.Fatalf("foreign buyer error = %v, want ErrOrderNotVisible", err)
+	}
+	if _, err := svc.MerchantOrder(context.Background(), 23, "merchant-order"); !errors.Is(err, ErrOrderNotVisible) {
+		t.Fatalf("foreign merchant error = %v, want ErrOrderNotVisible", err)
+	}
+	if got, err := svc.MerchantOrder(context.Background(), 22, "merchant-order"); err != nil || got.TotalE4 != 99 {
+		t.Fatalf("own merchant order = %+v, %v", got, err)
 	}
 }

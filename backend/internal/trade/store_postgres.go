@@ -2,6 +2,7 @@ package trade
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
@@ -9,6 +10,7 @@ import (
 
 type tradeDB interface {
 	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
+	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
 // PostgresStore persists only trade-owned tables. Cross-module identifiers are
@@ -20,8 +22,29 @@ type EventStore interface {
 }
 
 var _ Store = (*PostgresStore)(nil)
+var _ OrderReader = (*PostgresStore)(nil)
 
 func NewPostgresStore(db tradeDB) *PostgresStore { return &PostgresStore{db: db} }
+
+func (s *PostgresStore) FindBuyerOrder(ctx context.Context, buyerID int64, publicID string) (BuyerOrderView, error) {
+	var order BuyerOrderView
+	err := s.db.QueryRow(ctx, `SELECT public_id,buyer_account_id,total_e4 FROM trade.buyer_order WHERE public_id=$1 AND buyer_account_id=$2`, publicID, buyerID).
+		Scan(&order.PublicID, &order.BuyerAccountID, &order.TotalE4)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return BuyerOrderView{}, ErrOrderNotVisible
+	}
+	return order, err
+}
+
+func (s *PostgresStore) FindMerchantOrder(ctx context.Context, merchantID int64, publicID string) (MerchantOrderView, error) {
+	var order MerchantOrderView
+	err := s.db.QueryRow(ctx, `SELECT public_id,merchant_id,status,total_e4 FROM trade.merchant_order WHERE public_id=$1 AND merchant_id=$2`, publicID, merchantID).
+		Scan(&order.PublicID, &order.MerchantID, &order.Status, &order.TotalE4)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return MerchantOrderView{}, ErrOrderNotVisible
+	}
+	return order, err
+}
 
 func (s *PostgresStore) Create(ctx context.Context, order CreateOrder) error {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
@@ -72,6 +95,16 @@ func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from
 		return false, err
 	}
 	if OrderStatus(current) != from {
+		// A concurrent/retried delivery of the identical source event is an
+		// idempotent no-op even though the first delivery already advanced the
+		// state. Check only this order's source-key inside the row lock.
+		var seen bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM trade.order_event WHERE merchant_order_id=$1 AND source_type=$2 AND source_ref=$3)`, merchantOrderID, string(source.Type), source.Reference).Scan(&seen); err != nil {
+			return false, err
+		}
+		if seen {
+			return false, tx.Commit(ctx)
+		}
 		return false, ErrInvalidTransition
 	}
 	ct, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,from_status,to_status,source_type,source_ref) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (merchant_order_id,source_type,source_ref) DO NOTHING`, merchantOrderID, string(from), string(to), string(source.Type), source.Reference)
