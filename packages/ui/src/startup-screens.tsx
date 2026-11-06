@@ -160,14 +160,17 @@ export function ConsentView({
   translate,
   language,
   gateway,
+  account,
   onComplete
 }: {
   translate: Translate;
   language: Language;
   gateway: StartupGateway;
+  account: StartupAccount;
   onComplete: (account: StartupAccount) => void;
 }) {
   const [documents, setDocuments] = useState<LegalDocument[]>([]);
+  const [statuses, setStatuses] = useState<import("./startup").ConsentStatus[]>([]);
   const [required, setRequired] = useState<ConsentKind[]>([]);
   const [checked, setChecked] = useState<Partial<Record<ConsentKind, boolean>>>({});
   const [loading, setLoading] = useState(true);
@@ -180,6 +183,7 @@ export function ConsentView({
     Promise.all([gateway.getConsentState(), gateway.getLegalDocuments()]).then(
       ([statuses, currentDocuments]) => {
         if (!live) return;
+        setStatuses(statuses);
         setRequired(statuses.filter((status) => status.needsReaccept).map((status) => status.kind));
         setChecked(
           Object.fromEntries(
@@ -223,13 +227,13 @@ export function ConsentView({
     setBusy(true);
     setFailed(undefined);
     try {
-      let account: StartupAccount | undefined;
+      let acceptedAccount: StartupAccount | undefined;
       for (const kind of required) {
-        const document = documents.find((item) => item.kind === kind);
-        if (!document) throw new Error("The current legal document is unavailable");
-        account = await gateway.acceptConsent(kind, document.version);
+        const status = statuses.find((item) => item.kind === kind);
+        if (!status) throw new Error("The current consent status is unavailable");
+        acceptedAccount = await gateway.acceptConsent(kind, status.version);
       }
-      if (account) onComplete(account);
+      onComplete(acceptedAccount ?? { ...account, needsConsent: false });
     } catch {
       setBusy(false);
       setFailed("accept");

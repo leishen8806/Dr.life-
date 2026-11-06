@@ -118,7 +118,10 @@ describe("startup phases", () => {
       name: "ready",
       account: account({ lang: "km" })
     });
-    expect(accountPhase(account({ needsConsent: true }))).toEqual({ name: "consent" });
+    expect(accountPhase(account({ needsConsent: true }))).toEqual({
+      name: "consent",
+      account: account({ needsConsent: true })
+    });
   });
 
   it("counts the lockout down to zero and no further", () => {

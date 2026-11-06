@@ -61,7 +61,10 @@ export function useStartup(gateway: StartupGateway): Startup {
     let live = true;
     gateway.login().then(
       (account) => {
-        if (live) setOutcome(accountPhase(account));
+        if (live) {
+          const next = accountPhase(account);
+          setOutcome(next.name === "consent" ? { ...next, account } : next);
+        }
       },
       (error: unknown) => {
         if (live) setOutcome(failurePhase(error));
@@ -89,7 +92,8 @@ export function useStartup(gateway: StartupGateway): Startup {
       gateway.registerLanguage(language).then(
         (account) => {
           setBusy(false);
-          setOutcome(accountPhase(account));
+          const next = accountPhase(account);
+          setOutcome(next.name === "consent" ? { ...next, account } : next);
         },
         (error: unknown) => {
           setBusy(false);
@@ -204,6 +208,7 @@ export function StartupGate({
           translate={t}
           language={language}
           gateway={gateway}
+          account={phase.account}
           onComplete={startup.completeConsent}
         />
       );

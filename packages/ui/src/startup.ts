@@ -46,7 +46,7 @@ export type StartupPhase =
   /** First language registration; one language per account. */
   | { name: "language" }
   /** Agreement consent (A-09 / CMP-634) lands here in the next slice. */
-  | { name: "consent" }
+  | { name: "consent"; account: StartupAccount }
   | { name: "ready"; account: StartupAccount }
   /** 2006, and a frozen or disabled account on an otherwise successful login. */
   | { name: "blocked" }
@@ -93,7 +93,7 @@ export function failurePhase(error: unknown): StartupPhase {
 export function accountPhase(account: StartupAccount): StartupPhase {
   if (account.status !== "active") return { name: "blocked" };
   if (account.needsLanguage || !account.lang) return { name: "language" };
-  if (account.needsConsent) return { name: "consent" };
+  if (account.needsConsent) return { name: "consent", account };
   return { name: "ready", account };
 }
 
