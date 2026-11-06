@@ -50,6 +50,7 @@ Dr.life+（集团生活板块，柬埔寨）：先解决商家的**仓储 + 配�
 
 ## 5. 约定
 - 目录建议（可调整，须与文档一致）：`backend/`（Go：`cmd/`、`internal/<module>/`、`migrations/`、`api/openapi.yaml`）、`apps/buyer|merchant|driver|admin|wms`、`packages/ui|api-client|i18n`、`site/`（官网）、`docs/`（本仓库文档可保持在根目录）。
+- 任务领取、PR 流程与审查规则见 `docs/ops/DISPATCH.md`（与 Dr.RouteFit 一致：不自审、不合并、最终批准由负责人做）。
 - 提交信息用中文或英文均可，**一次提交一个主题**；PR 必须说明对哪些文档/表/接口有影响，**改表结构必须同时改《数据库表结构与账务详细设计》**，改接口必须同时改 `openapi.yaml`。
 - 数据库迁移只向前兼容（先加列 → 改代码 → 再删列）；账务表变更需要双人评审。
 - 不要把真实密钥、令牌、手机号、银行信息提交到仓库；示例用占位符。
