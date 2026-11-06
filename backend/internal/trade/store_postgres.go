@@ -15,6 +15,10 @@ type tradeDB interface {
 // received as values by the service and are never joined here.
 type PostgresStore struct{ db tradeDB }
 
+type EventStore interface {
+	Advance(ctx context.Context, merchantOrderID int64, from, to OrderStatus, source EventSource) (bool, error)
+}
+
 var _ Store = (*PostgresStore)(nil)
 
 func NewPostgresStore(db tradeDB) *PostgresStore { return &PostgresStore{db: db} }
@@ -50,4 +54,35 @@ func (s *PostgresStore) Create(ctx context.Context, order CreateOrder) error {
 		}
 	}
 	return tx.Commit(ctx)
+}
+
+// Advance locks the suborder, validates the domain transition, and uses the
+// source-key uniqueness constraint as the idempotency boundary.
+func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from, to OrderStatus, source EventSource) (bool, error) {
+	if _, err := Advance(from, to, source); err != nil {
+		return false, err
+	}
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var current string
+	if err := tx.QueryRow(ctx, `SELECT status FROM trade.merchant_order WHERE id=$1 FOR UPDATE`, merchantOrderID).Scan(&current); err != nil {
+		return false, err
+	}
+	if OrderStatus(current) != from {
+		return false, ErrInvalidTransition
+	}
+	ct, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,from_status,to_status,source_type,source_ref) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (merchant_order_id,source_type,source_ref) DO NOTHING`, merchantOrderID, string(from), string(to), string(source.Type), source.Reference)
+	if err != nil {
+		return false, err
+	}
+	if ct.RowsAffected() == 0 {
+		return false, tx.Commit(ctx)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE trade.merchant_order SET status=$2,version=version+1,updated_at=clock_timestamp() WHERE id=$1`, merchantOrderID, string(to)); err != nil {
+		return false, err
+	}
+	return true, tx.Commit(ctx)
 }
