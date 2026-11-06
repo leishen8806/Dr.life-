@@ -37,11 +37,11 @@ func (s *PgStore) CreateIntent(ctx context.Context, source ReceivableSnapshot) (
 		INSERT INTO trade.kess_payment_intent (public_id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (company_id, source_ref, attempt_no) DO NOTHING
-		RETURNING id, public_id, trade_no, amount_e4, currency, seller_code, status, create_attempts, created_at`, publicID, intent.CompanyID, intent.Channel, intent.TradeNo, intent.SourceRef, intent.AttemptNo, intent.AmountE4, intent.Currency, intent.ExpectedSellerCode, intent.Status).Scan(&intent.ID, &publicID, &intent.TradeNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt)
+		RETURNING id, public_id, trade_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at`, publicID, intent.CompanyID, intent.Channel, intent.TradeNo, intent.SourceRef, intent.AttemptNo, intent.AmountE4, intent.Currency, intent.ExpectedSellerCode, intent.Status).Scan(&intent.ID, &publicID, &intent.TradeNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = s.db.QueryRow(ctx, `
-			SELECT id, public_id, trade_no, amount_e4, currency, seller_code, status, create_attempts, created_at
-			FROM trade.kess_payment_intent WHERE company_id = $1 AND source_ref = $2 AND attempt_no = $3`, source.CompanyID, source.SourceRef, source.AttemptNo).Scan(&intent.ID, &publicID, &intent.TradeNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt)
+			SELECT id, public_id, trade_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at
+			FROM trade.kess_payment_intent WHERE company_id = $1 AND source_ref = $2 AND attempt_no = $3`, source.CompanyID, source.SourceRef, source.AttemptNo).Scan(&intent.ID, &publicID, &intent.TradeNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt)
 	}
 	if err != nil {
 		return Intent{}, err
@@ -55,9 +55,9 @@ func (s *PgStore) CreateIntent(ctx context.Context, source ReceivableSnapshot) (
 func (s *PgStore) Intent(ctx context.Context, id int64) (Intent, error) {
 	var intent Intent
 	err := s.db.QueryRow(ctx, `
-		SELECT id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status, create_attempts, created_at
+		SELECT id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at
 		FROM trade.kess_payment_intent WHERE id = $1`, id).Scan(
-		&intent.ID, &intent.CompanyID, &intent.Channel, &intent.TradeNo, &intent.SourceRef, &intent.AttemptNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt,
+		&intent.ID, &intent.CompanyID, &intent.Channel, &intent.TradeNo, &intent.SourceRef, &intent.AttemptNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Intent{}, ErrNotFound
@@ -76,21 +76,25 @@ func (s *PgStore) ClaimPending(ctx context.Context, id int64) (Intent, bool, err
 			FOR UPDATE SKIP LOCKED
 		)
 		UPDATE trade.kess_payment_intent AS intent
-		SET create_attempts = intent.create_attempts + 1, create_claimed_at = now()
+		SET status = CASE WHEN intent.create_attempts > 0 THEN 'UNKNOWN' ELSE intent.status END,
+			create_attempts = CASE WHEN intent.create_attempts = 0 THEN 1 ELSE intent.create_attempts END,
+			create_sent_at = CASE WHEN intent.create_attempts > 0 THEN COALESCE(intent.create_sent_at, intent.create_claimed_at) ELSE intent.create_sent_at END,
+			create_claimed_at = CASE WHEN intent.create_attempts = 0 THEN now() ELSE NULL END
 		FROM candidate WHERE intent.id = candidate.id
-		RETURNING intent.id, intent.company_id, intent.channel, intent.trade_no, intent.source_ref, intent.attempt_no, intent.amount_e4, intent.currency, intent.seller_code, intent.status, intent.create_attempts, intent.created_at`, id).Scan(
-		&intent.ID, &intent.CompanyID, &intent.Channel, &intent.TradeNo, &intent.SourceRef, &intent.AttemptNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt,
+		RETURNING intent.id, intent.company_id, intent.channel, intent.trade_no, intent.source_ref, intent.attempt_no, intent.amount_e4, intent.currency, intent.seller_code, intent.status, intent.create_attempts, intent.created_at, intent.create_sent_at`, id).Scan(
+		&intent.ID, &intent.CompanyID, &intent.Channel, &intent.TradeNo, &intent.SourceRef, &intent.AttemptNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Intent{}, false, nil
 	}
-	return intent, err == nil, err
+	return intent, err == nil && intent.Status == StatusPending, err
 }
 
 func (s *PgStore) ReleasePendingClaim(ctx context.Context, id int64) error {
 	command, err := s.db.Exec(ctx, `
-		UPDATE trade.kess_payment_intent SET create_claimed_at = NULL
-		WHERE id = $1 AND status = 'PENDING' AND create_claimed_at IS NOT NULL`, id)
+		UPDATE trade.kess_payment_intent
+		SET create_claimed_at = NULL, create_attempts = create_attempts - 1
+		WHERE id = $1 AND status = 'PENDING' AND create_claimed_at IS NOT NULL AND create_attempts > 0`, id)
 	if err != nil {
 		return err
 	}
@@ -104,9 +108,10 @@ func (s *PgStore) RecordChannelResult(ctx context.Context, id int64, from Status
 	command, err := s.db.Exec(ctx, `
 		UPDATE trade.kess_payment_intent
 		SET status = $2, channel_status = NULLIF($3, ''), channel_transaction_id = NULLIF($4, ''),
-			payment_url = COALESCE(NULLIF($5, ''), payment_url), last_checked_at = now()
+			payment_url = COALESCE(NULLIF($5, ''), payment_url), last_checked_at = now(),
+			create_sent_at = CASE WHEN $7 THEN COALESCE(create_sent_at, now()) ELSE create_sent_at END
 			, create_claimed_at = NULL
-		WHERE id = $1 AND status = $6`, id, result.Status, result.ChannelStatus, result.TransactionID, result.PaymentURL, from)
+		WHERE id = $1 AND status = $6`, id, result.Status, result.ChannelStatus, result.TransactionID, result.PaymentURL, from, result.CreateSent)
 	if err != nil {
 		return err
 	}

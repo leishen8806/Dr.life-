@@ -167,7 +167,7 @@ func TestHTTPClientRetriesOnlyDialFailure(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
 	})
 	config := validConfig(CreateServiceLower)
-	config.MaxRetries = 1
+	config.MaxRetries = intPtr(1)
 	client, err := NewHTTPClient(config, &http.Client{Transport: transport})
 	if err != nil {
 		t.Fatal(err)
@@ -177,6 +177,43 @@ func TestHTTPClientRetriesOnlyDialFailure(t *testing.T) {
 	}
 	if calls.Load() != 3 {
 		t.Fatalf("HTTP calls = %d, want 3 (dial failure + token retry + gateway)", calls.Load())
+	}
+}
+
+func TestHTTPClientAllowsZeroRetries(t *testing.T) {
+	var calls atomic.Int32
+	transport := roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return nil, &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("test dial failure")}
+	})
+	config := validConfig(CreateServiceLower)
+	config.MaxRetries = intPtr(0)
+	client, err := NewHTTPClient(config, &http.Client{Transport: transport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = client.Create(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"})
+	if calls.Load() != 1 {
+		t.Fatalf("HTTP calls = %d, want 1 with zero retries", calls.Load())
+	}
+}
+
+func TestHTTPClientClassifiesPreGatewayFailuresAsNotSent(t *testing.T) {
+	client, err := NewHTTPClient(validConfig(CreateServiceLower), &http.Client{Transport: roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusUnauthorized, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("unauthorized")), Request: request}, nil
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Create(context.Background(), Intent{AmountE4: 1, Currency: "USD"}); !errors.Is(err, ErrRequestNotSent) {
+		t.Fatalf("format error=%v, want ErrRequestNotSent", err)
+	}
+	if _, err := client.Create(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"}); !errors.Is(err, ErrRequestNotSent) {
+		t.Fatalf("token error=%v, want ErrRequestNotSent", err)
+	}
+	client.openUntil = time.Now().Add(time.Minute)
+	if _, err := client.Create(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"}); !errors.Is(err, ErrRequestNotSent) {
+		t.Fatalf("circuit error=%v, want ErrRequestNotSent", err)
 	}
 }
 
@@ -203,9 +240,100 @@ func TestHTTPClientCircuitOpensAfterRepeatedSentFailures(t *testing.T) {
 	}
 }
 
+func TestHTTPClientCircuitAllowsOneHalfOpenProbe(t *testing.T) {
+	var calls atomic.Int32
+	transport := roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+		call := calls.Add(1)
+		if call == 1 {
+			return &http.Response{StatusCode: http.StatusBadGateway, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("bad gateway")), Request: request}, nil
+		}
+		body := `{"access_token":"token","token_type":"Bearer","expires_in":60}`
+		if request.URL.Path != "/oauth/token" {
+			body = `{"success":true,"data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"1.00","currency":"USD","status":"WAITING","payment_link":"https://devwebpayment.kesspay.io/pay/a"}}`
+		}
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), Request: request}, nil
+	})
+	config := validConfig(CreateServiceLower)
+	config.CircuitFailures = 1
+	config.CircuitOpenFor = time.Millisecond
+	client, err := NewHTTPClient(config, &http.Client{Transport: transport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent := Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"}
+	_, _ = client.Create(context.Background(), intent)
+	_, _ = client.Create(context.Background(), intent)
+	time.Sleep(5 * time.Millisecond)
+	if _, err := client.Create(context.Background(), intent); err != nil {
+		t.Fatalf("half-open probe error = %v", err)
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("HTTP calls = %d, want failed token plus successful token and gateway", calls.Load())
+	}
+}
+
+func TestHTTPClientCircuitAllowsOnlyOneConcurrentHalfOpenProbe(t *testing.T) {
+	client, err := NewHTTPClient(validConfig(CreateServiceLower), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.openUntil = time.Now().Add(-time.Second)
+	if err := client.circuitReady(); err != nil {
+		t.Fatalf("first half-open probe error=%v", err)
+	}
+	if err := client.circuitReady(); err == nil {
+		t.Fatal("second concurrent half-open probe was allowed")
+	}
+	client.recordSuccess()
+	if err := client.circuitReady(); err != nil {
+		t.Fatalf("closed circuit error=%v", err)
+	}
+}
+
+func TestHTTPClientAcceptsConfiguredPaymentURLHost(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/oauth/token" {
+			_, _ = io.WriteString(writer, `{"access_token":"token","token_type":"Bearer","expires_in":60}`)
+			return
+		}
+		_, _ = io.WriteString(writer, `{"success":true,"data":{"out_trade_no":"DRL-01","seller":{"code":"seller"},"total_amount":"1.00","currency":"USD","status":"WAITING","payment_link":"https://pay.example.test/pay/a"}}`)
+	}))
+	defer server.Close()
+	config := validConfig(CreateServiceLower)
+	config.PaymentURLHost = "pay.example.test"
+	client, err := NewHTTPClient(config, sandboxHTTPClient(t, server))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Create(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHTTPClientRecognizesQueryNotFoundBody(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/oauth/token" {
+			_, _ = io.WriteString(writer, `{"access_token":"token","token_type":"Bearer","expires_in":60}`)
+			return
+		}
+		_, _ = io.WriteString(writer, `{"success":true,"data":{"status":"NOT_FOUND"}}`)
+	}))
+	defer server.Close()
+	client, err := NewHTTPClient(validConfig(CreateServiceLower), sandboxHTTPClient(t, server))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.Query(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"})
+	if !errors.Is(err, ErrChannelMissing) {
+		t.Fatalf("Query error = %v, want ErrChannelMissing", err)
+	}
+}
+
 func validConfig(service string) Config {
 	return Config{ClientID: "id", ClientSecret: "client-secret", Username: "user", Password: "password", SigningKey: "signing-key", SellerCode: "seller", CreateService: service}
 }
+
+func intPtr(value int) *int { return &value }
 
 // sandboxHTTPClient routes the fixed sandbox host to a local TLS server. The
 // client therefore exercises its real request/response decoding path without

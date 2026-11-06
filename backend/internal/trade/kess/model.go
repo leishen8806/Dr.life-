@@ -27,6 +27,7 @@ var (
 	ErrInvalidChannel = errors.New("invalid KESS channel response")
 	ErrConflict       = errors.New("kess payment intent state conflict")
 	ErrChannelMissing = errors.New("KESS order not found")
+	ErrRequestNotSent = errors.New("KESS request was not sent")
 )
 
 // Intent is the server-created receivable snapshot. AmountE4 is USD in 0.0001
@@ -44,6 +45,7 @@ type Intent struct {
 	Status             Status
 	CreateAttempts     int
 	CreatedAt          time.Time
+	LastCreateSentAt   *time.Time
 }
 
 // ReceivableSnapshot is produced by the server-side order total calculation.
@@ -72,6 +74,7 @@ type ChannelResult struct {
 	ChannelStatus string
 	TransactionID string
 	PaymentURL    string
+	CreateSent    bool
 }
 
 type Store interface {

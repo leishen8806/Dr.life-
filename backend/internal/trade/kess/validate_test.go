@@ -14,7 +14,7 @@ func TestValidateOrderRejectsMismatchedChannelFacts(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			order := valid
 			mutate(&order)
-			if _, err := validateOrder(intent, order, true); err != ErrInvalidChannel {
+			if _, err := validateOrder(intent, order, true, sandboxHost); err != ErrInvalidChannel {
 				t.Fatalf("validateOrder error = %v, want %v", err, ErrInvalidChannel)
 			}
 		})
@@ -29,7 +29,7 @@ func TestValidateOrderRejectsInvalidSuccessAndNonSandboxLink(t *testing.T) {
 		{TradeNo: "DRL-01", SellerCode: "seller", AmountE4: 123400, Currency: "USD", Status: "WAITING", PaymentURL: "https://devwebpayment.kesspay.io/not-pay/x"},
 		{TradeNo: "DRL-01", SellerCode: "seller", AmountE4: 123400, Currency: "USD", Status: "WAITING", PaymentURL: "https://user:pass@devwebpayment.kesspay.io/pay/x"},
 	} {
-		if _, err := validateOrder(intent, order, true); err != ErrInvalidChannel {
+		if _, err := validateOrder(intent, order, true, sandboxHost); err != ErrInvalidChannel {
 			t.Fatalf("validateOrder(%+v) error = %v, want %v", order, err, ErrInvalidChannel)
 		}
 	}
@@ -43,7 +43,7 @@ func TestNestedDataMustBeValidatedIndependentlyOfTopLevelSignature(t *testing.T)
 	}
 	intent := Intent{TradeNo: "DRL-01", ExpectedSellerCode: "seller", AmountE4: 123400, Currency: "USD"}
 	tamperedNestedData := ChannelOrder{TradeNo: "DRL-01", SellerCode: "seller", AmountE4: 999900, Currency: "USD", Status: "SUCCESS", TransactionID: "channel-1"}
-	if _, err := validateOrder(intent, tamperedNestedData, false); err != ErrInvalidChannel {
+	if _, err := validateOrder(intent, tamperedNestedData, false, sandboxHost); err != ErrInvalidChannel {
 		t.Fatalf("nested data accepted from top-level signature: %v", err)
 	}
 }

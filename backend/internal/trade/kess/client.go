@@ -37,9 +37,10 @@ type Config struct {
 	CreateService   string
 	SignType        string
 	Logger          *slog.Logger
-	MaxRetries      int
+	MaxRetries      *int
 	CircuitFailures int
 	CircuitOpenFor  time.Duration
+	PaymentURLHost  string
 }
 
 type HTTPClient struct {
@@ -51,6 +52,7 @@ type HTTPClient struct {
 	expiry    time.Time
 	failures  int
 	openUntil time.Time
+	halfOpen  bool
 }
 
 func NewHTTPClient(config Config, client *http.Client) (*HTTPClient, error) {
@@ -60,10 +62,14 @@ func NewHTTPClient(config Config, client *http.Client) (*HTTPClient, error) {
 	if config.SignType == "" {
 		config.SignType = SignMD5 // Pending confirmation against the KESS sandbox account.
 	}
-	if config.MaxRetries == 0 {
-		config.MaxRetries = 1
+	if config.MaxRetries == nil {
+		defaultRetries := 1
+		config.MaxRetries = &defaultRetries
 	}
-	if config.SignType != SignMD5 && config.SignType != SignHMACSHA256 || config.MaxRetries < 0 {
+	if config.PaymentURLHost == "" {
+		config.PaymentURLHost = sandboxHost
+	}
+	if config.SignType != SignMD5 && config.SignType != SignHMACSHA256 || *config.MaxRetries < 0 || !validPaymentHost(config.PaymentURLHost) {
 		return nil, ErrConfig
 	}
 	if config.CircuitFailures == 0 {
@@ -102,7 +108,7 @@ func NewHTTPClient(config Config, client *http.Client) (*HTTPClient, error) {
 func (c *HTTPClient) Create(ctx context.Context, intent Intent) (ChannelOrder, error) {
 	amount, err := FormatAmount(intent.AmountE4, intent.Currency)
 	if err != nil {
-		return ChannelOrder{}, err
+		return ChannelOrder{}, errors.Join(ErrRequestNotSent, err)
 	}
 	data, err := c.gateway(ctx, map[string]string{
 		"service": c.config.CreateService, "sign_type": c.config.SignType, "seller_code": c.config.SellerCode,
@@ -111,7 +117,7 @@ func (c *HTTPClient) Create(ctx context.Context, intent Intent) (ChannelOrder, e
 	if err != nil {
 		return ChannelOrder{}, err
 	}
-	order, err := decodeAndValidateOrder(data, intent, true)
+	order, err := decodeAndValidateOrder(data, intent, true, c.config.PaymentURLHost)
 	if err != nil {
 		c.config.Logger.ErrorContext(ctx, "KESS response order rejected", "operation", "createorder")
 	}
@@ -123,7 +129,10 @@ func (c *HTTPClient) Query(ctx context.Context, intent Intent) (ChannelOrder, er
 	if err != nil {
 		return ChannelOrder{}, err
 	}
-	order, err := decodeAndValidateOrder(data, intent, false)
+	if queryOrderMissing(data) {
+		return ChannelOrder{}, ErrChannelMissing
+	}
+	order, err := decodeAndValidateOrder(data, intent, false, c.config.PaymentURLHost)
 	if err != nil {
 		c.config.Logger.ErrorContext(ctx, "KESS response order rejected", "operation", "queryorder")
 	}
@@ -133,7 +142,7 @@ func (c *HTTPClient) Query(ctx context.Context, intent Intent) (ChannelOrder, er
 func (c *HTTPClient) gateway(ctx context.Context, fields map[string]string) (json.RawMessage, error) {
 	token, err := c.accessToken(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(ErrRequestNotSent, err)
 	}
 	fields["sign"] = signScalars(fields, c.config.SigningKey, c.config.SignType)
 	var response json.RawMessage
@@ -166,24 +175,24 @@ func (c *HTTPClient) accessToken(ctx context.Context) (string, error) {
 
 func (c *HTTPClient) post(ctx context.Context, path string, body any, bearer string, output any) error {
 	if err := c.circuitReady(); err != nil {
-		return err
+		return errors.Join(ErrRequestNotSent, err)
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return err
+		return errors.Join(ErrRequestNotSent, err)
 	}
 	var resp *http.Response
 	for attempt := 0; ; attempt++ {
 		req, requestErr := http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+path, bytes.NewReader(payload))
 		if requestErr != nil {
-			return requestErr
+			return errors.Join(ErrRequestNotSent, requestErr)
 		}
 		req.Header.Set("Content-Type", "application/json")
 		if bearer != "" {
 			req.Header.Set("Authorization", "Bearer "+bearer)
 		}
 		resp, err = c.http.Do(req)
-		if err == nil || !definitelyNotSent(err) || attempt >= c.config.MaxRetries {
+		if err == nil || !definitelyNotSent(err) || attempt >= *c.config.MaxRetries {
 			break
 		}
 		c.config.Logger.WarnContext(ctx, "KESS request retry", "operation", path, "attempt", attempt+1)
@@ -219,6 +228,12 @@ func (c *HTTPClient) circuitReady() error {
 	if time.Now().Before(c.openUntil) {
 		return fmt.Errorf("KESS circuit open: %w", ErrInvalidChannel)
 	}
+	if !c.openUntil.IsZero() {
+		if c.halfOpen {
+			return fmt.Errorf("KESS circuit half-open probe already active: %w", ErrInvalidChannel)
+		}
+		c.halfOpen = true
+	}
 	return nil
 }
 
@@ -226,8 +241,9 @@ func (c *HTTPClient) recordFailure() {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	c.failures++
-	if c.failures >= c.config.CircuitFailures {
+	if c.halfOpen || c.failures >= c.config.CircuitFailures {
 		c.openUntil = time.Now().Add(c.config.CircuitOpenFor)
+		c.halfOpen = false
 	}
 }
 
@@ -236,9 +252,13 @@ func (c *HTTPClient) recordSuccess() {
 	defer c.stateMu.Unlock()
 	c.failures = 0
 	c.openUntil = time.Time{}
+	c.halfOpen = false
 }
 
 func definitelyNotSent(err error) bool {
+	if errors.Is(err, ErrRequestNotSent) {
+		return true
+	}
 	var urlErr *url.Error
 	var opErr *net.OpError
 	return errors.As(err, &urlErr) && errors.As(urlErr.Err, &opErr) && opErr.Op == "dial"
@@ -338,13 +358,20 @@ func gatewayScalar(raw json.RawMessage) (string, bool) {
 	}
 }
 
-func decodeAndValidateOrder(raw json.RawMessage, intent Intent, requireURL bool) (ChannelOrder, error) {
+func decodeAndValidateOrder(raw json.RawMessage, intent Intent, requireURL bool, paymentURLHost string) (ChannelOrder, error) {
 	order, err := decodeOrder(raw)
 	if err != nil {
 		return ChannelOrder{}, err
 	}
-	if _, err := validateOrder(intent, order, requireURL); err != nil {
+	if _, err := validateOrder(intent, order, requireURL, paymentURLHost); err != nil {
 		return ChannelOrder{}, err
 	}
 	return order, nil
+}
+
+func queryOrderMissing(raw json.RawMessage) bool {
+	var response struct {
+		Status string `json:"status"`
+	}
+	return json.Unmarshal(raw, &response) == nil && response.Status == "NOT_FOUND"
 }

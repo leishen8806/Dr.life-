@@ -18,12 +18,13 @@ CREATE TABLE trade.kess_payment_intent (
     payment_url text,
     create_attempts integer NOT NULL DEFAULT 0 CHECK (create_attempts >= 0),
     create_claimed_at timestamptz,
+    create_sent_at timestamptz,
     last_checked_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ux_kess_payment_intent_company_source_attempt UNIQUE (company_id, source_ref, attempt_no)
 );
-CREATE INDEX ix_kess_payment_intent_recovery ON trade.kess_payment_intent (status, updated_at) WHERE status = 'UNKNOWN';
+CREATE INDEX ix_kess_payment_intent_recovery ON trade.kess_payment_intent (status, updated_at) WHERE status IN ('UNKNOWN', 'WAITING');
 
 -- Intent identity and receivable facts are immutable after persistence. The
 -- worker may only record channel facts and state observations.
@@ -33,7 +34,7 @@ BEGIN
     IF TG_OP = 'INSERT' THEN
         IF NEW.status <> 'PENDING' OR NEW.create_attempts <> 0 OR NEW.channel_status IS NOT NULL
            OR NEW.channel_transaction_id IS NOT NULL OR NEW.payment_url IS NOT NULL OR NEW.create_claimed_at IS NOT NULL
-           OR NEW.last_checked_at IS NOT NULL THEN
+           OR NEW.create_sent_at IS NOT NULL OR NEW.last_checked_at IS NOT NULL THEN
             RAISE EXCEPTION 'invalid initial kess payment intent state' USING ERRCODE = 'P0001';
         END IF;
         RETURN NEW;
@@ -61,7 +62,7 @@ FOR EACH ROW EXECUTE FUNCTION trade.guard_kess_payment_intent();
 
 REVOKE ALL ON trade.kess_payment_intent FROM trade_rw, report_ro;
 GRANT SELECT, INSERT ON trade.kess_payment_intent TO trade_rw;
-GRANT UPDATE (status, channel_status, channel_transaction_id, payment_url, create_attempts, create_claimed_at, last_checked_at) ON trade.kess_payment_intent TO trade_rw;
+GRANT UPDATE (status, channel_status, channel_transaction_id, payment_url, create_attempts, create_claimed_at, create_sent_at, last_checked_at) ON trade.kess_payment_intent TO trade_rw;
 REVOKE ALL ON SEQUENCE trade.kess_payment_intent_id_seq FROM trade_rw, report_ro, PUBLIC;
 GRANT USAGE, SELECT ON SEQUENCE trade.kess_payment_intent_id_seq TO trade_rw;
 GRANT SELECT (id, public_id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, status, channel_status, channel_transaction_id, created_at, updated_at, last_checked_at) ON trade.kess_payment_intent TO report_ro;

@@ -94,7 +94,11 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 
 	t.Run("outbound timeout sees persisted intent first", func(t *testing.T) {
 		client := persistedThenTimeout{pool: pool, intentID: intent.ID}
-		err := kess.NewWorker(store, &client, 24*time.Hour).Create(ctx, intent.ID)
+		worker, err := kess.NewWorker(store, &client, 24*time.Hour, "devwebpayment.kesspay.io")
+		if err != nil {
+			t.Fatal(err)
+		}
+		err = worker.Create(ctx, intent.ID)
 		if !errors.Is(err, context.DeadlineExceeded) {
 			t.Fatalf("Create error = %v, want deadline exceeded", err)
 		}
@@ -144,18 +148,19 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 	})
 
 	t.Run("module and report roles have narrowed privileges", func(t *testing.T) {
-		var canMutateReceivable, canRecordStatus, canDelete, canTruncate, reportReadsSeller, canUpdateSequence bool
+		var canMutateReceivable, canRecordStatus, canRecordCreateSent, canDelete, canTruncate, reportReadsSeller, canUpdateSequence bool
 		if err := pool.QueryRow(ctx, `
 			SELECT has_column_privilege('trade_rw', 'trade.kess_payment_intent', 'amount_e4', 'UPDATE'),
 			       has_column_privilege('trade_rw', 'trade.kess_payment_intent', 'status', 'UPDATE'),
+			       has_column_privilege('trade_rw', 'trade.kess_payment_intent', 'create_sent_at', 'UPDATE'),
 			       has_table_privilege('trade_rw', 'trade.kess_payment_intent', 'DELETE'),
 			       has_table_privilege('trade_rw', 'trade.kess_payment_intent', 'TRUNCATE'),
 			       has_column_privilege('report_ro', 'trade.kess_payment_intent', 'seller_code', 'SELECT'),
-			       has_sequence_privilege('trade_rw', 'trade.kess_payment_intent_id_seq', 'UPDATE')`).Scan(&canMutateReceivable, &canRecordStatus, &canDelete, &canTruncate, &reportReadsSeller, &canUpdateSequence); err != nil {
+			       has_sequence_privilege('trade_rw', 'trade.kess_payment_intent_id_seq', 'UPDATE')`).Scan(&canMutateReceivable, &canRecordStatus, &canRecordCreateSent, &canDelete, &canTruncate, &reportReadsSeller, &canUpdateSequence); err != nil {
 			t.Fatal(err)
 		}
-		if canMutateReceivable || !canRecordStatus || canDelete || canTruncate || reportReadsSeller || canUpdateSequence {
-			t.Fatalf("privileges amount=%v status=%v delete=%v truncate=%v seller=%v sequence_update=%v", canMutateReceivable, canRecordStatus, canDelete, canTruncate, reportReadsSeller, canUpdateSequence)
+		if canMutateReceivable || !canRecordStatus || !canRecordCreateSent || canDelete || canTruncate || reportReadsSeller || canUpdateSequence {
+			t.Fatalf("privileges amount=%v status=%v create_sent=%v delete=%v truncate=%v seller=%v sequence_update=%v", canMutateReceivable, canRecordStatus, canRecordCreateSent, canDelete, canTruncate, reportReadsSeller, canUpdateSequence)
 		}
 		var publicPrivileges int
 		if err := pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.table_privileges WHERE table_schema = 'trade' AND table_name = 'kess_payment_intent' AND grantee = 'PUBLIC'`).Scan(&publicPrivileges); err != nil {
@@ -163,6 +168,23 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 		}
 		if publicPrivileges != 0 {
 			t.Fatalf("PUBLIC privileges = %d, want 0", publicPrivileges)
+		}
+	})
+
+	t.Run("expired create lease becomes unknown without a second create claim", func(t *testing.T) {
+		stale, err := store.CreateIntent(ctx, kess.ReceivableSnapshot{CompanyID: 9, SourceRef: "01ARZ3NDEKTSV4RRFFQ69G5FAZ", AttemptNo: 1, AmountE4: 10000, Currency: "USD", SellerCode: "seller-test"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, claimed, err := store.ClaimPending(ctx, stale.ID); err != nil || !claimed {
+			t.Fatalf("initial claim claimed=%v error=%v", claimed, err)
+		}
+		if _, err := tradeConn.Exec(ctx, `UPDATE trade.kess_payment_intent SET create_claimed_at = now() - interval '6 minutes' WHERE id = $1`, stale.ID); err != nil {
+			t.Fatal(err)
+		}
+		got, claimed, err := store.ClaimPending(ctx, stale.ID)
+		if err != nil || claimed || got.Status != kess.StatusUnknown || got.CreateAttempts != 1 || got.LastCreateSentAt == nil {
+			t.Fatalf("expired claim = %+v claimed=%v error=%v; want UNKNOWN, unclaimed, one attempt and sent time", got, claimed, err)
 		}
 	})
 
@@ -201,11 +223,11 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 		if _, err := pool.Exec(ctx, `INSERT INTO trade.kess_payment_intent (public_id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status) VALUES ($1, 12, 'kess', $2, $1, 1, 100, 'USD', 'seller', 'PENDING')`, pendingID, "DRL-"+pendingID+"-1"); err != nil {
 			t.Fatal(err)
 		}
-		_, err = pool.Exec(ctx, `UPDATE trade.kess_payment_intent SET status = 'SUCCESS' WHERE public_id = $1`, pendingID)
+		_, err = tradeConn.Exec(ctx, `UPDATE trade.kess_payment_intent SET status = 'SUCCESS' WHERE public_id = $1`, pendingID)
 		assertPGError(t, err, "P0001", "invalid kess payment intent status transition")
 
 		const successID = "01ARZ3NDEKTSV4RRFFQ69G5FAX"
-		_, err = pool.Exec(ctx, `INSERT INTO trade.kess_payment_intent (public_id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status) VALUES ($1, 12, 'kess', $2, $1, 1, 100, 'USD', 'seller', 'SUCCESS')`, successID, "DRL-"+successID+"-1")
+		_, err = tradeConn.Exec(ctx, `INSERT INTO trade.kess_payment_intent (public_id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status) VALUES ($1, 12, 'kess', $2, $1, 1, 100, 'USD', 'seller', 'SUCCESS')`, successID, "DRL-"+successID+"-1")
 		assertPGError(t, err, "P0001", "invalid initial kess payment intent state")
 		if _, err := pool.Exec(ctx, `INSERT INTO trade.kess_payment_intent (public_id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status) VALUES ($1, 12, 'kess', $2, $1, 1, 100, 'USD', 'seller', 'PENDING')`, successID, "DRL-"+successID+"-1"); err != nil {
 			t.Fatal(err)
