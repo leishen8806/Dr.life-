@@ -31,8 +31,8 @@ export function OrderDetailView({
               <span className="buyer-order-status">{t(`order.buyerStatus.${subOrder.status}` as const)}</span>
             </div>
             <p className="buyer-order-detail__meta">{t("order.subOrder")}: {subOrder.publicId}</p>
-            <p className="buyer-order-detail__meta">{t("order.paymentStatus")}: {t(`order.payment.${subOrder.paymentStatus}` as const)}</p>
-            {subOrder.paymentStatus === "confirming" && <p className="buyer-order-warning">{t("order.paymentConfirming")}</p>}
+            <p className="buyer-order-detail__meta">{t("order.paymentStatus")}: {t(`order.payment.${order.paymentStatus}` as const)}</p>
+            {order.paymentStatus === "confirming" && <p className="buyer-order-warning">{t("order.paymentConfirming")}</p>}
             <h3 className="buyer-section__title">{t("order.itemsTitle")}</h3>
             <div className="buyer-order-lines">
               {subOrder.lines.map((line) => (

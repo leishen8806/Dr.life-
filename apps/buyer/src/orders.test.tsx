@@ -33,7 +33,7 @@ describe("buyer order mock flow", () => {
         onOpen={() => undefined}
       />
     );
-    expect(mockOrders).toHaveLength(15);
+    expect(mockOrders).toHaveLength(16);
     expect(text(markup)).toContain("Interface-stub data for the buyer order flow");
     expect(text(markup)).toContain("Awaiting payment confirmation");
     expect(text(markup)).toContain("Warehouse processing, awaiting acceptance");
