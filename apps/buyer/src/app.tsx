@@ -9,6 +9,7 @@ import {
   loadProducts
 } from "./api";
 import { appendFeed, firstFeed, nextPage, type ProductFeed } from "./feed";
+import { mockOrders, type BuyerOrder } from "./orders";
 import { addProduct, cartCount, stepQuantity, updateQuantity, type CartItem } from "./cart";
 import { errorMessageKey, type Resource } from "./resource";
 import type { Category, Product } from "./types";
@@ -16,11 +17,15 @@ import { CategoryView } from "./views/category-view";
 import { CartView } from "./views/cart-view";
 import { HomeView } from "./views/home-view";
 import { ProductDetailView } from "./views/product-detail-view";
+import { OrderDetailView } from "./views/order-detail-view";
+import { OrderListView } from "./views/order-list-view";
 
 type Route =
   | { name: "home" }
   | { name: "category"; code?: string }
   | { name: "product"; product: Product }
+  | { name: "orders" }
+  | { name: "order"; order: BuyerOrder }
   | { name: "cart" };
 
 const featuredPageSize = 6;
@@ -221,6 +226,13 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
     (product: Product) => push({ name: "product", product }),
     [push]
   );
+  const openOrders = useCallback(() => push({ name: "orders" }), [push]);
+  const openOrder = useCallback((order: BuyerOrder) => push({ name: "order", order }), [push]);
+  const loadOrders = useCallback(
+    async () => (import.meta.env.DEV ? mockOrders : []),
+    []
+  );
+  const [orders, retryOrders] = useLoaded(loadOrders);
 
   const addToCart = useCallback((product: Product) => {
     const result = addProduct(cart, product);
@@ -246,12 +258,39 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
   const actions = (
     <>
       <LanguageSwitcher />
+      <button type="button" className="buyer-orders-action" onClick={openOrders}>
+        {t("order.pageTitle")}
+      </button>
       <button type="button" className="buyer-cart-action" onClick={openCart}>
         {t("mall.cart")} <span aria-label={t("mall.cartCount", { count: cartCount(cart) })}>{cartCount(cart)}</span>
       </button>
     </>
   );
   const knownCategories = categories.status === "ready" ? categories.value : [];
+
+  if (route.name === "order")
+    return (
+      <OrderDetailView
+        t={t}
+        language={language}
+        order={route.order}
+        actions={actions}
+        onBack={back}
+      />
+    );
+
+  if (route.name === "orders")
+    return (
+      <OrderListView
+        t={t}
+        language={language}
+        orders={orders}
+        actions={actions}
+        onBack={back}
+        onRetry={retryOrders}
+        onOpen={openOrder}
+      />
+    );
 
   if (route.name === "cart")
     return (
