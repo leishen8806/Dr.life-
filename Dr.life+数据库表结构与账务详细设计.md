@@ -14,7 +14,7 @@
 |---|---|---|
 | `iam` | 账号与权限 | 人、账号、Bot 池、登录、会话、商户员工、平台管理员与角色、账号关联 |
 | `catalog` | 商品与目录 | 分类、商品、阶梯价、导入、标准分、搜索词 |
-| `trade` | 订单与项目 | 订单、询价与报价、装修项目与分批计划、付款凭证、售后 |
+| `trade` | 订单与项目 | 买家订单、商家子订单、订单事件、询价与报价、装修项目与分批计划、售后 |
 | `wms` | 仓储 | 仓库分区、库位、库存、入仓、库存流水、仓储费计提与账单 |
 | `logistics` | 物流 | 配送单、节点、司机、任务、配送费规则、签收凭证 |
 | `ledger` | **账务（核心）** | 账户、流水、分录、余额、冻结、提现、对账 |
@@ -90,14 +90,24 @@
 ### `trade`
 | 表 | 关键字段与约束 |
 |---|---|
-| `order` | id, order_no unique, buyer_account_id, merchant_id, status (`unpaid/paid_proof/shipped/arrived/closed/problem/cancelled`), total_e4, delivery_mode (`zto/self`), delivery_fee_hold_txn_id, delivery_fee_release_txn_id, problem_note, closed_at |
-| `order_item` | order_id, product_id, qty, unit_price_e4（下单时快照，含阶梯匹配结果）, vol_m3 |
-| `payment_proof` | id, order_id / plan_batch_id, amount_e4, ref, proof_file_id, recorded_by, created_at | **货款凭证，不进账务分录**（线下付款，只留痕）；流水页通过视图并列显示 |
+| `buyer_order` | id, public_id, buyer_account_id, idempotency_key, request_hash, total_e4, reservation_released_at, reservation_committed_at, refund_required_at；`UNIQUE(buyer_account_id,idempotency_key)`，一个买家一次提交产生一个父订单，金额等于其子订单金额之和；预留释放和提交标记均只允许从空值写入一次且互斥，提交标记仅在全部子订单已付款且目录预留提交成功后写入；退款标记只允许在全部子订单已付款后写入；未写入提交标记或已要求退款时均禁止进入 submitted |
+| `merchant_order` | id, public_id, buyer_order_id, merchant_id, external_order_id=`DRL-<public_id>`, status, total_e4, version；每个子订单只属于一个商家，`UNIQUE(buyer_order_id, merchant_id)`；同一父订单不得同时存在 cancelled 与 awaiting_payment 子订单 |
+| `order_line` | merchant_order_id, sku_public_id, quantity, unit_price_e4, line_total_e4；SKU 与单价均为下单快照，单价必须为整分，`line_total_e4=quantity*unit_price_e4`；仅允许在子订单 `awaiting_payment` 时插入 |
+| `reservation_release_outbox` | reservation_key, action (`release/commit/review_release`), reason, attempts, claimed_at, completed_at, next_attempt_at, created_at, updated_at；预占释放失败、付款后的预占提交以及“订单创建结果未知、释放前需复查”均持久化，消费者以 `SKIP LOCKED` 领取；同一 `(reservation_key,action)` 同时最多一条未完成动作，已完成动作保留，后续失败可生成新的动作序号重新入队；领取租约 5 分钟，worker 中断后允许重新领取；应用角色无删除权限，保留补偿审计轨迹 |
+| `payment_reconciliation_task` | buyer_order_id, source_ref, paid_amount_e4, detected_at；已付款订单出现不同 KESS 来源时按来源流水号持久化唯一对账待办，重复查单始终返回同一对账信号，不得因来源已登记而静默成功 |
+| `order_event_source` | buyer_order_id, source_type (`kess_result/routefit_event/system`), source_ref；来源引用全局唯一并绑定一个买家订单，同一来源可推进该父订单下的多个子订单 |
+| `order_event` | merchant_order_id, buyer_order_id, from_status, to_status, source_type, source_ref, created_txid, created_at；来源必须已登记且属于同一买家订单；`created_txid` 由数据库触发器强制写入当前事务号，调用方传值会被覆盖；状态变更只能使用同一数据库事务写入的匹配事件；子订单内来源组合唯一、只追加，禁止 UPDATE/DELETE/TRUNCATE |
 | `rfq` | id, buyer_account_id, name, area/loc, category_id, qty_text, budget_e4, due_date, target_merchant_id, status |
 | `quote` | id, rfq_id, merchant_id, price_e4, lead_days, valid_until, note, selected boolean；`UNIQUE(rfq_id,merchant_id)` |
 | `project` | id, buyer_account_id, company_merchant_id, name, area, budget_e4, status |
 | `pay_plan` / `pay_plan_batch` | plan: id, project_id, total_e4, status；batch: id, plan_id, seq, payee_merchant_id, amount_e4, condition, status (`planned/frozen/released/disputed/refunded`), freeze_txn_id, release_txn_id；**`SUM(batch.amount)=plan.total`（应用层 + 触发器）** |
-| `after_sale` | id, order_id, kind (`refund/return/damage`), status, initiator, decided_by, amount_e4, ledger_txn_id |
+| `after_sale` | id, merchant_order_id（指向子订单）, kind (`refund/return/damage`), status, initiator, decided_by, amount_e4, ledger_txn_id |
+
+子订单主线状态为 `awaiting_payment → paid → submitted → accepted → in_fulfillment → shipped → delivered_verified → settled`；本阶段还允许 `awaiting_payment → cancelled` 与 `submitted → rejected`。同一父订单采用整笔付款：任一未付款子订单取消时，同父订单其余 `awaiting_payment` 子订单在同一事务内一并取消，禁止形成“部分取消、部分待付款”的不可支付批次。释放目录预留时也先锁父订单并取消全部未付款子订单，买家端不再显示付款入口。`rejected/cancelled/delivery_failed/returning/returned/exception` 为旁路状态，其他迁移由后续任务实现。以上模型取代旧 `order` 的 `unpaid/paid_proof/shipped/arrived/closed/problem/cancelled` 状态和 `order_item`；线下 `payment_proof` 已取消，不再作为订单领域模型。父订单金额由延迟约束校验为子订单金额之和，子订单金额同样校验为订单行金额之和。
+
+付款成功必须调用受限的父订单批量入口 `trade.confirm_order_payment`：先锁父订单，核对实付金额等于 `buyer_order.total_e4` 且预留未释放/订单未取消，再在同一事务中写入 `commit` 补偿动作、为全部子订单写事件并转为 `paid`。普通子订单状态入口不得执行 `awaiting_payment → paid` 或取消，取消统一走 `ReleaseReservations`，在一个事务内先写释放标记与 release outbox，再取消全部未付款子订单；数据库触发器拒绝缺少该持久释放证据的直接取消。取消或释放后付款统一返回 SQLSTATE `TR001`，金额不符返回 `TR002`，部分取消由延迟约束以 `TR003` 拒绝。已付订单收到相同 KESS 来源是幂等重放，即使部分子订单已推进也不得报错；收到新的来源时保留来源记录、持久化 `payment_reconciliation_task` 并返回 `reconciliation_required`，由 Go 层转换为 `ErrPaymentReconciliation`，同一来源后续重放仍返回该信号，不得静默成功。数据库付款成功后必须幂等提交目录预留，并由同步路径或 worker 在同一事务中持久化 `reservation_committed_at`、完成 commit 动作；该标记缺失时数据库拒绝进入 submitted。目录 `Release` 在 `Commit` 之后必须为空操作。若付款落库后目录 `Commit` 明确返回 `ErrReservationReleased`，订单必须持久化 `refund_required_at`、终止 commit 补偿且禁止进入 submitted；其他瞬时提交失败由持久化消费者或付款结果重放继续重试，不得重复付款。订单创建结果不确定且二次查询失败时写入 `review_release`，消费者重新确认订单不存在后才释放预留；若数据库整体故障导致订单与 `review_release` 均无法写入，由目录预占超时机制兜底回收，恢复后需核对超时回收记录。
+
+本阶段已提供 `ProcessReservationActions` 消费入口与重试/并发领取测试，但正式 worker 的定时接线要等目录适配器进入应用装配后完成。在此之前，即时提交与付款结果重放可以完成 `commit`；即时 `release` 失败会持久化待处理，但不能声称已具备无人值守自动恢复，运维须监控该表积压。
 
 ### `wms`
 | 表 | 关键字段与约束 |
@@ -299,7 +309,7 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 | 6.17 | **应付中通付款** | `carrier_pay` | DR `PAYABLE_CARRIER` / CR `BANK_DEDICATED` | 对应中通对账单；双人复核 |
 | 6.18 | **冲销** | `reversal` | 原交易分录**借贷互换**（逐条对称） | 指向 `reverses_txn_id`；已冲销的交易不得再次冲销；需"资金"编辑权限并写审计 |
 | 6.19 | **对账差异调整** | `bank_diff` | 差异金额入 `SUSPENSE`（DR/CR `BANK_DEDICATED` 对 `SUSPENSE`） | **`SUSPENSE` 余额必须在 N 天内清零**，超期告警 |
-| — | **货款凭证**（买家线下付商家） | 不入账 | 写 `trade.payment_proof` | **不进分录**，流水页并列显示"凭证（仅留痕）" |
+| — | **货款凭证**（停用，见 D3 / 6-B） | 不入账 | `trade.payment_proof` 表保留但不再写入 | 买家货款改由 KESS 收款并按 6-B 入账 |
 
 #### 6.18 冲销补充规则
 
