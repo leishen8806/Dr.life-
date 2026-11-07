@@ -7,7 +7,7 @@
 ## 与产品事实一致的关键点（审校时重点核对）
 
 - 平台销售佣金 0%，结算服务费 0；仓储费按体积收；配送费由商家发货时预付并托管，签收后分账；平台不向司机收费。
-- 客户资金由合作银行专用账户持有，平台不动用，不放贷，不担保；买家与商家货款线下付，平台只记凭证。
+- 客户资金由合作银行专用账户持有，平台不动用，不放贷，不担保；商城订单通过 KESS 收款并按订单托管。本文仍是法律草案，KESS 条款须经柬埔寨律师复核后发布。
 - AI：回答仅供参考；外部接口（DeepSeek、OpenAI ChatGPT）发送前去除个人信息、不得用于训练；另有自建 Ollama；画像只存标签和匿名编号，不含聊天原文；画像默认不用于广告定向。
 - 用户权利：查看、更正、删除、撤回同意、导出、注销；有法定保留的账务数据只做匿名化。
 
@@ -28,7 +28,7 @@ DR.LIFE+（以下简称“平台”）通过 Telegram Mini App 提供建材装�
 你通过 Telegram 账号登录。每个人在每种角色（买家、商家、司机）下各有一个账号。请提供真实信息，保管好账号，不得转让他人。商家老板可以添加员工，并对员工的操作负责。
 
 3. 平台角色与边界
-平台是信息与服务平台。买家与商家之间的货款在平台之外支付，平台只记录付款凭证。平台不放贷，不提供担保。
+平台是信息与服务平台。商城订单通过 KESS 收款，资金进入合作银行专用账户，并按订单规则托管和结算；平台不得动用客户资金。平台不放贷，不提供担保。本条须经柬埔寨律师复核后发布。
 
 4. 费用
 平台销售佣金为 0%，结算服务费为 0。仓储费按体积计费（美元/立方米/月），以平台公示的价格为准。配送费由商家在发货时预付并托管，买家签收后分账。平台不向司机收取任何费用。费用调整会提前通知。
@@ -77,7 +77,7 @@ DR.LIFE+ (the “Platform”) provides, through Telegram Mini Apps, product list
 You sign in with your Telegram account. Each person has one account per role (buyer, merchant, driver). Provide true information, keep your account secure and do not transfer it. A merchant owner may add staff and is responsible for their actions.
 
 3. Role and limits of the Platform
-The Platform is an information and service platform. Payment for goods between buyer and merchant is made outside the Platform; the Platform only records payment proof. The Platform does not lend and does not guarantee.
+The Platform is an information and service platform. Marketplace orders are collected through KESS into the dedicated account held by the partner bank, then held and settled under the order rules; the Platform may not use customer funds. The Platform does not lend or guarantee. This clause requires review by a Cambodian lawyer before publication.
 
 4. Fees
 Sales commission is 0% and the settlement service fee is 0. Storage is billed by volume (USD per cubic metre per month) at the published price. Delivery fees are prepaid by the merchant when goods are shipped and held in escrow, then split after the buyer signs for the goods. The Platform charges drivers nothing. Fee changes are announced in advance.
@@ -126,7 +126,7 @@ DR.LIFE+ (ហៅថា «វេទិកា») ផ្តល់សេវាតា
 អ្នកចូលតាមគណនី Telegram។ មនុស្សម្នាក់មានគណនីមួយក្នុងតួនាទីនីមួយៗ (អ្នកទិញ អ្នកលក់ អ្នកបើកបរ)។ សូមផ្តល់ព័ត៌មានពិត រក្សាសុវត្ថិភាពគណនី និងមិនផ្ទេរឱ្យអ្នកដទៃ។ ម្ចាស់ហាងអាចបន្ថែមបុគ្គលិក ហើយទទួលខុសត្រូវចំពោះសកម្មភាពរបស់បុគ្គលិក។
 
 ៣. តួនាទី និងព្រំដែនវេទិកា
-វេទិកាជាកន្លែងផ្តល់ព័ត៌មាន និងសេវា។ ការបង់ប្រាក់ទំនិញរវាងអ្នកទិញ និងអ្នកលក់ធ្វើក្រៅវេទិកា វេទិកាគ្រាន់តែកត់ត្រាភស្តុតាងបង់ប្រាក់។ វេទិកាមិនផ្តល់កម្ចី និងមិនធានាឡើយ។
+វេទិកាជាកន្លែងផ្តល់ព័ត៌មាន និងសេវា។ ការបញ្ជាទិញក្នុងផ្សារទទួលការបង់ប្រាក់តាម KESS ហើយប្រាក់ចូលគណនីឧទ្ទិសដែលកាន់កាប់ដោយធនាគារដៃគូ បន្ទាប់មកត្រូវបានទុកជាប្រាក់ធានា និងទូទាត់តាមច្បាប់នៃការបញ្ជាទិញ។ វេទិកាមិនអាចប្រើប្រាក់របស់អតិថិជន មិនផ្តល់កម្ចី និងមិនធានាឡើយ។ ប្រការនេះត្រូវឱ្យមេធាវីកម្ពុជាពិនិត្យមុនពេលបោះពុម្ព។
 
 ៤. ថ្លៃសេវា
 កម្រៃលក់ ០% ថ្លៃសេវាទូទាត់ ០។ ថ្លៃឃ្លាំងគិតតាមមាឌ (ដុល្លារ/ម៉ែត្រគូប/ខែ) តាមតម្លៃដែលបានបង្ហាញ។ ថ្លៃដឹកជញ្ជូនត្រូវបង់ជាមុនដោយអ្នកលក់ពេលបញ្ជូនទំនិញ ទុកជាប្រាក់បញ្ញើ ហើយបែងចែកបន្ទាប់ពីអ្នកទិញទទួលទំនិញ។ វេទិកាមិនយកថ្លៃពីអ្នកបើកបរ។ ការផ្លាស់ប្តូរថ្លៃនឹងជូនដំណឹងជាមុន។
@@ -174,7 +174,7 @@ DR.LIFE+ 隐私政策
 本政策适用于 DR.LIFE+（以下简称“我们”）的买家、商家、司机 Mini App 及相关服务。运营主体：[公司名称，须填写]；联系方式：https://settlecore.org/contact。
 
 2. 我们收集哪些信息
-① Telegram 用户编号、昵称、界面语言；② 你提供的资料：姓名、手机号、地址、企业资料；③ 交易与资金记录：订单、付款凭证、钱包流水、提现账户；④ 使用信息：设备、页面访问、点击等（用匿名编号记录）；⑤ AI 聊天内容，以及由此总结的基础信息和兴趣标签；⑥ 你上传的照片和凭证；⑦ 司机端在执行任务期间的位置。
+① Telegram 用户编号、昵称、界面语言；② 你提供的资料：姓名、手机号、地址、企业资料；③ 交易与资金记录：订单、KESS 支付意向与查单结果、托管记录、钱包流水、提现账户；历史 `payment_proof` 仅为旧数据，不再新增；④ 使用信息：设备、页面访问、点击等（用匿名编号记录）；⑤ AI 聊天内容，以及由此总结的基础信息和兴趣标签；⑥ 你上传的照片和凭证；⑦ 司机端在执行任务期间的位置。
 
 3. 我们如何使用
 提供和改进服务；处理订单、配送、结算与对账；发送订单和资金通知；风险控制和合规审计；根据你的兴趣推荐商品。
@@ -220,7 +220,7 @@ Version 1.0 · Effective 2026-10-09
 This policy applies to the buyer, merchant and driver Mini Apps and related services of DR.LIFE+ (“we”). Operator: [company name, to be filled in]. Contact: https://settlecore.org/contact.
 
 2. What we collect
-(1) Telegram user ID, name and interface language; (2) information you provide: name, phone number, address, business details; (3) transaction and funds records: orders, payment proof, wallet entries, withdrawal accounts; (4) usage information: device, page views and clicks (recorded under a pseudonymous ID); (5) AI chat content and the basic information and interest tags summarised from it; (6) photos and proofs you upload; (7) drivers’ location while performing tasks.
+(1) Telegram user ID, name and interface language; (2) information you provide: name, phone number, address, business details; (3) transaction and funds records: orders, KESS payment intents and query results, holds, wallet entries and withdrawal accounts; historical `payment_proof` records are retained but no longer created; (4) usage information: device, page views and clicks (recorded under a pseudonymous ID); (5) AI chat content and the basic information and interest tags summarised from it; (6) photos and proofs you upload; (7) drivers’ location while performing tasks.
 
 3. How we use it
 To provide and improve the service; to process orders, delivery, settlement and reconciliation; to send order and funds notifications; for risk control and compliance audit; and to recommend products based on your interests.
@@ -266,7 +266,7 @@ https://settlecore.org/contact
 គោលការណ៍នេះអនុវត្តចំពោះ Mini App អ្នកទិញ អ្នកលក់ អ្នកបើកបរ និងសេវាពាក់ព័ន្ធរបស់ DR.LIFE+ (ហៅថា «យើង»)។ ប្រតិបត្តិករ៖ [ឈ្មោះក្រុមហ៊ុន ត្រូវបំពេញ]។ ទំនាក់ទំនង៖ https://settlecore.org/contact។
 
 ២. ព័ត៌មានដែលយើងប្រមូល
-១) លេខអ្នកប្រើ Telegram ឈ្មោះ និងភាសា ២) ព័ត៌មានដែលអ្នកផ្តល់៖ ឈ្មោះ លេខទូរស័ព្ទ អាសយដ្ឋាន ព័ត៌មានអាជីវកម្ម ៣) កំណត់ត្រាប្រតិបត្តិការ និងប្រាក់៖ ការបញ្ជាទិញ ភស្តុតាងបង់ប្រាក់ ចលនាកាបូប គណនីដកប្រាក់ ៤) ព័ត៌មានប្រើប្រាស់៖ ឧបករណ៍ ទំព័រដែលបានមើល ការចុច (កត់ត្រាដោយលេខអនាមិក) ៥) ខ្លឹមសារជជែកជាមួយ AI និងព័ត៌មានមូលដ្ឋាន និងស្លាកចំណូលចិត្តដែលសង្ខេបពីវា ៦) រូបថត និងភស្តុតាងដែលអ្នកផ្ទុកឡើង ៧) ទីតាំងរបស់អ្នកបើកបរក្នុងអំឡុងពេលអនុវត្តភារកិច្ច។
+១) លេខអ្នកប្រើ Telegram ឈ្មោះ និងភាសា ២) ព័ត៌មានដែលអ្នកផ្តល់៖ ឈ្មោះ លេខទូរស័ព្ទ អាសយដ្ឋាន ព័ត៌មានអាជីវកម្ម ៣) កំណត់ត្រាប្រតិបត្តិការ និងប្រាក់៖ ការបញ្ជាទិញ បំណងបង់ប្រាក់ KESS និងលទ្ធផលសាកសួរ កំណត់ត្រាប្រាក់ធានា ចលនាកាបូប និងគណនីដកប្រាក់; កំណត់ត្រា `payment_proof` ចាស់ត្រូវបានរក្សាទុក ប៉ុន្តែមិនបង្កើតថ្មីទៀតទេ ៤) ព័ត៌មានប្រើប្រាស់៖ ឧបករណ៍ ទំព័រដែលបានមើល ការចុច (កត់ត្រាដោយលេខអនាមិក) ៥) ខ្លឹមសារជជែកជាមួយ AI និងព័ត៌មានមូលដ្ឋាន និងស្លាកចំណូលចិត្តដែលសង្ខេបពីវា ៦) រូបថត និងភស្តុតាងដែលអ្នកផ្ទុកឡើង ៧) ទីតាំងរបស់អ្នកបើកបរក្នុងអំឡុងពេលអនុវត្តភារកិច្ច។
 
 ៣. យើងប្រើប្រាស់យ៉ាងដូចម្តេច
 ដើម្បីផ្តល់ និងកែលម្អសេវា ដំណើរការការបញ្ជាទិញ ការដឹកជញ្ជូន ការទូទាត់ និងការផ្ទៀងផ្ទាត់ ផ្ញើការជូនដំណឹងអំពីការបញ្ជាទិញ និងប្រាក់ គ្រប់គ្រងហានិភ័យ និងសវនកម្ម និងណែនាំទំនិញតាមចំណូលចិត្តរបស់អ្នក។
