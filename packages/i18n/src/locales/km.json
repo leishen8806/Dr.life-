@@ -212,6 +212,7 @@
 ,"mall.cartAvailable": "[TODO-KM-REVIEW] មានលក់៖ {quantity}"
 ,"mall.cartOutOfStock": "[TODO-KM-REVIEW] បរិមាណលើសស្តុកដែលមាន។"
 ,"mall.cartBelowMoq": "[TODO-KM-REVIEW] បរិមាណទាបជាងចំនួនអប្បបរមា។"
+,"mall.cartIntegerOnly": "[TODO-KM-REVIEW] បរិមាណត្រូវតែជាចំនួនគត់។"
 ,"mall.cartRemove": "[TODO-KM-REVIEW] លុបចេញ"
 ,"mall.cartSubtotal": "[TODO-KM-REVIEW] សរុបតាមអ្នកផ្គត់ផ្គង់"
 ,"mall.cartTotal": "[TODO-KM-REVIEW] សរុប"
