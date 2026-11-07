@@ -325,7 +325,7 @@ BEGIN
         IF target_committed_at IS NULL THEN
             INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
             VALUES (target_reservation_key,'commit','payment_confirmed')
-            ON CONFLICT (reservation_key,action) WHERE completed_at IS NULL DO NOTHING;
+            ON CONFLICT DO NOTHING;
         END IF;
         applied := false;
         reconciliation_required := false;
@@ -343,7 +343,7 @@ BEGIN
 
     INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
     VALUES (target_reservation_key,'commit','payment_confirmed')
-    ON CONFLICT (reservation_key,action) WHERE completed_at IS NULL DO NOTHING;
+    ON CONFLICT DO NOTHING;
 
     INSERT INTO trade.payment_transition_guard (txid,buyer_order_id) VALUES (txid_current(),target_id);
     INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref)
