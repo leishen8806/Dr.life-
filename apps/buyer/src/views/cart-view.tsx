@@ -18,7 +18,7 @@ function groupItems(items: readonly CartItem[]) {
 function errorLabel(t: LocaleProps["t"], error?: CartError) {
   if (error === "overAvailable") return t("mall.cartOutOfStock");
   if (error === "belowMoq") return t("mall.cartBelowMoq");
-  return error === "invalidQuantity" ? t("common.failure") : undefined;
+  return error === "invalidQuantity" ? t("mall.cartIntegerOnly") : undefined;
 }
 
 export function CartView({
@@ -74,9 +74,9 @@ export function CartView({
                           <button type="button" aria-label={`${t("mall.cartQuantity")} -`} onClick={() => onStepQuantity(item, -1)}>−</button>
                           <input
                             aria-label={t("mall.cartQuantity")}
-                            inputMode="decimal"
+                            inputMode="numeric"
                             min="0"
-                            step="any"
+                            step="1"
                             type="number"
                             value={item.quantity}
                             onChange={(event) => onUpdateQuantity(item, event.target.value)}

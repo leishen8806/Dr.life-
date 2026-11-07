@@ -212,6 +212,7 @@
 ,"mall.cartAvailable": "可售：{quantity}"
 ,"mall.cartOutOfStock": "数量超过可售量。"
 ,"mall.cartBelowMoq": "数量低于起订量。"
+,"mall.cartIntegerOnly": "数量必须是整数。"
 ,"mall.cartRemove": "移除"
 ,"mall.cartSubtotal": "商家小计"
 ,"mall.cartTotal": "合计"
