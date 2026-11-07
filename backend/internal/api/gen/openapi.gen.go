@@ -4,6 +4,7 @@
 package gen
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -422,6 +423,36 @@ func (e AuditListSuccessResponseOk) Valid() bool {
 	}
 }
 
+// Defines values for BuyerOrderListSuccessResponseOk.
+const (
+	BuyerOrderListSuccessResponseOkTrue BuyerOrderListSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the BuyerOrderListSuccessResponseOk enum.
+func (e BuyerOrderListSuccessResponseOk) Valid() bool {
+	switch e {
+	case BuyerOrderListSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for BuyerOrderSuccessResponseOk.
+const (
+	BuyerOrderSuccessResponseOkTrue BuyerOrderSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the BuyerOrderSuccessResponseOk enum.
+func (e BuyerOrderSuccessResponseOk) Valid() bool {
+	switch e {
+	case BuyerOrderSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CategoryListSuccessResponseOk.
 const (
 	CategoryListSuccessResponseOkTrue CategoryListSuccessResponseOk = true
@@ -529,13 +560,13 @@ func (e ErrorCode) Valid() bool {
 
 // Defines values for ErrorEnvelopeOk.
 const (
-	False ErrorEnvelopeOk = false
+	ErrorEnvelopeOkFalse ErrorEnvelopeOk = false
 )
 
 // Valid indicates whether the value is a known member of the ErrorEnvelopeOk enum.
 func (e ErrorEnvelopeOk) Valid() bool {
 	switch e {
-	case False:
+	case ErrorEnvelopeOkFalse:
 		return true
 	default:
 		return false
@@ -710,6 +741,174 @@ const (
 func (e LedgerReadSuccessResponseOk) Valid() bool {
 	switch e {
 	case LedgerReadSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MerchantSuborderListSuccessResponseOk.
+const (
+	MerchantSuborderListSuccessResponseOkTrue MerchantSuborderListSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the MerchantSuborderListSuccessResponseOk enum.
+func (e MerchantSuborderListSuccessResponseOk) Valid() bool {
+	switch e {
+	case MerchantSuborderListSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MerchantSuborderSuccessResponseOk.
+const (
+	MerchantSuborderSuccessResponseOkTrue MerchantSuborderSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the MerchantSuborderSuccessResponseOk enum.
+func (e MerchantSuborderSuccessResponseOk) Valid() bool {
+	switch e {
+	case MerchantSuborderSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OrderErrorCode.
+const (
+	OrderAmountMismatch      OrderErrorCode = 3004
+	OrderCancelledOrReleased OrderErrorCode = 3003
+	OrderInsufficientStock   OrderErrorCode = 3002
+	OrderInvalidItem         OrderErrorCode = 3001
+	OrderStateConflict       OrderErrorCode = 3005
+)
+
+// Valid indicates whether the value is a known member of the OrderErrorCode enum.
+func (e OrderErrorCode) Valid() bool {
+	switch e {
+	case OrderAmountMismatch:
+		return true
+	case OrderCancelledOrReleased:
+		return true
+	case OrderInsufficientStock:
+		return true
+	case OrderInvalidItem:
+		return true
+	case OrderStateConflict:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OrderErrorEnvelopeOk.
+const (
+	OrderErrorEnvelopeOkFalse OrderErrorEnvelopeOk = false
+)
+
+// Valid indicates whether the value is a known member of the OrderErrorEnvelopeOk enum.
+func (e OrderErrorEnvelopeOk) Valid() bool {
+	switch e {
+	case OrderErrorEnvelopeOkFalse:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OrderPaymentSuccessResponseOk.
+const (
+	OrderPaymentSuccessResponseOkTrue OrderPaymentSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the OrderPaymentSuccessResponseOk enum.
+func (e OrderPaymentSuccessResponseOk) Valid() bool {
+	switch e {
+	case OrderPaymentSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OrderStatus.
+const (
+	OrderStatusAccepted          OrderStatus = "accepted"
+	OrderStatusAwaitingPayment   OrderStatus = "awaiting_payment"
+	OrderStatusCancelled         OrderStatus = "cancelled"
+	OrderStatusDeliveredVerified OrderStatus = "delivered_verified"
+	OrderStatusDeliveryFailed    OrderStatus = "delivery_failed"
+	OrderStatusException         OrderStatus = "exception"
+	OrderStatusInFulfillment     OrderStatus = "in_fulfillment"
+	OrderStatusPaid              OrderStatus = "paid"
+	OrderStatusRejected          OrderStatus = "rejected"
+	OrderStatusReturned          OrderStatus = "returned"
+	OrderStatusReturning         OrderStatus = "returning"
+	OrderStatusSettled           OrderStatus = "settled"
+	OrderStatusShipped           OrderStatus = "shipped"
+	OrderStatusSubmitted         OrderStatus = "submitted"
+)
+
+// Valid indicates whether the value is a known member of the OrderStatus enum.
+func (e OrderStatus) Valid() bool {
+	switch e {
+	case OrderStatusAccepted:
+		return true
+	case OrderStatusAwaitingPayment:
+		return true
+	case OrderStatusCancelled:
+		return true
+	case OrderStatusDeliveredVerified:
+		return true
+	case OrderStatusDeliveryFailed:
+		return true
+	case OrderStatusException:
+		return true
+	case OrderStatusInFulfillment:
+		return true
+	case OrderStatusPaid:
+		return true
+	case OrderStatusRejected:
+		return true
+	case OrderStatusReturned:
+		return true
+	case OrderStatusReturning:
+		return true
+	case OrderStatusSettled:
+		return true
+	case OrderStatusShipped:
+		return true
+	case OrderStatusSubmitted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PaymentStatus.
+const (
+	PaymentStatusConfirming PaymentStatus = "confirming"
+	PaymentStatusFailed     PaymentStatus = "failed"
+	PaymentStatusPending    PaymentStatus = "pending"
+	PaymentStatusRefunded   PaymentStatus = "refunded"
+	PaymentStatusSucceeded  PaymentStatus = "succeeded"
+)
+
+// Valid indicates whether the value is a known member of the PaymentStatus enum.
+func (e PaymentStatus) Valid() bool {
+	switch e {
+	case PaymentStatusConfirming:
+		return true
+	case PaymentStatusFailed:
+		return true
+	case PaymentStatusPending:
+		return true
+	case PaymentStatusRefunded:
+		return true
+	case PaymentStatusSucceeded:
 		return true
 	default:
 		return false
@@ -1658,6 +1857,74 @@ type AuditRecord struct {
 	Ts        time.Time              `json:"ts"`
 }
 
+// BuyerOrder defines model for BuyerOrder.
+type BuyerOrder struct {
+	CreatedAt time.Time `json:"created_at"`
+
+	// GoodsAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	GoodsAmountE4 OrderMoneyE4 `json:"goods_amount_e4"`
+
+	// PayableAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	PayableAmountE4 OrderMoneyE4 `json:"payable_amount_e4"`
+
+	// PaymentStatus Payment result tracked independently from merchant-suborder state.
+	PaymentStatus           PaymentStatus `json:"payment_status"`
+	PublicId                string        `json:"public_id"`
+	ShippingAddressPublicId string        `json:"shipping_address_public_id"`
+
+	// ShippingAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	ShippingAmountE4 OrderMoneyE4    `json:"shipping_amount_e4"`
+	Suborders        []BuyerSuborder `json:"suborders"`
+
+	// SummaryStatus Server-derived display summary of the suborders. Suborder status values remain authoritative; the aggregation rule must be fixed before handler implementation.
+	SummaryStatus string    `json:"summary_status"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// BuyerOrderListData defines model for BuyerOrderListData.
+type BuyerOrderListData struct {
+	Items      []BuyerOrder `json:"items"`
+	NextCursor *string      `json:"next_cursor"`
+}
+
+// BuyerOrderListSuccessResponse defines model for BuyerOrderListSuccessResponse.
+type BuyerOrderListSuccessResponse struct {
+	Data      BuyerOrderListData              `json:"data"`
+	Ok        BuyerOrderListSuccessResponseOk `json:"ok"`
+	RequestId string                          `json:"request_id"`
+}
+
+// BuyerOrderListSuccessResponseOk defines model for BuyerOrderListSuccessResponse.Ok.
+type BuyerOrderListSuccessResponseOk bool
+
+// BuyerOrderSuccessResponse defines model for BuyerOrderSuccessResponse.
+type BuyerOrderSuccessResponse struct {
+	Data      BuyerOrder                  `json:"data"`
+	Ok        BuyerOrderSuccessResponseOk `json:"ok"`
+	RequestId string                      `json:"request_id"`
+}
+
+// BuyerOrderSuccessResponseOk defines model for BuyerOrderSuccessResponse.Ok.
+type BuyerOrderSuccessResponseOk bool
+
+// BuyerSuborder defines model for BuyerSuborder.
+type BuyerSuborder struct {
+	// GoodsAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	GoodsAmountE4    OrderMoneyE4        `json:"goods_amount_e4"`
+	Items            []OrderLineSnapshot `json:"items"`
+	MerchantPublicId string              `json:"merchant_public_id"`
+
+	// PayableAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	PayableAmountE4 OrderMoneyE4 `json:"payable_amount_e4"`
+	PublicId        string       `json:"public_id"`
+
+	// ShippingAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	ShippingAmountE4 OrderMoneyE4 `json:"shipping_amount_e4"`
+
+	// Status Authoritative merchant-suborder state. Parent-order status is a derived summary only.
+	Status OrderStatus `json:"status"`
+}
+
 // Category defines model for Category.
 type Category struct {
 	Code        string  `json:"code"`
@@ -1890,12 +2157,132 @@ type MerchantBalance struct {
 	MerchantId  int64 `json:"merchant_id"`
 }
 
+// MerchantSuborder One suborder scoped to the authenticated merchant; sibling merchant data is never included.
+type MerchantSuborder struct {
+	CreatedAt time.Time `json:"created_at"`
+
+	// GoodsAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	GoodsAmountE4  OrderMoneyE4        `json:"goods_amount_e4"`
+	Items          []OrderLineSnapshot `json:"items"`
+	ParentPublicId string              `json:"parent_public_id"`
+
+	// PayableAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	PayableAmountE4         OrderMoneyE4 `json:"payable_amount_e4"`
+	PublicId                string       `json:"public_id"`
+	ShippingAddressPublicId string       `json:"shipping_address_public_id"`
+
+	// ShippingAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	ShippingAmountE4 OrderMoneyE4 `json:"shipping_amount_e4"`
+
+	// Status Authoritative merchant-suborder state. Parent-order status is a derived summary only.
+	Status    OrderStatus `json:"status"`
+	UpdatedAt time.Time   `json:"updated_at"`
+}
+
+// MerchantSuborderListData defines model for MerchantSuborderListData.
+type MerchantSuborderListData struct {
+	Items      []MerchantSuborder `json:"items"`
+	NextCursor *string            `json:"next_cursor"`
+}
+
+// MerchantSuborderListSuccessResponse defines model for MerchantSuborderListSuccessResponse.
+type MerchantSuborderListSuccessResponse struct {
+	Data      MerchantSuborderListData              `json:"data"`
+	Ok        MerchantSuborderListSuccessResponseOk `json:"ok"`
+	RequestId string                                `json:"request_id"`
+}
+
+// MerchantSuborderListSuccessResponseOk defines model for MerchantSuborderListSuccessResponse.Ok.
+type MerchantSuborderListSuccessResponseOk bool
+
+// MerchantSuborderSuccessResponse defines model for MerchantSuborderSuccessResponse.
+type MerchantSuborderSuccessResponse struct {
+	// Data One suborder scoped to the authenticated merchant; sibling merchant data is never included.
+	Data      MerchantSuborder                  `json:"data"`
+	Ok        MerchantSuborderSuccessResponseOk `json:"ok"`
+	RequestId string                            `json:"request_id"`
+}
+
+// MerchantSuborderSuccessResponseOk defines model for MerchantSuborderSuccessResponse.Ok.
+type MerchantSuborderSuccessResponseOk bool
+
 // Messages defines model for Messages.
 type Messages struct {
 	En string `json:"en"`
 	Km string `json:"km"`
 	Zh string `json:"zh"`
 }
+
+// OrderCreateItem defines model for OrderCreateItem.
+type OrderCreateItem struct {
+	Quantity    int64  `json:"quantity"`
+	SkuPublicId string `json:"sku_public_id"`
+}
+
+// OrderCreateRequest defines model for OrderCreateRequest.
+type OrderCreateRequest struct {
+	Items []OrderCreateItem `json:"items"`
+
+	// ShippingAddressPublicId Reference to a saved address owned by the authenticated buyer; address details are resolved by the server.
+	ShippingAddressPublicId string `json:"shipping_address_public_id"`
+}
+
+// OrderErrorBody defines model for OrderErrorBody.
+type OrderErrorBody struct {
+	// Code Order-domain error code reserved by this contract; handler wiring is deferred to
+	Code    OrderErrorCode `json:"code"`
+	Message Messages       `json:"message"`
+}
+
+// OrderErrorCode Order-domain error code reserved by this contract; handler wiring is deferred to
+type OrderErrorCode int32
+
+// OrderErrorEnvelope defines model for OrderErrorEnvelope.
+type OrderErrorEnvelope struct {
+	Error     OrderErrorBody       `json:"error"`
+	Ok        OrderErrorEnvelopeOk `json:"ok"`
+	RequestId string               `json:"request_id"`
+}
+
+// OrderErrorEnvelopeOk defines model for OrderErrorEnvelope.Ok.
+type OrderErrorEnvelopeOk bool
+
+// OrderLineSnapshot defines model for OrderLineSnapshot.
+type OrderLineSnapshot struct {
+	// LineTotalE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	LineTotalE4 OrderMoneyE4 `json:"line_total_e4"`
+	Quantity    int64        `json:"quantity"`
+	SkuPublicId string       `json:"sku_public_id"`
+
+	// UnitPriceE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	UnitPriceE4 OrderMoneyE4 `json:"unit_price_e4"`
+}
+
+// OrderMoneyE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+type OrderMoneyE4 = int64
+
+// OrderPaymentData defines model for OrderPaymentData.
+type OrderPaymentData struct {
+	ExpiresAt   time.Time `json:"expires_at"`
+	PaymentLink string    `json:"payment_link"`
+	PaymentNo   string    `json:"payment_no"`
+}
+
+// OrderPaymentSuccessResponse defines model for OrderPaymentSuccessResponse.
+type OrderPaymentSuccessResponse struct {
+	Data      OrderPaymentData              `json:"data"`
+	Ok        OrderPaymentSuccessResponseOk `json:"ok"`
+	RequestId string                        `json:"request_id"`
+}
+
+// OrderPaymentSuccessResponseOk defines model for OrderPaymentSuccessResponse.Ok.
+type OrderPaymentSuccessResponseOk bool
+
+// OrderStatus Authoritative merchant-suborder state. Parent-order status is a derived summary only.
+type OrderStatus string
+
+// PaymentStatus Payment result tracked independently from merchant-suborder state.
+type PaymentStatus string
 
 // PingData defines model for PingData.
 type PingData struct {
@@ -2349,6 +2736,14 @@ type MethodNotAllowed = ErrorEnvelope
 // NotFound defines model for NotFound.
 type NotFound = ErrorEnvelope
 
+// OrderBadRequest defines model for OrderBadRequest.
+type OrderBadRequest struct {
+	union json.RawMessage
+}
+
+// OrderConflict defines model for OrderConflict.
+type OrderConflict = OrderErrorEnvelope
+
 // RefreshSucceeded defines model for RefreshSucceeded.
 type RefreshSucceeded = RefreshSuccessResponse
 
@@ -2481,6 +2876,33 @@ type DeleteBuyerMeSessionParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ListBuyerOrdersParams defines parameters for ListBuyerOrders.
+type ListBuyerOrdersParams struct {
+	// Cursor Opaque cursor returned by the previous page.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// CreateBuyerOrderParams defines parameters for CreateBuyerOrder.
+type CreateBuyerOrderParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CancelBuyerOrderParams defines parameters for CancelBuyerOrder.
+type CancelBuyerOrderParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateBuyerOrderPaymentParams defines parameters for CreateBuyerOrderPayment.
+type CreateBuyerOrderPaymentParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
 // PostDriverAuthLogoutParams defines parameters for PostDriverAuthLogout.
 type PostDriverAuthLogoutParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
@@ -2607,6 +3029,15 @@ type PublishMerchantProductParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ListMerchantSubordersParams defines parameters for ListMerchantSuborders.
+type ListMerchantSubordersParams struct {
+	// Cursor Opaque cursor returned by the previous page.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
 // ListPublicCategoriesParams defines parameters for ListPublicCategories.
 type ListPublicCategoriesParams struct {
 	// Page One-based page number.
@@ -2687,6 +3118,9 @@ type PostBuyerMeConsentRevokeJSONRequestBody = ConsentRevokeRequest
 // PutBuyerMeLanguageJSONRequestBody defines body for PutBuyerMeLanguage for application/json ContentType.
 type PutBuyerMeLanguageJSONRequestBody = LanguageUpdateRequest
 
+// CreateBuyerOrderJSONRequestBody defines body for CreateBuyerOrder for application/json ContentType.
+type CreateBuyerOrderJSONRequestBody = OrderCreateRequest
+
 // PostDriverMeConsentsJSONRequestBody defines body for PostDriverMeConsents for application/json ContentType.
 type PostDriverMeConsentsJSONRequestBody = ConsentAcceptRequest
 
@@ -2722,6 +3156,68 @@ type PostAuthRefreshJSONRequestBody = RefreshRequest
 
 // PostTelegramAuthJSONRequestBody defines body for PostTelegramAuth for application/json ContentType.
 type PostTelegramAuthJSONRequestBody = TelegramAuthRequest
+
+// AsErrorEnvelope returns the union data inside the OrderBadRequest as a ErrorEnvelope
+func (t OrderBadRequest) AsErrorEnvelope() (ErrorEnvelope, error) {
+	var body ErrorEnvelope
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromErrorEnvelope overwrites any union data inside the OrderBadRequest as the provided ErrorEnvelope
+func (t *OrderBadRequest) FromErrorEnvelope(v ErrorEnvelope) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeErrorEnvelope performs a merge with any union data inside the OrderBadRequest, using the provided ErrorEnvelope
+func (t *OrderBadRequest) MergeErrorEnvelope(v ErrorEnvelope) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOrderErrorEnvelope returns the union data inside the OrderBadRequest as a OrderErrorEnvelope
+func (t OrderBadRequest) AsOrderErrorEnvelope() (OrderErrorEnvelope, error) {
+	var body OrderErrorEnvelope
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOrderErrorEnvelope overwrites any union data inside the OrderBadRequest as the provided OrderErrorEnvelope
+func (t *OrderBadRequest) FromOrderErrorEnvelope(v OrderErrorEnvelope) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOrderErrorEnvelope performs a merge with any union data inside the OrderBadRequest, using the provided OrderErrorEnvelope
+func (t *OrderBadRequest) MergeOrderErrorEnvelope(v OrderErrorEnvelope) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t OrderBadRequest) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *OrderBadRequest) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -2800,6 +3296,21 @@ type ServerInterface interface {
 	// DeleteBuyerMeSession Revoke one session owned by the current buyer account
 	// (DELETE /v1/buyer/me/sessions/{id})
 	DeleteBuyerMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteBuyerMeSessionParams)
+	// ListBuyerOrders List the authenticated buyer parent orders
+	// (GET /v1/buyer/orders)
+	ListBuyerOrders(w http.ResponseWriter, r *http.Request, params ListBuyerOrdersParams)
+	// CreateBuyerOrder Create one parent order and split it into merchant suborders
+	// (POST /v1/buyer/orders)
+	CreateBuyerOrder(w http.ResponseWriter, r *http.Request, params CreateBuyerOrderParams)
+	// GetBuyerOrder Read one parent order owned by the authenticated buyer
+	// (GET /v1/buyer/orders/{public_id})
+	GetBuyerOrder(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// CancelBuyerOrder Cancel one parent order before payment
+	// (POST /v1/buyer/orders/{public_id}/cancel)
+	CancelBuyerOrder(w http.ResponseWriter, r *http.Request, publicId PublicID, params CancelBuyerOrderParams)
+	// CreateBuyerOrderPayment Create a KESS payment for one parent order
+	// (POST /v1/buyer/orders/{public_id}/payments)
+	CreateBuyerOrderPayment(w http.ResponseWriter, r *http.Request, publicId PublicID, params CreateBuyerOrderPaymentParams)
 	// GetBuyerWalletTransactions List the authenticated buyer wallet transactions
 	// (GET /v1/buyer/wallet/transactions)
 	GetBuyerWalletTransactions(w http.ResponseWriter, r *http.Request)
@@ -2899,6 +3410,12 @@ type ServerInterface interface {
 	// PublishMerchantProduct Publish a product; requires complete trilingual text and at least two price tiers
 	// (POST /v1/merchant/products/{public_id}/publish)
 	PublishMerchantProduct(w http.ResponseWriter, r *http.Request, publicId PublicID, params PublishMerchantProductParams)
+	// ListMerchantSuborders List suborders belonging to the authenticated merchant
+	// (GET /v1/merchant/suborders)
+	ListMerchantSuborders(w http.ResponseWriter, r *http.Request, params ListMerchantSubordersParams)
+	// GetMerchantSuborder Read one suborder belonging to the authenticated merchant
+	// (GET /v1/merchant/suborders/{public_id})
+	GetMerchantSuborder(w http.ResponseWriter, r *http.Request, publicId PublicID)
 	// GetMerchantWalletTransactions List the authenticated merchant wallet transactions
 	// (GET /v1/merchant/wallet/transactions)
 	GetMerchantWalletTransactions(w http.ResponseWriter, r *http.Request)
@@ -3082,6 +3599,36 @@ func (_ Unimplemented) GetBuyerMeSessions(w http.ResponseWriter, r *http.Request
 // DeleteBuyerMeSession Revoke one session owned by the current buyer account
 // (DELETE /v1/buyer/me/sessions/{id})
 func (_ Unimplemented) DeleteBuyerMeSession(w http.ResponseWriter, r *http.Request, id SessionID, params DeleteBuyerMeSessionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListBuyerOrders List the authenticated buyer parent orders
+// (GET /v1/buyer/orders)
+func (_ Unimplemented) ListBuyerOrders(w http.ResponseWriter, r *http.Request, params ListBuyerOrdersParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateBuyerOrder Create one parent order and split it into merchant suborders
+// (POST /v1/buyer/orders)
+func (_ Unimplemented) CreateBuyerOrder(w http.ResponseWriter, r *http.Request, params CreateBuyerOrderParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetBuyerOrder Read one parent order owned by the authenticated buyer
+// (GET /v1/buyer/orders/{public_id})
+func (_ Unimplemented) GetBuyerOrder(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CancelBuyerOrder Cancel one parent order before payment
+// (POST /v1/buyer/orders/{public_id}/cancel)
+func (_ Unimplemented) CancelBuyerOrder(w http.ResponseWriter, r *http.Request, publicId PublicID, params CancelBuyerOrderParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateBuyerOrderPayment Create a KESS payment for one parent order
+// (POST /v1/buyer/orders/{public_id}/payments)
+func (_ Unimplemented) CreateBuyerOrderPayment(w http.ResponseWriter, r *http.Request, publicId PublicID, params CreateBuyerOrderPaymentParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3280,6 +3827,18 @@ func (_ Unimplemented) UpdateMerchantProduct(w http.ResponseWriter, r *http.Requ
 // PublishMerchantProduct Publish a product; requires complete trilingual text and at least two price tiers
 // (POST /v1/merchant/products/{public_id}/publish)
 func (_ Unimplemented) PublishMerchantProduct(w http.ResponseWriter, r *http.Request, publicId PublicID, params PublishMerchantProductParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListMerchantSuborders List suborders belonging to the authenticated merchant
+// (GET /v1/merchant/suborders)
+func (_ Unimplemented) ListMerchantSuborders(w http.ResponseWriter, r *http.Request, params ListMerchantSubordersParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetMerchantSuborder Read one suborder belonging to the authenticated merchant
+// (GET /v1/merchant/suborders/{public_id})
+func (_ Unimplemented) GetMerchantSuborder(w http.ResponseWriter, r *http.Request, publicId PublicID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4341,6 +4900,231 @@ func (siw *ServerInterfaceWrapper) DeleteBuyerMeSession(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteBuyerMeSession(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListBuyerOrders operation middleware
+func (siw *ServerInterfaceWrapper) ListBuyerOrders(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListBuyerOrdersParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBuyerOrders(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBuyerOrder operation middleware
+func (siw *ServerInterfaceWrapper) CreateBuyerOrder(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateBuyerOrderParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBuyerOrder(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBuyerOrder operation middleware
+func (siw *ServerInterfaceWrapper) GetBuyerOrder(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBuyerOrder(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelBuyerOrder operation middleware
+func (siw *ServerInterfaceWrapper) CancelBuyerOrder(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CancelBuyerOrderParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelBuyerOrder(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBuyerOrderPayment operation middleware
+func (siw *ServerInterfaceWrapper) CreateBuyerOrderPayment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateBuyerOrderPaymentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBuyerOrderPayment(w, r, publicId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5499,6 +6283,78 @@ func (siw *ServerInterfaceWrapper) PublishMerchantProduct(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ListMerchantSuborders operation middleware
+func (siw *ServerInterfaceWrapper) ListMerchantSuborders(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMerchantSubordersParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMerchantSuborders(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMerchantSuborder operation middleware
+func (siw *ServerInterfaceWrapper) GetMerchantSuborder(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMerchantSuborder(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMerchantWalletTransactions operation middleware
 func (siw *ServerInterfaceWrapper) GetMerchantWalletTransactions(w http.ResponseWriter, r *http.Request) {
 
@@ -6104,6 +6960,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/v1/admin/ledger/accounts/{account_ref}/postings", wrapper.GetAdminLedgerAccountPostings)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/orders", wrapper.ListBuyerOrders)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/buyer/orders", wrapper.CreateBuyerOrder)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/orders/{public_id}", wrapper.GetBuyerOrder)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/buyer/orders/{public_id}/payments", wrapper.CreateBuyerOrderPayment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/buyer/orders/{public_id}/cancel", wrapper.CancelBuyerOrder)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/buyer/wallet/transactions", wrapper.GetBuyerWalletTransactions)
 	})
 	r.Group(func(r chi.Router) {
@@ -6174,6 +7045,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/v1/merchant/me/links/{id}", wrapper.DeleteMerchantMeLink)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/suborders", wrapper.ListMerchantSuborders)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/suborders/{public_id}", wrapper.GetMerchantSuborder)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/merchant/products", wrapper.ListMerchantProducts)
