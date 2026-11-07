@@ -85,9 +85,9 @@ func ValidateTiers(tiers []Tier) error {
 	}
 	seen := make(map[string]struct{}, len(tiers))
 	for i, tier := range tiers {
-		quantity, err := ParseDecimal(tier.MinQty, 3)
+		quantity, err := ParseDecimal(tier.MinQty, 0)
 		if err != nil || quantity == "0" {
-			return invalid(fmt.Sprintf("tiers[%d].min_qty", i), "minimum quantity must be a positive decimal with at most three decimals")
+			return invalid(fmt.Sprintf("tiers[%d].min_qty", i), "minimum quantity must be a positive integer")
 		}
 		if _, duplicate := seen[quantity]; duplicate {
 			return invalid(fmt.Sprintf("tiers[%d].min_qty", i), "minimum quantity must be unique per product")

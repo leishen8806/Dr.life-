@@ -488,26 +488,31 @@ func (e ConsentKind) Valid() bool {
 
 // Defines values for ErrorCode.
 const (
-	ErrorCodeAccountBlocked       ErrorCode = 2006
-	ErrorCodeAlreadyProcessed     ErrorCode = 1011
-	ErrorCodeConsentRequired      ErrorCode = 2008
-	ErrorCodeIdempotencyConflict  ErrorCode = 1009
-	ErrorCodeIdempotencyPending   ErrorCode = 1010
-	ErrorCodeInternalError        ErrorCode = 1001
-	ErrorCodeInvalidArgument      ErrorCode = 1002
-	ErrorCodeLoginTooManyAttempts ErrorCode = 2007
-	ErrorCodeMethodNotAllowed     ErrorCode = 1006
-	ErrorCodePermissionDenied     ErrorCode = 2002
-	ErrorCodeRequestTooLarge      ErrorCode = 1007
-	ErrorCodeResourceNotFound     ErrorCode = 1003
-	ErrorCodeServiceUnavailable   ErrorCode = 1005
-	ErrorCodeStepUpInvalid        ErrorCode = 2004
-	ErrorCodeStepUpRequired       ErrorCode = 2003
-	ErrorCodeTelegramLoginFailed  ErrorCode = 2005
-	ErrorCodeTooManyRequests      ErrorCode = 1004
-	ErrorCodeUnauthenticated      ErrorCode = 2001
-	ErrorCodeUnsupportedMedia     ErrorCode = 1008
-	ErrorCodeWebhookInvalid       ErrorCode = 7001
+	ErrorCodeAccountBlocked           ErrorCode = 2006
+	ErrorCodeAlreadyProcessed         ErrorCode = 1011
+	ErrorCodeConsentRequired          ErrorCode = 2008
+	ErrorCodeIdempotencyConflict      ErrorCode = 1009
+	ErrorCodeIdempotencyPending       ErrorCode = 1010
+	ErrorCodeInternalError            ErrorCode = 1001
+	ErrorCodeInvalidArgument          ErrorCode = 1002
+	ErrorCodeLoginTooManyAttempts     ErrorCode = 2007
+	ErrorCodeMethodNotAllowed         ErrorCode = 1006
+	ErrorCodeOrderAmountMismatch      ErrorCode = 3004
+	ErrorCodeOrderCancelledOrReleased ErrorCode = 3003
+	ErrorCodeOrderInsufficientStock   ErrorCode = 3002
+	ErrorCodeOrderInvalidItem         ErrorCode = 3001
+	ErrorCodeOrderStateConflict       ErrorCode = 3005
+	ErrorCodePermissionDenied         ErrorCode = 2002
+	ErrorCodeRequestTooLarge          ErrorCode = 1007
+	ErrorCodeResourceNotFound         ErrorCode = 1003
+	ErrorCodeServiceUnavailable       ErrorCode = 1005
+	ErrorCodeStepUpInvalid            ErrorCode = 2004
+	ErrorCodeStepUpRequired           ErrorCode = 2003
+	ErrorCodeTelegramLoginFailed      ErrorCode = 2005
+	ErrorCodeTooManyRequests          ErrorCode = 1004
+	ErrorCodeUnauthenticated          ErrorCode = 2001
+	ErrorCodeUnsupportedMedia         ErrorCode = 1008
+	ErrorCodeWebhookInvalid           ErrorCode = 7001
 )
 
 // Valid indicates whether the value is a known member of the ErrorCode enum.
@@ -530,6 +535,16 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeLoginTooManyAttempts:
 		return true
 	case ErrorCodeMethodNotAllowed:
+		return true
+	case ErrorCodeOrderAmountMismatch:
+		return true
+	case ErrorCodeOrderCancelledOrReleased:
+		return true
+	case ErrorCodeOrderInsufficientStock:
+		return true
+	case ErrorCodeOrderInvalidItem:
+		return true
+	case ErrorCodeOrderStateConflict:
 		return true
 	case ErrorCodePermissionDenied:
 		return true
@@ -777,33 +792,6 @@ func (e MerchantSuborderSuccessResponseOk) Valid() bool {
 	}
 }
 
-// Defines values for OrderErrorCode.
-const (
-	OrderAmountMismatch      OrderErrorCode = 3004
-	OrderCancelledOrReleased OrderErrorCode = 3003
-	OrderInsufficientStock   OrderErrorCode = 3002
-	OrderInvalidItem         OrderErrorCode = 3001
-	OrderStateConflict       OrderErrorCode = 3005
-)
-
-// Valid indicates whether the value is a known member of the OrderErrorCode enum.
-func (e OrderErrorCode) Valid() bool {
-	switch e {
-	case OrderAmountMismatch:
-		return true
-	case OrderCancelledOrReleased:
-		return true
-	case OrderInsufficientStock:
-		return true
-	case OrderInvalidItem:
-		return true
-	case OrderStateConflict:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for OrderErrorEnvelopeOk.
 const (
 	OrderErrorEnvelopeOkFalse OrderErrorEnvelopeOk = false
@@ -882,6 +870,63 @@ func (e OrderStatus) Valid() bool {
 	case OrderStatusShipped:
 		return true
 	case OrderStatusSubmitted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OrderSummaryStatus.
+const (
+	OrderSummaryStatusAccepted          OrderSummaryStatus = "accepted"
+	OrderSummaryStatusAwaitingPayment   OrderSummaryStatus = "awaiting_payment"
+	OrderSummaryStatusCancelled         OrderSummaryStatus = "cancelled"
+	OrderSummaryStatusDeliveredVerified OrderSummaryStatus = "delivered_verified"
+	OrderSummaryStatusDeliveryFailed    OrderSummaryStatus = "delivery_failed"
+	OrderSummaryStatusException         OrderSummaryStatus = "exception"
+	OrderSummaryStatusInFulfillment     OrderSummaryStatus = "in_fulfillment"
+	OrderSummaryStatusMixed             OrderSummaryStatus = "mixed"
+	OrderSummaryStatusPaid              OrderSummaryStatus = "paid"
+	OrderSummaryStatusRejected          OrderSummaryStatus = "rejected"
+	OrderSummaryStatusReturned          OrderSummaryStatus = "returned"
+	OrderSummaryStatusReturning         OrderSummaryStatus = "returning"
+	OrderSummaryStatusSettled           OrderSummaryStatus = "settled"
+	OrderSummaryStatusShipped           OrderSummaryStatus = "shipped"
+	OrderSummaryStatusSubmitted         OrderSummaryStatus = "submitted"
+)
+
+// Valid indicates whether the value is a known member of the OrderSummaryStatus enum.
+func (e OrderSummaryStatus) Valid() bool {
+	switch e {
+	case OrderSummaryStatusAccepted:
+		return true
+	case OrderSummaryStatusAwaitingPayment:
+		return true
+	case OrderSummaryStatusCancelled:
+		return true
+	case OrderSummaryStatusDeliveredVerified:
+		return true
+	case OrderSummaryStatusDeliveryFailed:
+		return true
+	case OrderSummaryStatusException:
+		return true
+	case OrderSummaryStatusInFulfillment:
+		return true
+	case OrderSummaryStatusMixed:
+		return true
+	case OrderSummaryStatusPaid:
+		return true
+	case OrderSummaryStatusRejected:
+		return true
+	case OrderSummaryStatusReturned:
+		return true
+	case OrderSummaryStatusReturning:
+		return true
+	case OrderSummaryStatusSettled:
+		return true
+	case OrderSummaryStatusShipped:
+		return true
+	case OrderSummaryStatusSubmitted:
 		return true
 	default:
 		return false
@@ -1861,30 +1906,33 @@ type AuditRecord struct {
 type BuyerOrder struct {
 	CreatedAt time.Time `json:"created_at"`
 
-	// GoodsAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	// GoodsAmountE4 Sum of suborder merchandise snapshots.
 	GoodsAmountE4 OrderMoneyE4 `json:"goods_amount_e4"`
 
-	// PayableAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	// PayableAmountE4 Parent-order payable snapshot, equal to goods_amount_e4 plus shipping_amount_e4.
 	PayableAmountE4 OrderMoneyE4 `json:"payable_amount_e4"`
 
-	// PaymentStatus Payment result tracked independently from merchant-suborder state.
-	PaymentStatus           PaymentStatus `json:"payment_status"`
-	PublicId                string        `json:"public_id"`
-	ShippingAddressPublicId string        `json:"shipping_address_public_id"`
+	// PaymentStatus Payment result tracked independently from merchant-suborder state. The latest parent-order payment intent maps PENDING/WAITING to pending, UNKNOWN/REVIEW to confirming, SUCCESS to succeeded, FAILED/CLOSED to failed, REFUND to refunded, and no intent to pending.
+	PaymentStatus PaymentStatus `json:"payment_status"`
+	PublicId      string        `json:"public_id"`
 
-	// ShippingAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	// ShippingAddress Full delivery-address snapshot saved by trade when the buyer places the order. It is returned only on buyer-owned order responses.
+	ShippingAddress         BuyerShippingAddressSnapshot `json:"shipping_address"`
+	ShippingAddressPublicId string                       `json:"shipping_address_public_id"`
+
+	// ShippingAmountE4 Sum of snapshotted RouteFit shipping quotes; free-shipping suborders contribute 0.
 	ShippingAmountE4 OrderMoneyE4    `json:"shipping_amount_e4"`
 	Suborders        []BuyerSuborder `json:"suborders"`
 
-	// SummaryStatus Server-derived display summary of the suborders. Suborder status values remain authoritative; the aggregation rule must be fixed before handler implementation.
-	SummaryStatus string    `json:"summary_status"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	// SummaryStatus Server-derived display summary. When every suborder has the same status, use that status; otherwise use mixed. Suborder status remains authoritative.
+	SummaryStatus OrderSummaryStatus `json:"summary_status"`
+	UpdatedAt     time.Time          `json:"updated_at"`
 }
 
 // BuyerOrderListData defines model for BuyerOrderListData.
 type BuyerOrderListData struct {
-	Items      []BuyerOrder `json:"items"`
-	NextCursor *string      `json:"next_cursor"`
+	Items      []BuyerOrderSummary `json:"items"`
+	NextCursor *string             `json:"next_cursor"`
 }
 
 // BuyerOrderListSuccessResponse defines model for BuyerOrderListSuccessResponse.
@@ -1907,19 +1955,55 @@ type BuyerOrderSuccessResponse struct {
 // BuyerOrderSuccessResponseOk defines model for BuyerOrderSuccessResponse.Ok.
 type BuyerOrderSuccessResponseOk bool
 
+// BuyerOrderSummary Buyer-owned list projection. The full delivery-address snapshot is intentionally omitted and is available from the detail endpoint.
+type BuyerOrderSummary struct {
+	CreatedAt time.Time `json:"created_at"`
+
+	// GoodsAmountE4 Sum of suborder merchandise snapshots.
+	GoodsAmountE4 OrderMoneyE4 `json:"goods_amount_e4"`
+
+	// PayableAmountE4 Parent-order payable snapshot, equal to goods_amount_e4 plus shipping_amount_e4.
+	PayableAmountE4 OrderMoneyE4 `json:"payable_amount_e4"`
+
+	// PaymentStatus Payment result tracked independently from merchant-suborder state. The latest parent-order payment intent maps PENDING/WAITING to pending, UNKNOWN/REVIEW to confirming, SUCCESS to succeeded, FAILED/CLOSED to failed, REFUND to refunded, and no intent to pending.
+	PaymentStatus           PaymentStatus `json:"payment_status"`
+	PublicId                string        `json:"public_id"`
+	ShippingAddressPublicId string        `json:"shipping_address_public_id"`
+
+	// ShippingAmountE4 Sum of snapshotted RouteFit shipping quotes; free-shipping suborders contribute 0.
+	ShippingAmountE4 OrderMoneyE4    `json:"shipping_amount_e4"`
+	Suborders        []BuyerSuborder `json:"suborders"`
+
+	// SummaryStatus Server-derived display summary. When every suborder has the same status, use that status; otherwise use mixed. Suborder status remains authoritative.
+	SummaryStatus OrderSummaryStatus `json:"summary_status"`
+	UpdatedAt     time.Time          `json:"updated_at"`
+}
+
+// BuyerShippingAddressSnapshot Full delivery-address snapshot saved by trade when the buyer places the order. It is returned only on buyer-owned order responses.
+type BuyerShippingAddressSnapshot struct {
+	AddressText string `json:"address_text"`
+
+	// Phone Full recipient phone number visible only to the owning buyer.
+	Phone         string `json:"phone"`
+	RecipientName string `json:"recipient_name"`
+}
+
 // BuyerSuborder defines model for BuyerSuborder.
 type BuyerSuborder struct {
-	// GoodsAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	// GoodsAmountE4 Snapshotted merchandise subtotal for this suborder.
 	GoodsAmountE4    OrderMoneyE4        `json:"goods_amount_e4"`
 	Items            []OrderLineSnapshot `json:"items"`
 	MerchantPublicId string              `json:"merchant_public_id"`
 
-	// PayableAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	// PayableAmountE4 Buyer payable snapshot for this suborder, equal to goods_amount_e4 plus shipping_amount_e4.
 	PayableAmountE4 OrderMoneyE4 `json:"payable_amount_e4"`
 	PublicId        string       `json:"public_id"`
 
-	// ShippingAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	// ShippingAmountE4 RouteFit real-time shipping quote snapshotted when the order is placed; 0 when shipping is free to the buyer.
 	ShippingAmountE4 OrderMoneyE4 `json:"shipping_amount_e4"`
+
+	// ShippingQuoteExpiresAt Expiry of the RouteFit quote used for the shipping snapshot.
+	ShippingQuoteExpiresAt time.Time `json:"shipping_quote_expires_at"`
 
 	// Status Authoritative merchant-suborder state. Parent-order status is a derived summary only.
 	Status OrderStatus `json:"status"`
@@ -2157,22 +2241,39 @@ type MerchantBalance struct {
 	MerchantId  int64 `json:"merchant_id"`
 }
 
+// MerchantShippingAddressSnapshot Delivery-address snapshot visible to the scoped merchant. The server masks the phone before serialization; the merchant never receives the full number.
+type MerchantShippingAddressSnapshot struct {
+	AddressText string `json:"address_text"`
+
+	// Phone Server-masked phone containing exactly four asterisks and the final four digits.
+	//
+	// Example: ****1234
+	Phone         string `json:"phone"`
+	RecipientName string `json:"recipient_name"`
+}
+
 // MerchantSuborder One suborder scoped to the authenticated merchant; sibling merchant data is never included.
 type MerchantSuborder struct {
 	CreatedAt time.Time `json:"created_at"`
 
-	// GoodsAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	// GoodsAmountE4 Snapshotted merchandise subtotal for this suborder.
 	GoodsAmountE4  OrderMoneyE4        `json:"goods_amount_e4"`
 	Items          []OrderLineSnapshot `json:"items"`
 	ParentPublicId string              `json:"parent_public_id"`
 
-	// PayableAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
-	PayableAmountE4         OrderMoneyE4 `json:"payable_amount_e4"`
-	PublicId                string       `json:"public_id"`
-	ShippingAddressPublicId string       `json:"shipping_address_public_id"`
+	// PayableAmountE4 Buyer payable snapshot for this suborder, equal to goods_amount_e4 plus shipping_amount_e4.
+	PayableAmountE4 OrderMoneyE4 `json:"payable_amount_e4"`
+	PublicId        string       `json:"public_id"`
 
-	// ShippingAmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	// ShippingAddress Delivery-address snapshot visible to the scoped merchant. The server masks the phone before serialization; the merchant never receives the full number.
+	ShippingAddress         MerchantShippingAddressSnapshot `json:"shipping_address"`
+	ShippingAddressPublicId string                          `json:"shipping_address_public_id"`
+
+	// ShippingAmountE4 RouteFit real-time shipping quote snapshotted when the order is placed; 0 when shipping is free to the buyer.
 	ShippingAmountE4 OrderMoneyE4 `json:"shipping_amount_e4"`
+
+	// ShippingQuoteExpiresAt Expiry of the RouteFit quote used for the shipping snapshot.
+	ShippingQuoteExpiresAt time.Time `json:"shipping_quote_expires_at"`
 
 	// Status Authoritative merchant-suborder state. Parent-order status is a derived summary only.
 	Status    OrderStatus `json:"status"`
@@ -2229,13 +2330,10 @@ type OrderCreateRequest struct {
 
 // OrderErrorBody defines model for OrderErrorBody.
 type OrderErrorBody struct {
-	// Code Order-domain error code reserved by this contract; handler wiring is deferred to
-	Code    OrderErrorCode `json:"code"`
-	Message Messages       `json:"message"`
+	// Code Documented application error code; ranges are described in the API description.
+	Code    ErrorCode `json:"code"`
+	Message Messages  `json:"message"`
 }
-
-// OrderErrorCode Order-domain error code reserved by this contract; handler wiring is deferred to
-type OrderErrorCode int32
 
 // OrderErrorEnvelope defines model for OrderErrorEnvelope.
 type OrderErrorEnvelope struct {
@@ -2281,7 +2379,10 @@ type OrderPaymentSuccessResponseOk bool
 // OrderStatus Authoritative merchant-suborder state. Parent-order status is a derived summary only.
 type OrderStatus string
 
-// PaymentStatus Payment result tracked independently from merchant-suborder state.
+// OrderSummaryStatus Server-derived display summary. When every suborder has the same status, use that status; otherwise use mixed. Suborder status remains authoritative.
+type OrderSummaryStatus string
+
+// PaymentStatus Payment result tracked independently from merchant-suborder state. The latest parent-order payment intent maps PENDING/WAITING to pending, UNKNOWN/REVIEW to confirming, SUCCESS to succeeded, FAILED/CLOSED to failed, REFUND to refunded, and no intent to pending.
 type PaymentStatus string
 
 // PingData defines model for PingData.
@@ -2393,8 +2494,8 @@ type ProductSuccessResponseOk bool
 
 // ProductTier defines model for ProductTier.
 type ProductTier struct {
-	// MinQty Minimum order quantity as a decimal string; never a floating-point number.
-	MinQty string `json:"min_qty"`
+	// MinQty Minimum order quantity. Trial orders accept whole units only; fractional quantities are rejected.
+	MinQty int64 `json:"min_qty"`
 
 	// UnitPriceE4 Unit price in ten-thousandths of a US dollar.
 	UnitPriceE4 int64 `json:"unit_price_e4"`
@@ -2742,7 +2843,9 @@ type OrderBadRequest struct {
 }
 
 // OrderConflict defines model for OrderConflict.
-type OrderConflict = OrderErrorEnvelope
+type OrderConflict struct {
+	union json.RawMessage
+}
 
 // RefreshSucceeded defines model for RefreshSucceeded.
 type RefreshSucceeded = RefreshSuccessResponse
@@ -3215,6 +3318,68 @@ func (t OrderBadRequest) MarshalJSON() ([]byte, error) {
 }
 
 func (t *OrderBadRequest) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsOrderErrorEnvelope returns the union data inside the OrderConflict as a OrderErrorEnvelope
+func (t OrderConflict) AsOrderErrorEnvelope() (OrderErrorEnvelope, error) {
+	var body OrderErrorEnvelope
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOrderErrorEnvelope overwrites any union data inside the OrderConflict as the provided OrderErrorEnvelope
+func (t *OrderConflict) FromOrderErrorEnvelope(v OrderErrorEnvelope) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOrderErrorEnvelope performs a merge with any union data inside the OrderConflict, using the provided OrderErrorEnvelope
+func (t *OrderConflict) MergeOrderErrorEnvelope(v OrderErrorEnvelope) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsErrorEnvelope returns the union data inside the OrderConflict as a ErrorEnvelope
+func (t OrderConflict) AsErrorEnvelope() (ErrorEnvelope, error) {
+	var body ErrorEnvelope
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromErrorEnvelope overwrites any union data inside the OrderConflict as the provided ErrorEnvelope
+func (t *OrderConflict) FromErrorEnvelope(v ErrorEnvelope) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeErrorEnvelope performs a merge with any union data inside the OrderConflict, using the provided ErrorEnvelope
+func (t *OrderConflict) MergeErrorEnvelope(v ErrorEnvelope) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t OrderConflict) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *OrderConflict) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

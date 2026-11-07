@@ -784,7 +784,7 @@ paths:
       tags: [buyer]
       operationId: cancelBuyerOrder
       summary: Cancel one parent order before payment
-      description: Cancellation is allowed only while every suborder remains awaiting_payment.
+      description: Cancellation is allowed only while every suborder remains awaiting_payment and payment_status is not confirming. A confirming payment returns 409 with the user-facing message "付款确认中，请稍后".
       x-roles: [buyer]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -1520,7 +1520,7 @@ components:
       type: integer
       format: int32
       description: Documented application error code; ranges are described in the API description.
-      enum: [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 7001]
+      enum: [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 3001, 3002, 3003, 3004, 3005, 7001]
       x-enum-varnames:
         - InternalError
         - InvalidArgument
@@ -1541,18 +1541,12 @@ components:
         - AccountBlocked
         - LoginTooManyAttempts
         - ConsentRequired
-        - WebhookInvalid
-    OrderErrorCode:
-      type: integer
-      format: int32
-      description: Order-domain error code reserved by this contract; handler wiring is deferred to #144.
-      enum: [3001, 3002, 3003, 3004, 3005]
-      x-enum-varnames:
         - OrderInvalidItem
         - OrderInsufficientStock
         - OrderCancelledOrReleased
         - OrderAmountMismatch
         - OrderStateConflict
+        - WebhookInvalid
     Messages:
       type: object
       additionalProperties: false
@@ -1604,7 +1598,7 @@ components:
       additionalProperties: false
       required: [code, message]
       properties:
-        code: {$ref: "#/components/schemas/OrderErrorCode"}
+        code: {$ref: "#/components/schemas/ErrorCode"}
         message: {$ref: "#/components/schemas/Messages"}
     OrderErrorEnvelope:
       type: object
@@ -2187,9 +2181,10 @@ components:
       required: [min_qty, unit_price_e4]
       properties:
         min_qty:
-          type: string
-          description: Minimum order quantity as a decimal string; never a floating-point number.
-          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+          type: integer
+          format: int64
+          minimum: 1
+          description: Minimum order quantity. Trial orders accept whole units only; fractional quantities are rejected.
         unit_price_e4:
           type: integer
           format: int64
@@ -2550,8 +2545,27 @@ components:
         - exception
     PaymentStatus:
       type: string
-      description: Payment result tracked independently from merchant-suborder state.
+      description: Payment result tracked independently from merchant-suborder state. The latest parent-order payment intent maps PENDING/WAITING to pending, UNKNOWN/REVIEW to confirming, SUCCESS to succeeded, FAILED/CLOSED to failed, REFUND to refunded, and no intent to pending.
       enum: [pending, confirming, succeeded, failed, refunded]
+    OrderSummaryStatus:
+      type: string
+      description: Server-derived display summary. When every suborder has the same status, use that status; otherwise use mixed. Suborder status remains authoritative.
+      enum:
+        - awaiting_payment
+        - paid
+        - submitted
+        - accepted
+        - in_fulfillment
+        - shipped
+        - delivered_verified
+        - settled
+        - rejected
+        - cancelled
+        - delivery_failed
+        - returning
+        - returned
+        - exception
+        - mixed
     OrderMoneyE4:
       type: integer
       format: int64
@@ -2597,10 +2611,36 @@ components:
           minimum: 1
         unit_price_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
         line_total_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
+    BuyerShippingAddressSnapshot:
+      type: object
+      additionalProperties: false
+      description: Full delivery-address snapshot saved by trade when the buyer places the order. It is returned only on buyer-owned order responses.
+      required: [recipient_name, address_text, phone]
+      properties:
+        recipient_name: {type: string, minLength: 1, maxLength: 120}
+        address_text: {type: string, minLength: 1, maxLength: 500}
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: Full recipient phone number visible only to the owning buyer.
+    MerchantShippingAddressSnapshot:
+      type: object
+      additionalProperties: false
+      description: Delivery-address snapshot visible to the scoped merchant. The server masks the phone before serialization; the merchant never receives the full number.
+      required: [recipient_name, address_text, phone]
+      properties:
+        recipient_name: {type: string, minLength: 1, maxLength: 120}
+        address_text: {type: string, minLength: 1, maxLength: 500}
+        phone:
+          type: string
+          pattern: "^\\*{4}[0-9]{4}$"
+          example: "****1234"
+          description: Server-masked phone containing exactly four asterisks and the final four digits.
     BuyerSuborder:
       type: object
       additionalProperties: false
-      required: [public_id, merchant_public_id, status, items, goods_amount_e4, shipping_amount_e4, payable_amount_e4]
+      required: [public_id, merchant_public_id, status, items, goods_amount_e4, shipping_amount_e4, payable_amount_e4, shipping_quote_expires_at]
       properties:
         public_id:
           type: string
@@ -2613,12 +2653,52 @@ components:
           type: array
           minItems: 1
           items: {$ref: "#/components/schemas/OrderLineSnapshot"}
-        goods_amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
-        shipping_amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
-        payable_amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
+        goods_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Snapshotted merchandise subtotal for this suborder.
+        shipping_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: RouteFit real-time shipping quote snapshotted when the order is placed; 0 when shipping is free to the buyer.
+        payable_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Buyer payable snapshot for this suborder, equal to goods_amount_e4 plus shipping_amount_e4.
+        shipping_quote_expires_at:
+          type: string
+          format: date-time
+          description: Expiry of the RouteFit quote used for the shipping snapshot.
     BuyerOrder:
       type: object
       additionalProperties: false
+      required: [public_id, shipping_address_public_id, shipping_address, payment_status, summary_status, suborders, goods_amount_e4, shipping_amount_e4, payable_amount_e4, created_at, updated_at]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        shipping_address_public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        shipping_address: {$ref: "#/components/schemas/BuyerShippingAddressSnapshot"}
+        payment_status: {$ref: "#/components/schemas/PaymentStatus"}
+        summary_status: {$ref: "#/components/schemas/OrderSummaryStatus"}
+        suborders:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/BuyerSuborder"}
+        goods_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Sum of suborder merchandise snapshots.
+        shipping_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Sum of snapshotted RouteFit shipping quotes; free-shipping suborders contribute 0.
+        payable_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Parent-order payable snapshot, equal to goods_amount_e4 plus shipping_amount_e4.
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    BuyerOrderSummary:
+      type: object
+      additionalProperties: false
+      description: Buyer-owned list projection. The full delivery-address snapshot is intentionally omitted and is available from the detail endpoint.
       required: [public_id, shipping_address_public_id, payment_status, summary_status, suborders, goods_amount_e4, shipping_amount_e4, payable_amount_e4, created_at, updated_at]
       properties:
         public_id:
@@ -2628,16 +2708,20 @@ components:
           type: string
           pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
         payment_status: {$ref: "#/components/schemas/PaymentStatus"}
-        summary_status:
-          type: string
-          description: Server-derived display summary of the suborders. Suborder status values remain authoritative; the aggregation rule must be fixed before handler implementation.
+        summary_status: {$ref: "#/components/schemas/OrderSummaryStatus"}
         suborders:
           type: array
           minItems: 1
           items: {$ref: "#/components/schemas/BuyerSuborder"}
-        goods_amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
-        shipping_amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
-        payable_amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
+        goods_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Sum of suborder merchandise snapshots.
+        shipping_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Sum of snapshotted RouteFit shipping quotes; free-shipping suborders contribute 0.
+        payable_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Parent-order payable snapshot, equal to goods_amount_e4 plus shipping_amount_e4.
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
     BuyerOrderListData:
@@ -2647,7 +2731,7 @@ components:
       properties:
         items:
           type: array
-          items: {$ref: "#/components/schemas/BuyerOrder"}
+          items: {$ref: "#/components/schemas/BuyerOrderSummary"}
         next_cursor:
           type: string
           nullable: true
@@ -2672,7 +2756,7 @@ components:
       type: object
       additionalProperties: false
       description: One suborder scoped to the authenticated merchant; sibling merchant data is never included.
-      required: [public_id, parent_public_id, status, items, shipping_address_public_id, goods_amount_e4, shipping_amount_e4, payable_amount_e4, created_at, updated_at]
+      required: [public_id, parent_public_id, status, items, shipping_address_public_id, shipping_address, goods_amount_e4, shipping_amount_e4, payable_amount_e4, shipping_quote_expires_at, created_at, updated_at]
       properties:
         public_id:
           type: string
@@ -2688,9 +2772,20 @@ components:
         shipping_address_public_id:
           type: string
           pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
-        goods_amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
-        shipping_amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
-        payable_amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
+        shipping_address: {$ref: "#/components/schemas/MerchantShippingAddressSnapshot"}
+        goods_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Snapshotted merchandise subtotal for this suborder.
+        shipping_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: RouteFit real-time shipping quote snapshotted when the order is placed; 0 when shipping is free to the buyer.
+        payable_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Buyer payable snapshot for this suborder, equal to goods_amount_e4 plus shipping_amount_e4.
+        shipping_quote_expires_at:
+          type: string
+          format: date-time
+          description: Expiry of the RouteFit quote used for the shipping snapshot.
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
     MerchantSuborderListData:
@@ -2994,11 +3089,16 @@ components:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
     OrderConflict:
-      description: Order cannot proceed because stock is insufficient, the order was cancelled or released, an amount differs from the server snapshot, or the current state disallows the action (error code 3002, 3003, 3004, or 3005).
+      description: Order cannot proceed because stock is insufficient, the order was cancelled or released, an amount differs from the server snapshot, payment is confirming, the current state disallows the action, or an idempotent request is still processing/cannot be replayed (error code 3002, 3003, 3004, 3005, 1010, or 1011).
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/OrderErrorEnvelope"
+            oneOf:
+              - $ref: "#/components/schemas/OrderErrorEnvelope"
+              - $ref: "#/components/schemas/ErrorEnvelope"
     RequestTooLarge:
       description: Request body exceeds the configured route limit (error code 1007).
       content:

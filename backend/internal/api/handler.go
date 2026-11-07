@@ -1622,13 +1622,13 @@ func toGenCategory(category catalog.Category) gen.Category {
 func toGenProduct(product catalog.Product) gen.Product {
 	tiers := make(gen.ProductTierList, 0, len(product.Tiers))
 	for _, tier := range product.Tiers {
-		tiers = append(tiers, gen.ProductTier{MinQty: tier.MinQty, UnitPriceE4: tier.UnitPriceE4})
+		tiers = append(tiers, toGenTier(tier))
 	}
 	skus := make(gen.SKUList, 0, len(product.SKUs))
 	for _, sku := range product.SKUs {
 		skuTiers := make(gen.ProductTierList, 0, len(sku.Tiers))
 		for _, tier := range sku.Tiers {
-			skuTiers = append(skuTiers, gen.ProductTier{MinQty: tier.MinQty, UnitPriceE4: tier.UnitPriceE4})
+			skuTiers = append(skuTiers, toGenTier(tier))
 		}
 		item := gen.SKU{PublicId: sku.PublicID, AttributeValues: sku.AttributeValues, Status: gen.SKUStatus(sku.Status), Tiers: skuTiers}
 		if sku.MerchantSKUCode != "" {
@@ -1660,6 +1660,14 @@ func toGenProduct(product catalog.Product) gen.Product {
 		UpdatedAt:    product.UpdatedAt,
 		VolM3:        optionalString(product.VolumeM3),
 	}
+}
+
+func toGenTier(tier catalog.Tier) gen.ProductTier {
+	minQty, err := strconv.ParseInt(tier.MinQty, 10, 64)
+	if err != nil || minQty < 1 {
+		panic("catalog tier min_qty must be a positive integer")
+	}
+	return gen.ProductTier{MinQty: minQty, UnitPriceE4: tier.UnitPriceE4}
 }
 
 func toGenLocalized(text catalog.LocalizedText) gen.LocalizedText {
@@ -1701,7 +1709,7 @@ func localizedPatch(text gen.LocalizedText) catalog.LocalizedText {
 func fromGenTiers(tiers gen.ProductTierList) []catalog.Tier {
 	converted := make([]catalog.Tier, 0, len(tiers))
 	for _, tier := range tiers {
-		converted = append(converted, catalog.Tier{MinQty: tier.MinQty, UnitPriceE4: tier.UnitPriceE4})
+		converted = append(converted, catalog.Tier{MinQty: strconv.FormatInt(tier.MinQty, 10), UnitPriceE4: tier.UnitPriceE4})
 	}
 	return converted
 }

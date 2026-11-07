@@ -85,8 +85,8 @@ describe("checkProductDraft", () => {
       vol_m3: "0.0125",
       source: "manual",
       tiers: [
-        { min_qty: "10", unit_price_e4: 125000 },
-        { min_qty: "100", unit_price_e4: 118000 }
+        { min_qty: 10, unit_price_e4: 125000 },
+        { min_qty: 100, unit_price_e4: 118000 }
       ]
     });
   });
@@ -169,15 +169,15 @@ describe("checkProductDraft", () => {
     ]);
   });
 
-  it("requires distinct minimum quantities after normalisation", () => {
+  it("rejects fractional minimum quantities", () => {
     const draft = validDraft();
     draft.tiers = [
       { minQty: "1.5", unitPrice: "12.5" },
-      { minQty: "1.500", unitPrice: "11.8" }
+      { minQty: "10", unitPrice: "11.8" }
     ];
 
     expect(checkProductDraft(draft).errors).toEqual([
-      { field: "tiers[1].min_qty", messageKey: "product.error.minQtyDuplicate" }
+      { field: "tiers[0].min_qty", messageKey: "product.error.minQtyInvalid" }
     ]);
   });
 
@@ -197,7 +197,7 @@ describe("checkProductDraft", () => {
     ]);
   });
 
-  it("rejects a minimum quantity with more than three decimals", () => {
+  it("rejects any decimal minimum quantity", () => {
     const draft = validDraft();
     draft.tiers[0] = { minQty: "1.2345", unitPrice: "12.5" };
 
@@ -219,8 +219,8 @@ describe("request builders", () => {
       lead_days: 7,
       vol_m3: "0.0125",
       tiers: [
-        { min_qty: "10", unit_price_e4: 125000 },
-        { min_qty: "100", unit_price_e4: 118000 }
+        { min_qty: 10, unit_price_e4: 125000 },
+        { min_qty: 100, unit_price_e4: 118000 }
       ]
     });
   });
@@ -242,8 +242,8 @@ describe("draftFromProduct", () => {
     status: "draft",
     source: "manual",
     tiers: [
-      { min_qty: "10", unit_price_e4: 125000 },
-      { min_qty: "100", unit_price_e4: 50 }
+      { min_qty: 10, unit_price_e4: 125000 },
+      { min_qty: 100, unit_price_e4: 50 }
     ],
     skus: [],
     updated_at: "2026-10-29T00:00:00Z"

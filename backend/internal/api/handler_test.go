@@ -1261,7 +1261,7 @@ func TestUppercasePublicIDInPathReachesTheGatewayRouteMatcher(t *testing.T) {
 }
 func validCreateBody() string {
 	return `{"category_code":"c1","name":{"zh":"瓷砖","en":"Tiles","km":"ក្បឿង"},"origin":"cn","unit":"pcs",` +
-		`"tiers":[{"min_qty":"10","unit_price_e4":140000},{"min_qty":"100","unit_price_e4":120000}]}`
+		`"tiers":[{"min_qty":10,"unit_price_e4":140000},{"min_qty":100,"unit_price_e4":120000}]}`
 }
 
 // 验收：PATCH {"spec":{}} 表示「清空规格」（存储层写 NULL），必须与「字段缺省」区分开；
@@ -1346,7 +1346,7 @@ func TestCreateRejectsIllegalNumbers(t *testing.T) {
 func TestCreateSKUTextLengthBounds(t *testing.T) {
 	handler := catalogHandler(&stubStore{}, activeDirectory(), merchantAuth())
 	requestFor := func(code, unit string) *httptest.ResponseRecorder {
-		body := `{"category_code":"c1","name":{"zh":"瓷砖","en":"Tiles","km":"ក្បឿង"},"origin":"cn","unit":"pcs","skus":[{"merchant_sku_code":"` + code + `","unit":"` + unit + `","spec_values":[],"tiers":[{"min_qty":"1","unit_price_e4":2},{"min_qty":"2","unit_price_e4":1}]}]}`
+		body := `{"category_code":"c1","name":{"zh":"瓷砖","en":"Tiles","km":"ក្បឿង"},"origin":"cn","unit":"pcs","skus":[{"merchant_sku_code":"` + code + `","unit":"` + unit + `","spec_values":[],"tiers":[{"min_qty":1,"unit_price_e4":2},{"min_qty":2,"unit_price_e4":1}]}]}`
 		request := httptest.NewRequest(http.MethodPost, "/v1/merchant/products", strings.NewReader(body))
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Idempotency-Key", "test-sku-length-"+strconv.Itoa(len(code))+"-"+strconv.Itoa(len(unit)))

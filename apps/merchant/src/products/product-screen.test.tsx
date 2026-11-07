@@ -21,7 +21,7 @@ const product: Product = {
   origin: "cn",
   status: "on",
   source: "manual",
-  tiers: [{ min_qty: "10", unit_price_e4: 125_000 }],
+  tiers: [{ min_qty: 10, unit_price_e4: 125_000 }],
   skus: [],
   updated_at: "2026-10-29T00:00:00Z"
 };

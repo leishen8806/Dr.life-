@@ -690,7 +690,7 @@ export interface paths {
         put?: never;
         /**
          * Cancel one parent order before payment
-         * @description Cancellation is allowed only while every suborder remains awaiting_payment.
+         * @description Cancellation is allowed only while every suborder remains awaiting_payment and payment_status is not confirming. A confirming payment returns 409 with the user-facing message "付款确认中，请稍后".
          */
         post: operations["cancelBuyerOrder"];
         delete?: never;
@@ -1236,13 +1236,7 @@ export interface components {
          * @description Documented application error code; ranges are described in the API description.
          * @enum {integer}
          */
-        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 7001;
-        /**
-         * Format: int32
-         * @description Order-domain error code reserved by this contract; handler wiring is deferred to
-         * @enum {integer}
-         */
-        OrderErrorCode: 3001 | 3002 | 3003 | 3004 | 3005;
+        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 3001 | 3002 | 3003 | 3004 | 3005 | 7001;
         Messages: {
             zh: string;
             en: string;
@@ -1265,7 +1259,7 @@ export interface components {
             request_id: string;
         };
         OrderErrorBody: {
-            code: components["schemas"]["OrderErrorCode"];
+            code: components["schemas"]["ErrorCode"];
             message: components["schemas"]["Messages"];
         };
         OrderErrorEnvelope: {
@@ -1625,8 +1619,11 @@ export interface components {
             body: components["schemas"]["LocalizedText"];
         };
         ProductTier: {
-            /** @description Minimum order quantity as a decimal string; never a floating-point number. */
-            min_qty: string;
+            /**
+             * Format: int64
+             * @description Minimum order quantity. Trial orders accept whole units only; fractional quantities are rejected.
+             */
+            min_qty: number;
             /**
              * Format: int64
              * @description Unit price in ten-thousandths of a US dollar.
@@ -1783,10 +1780,15 @@ export interface components {
          */
         OrderStatus: "awaiting_payment" | "paid" | "submitted" | "accepted" | "in_fulfillment" | "shipped" | "delivered_verified" | "settled" | "rejected" | "cancelled" | "delivery_failed" | "returning" | "returned" | "exception";
         /**
-         * @description Payment result tracked independently from merchant-suborder state.
+         * @description Payment result tracked independently from merchant-suborder state. The latest parent-order payment intent maps PENDING/WAITING to pending, UNKNOWN/REVIEW to confirming, SUCCESS to succeeded, FAILED/CLOSED to failed, REFUND to refunded, and no intent to pending.
          * @enum {string}
          */
         PaymentStatus: "pending" | "confirming" | "succeeded" | "failed" | "refunded";
+        /**
+         * @description Server-derived display summary. When every suborder has the same status, use that status; otherwise use mixed. Suborder status remains authoritative.
+         * @enum {string}
+         */
+        OrderSummaryStatus: "awaiting_payment" | "paid" | "submitted" | "accepted" | "in_fulfillment" | "shipped" | "delivered_verified" | "settled" | "rejected" | "cancelled" | "delivery_failed" | "returning" | "returned" | "exception" | "mixed";
         /**
          * Format: int64
          * @description Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
@@ -1809,24 +1811,70 @@ export interface components {
             unit_price_e4: components["schemas"]["OrderMoneyE4"];
             line_total_e4: components["schemas"]["OrderMoneyE4"];
         };
+        /** @description Full delivery-address snapshot saved by trade when the buyer places the order. It is returned only on buyer-owned order responses. */
+        BuyerShippingAddressSnapshot: {
+            recipient_name: string;
+            address_text: string;
+            /** @description Full recipient phone number visible only to the owning buyer. */
+            phone: string;
+        };
+        /** @description Delivery-address snapshot visible to the scoped merchant. The server masks the phone before serialization; the merchant never receives the full number. */
+        MerchantShippingAddressSnapshot: {
+            recipient_name: string;
+            address_text: string;
+            /**
+             * @description Server-masked phone containing exactly four asterisks and the final four digits.
+             * @example ****1234
+             */
+            phone: string;
+        };
         BuyerSuborder: {
             public_id: string;
             merchant_public_id: string;
             status: components["schemas"]["OrderStatus"];
             items: components["schemas"]["OrderLineSnapshot"][];
+            /** @description Snapshotted merchandise subtotal for this suborder. */
             goods_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description RouteFit real-time shipping quote snapshotted when the order is placed; 0 when shipping is free to the buyer. */
             shipping_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Buyer payable snapshot for this suborder, equal to goods_amount_e4 plus shipping_amount_e4. */
             payable_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /**
+             * Format: date-time
+             * @description Expiry of the RouteFit quote used for the shipping snapshot.
+             */
+            shipping_quote_expires_at: string;
         };
         BuyerOrder: {
             public_id: string;
             shipping_address_public_id: string;
+            shipping_address: components["schemas"]["BuyerShippingAddressSnapshot"];
             payment_status: components["schemas"]["PaymentStatus"];
-            /** @description Server-derived display summary of the suborders. Suborder status values remain authoritative; the aggregation rule must be fixed before handler implementation. */
-            summary_status: string;
+            summary_status: components["schemas"]["OrderSummaryStatus"];
             suborders: components["schemas"]["BuyerSuborder"][];
+            /** @description Sum of suborder merchandise snapshots. */
             goods_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Sum of snapshotted RouteFit shipping quotes; free-shipping suborders contribute 0. */
             shipping_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Parent-order payable snapshot, equal to goods_amount_e4 plus shipping_amount_e4. */
+            payable_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description Buyer-owned list projection. The full delivery-address snapshot is intentionally omitted and is available from the detail endpoint. */
+        BuyerOrderSummary: {
+            public_id: string;
+            shipping_address_public_id: string;
+            payment_status: components["schemas"]["PaymentStatus"];
+            summary_status: components["schemas"]["OrderSummaryStatus"];
+            suborders: components["schemas"]["BuyerSuborder"][];
+            /** @description Sum of suborder merchandise snapshots. */
+            goods_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Sum of snapshotted RouteFit shipping quotes; free-shipping suborders contribute 0. */
+            shipping_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Parent-order payable snapshot, equal to goods_amount_e4 plus shipping_amount_e4. */
             payable_amount_e4: components["schemas"]["OrderMoneyE4"];
             /** Format: date-time */
             created_at: string;
@@ -1834,7 +1882,7 @@ export interface components {
             updated_at: string;
         };
         BuyerOrderListData: {
-            items: components["schemas"]["BuyerOrder"][];
+            items: components["schemas"]["BuyerOrderSummary"][];
             next_cursor: string | null;
         };
         BuyerOrderSuccessResponse: {
@@ -1856,9 +1904,18 @@ export interface components {
             status: components["schemas"]["OrderStatus"];
             items: components["schemas"]["OrderLineSnapshot"][];
             shipping_address_public_id: string;
+            shipping_address: components["schemas"]["MerchantShippingAddressSnapshot"];
+            /** @description Snapshotted merchandise subtotal for this suborder. */
             goods_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description RouteFit real-time shipping quote snapshotted when the order is placed; 0 when shipping is free to the buyer. */
             shipping_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Buyer payable snapshot for this suborder, equal to goods_amount_e4 plus shipping_amount_e4. */
             payable_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /**
+             * Format: date-time
+             * @description Expiry of the RouteFit quote used for the shipping snapshot.
+             */
+            shipping_quote_expires_at: string;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -2204,13 +2261,14 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
-        /** @description Order cannot proceed because stock is insufficient, the order was cancelled or released, an amount differs from the server snapshot, or the current state disallows the action (error code 3002, 3003, 3004, or 3005). */
+        /** @description Order cannot proceed because stock is insufficient, the order was cancelled or released, an amount differs from the server snapshot, payment is confirming, the current state disallows the action, or an idempotent request is still processing/cannot be replayed (error code 3002, 3003, 3004, 3005, 1010, or 1011). */
         OrderConflict: {
             headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["OrderErrorEnvelope"];
+                "application/json": components["schemas"]["OrderErrorEnvelope"] | components["schemas"]["ErrorEnvelope"];
             };
         };
         /** @description Request body exceeds the configured route limit (error code 1007). */
