@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"math"
+	"math/rand"
+	"strings"
 	"testing"
 )
 
@@ -210,6 +212,60 @@ func TestPlaceRejectsInactiveMissingKeyAndUnavailableWithoutWriting(t *testing.T
 				t.Fatalf("err=%v created=%+v", err, store.created)
 			}
 		})
+	}
+}
+
+func TestPlaceValidatesAndNormalizesIdempotencyKeyBoundary(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		key  string
+		want error
+	}{
+		{name: "blank", key: " \t ", want: ErrIdempotencyRequired},
+		{name: "201", key: strings.Repeat("k", 201), want: ErrIdempotencyRequired},
+		{name: "200", key: "  " + strings.Repeat("k", 200) + "  "},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := &stubOrders{}
+			order, err := NewService(store, stubAccounts{"active"}, catalogFixture()).Place(context.Background(), 1, tc.key, []OrderLineInput{{"A", 1}})
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("error=%v, want %v", err, tc.want)
+			}
+			if tc.want == nil && (order.IdempotencyKey != strings.Repeat("k", 200) || len(order.IdempotencyKey) != 200) {
+				t.Fatalf("idempotency key=%q len=%d", order.IdempotencyKey, len(order.IdempotencyKey))
+			}
+			if tc.want != nil && store.created.PublicID != "" {
+				t.Fatalf("invalid key created order %+v", store.created)
+			}
+		})
+	}
+}
+
+func TestPlaceOrderAmountSumsForVariedLineCounts(t *testing.T) {
+	random := rand.New(rand.NewSource(1))
+	for attempt := 0; attempt < 100; attempt++ {
+		lineCount := 1 + random.Intn(50)
+		lines := make([]OrderLineInput, 0, lineCount)
+		catalog := &stubCatalog{lines: make(map[string]CatalogLine, lineCount)}
+		for i := 0; i < lineCount; i++ {
+			sku := string(rune(0x1000 + i))
+			lines = append(lines, OrderLineInput{SKUPublicID: sku, Quantity: int64(1 + random.Intn(10))})
+			catalog.lines[sku] = CatalogLine{SKUPublicID: sku, MerchantID: int64(1 + random.Intn(5)), OnSale: true, Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: int64(1+random.Intn(1000)) * 100}}}
+		}
+		order, err := NewService(&stubOrders{}, stubAccounts{"active"}, catalog).Place(context.Background(), 1, "property-key", lines)
+		if err != nil {
+			t.Fatalf("attempt=%d: %v", attempt, err)
+		}
+		var childTotal, lineTotal int64
+		for _, child := range order.Children {
+			childTotal += child.TotalE4
+			for _, line := range child.Lines {
+				lineTotal += line.LineTotalE4
+			}
+		}
+		if childTotal != order.TotalE4 || lineTotal != order.TotalE4 {
+			t.Fatalf("attempt=%d parent=%d children=%d lines=%d", attempt, order.TotalE4, childTotal, lineTotal)
+		}
 	}
 }
 

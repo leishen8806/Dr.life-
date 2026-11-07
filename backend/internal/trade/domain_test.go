@@ -22,6 +22,24 @@ func TestSplitLinesSnapshotsTierPriceAndTotals(t *testing.T) {
 	}
 }
 
+func TestBuildOrderItemsRejectsOnlySelectedNonWholeCentTier(t *testing.T) {
+	_, _, err := BuildOrderItems([]CatalogLine{{
+		SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAW", MerchantID: 10, Quantity: 2, OnSale: true,
+		Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: 101}, {MinQuantity: 10, UnitPriceE4: 200}},
+	}})
+	if !errors.Is(err, ErrPriceNotWholeCent) {
+		t.Fatalf("selected non-whole-cent tier error=%v, want ErrPriceNotWholeCent", err)
+	}
+
+	items, total, err := BuildOrderItems([]CatalogLine{{
+		SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAW", MerchantID: 10, Quantity: 2, OnSale: true,
+		Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: 100}, {MinQuantity: 10, UnitPriceE4: 201}},
+	}})
+	if err != nil || len(items) != 1 || items[0].UnitPriceE4 != 100 || total != 200 {
+		t.Fatalf("unselected tier blocked order: items=%+v total=%d err=%v", items, total, err)
+	}
+}
+
 func TestAdvanceOnlyAllowsContractTransitionsAndRequiresSource(t *testing.T) {
 	if _, err := Advance(AwaitingPayment, Paid, EventSource{}); !errors.Is(err, ErrEventSourceRequired) {
 		t.Fatalf("missing source error=%v", err)

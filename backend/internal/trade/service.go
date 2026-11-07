@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 var (
@@ -119,7 +120,8 @@ func (s *Service) MerchantOrder(ctx context.Context, merchantID int64, publicID 
 	return reader.FindMerchantOrder(ctx, merchantID, publicID)
 }
 func (s *Service) Place(ctx context.Context, buyer int64, idempotencyKey string, lines []OrderLineInput) (CreateOrder, error) {
-	if idempotencyKey == "" {
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if len(idempotencyKey) < 1 || len(idempotencyKey) > 200 {
 		return CreateOrder{}, ErrIdempotencyRequired
 	}
 	status, err := s.accounts.Status(ctx, buyer)

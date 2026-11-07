@@ -34,12 +34,14 @@ const (
 )
 
 var (
-	ErrInvalidTransition   = errors.New("trade: invalid order transition")
-	ErrEventSourceRequired = errors.New("trade: event source is required")
-	ErrInvalidOrderLine    = errors.New("trade: invalid order line")
-	ErrNoMatchingTier      = errors.New("trade: no matching price tier")
-	ErrReservationReleased = errors.New("trade: order reservation was released")
-	ErrPaymentAmount       = errors.New("trade: paid amount does not match order total")
+	ErrInvalidTransition     = errors.New("trade: invalid order transition")
+	ErrEventSourceRequired   = errors.New("trade: event source is required")
+	ErrInvalidOrderLine      = errors.New("trade: invalid order line")
+	ErrNoMatchingTier        = errors.New("trade: no matching price tier")
+	ErrPriceNotWholeCent     = errors.New("trade: selected price tier is not a whole cent")
+	ErrReservationReleased   = errors.New("trade: order reservation was released")
+	ErrPaymentAmount         = errors.New("trade: paid amount does not match order total")
+	ErrPaymentReconciliation = errors.New("trade: paid order received another payment source")
 )
 
 type EventSource struct {
@@ -75,9 +77,9 @@ func BuildOrderItems(lines []CatalogLine) ([]OrderItem, int64, error) {
 		if line.SKUPublicID == "" || line.MerchantID <= 0 || line.Quantity <= 0 || !line.OnSale {
 			return nil, 0, ErrInvalidOrderLine
 		}
-		price, ok := tierPrice(line.Quantity, line.Tiers)
-		if !ok {
-			return nil, 0, ErrNoMatchingTier
+		price, err := tierPrice(line.Quantity, line.Tiers)
+		if err != nil {
+			return nil, 0, err
 		}
 		if price > 0 && line.Quantity > maxInt64/price {
 			return nil, 0, ErrInvalidOrderLine
@@ -92,23 +94,29 @@ func BuildOrderItems(lines []CatalogLine) ([]OrderItem, int64, error) {
 	return items, total, nil
 }
 
-func tierPrice(quantity int64, tiers []Tier) (int64, bool) {
+func tierPrice(quantity int64, tiers []Tier) (int64, error) {
 	var price, bestMinimum int64
 	found := false
 	seen := make(map[int64]struct{}, len(tiers))
 	for _, tier := range tiers {
-		if tier.MinQuantity <= 0 || tier.UnitPriceE4 < 0 || tier.UnitPriceE4%100 != 0 {
-			return 0, false
+		if tier.MinQuantity <= 0 || tier.UnitPriceE4 < 0 {
+			return 0, ErrNoMatchingTier
 		}
 		if _, duplicate := seen[tier.MinQuantity]; duplicate {
-			return 0, false
+			return 0, ErrNoMatchingTier
 		}
 		seen[tier.MinQuantity] = struct{}{}
 		if tier.MinQuantity <= quantity && (!found || tier.MinQuantity > bestMinimum) {
 			price, bestMinimum, found = tier.UnitPriceE4, tier.MinQuantity, true
 		}
 	}
-	return price, found
+	if !found {
+		return 0, ErrNoMatchingTier
+	}
+	if price%100 != 0 {
+		return 0, ErrPriceNotWholeCent
+	}
+	return price, nil
 }
 
 func Advance(from, to OrderStatus, source EventSource) (OrderStatus, error) {
