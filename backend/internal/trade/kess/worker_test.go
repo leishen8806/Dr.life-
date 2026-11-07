@@ -197,6 +197,39 @@ func TestRecoverUnknownKeepsMissingOrderBeforeRecoveryWindow(t *testing.T) {
 	}
 }
 
+func TestRecoverUnknownMovesWaitingNotFoundToManualReview(t *testing.T) {
+	now := time.Date(2026, 11, 7, 9, 0, 0, 0, time.UTC)
+	sentAt := now.Add(-48 * time.Hour)
+	intent := Intent{ID: 12, TradeNo: "DRL-ORDER-10-1", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller", Status: StatusWaiting, LastCreateSentAt: &sentAt}
+	store := &memoryStore{intent: intent}
+	worker := newTestWorker(t, store, &queryClient{queryErr: ErrChannelMissing}, 24*time.Hour)
+	worker.now = func() time.Time { return now }
+
+	if err := worker.RecoverUnknown(context.Background(), intent.ID); err != nil {
+		t.Fatalf("RecoverUnknown error = %v, want manual-review transition", err)
+	}
+	if store.intent.Status != StatusUnknown {
+		t.Fatalf("status = %q, want UNKNOWN", store.intent.Status)
+	}
+}
+
+func TestMemoryStoreExpiredClaimUsesOriginalClaimTime(t *testing.T) {
+	claimedAt := time.Date(2026, 11, 7, 8, 0, 0, 0, time.UTC)
+	store := &memoryStore{
+		intent:    Intent{ID: 13, Status: StatusPending, CreateAttempts: 1},
+		claimed:   true,
+		claimedAt: claimedAt,
+		now:       func() time.Time { return claimedAt.Add(6 * time.Minute) },
+	}
+	intent, claimed, err := store.ClaimPending(context.Background(), 13)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if claimed || intent.Status != StatusUnknown || intent.LastCreateSentAt == nil || !intent.LastCreateSentAt.Equal(claimedAt) {
+		t.Fatalf("claimed=%v status=%q sentAt=%v, want false/UNKNOWN/%v", claimed, intent.Status, intent.LastCreateSentAt, claimedAt)
+	}
+}
+
 func TestNewWorkerRejectsNonPositiveRecoveryWindow(t *testing.T) {
 	if _, err := NewWorker(&memoryStore{}, &queryClient{}, 0, sandboxHost); !errors.Is(err, ErrConfig) {
 		t.Fatalf("NewWorker error=%v, want ErrConfig", err)
@@ -213,8 +246,10 @@ func newTestWorker(t *testing.T, store Store, client Client, recoveryWindow time
 }
 
 type memoryStore struct {
-	intent  Intent
-	claimed bool
+	intent    Intent
+	claimed   bool
+	claimedAt time.Time
+	now       func() time.Time
 }
 
 func (s *memoryStore) Intent(_ context.Context, id int64) (Intent, error) {
@@ -228,16 +263,27 @@ func (s *memoryStore) ClaimPending(_ context.Context, id int64) (Intent, bool, e
 	if id != s.intent.ID {
 		return Intent{}, false, ErrNotFound
 	}
-	if s.intent.Status != StatusPending || s.claimed {
+	if s.intent.Status != StatusPending {
+		return Intent{}, false, nil
+	}
+	now := time.Now()
+	if s.now != nil {
+		now = s.now()
+	}
+	if s.claimed && (s.claimedAt.IsZero() || now.Sub(s.claimedAt) < 5*time.Minute) {
 		return Intent{}, false, nil
 	}
 	if s.intent.CreateAttempts > 0 {
-		now := time.Now()
-		s.intent.LastCreateSentAt = &now
+		if s.claimedAt.IsZero() {
+			s.claimedAt = now
+		}
+		s.intent.LastCreateSentAt = &s.claimedAt
 		s.intent.Status = StatusUnknown
+		s.claimed = false
 		return s.intent, false, nil
 	}
 	s.claimed = true
+	s.claimedAt = now
 	s.intent.CreateAttempts++
 	return s.intent, true, nil
 }
@@ -247,6 +293,7 @@ func (s *memoryStore) ReleasePendingClaim(_ context.Context, id int64) error {
 		return ErrConflict
 	}
 	s.claimed = false
+	s.claimedAt = time.Time{}
 	s.intent.CreateAttempts--
 	return nil
 }

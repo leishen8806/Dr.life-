@@ -179,12 +179,14 @@ func (c *HTTPClient) post(ctx context.Context, path string, body any, bearer str
 	}
 	payload, err := json.Marshal(body)
 	if err != nil {
+		c.recordFailure()
 		return errors.Join(ErrRequestNotSent, err)
 	}
 	var resp *http.Response
 	for attempt := 0; ; attempt++ {
 		req, requestErr := http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+path, bytes.NewReader(payload))
 		if requestErr != nil {
+			c.recordFailure()
 			return errors.Join(ErrRequestNotSent, requestErr)
 		}
 		req.Header.Set("Content-Type", "application/json")
@@ -206,9 +208,6 @@ func (c *HTTPClient) post(ctx context.Context, path string, body any, bearer str
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		c.recordFailure()
 		c.config.Logger.WarnContext(ctx, "KESS response failed", "operation", path, "status_code", resp.StatusCode)
-		if resp.StatusCode == http.StatusNotFound {
-			return ErrChannelMissing
-		}
 		return fmt.Errorf("KESS request failed: HTTP %d", resp.StatusCode)
 	}
 	decoder := json.NewDecoder(io.LimitReader(resp.Body, 1<<20))

@@ -179,11 +179,12 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 		if _, claimed, err := store.ClaimPending(ctx, stale.ID); err != nil || !claimed {
 			t.Fatalf("initial claim claimed=%v error=%v", claimed, err)
 		}
-		if _, err := tradeConn.Exec(ctx, `UPDATE trade.kess_payment_intent SET create_claimed_at = now() - interval '6 minutes' WHERE id = $1`, stale.ID); err != nil {
+		var claimedAt time.Time
+		if err := tradeConn.QueryRow(ctx, `UPDATE trade.kess_payment_intent SET create_claimed_at = now() - interval '6 minutes' WHERE id = $1 RETURNING create_claimed_at`, stale.ID).Scan(&claimedAt); err != nil {
 			t.Fatal(err)
 		}
 		got, claimed, err := store.ClaimPending(ctx, stale.ID)
-		if err != nil || claimed || got.Status != kess.StatusUnknown || got.CreateAttempts != 1 || got.LastCreateSentAt == nil {
+		if err != nil || claimed || got.Status != kess.StatusUnknown || got.CreateAttempts != 1 || got.LastCreateSentAt == nil || got.LastCreateSentAt.Sub(claimedAt).Abs() > time.Second {
 			t.Fatalf("expired claim = %+v claimed=%v error=%v; want UNKNOWN, unclaimed, one attempt and sent time", got, claimed, err)
 		}
 	})

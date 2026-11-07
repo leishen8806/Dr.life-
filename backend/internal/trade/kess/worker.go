@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -71,7 +72,11 @@ func (w *Worker) RecoverUnknown(ctx context.Context, id int64) error {
 	}
 	order, err := w.client.Query(ctx, intent)
 	if err != nil {
-		if errors.Is(err, ErrChannelMissing) && intent.LastCreateSentAt != nil && w.now().Sub(*intent.LastCreateSentAt) >= w.recoveryWindow {
+		if errors.Is(err, ErrChannelMissing) && intent.Status == StatusWaiting {
+			slog.WarnContext(ctx, "KESS confirmed order missing; manual review required", "payment_intent_id", id)
+			return w.store.RecordChannelResult(ctx, id, StatusWaiting, ChannelResult{Status: StatusUnknown, ChannelStatus: "NOT_FOUND"})
+		}
+		if errors.Is(err, ErrChannelMissing) && intent.Status == StatusUnknown && intent.LastCreateSentAt != nil && w.now().Sub(*intent.LastCreateSentAt) >= w.recoveryWindow {
 			return w.store.RecordChannelResult(ctx, id, intent.Status, ChannelResult{Status: StatusClosed, ChannelStatus: "NOT_FOUND"})
 		}
 		return err

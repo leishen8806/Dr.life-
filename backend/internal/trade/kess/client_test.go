@@ -217,6 +217,32 @@ func TestHTTPClientClassifiesPreGatewayFailuresAsNotSent(t *testing.T) {
 	}
 }
 
+func TestHTTPNotFoundIsNeverAQueryOrderBusinessResult(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		cachedToken bool
+	}{
+		{name: "token endpoint"},
+		{name: "gateway endpoint", cachedToken: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client, err := NewHTTPClient(validConfig(CreateServiceLower), &http.Client{Transport: roundTripperFunc(func(request *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: http.StatusNotFound, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("not found")), Request: request}, nil
+			})})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if test.cachedToken {
+				client.token, client.expiry = "token", time.Now().Add(time.Minute)
+			}
+			_, err = client.Query(context.Background(), Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"})
+			if err == nil || errors.Is(err, ErrChannelMissing) || !strings.Contains(err.Error(), "HTTP 404") {
+				t.Fatalf("Query error = %v, want retryable HTTP 404 and not ErrChannelMissing", err)
+			}
+		})
+	}
+}
+
 func TestHTTPClientCircuitOpensAfterRepeatedSentFailures(t *testing.T) {
 	var calls atomic.Int32
 	transport := roundTripperFunc(func(request *http.Request) (*http.Response, error) {
@@ -287,6 +313,20 @@ func TestHTTPClientCircuitAllowsOnlyOneConcurrentHalfOpenProbe(t *testing.T) {
 	client.recordSuccess()
 	if err := client.circuitReady(); err != nil {
 		t.Fatalf("closed circuit error=%v", err)
+	}
+}
+
+func TestHTTPClientRequestConstructionFailureClosesHalfOpenProbe(t *testing.T) {
+	client, err := NewHTTPClient(validConfig(CreateServiceLower), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.openUntil = time.Now().Add(-time.Second)
+	if err := client.post(context.Background(), "\n", map[string]string{"a": "b"}, "", &struct{}{}); !errors.Is(err, ErrRequestNotSent) {
+		t.Fatalf("post error = %v, want ErrRequestNotSent", err)
+	}
+	if client.halfOpen || !client.openUntil.After(time.Now()) {
+		t.Fatalf("half-open state stuck: halfOpen=%v openUntil=%v", client.halfOpen, client.openUntil)
 	}
 }
 
