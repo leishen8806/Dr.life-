@@ -22,7 +22,7 @@ func TestArgon2WorkHasIndependentConcurrencyLimit(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			withArgon2Slot(func() []byte {
+			_, err := withArgon2Slot(context.Background(), func() []byte {
 				current := active.Add(1)
 				for {
 					old := peak.Load()
@@ -35,6 +35,9 @@ func TestArgon2WorkHasIndependentConcurrencyLimit(t *testing.T) {
 				active.Add(-1)
 				return nil
 			})
+			if err != nil {
+				t.Errorf("Argon2 slot: %v", err)
+			}
 		}()
 	}
 	for range argon2ConcurrencyLimit {
@@ -49,6 +52,27 @@ func TestArgon2WorkHasIndependentConcurrencyLimit(t *testing.T) {
 	wg.Wait()
 	if got := peak.Load(); got != argon2ConcurrencyLimit {
 		t.Fatalf("peak Argon2 work=%d, want %d", got, argon2ConcurrencyLimit)
+	}
+}
+
+func TestArgon2WaitHonorsContext(t *testing.T) {
+	for range argon2ConcurrencyLimit {
+		argon2Slots <- struct{}{}
+	}
+	t.Cleanup(func() {
+		for range argon2ConcurrencyLimit {
+			<-argon2Slots
+		}
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	ran := false
+	result, err := withArgon2Slot(ctx, func() []byte {
+		ran = true
+		return []byte("unexpected")
+	})
+	if !errors.Is(err, context.Canceled) || result != nil || ran {
+		t.Fatalf("cancelled wait result=%q err=%v ran=%v, want nil context.Canceled false", result, err, ran)
 	}
 }
 

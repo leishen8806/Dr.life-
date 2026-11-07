@@ -2,6 +2,7 @@ package iam
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -59,14 +60,40 @@ func TestRedisAdminSecurityStateIsShared(t *testing.T) {
 	if got := allowed.Load(); got != adminLoginFailureLimit {
 		t.Fatalf("allowed attempts=%d, want %d", got, adminLoginFailureLimit)
 	}
+	accountKey, ipKey := adminFailureKeys("admin@example.test", "192.0.2.1")[0], adminFailureKeys("admin@example.test", "192.0.2.1")[1]
+	if err := first.client.PExpire(ctx, accountKey, 2*time.Second).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := first.ReserveAttempt(ctx, "admin@example.test", "192.0.2.1"); err != nil || ok {
+		t.Fatalf("locked reservation allowed=%v err=%v, want denied", ok, err)
+	}
+	if count, err := first.client.Get(ctx, accountKey).Int(); err != nil || count != adminLoginFailureLimit {
+		t.Fatalf("locked account count=%d err=%v, want %d", count, err, adminLoginFailureLimit)
+	}
+	if ttl, err := first.client.PTTL(ctx, accountKey).Result(); err != nil || ttl > 5*time.Second {
+		t.Fatalf("locked account ttl=%v err=%v, want fixed near 2s", ttl, err)
+	}
 	if locked, err := second.Locked(ctx, "admin@example.test", "192.0.2.2"); err != nil || !locked {
 		t.Fatalf("shared account lock locked=%v err=%v", locked, err)
 	}
-	if err := second.ClearFailures(ctx, "admin@example.test", "192.0.2.1"); err != nil {
+	if err := second.ClearAccountFailures(ctx, "admin@example.test"); err != nil {
 		t.Fatal(err)
 	}
 	if locked, err := first.Locked(ctx, "admin@example.test", "192.0.2.1"); err != nil || locked {
 		t.Fatalf("cleared lock locked=%v err=%v", locked, err)
+	}
+	if count, err := first.client.Get(ctx, ipKey).Int(); err != nil || count != adminLoginFailureLimit {
+		t.Fatalf("successful account clear changed IP count=%d err=%v, want %d", count, err, adminLoginFailureLimit)
+	}
+	sharedIP := "192.0.2.20"
+	for attempt := 0; attempt < adminLoginFailureLimit*4; attempt++ {
+		ok, err := first.ReserveAttempt(ctx, "admin-"+strconv.Itoa(attempt)+"@example.test", sharedIP)
+		if err != nil || !ok {
+			t.Fatalf("shared IP attempt %d allowed=%v err=%v", attempt+1, ok, err)
+		}
+	}
+	if ok, err := first.ReserveAttempt(ctx, "admin-over-limit@example.test", sharedIP); err != nil || ok {
+		t.Fatalf("shared IP over-limit allowed=%v err=%v, want denied at %d", ok, err, adminLoginFailureLimit*4)
 	}
 	if fresh, err := first.ConsumeTOTP(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB0", 123, time.Minute); err != nil || !fresh {
 		t.Fatalf("first TOTP consume fresh=%v err=%v", fresh, err)

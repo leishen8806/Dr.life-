@@ -236,6 +236,10 @@ func AuthorizeAdmin(matrix AdminMatrix, identity AdminIdentity, module Module, r
 }
 
 func HashPassword(password string) (string, error) {
+	return HashPasswordContext(context.Background(), password)
+}
+
+func HashPasswordContext(ctx context.Context, password string) (string, error) {
 	if len(password) == 0 || len(password) > 1024 {
 		return "", errors.New("iam: invalid password")
 	}
@@ -243,29 +247,44 @@ func HashPassword(password string) (string, error) {
 	if _, err := rand.Read(salt); err != nil {
 		return "", errors.New("iam: password salt source failed")
 	}
-	hash := withArgon2Slot(func() []byte {
+	hash, err := withArgon2Slot(ctx, func() []byte {
 		return argon2.IDKey([]byte(password), salt, argonTime, argonMemory, argonThreads, argonKeyLen)
 	})
+	if err != nil {
+		return "", err
+	}
 	defer zero(hash)
 	return fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s", argonMemory, argonTime, argonThreads, base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(hash)), nil
 }
 
 func VerifyPassword(encoded, password string) bool {
-	params, salt, expected, err := parsePasswordHash(encoded)
-	if err != nil || len(password) == 0 {
-		return false
-	}
-	actual := withArgon2Slot(func() []byte {
-		return argon2.IDKey([]byte(password), salt, params.time, params.memory, params.threads, uint32(len(expected)))
-	})
-	defer zero(actual)
-	return subtle.ConstantTimeCompare(actual, expected) == 1
+	verified, _ := VerifyPasswordContext(context.Background(), encoded, password)
+	return verified
 }
 
-func withArgon2Slot(work func() []byte) []byte {
-	argon2Slots <- struct{}{}
-	defer func() { <-argon2Slots }()
-	return work()
+func VerifyPasswordContext(ctx context.Context, encoded, password string) (bool, error) {
+	params, salt, expected, err := parsePasswordHash(encoded)
+	if err != nil || len(password) == 0 {
+		return false, nil
+	}
+	actual, err := withArgon2Slot(ctx, func() []byte {
+		return argon2.IDKey([]byte(password), salt, params.time, params.memory, params.threads, uint32(len(expected)))
+	})
+	if err != nil {
+		return false, err
+	}
+	defer zero(actual)
+	return subtle.ConstantTimeCompare(actual, expected) == 1, nil
+}
+
+func withArgon2Slot(ctx context.Context, work func() []byte) ([]byte, error) {
+	select {
+	case argon2Slots <- struct{}{}:
+		defer func() { <-argon2Slots }()
+		return work(), nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 type argonParams struct {
@@ -342,7 +361,14 @@ func EncryptTOTPSecret(ctx context.Context, cipher TOTPSecretCipher, publicID, s
 // credential failed. The caller is responsible for fetching only an active
 // administrator record and recording a successful login transactionally.
 func AuthenticateAdmin(ctx context.Context, cipher TOTPSecretCipher, admin AdminCredentials, password, code string, at time.Time) error {
-	if cipher == nil || admin.Status != AdminStatusActive || admin.PublicID == "" || len(admin.TOTPSecretEnc) == 0 || !VerifyPassword(admin.PasswordHash, password) {
+	if cipher == nil || admin.Status != AdminStatusActive || admin.PublicID == "" || len(admin.TOTPSecretEnc) == 0 {
+		return ErrAdminAuthentication
+	}
+	verified, err := VerifyPasswordContext(ctx, admin.PasswordHash, password)
+	if err != nil {
+		return err
+	}
+	if !verified {
 		return ErrAdminAuthentication
 	}
 	secret, err := cipher.Decrypt(ctx, admin.TOTPSecretEnc, adminTOTPAAD(admin.PublicID))

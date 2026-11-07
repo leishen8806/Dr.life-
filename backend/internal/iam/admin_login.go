@@ -15,6 +15,7 @@ import (
 )
 
 const adminLoginFailureLimit = 5
+const adminLoginIPFailureLimit = adminLoginFailureLimit * 4
 
 var adminLoginFailureWindow = 15 * time.Minute
 
@@ -82,7 +83,10 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 	if err == nil && credential.Status == AdminStatusActive {
 		passwordHash = credential.PasswordHash
 	}
-	passwordOK := VerifyPassword(passwordHash, input.Password)
+	passwordOK, verifyErr := VerifyPasswordContext(ctx, passwordHash, input.Password)
+	if verifyErr != nil {
+		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
+	}
 	authenticated := err == nil && credential.Status == AdminStatusActive && passwordOK
 	if authenticated {
 		secret, decryptErr := s.Cipher.Decrypt(ctx, credential.TOTPSecretEnc, adminTOTPAAD(credential.PublicID))
@@ -108,7 +112,7 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 		}
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
-	if err := s.Security.ClearFailures(ctx, email, input.IP); err != nil {
+	if err := s.Security.ClearAccountFailures(ctx, email); err != nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 

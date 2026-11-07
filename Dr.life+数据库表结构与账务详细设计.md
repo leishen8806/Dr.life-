@@ -66,7 +66,7 @@
 | `merchant_op_log` | id, merchant_id, actor_account_id, action, detail, created_at | 员工操作记录（只追加） |
 | `account_link` | id, buyer_account_id, merchant_account_id, linked_at, unlinked_at | 一键关联；`UNIQUE(buyer,merchant)` 且仅一条未解除；**只保存关联，不改变任何资金/订单归属** |
 | `admin_user` | id, public_id, name, email, password_hash(argon2), totp_secret_enc, role, data_scope text[], status, last_login_at | 密码只存 Argon2 哈希，TOTP 密钥由应用层信封加密后存放（AAD=`admin_totp:<public_id>`）；Argon2 创建与校验共用独立的 8 槽并发上限；平台与物流仓储 Web 账号；超级管理员至少 1 位启用（应用层 + 数据库触发器 + 定期审计） |
-| `admin_audit_outbox` | id, public_id, occurred_at, actor_id, actor_role, action, target, detail jsonb, ip, request_id, attempts, last_error, delivered_at | 管理员登录、step-up、改密、创建、停用和角色变更先持久化落箱；投递以 `FOR UPDATE SKIP LOCKED` 认领，并用 `public_id` 在审计链 `event_seen` 唯一去重；失败保留重试，已投递超过 30 天的行分批清理 |
+| `admin_audit_outbox` | id, public_id, occurred_at, actor_id, actor_role, action, target, detail jsonb, ip, request_id, attempts, last_error, delivered_at | 管理员登录、step-up、改密、创建、停用和角色变更先持久化落箱；投递以 `FOR UPDATE SKIP LOCKED` 认领，并用 `public_id` 在审计链 `event_seen` 唯一去重；失败保留重试，已投递超过 30 天的行通过 `delivered_at IS NOT NULL` 部分索引分批清理 |
 | `admin_role_perm` | role (`super/ops/finance/logi/cs/auditor`), module(17 个), level | 对应《权限与审计规范》矩阵；`super` 固定全 `edit` |
 | `actor` | id, kind (`account/admin/system/external`), ref_id | 统一"操作人"，供 `created_by`、审计、流水引用 |
 

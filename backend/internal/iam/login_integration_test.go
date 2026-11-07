@@ -51,22 +51,24 @@ func (s *testAdminSecurity) ReserveAttempt(_ context.Context, account, ip string
 	if s.counts == nil {
 		s.counts = make(map[string]int)
 	}
+	if s.counts["a:"+account] >= adminLoginFailureLimit || s.counts["i:"+ip] >= adminLoginIPFailureLimit {
+		return false, nil
+	}
 	s.counts["a:"+account]++
 	s.counts["i:"+ip]++
-	return s.counts["a:"+account] <= adminLoginFailureLimit && s.counts["i:"+ip] <= adminLoginFailureLimit, nil
+	return true, nil
 }
 
 func (s *testAdminSecurity) Locked(_ context.Context, account, ip string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.counts["a:"+account] >= adminLoginFailureLimit || s.counts["i:"+ip] >= adminLoginFailureLimit, nil
+	return s.counts["a:"+account] >= adminLoginFailureLimit || s.counts["i:"+ip] >= adminLoginIPFailureLimit, nil
 }
 
-func (s *testAdminSecurity) ClearFailures(_ context.Context, account, ip string) error {
+func (s *testAdminSecurity) ClearAccountFailures(_ context.Context, account string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.counts, "a:"+account)
-	delete(s.counts, "i:"+ip)
 	return nil
 }
 
@@ -247,6 +249,10 @@ func (f *loginFixture) testAdminAuditOutboxConcurrentDelivery(t *testing.T) {
 	}
 	if logs != 1 || seen != 1 {
 		t.Fatalf("audit logs=%d event_seen=%d, want one idempotent append", logs, seen)
+	}
+	var cleanupIndex string
+	if err := f.pool.QueryRow(ctx, `SELECT indexdef FROM pg_indexes WHERE schemaname='iam' AND indexname='ix_admin_audit_outbox_delivered'`).Scan(&cleanupIndex); err != nil || !strings.Contains(cleanupIndex, "delivered_at") || !strings.Contains(cleanupIndex, "WHERE (delivered_at IS NOT NULL)") {
+		t.Fatalf("outbox cleanup index=%q err=%v, want partial delivered_at index", cleanupIndex, err)
 	}
 	oldID := mustULID(t)
 	if _, err := f.pool.Exec(ctx, `
@@ -521,11 +527,15 @@ func (f *loginFixture) testAdminPasswordLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := &AdminLoginService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: f.cache, Security: &testAdminSecurity{}, Now: func() time.Time { return f.now }}
+	security := &testAdminSecurity{}
+	service := &AdminLoginService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: f.cache, Security: security, Now: func() time.Time { return f.now }}
 	input := AdminLoginInput{Email: "login-admin@example.test", Password: password, TOTPCode: code, IP: "198.51.100.4", DeviceID: "web:1", RequestID: "admin-login-test"}
 	result, err := service.Login(ctx, input)
 	if err != nil || result.AccessToken == "" || result.RefreshToken == "" || result.AccessExpiresIn != 600 {
 		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if accountCount, ipCount := security.counts["a:"+input.Email], security.counts["i:"+input.IP]; accountCount != 0 || ipCount != 1 {
+		t.Fatalf("successful login failure counters account=%d IP=%d, want 0 and 1", accountCount, ipCount)
 	}
 	failureRequestID := "admin-login-failed"
 	if _, err := service.Login(ctx, AdminLoginInput{Email: input.Email, Password: "wrong", TOTPCode: code, IP: input.IP, DeviceID: input.DeviceID, RequestID: failureRequestID}); err == nil {

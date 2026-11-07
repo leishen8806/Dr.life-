@@ -1,6 +1,7 @@
 package iam
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -45,16 +46,10 @@ func (s *AdminPasswordService) Change(ctx context.Context, input AdminPasswordCh
 		return httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 	now := s.now()
-	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
 	var adminID int64
 	var email string
 	var credential AdminCredentials
-	err = tx.QueryRow(ctx, `SELECT id,public_id,email,password_hash,totp_secret_enc,status FROM iam.admin_user WHERE public_id=$1 FOR UPDATE`, strings.TrimSpace(input.AdminPublicID)).
+	err := s.DB.QueryRow(ctx, `SELECT id,public_id,email,password_hash,totp_secret_enc,status FROM iam.admin_user WHERE public_id=$1`, strings.TrimSpace(input.AdminPublicID)).
 		Scan(&adminID, &credential.PublicID, &email, &credential.PasswordHash, &credential.TOTPSecretEnc, &credential.Status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return httpx.NewAppError(httpx.CodeUnauthenticated)
@@ -69,7 +64,11 @@ func (s *AdminPasswordService) Change(ctx context.Context, input AdminPasswordCh
 	if !allowedAttempt {
 		return httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
-	authenticated := AuthenticateAdmin(ctx, s.Cipher, credential, input.CurrentPassword, input.TOTPCode, now) == nil
+	authErr := AuthenticateAdmin(ctx, s.Cipher, credential, input.CurrentPassword, input.TOTPCode, now)
+	if authErr != nil && !errors.Is(authErr, ErrAdminAuthentication) {
+		return authErr
+	}
+	authenticated := authErr == nil
 	if authenticated {
 		fresh, consumeErr := s.Security.ConsumeTOTP(ctx, credential.PublicID, now.Unix()/30, 90*time.Second)
 		if consumeErr != nil {
@@ -79,20 +78,31 @@ func (s *AdminPasswordService) Change(ctx context.Context, input AdminPasswordCh
 	}
 	if !authenticated {
 		detail, _ := json.Marshal(map[string]string{"result": "failed"})
-		if _, err := queueAdminAudit(ctx, tx, platformaudit.Entry{Time: now, ActorID: adminID, ActorRole: "admin", Action: platformaudit.ActionAccountChanged, Target: "admin:" + credential.PublicID, Detail: detail, IP: input.IP, RequestID: input.RequestID}); err != nil {
-			return httpx.NewAppError(httpx.CodeServiceUnavailable)
-		}
-		if err := tx.Commit(ctx); err != nil {
+		if _, err := enqueueAdminAudit(ctx, s.DB, platformaudit.Entry{Time: now, ActorID: adminID, ActorRole: "admin", Action: platformaudit.ActionAccountChanged, Target: "admin:" + credential.PublicID, Detail: detail, IP: input.IP, RequestID: input.RequestID}); err != nil {
 			return httpx.NewAppError(httpx.CodeServiceUnavailable)
 		}
 		return httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
-	if err := s.Security.ClearFailures(ctx, email, input.IP); err != nil {
+	if err := s.Security.ClearAccountFailures(ctx, email); err != nil {
 		return httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
-	hash, err := HashPassword(input.NewPassword)
+	hash, err := HashPasswordContext(ctx, input.NewPassword)
 	if err != nil {
 		return err
+	}
+	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var lockedID int64
+	var lockedCredential AdminCredentials
+	if err := tx.QueryRow(ctx, `SELECT id,public_id,password_hash,totp_secret_enc,status FROM iam.admin_user WHERE public_id=$1 FOR UPDATE`, credential.PublicID).
+		Scan(&lockedID, &lockedCredential.PublicID, &lockedCredential.PasswordHash, &lockedCredential.TOTPSecretEnc, &lockedCredential.Status); err != nil {
+		return err
+	}
+	if lockedID != adminID || lockedCredential.PasswordHash != credential.PasswordHash || !bytes.Equal(lockedCredential.TOTPSecretEnc, credential.TOTPSecretEnc) || lockedCredential.Status != AdminStatusActive {
+		return httpx.NewAppError(httpx.CodeUnauthenticated)
 	}
 	if _, err := tx.Exec(ctx, `UPDATE iam.admin_user SET password_hash=$1,password_change_required=false,updated_at=$2 WHERE id=$3`, hash, now, adminID); err != nil {
 		return err

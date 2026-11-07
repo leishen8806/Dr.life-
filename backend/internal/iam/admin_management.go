@@ -350,7 +350,7 @@ func (s *AdminManagementService) prepareAdminCreate(ctx context.Context, input A
 	if err != nil {
 		return preparedAdminCreate{}, err
 	}
-	hash, err := HashPassword(password)
+	hash, err := HashPasswordContext(ctx, password)
 	if err != nil {
 		return preparedAdminCreate{}, err
 	}

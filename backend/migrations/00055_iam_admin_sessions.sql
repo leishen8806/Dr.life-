@@ -34,6 +34,7 @@ CREATE TABLE iam.admin_audit_outbox (
 );
 
 CREATE INDEX ix_admin_audit_outbox_pending ON iam.admin_audit_outbox (id) WHERE delivered_at IS NULL;
+CREATE INDEX ix_admin_audit_outbox_delivered ON iam.admin_audit_outbox (delivered_at) WHERE delivered_at IS NOT NULL;
 
 -- +goose Down
 DROP TABLE iam.admin_audit_outbox;

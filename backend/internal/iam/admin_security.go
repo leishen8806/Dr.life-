@@ -15,7 +15,7 @@ import (
 // across all application instances. Authentication fails closed on store errors.
 type AdminSecurityStore interface {
 	ReserveAttempt(context.Context, string, string) (bool, error)
-	ClearFailures(context.Context, string, string) error
+	ClearAccountFailures(context.Context, string) error
 	ConsumeTOTP(context.Context, string, int64, time.Duration) (bool, error)
 }
 
@@ -36,31 +36,29 @@ func (s *RedisAdminSecurityStore) Locked(ctx context.Context, account, ip string
 	if err != nil {
 		return false, err
 	}
-	for _, value := range values {
-		count, _ := strconv.Atoi(stringValue(value))
-		if count >= adminLoginFailureLimit {
-			return true, nil
-		}
-	}
-	return false, nil
+	accountCount, _ := strconv.Atoi(stringValue(values[0]))
+	ipCount, _ := strconv.Atoi(stringValue(values[1]))
+	return accountCount >= adminLoginFailureLimit || ipCount >= adminLoginIPFailureLimit, nil
 }
 
 func (s *RedisAdminSecurityStore) ReserveAttempt(ctx context.Context, account, ip string) (bool, error) {
 	keys := adminFailureKeys(account, ip)
 	result, err := s.client.Eval(ctx, `
-local account_count = redis.call('INCR', KEYS[1])
-local ip_count = redis.call('INCR', KEYS[2])
-redis.call('PEXPIRE', KEYS[1], ARGV[2])
-redis.call('PEXPIRE', KEYS[2], ARGV[2])
-if account_count > tonumber(ARGV[1]) or ip_count > tonumber(ARGV[1]) then
+local account_count = tonumber(redis.call('GET', KEYS[1]) or '0')
+local ip_count = tonumber(redis.call('GET', KEYS[2]) or '0')
+if account_count >= tonumber(ARGV[1]) or ip_count >= tonumber(ARGV[2]) then
   return 0
 end
-return 1`, keys, adminLoginFailureLimit, adminLoginFailureWindow.Milliseconds()).Int()
+account_count = redis.call('INCR', KEYS[1])
+ip_count = redis.call('INCR', KEYS[2])
+if account_count == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[3]) end
+if ip_count == 1 then redis.call('PEXPIRE', KEYS[2], ARGV[3]) end
+return 1`, keys, adminLoginFailureLimit, adminLoginIPFailureLimit, adminLoginFailureWindow.Milliseconds()).Int()
 	return result == 1, err
 }
 
-func (s *RedisAdminSecurityStore) ClearFailures(ctx context.Context, account, ip string) error {
-	return s.client.Del(ctx, adminFailureKeys(account, ip)...).Err()
+func (s *RedisAdminSecurityStore) ClearAccountFailures(ctx context.Context, account string) error {
+	return s.client.Del(ctx, adminFailureKeys(account, "")[0]).Err()
 }
 
 func (s *RedisAdminSecurityStore) ConsumeTOTP(ctx context.Context, adminPublicID string, step int64, ttl time.Duration) (bool, error) {
