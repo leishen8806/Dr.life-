@@ -1176,7 +1176,7 @@ func TestCreateProductReturnsCreatedEnvelope(t *testing.T) {
 
 // 验收：公开浏览接口无需登录即可访问。
 func TestPublicProductListIsOpen(t *testing.T) {
-	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOn, Name: completeName}}}
+	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOn, Name: completeName, Tiers: []catalog.Tier{{MinQty: "1.000", UnitPriceE4: 100}}}}}
 	handler := catalogHandler(store, activeDirectory(), nil)
 
 	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/products?category=c1", nil))
@@ -1185,6 +1185,26 @@ func TestPublicProductListIsOpen(t *testing.T) {
 	}
 	if store.filter.Status != catalog.StatusOn || store.plan.Category != "c1" {
 		t.Fatalf("filter/plan = %+v/%+v", store.filter, store.plan)
+	}
+}
+
+func TestPublicProductListReturns500ForFractionalTierWithoutPanic(t *testing.T) {
+	store := &stubStore{products: []catalog.Product{{
+		PublicID: merchantULID,
+		Status:   catalog.StatusOn,
+		Name:     completeName,
+		Tiers:    []catalog.Tier{{MinQty: "1.5", UnitPriceE4: 100}},
+	}}}
+	handler := api.Handler{Catalog: catalog.New(store, catalog.Options{Merchants: activeDirectory()})}
+	recorder := httptest.NewRecorder()
+
+	handler.ListPublicProducts(recorder, httptest.NewRequest(http.MethodGet, "/v1/public/products", nil), gen.ListPublicProductsParams{})
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if code := decodeErrorCode(t, recorder); code != 1001 {
+		t.Fatalf("code = %d, want 1001", code)
 	}
 }
 

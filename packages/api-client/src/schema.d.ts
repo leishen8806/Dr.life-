@@ -1258,16 +1258,6 @@ export interface components {
             error: components["schemas"]["ErrorBody"];
             request_id: string;
         };
-        OrderErrorBody: {
-            code: components["schemas"]["ErrorCode"];
-            message: components["schemas"]["Messages"];
-        };
-        OrderErrorEnvelope: {
-            /** @enum {boolean} */
-            ok: false;
-            error: components["schemas"]["OrderErrorBody"];
-            request_id: string;
-        };
         PingData: {
             /** @enum {boolean} */
             pong: true;
@@ -2157,7 +2147,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["ErrorEnvelope"] | components["schemas"]["OrderErrorEnvelope"];
+                "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
         /** @description Authentication required (error code 2001). */
@@ -2268,7 +2258,7 @@ export interface components {
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["OrderErrorEnvelope"] | components["schemas"]["ErrorEnvelope"];
+                "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
         /** @description Request body exceeds the configured route limit (error code 1007). */

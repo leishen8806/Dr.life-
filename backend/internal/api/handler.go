@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -1141,7 +1142,12 @@ func (h Handler) ListPublicProducts(w http.ResponseWriter, r *http.Request, para
 		h.writeError(w, r, err)
 		return
 	}
-	httpx.WriteOK(w, r, publicProductListData(page))
+	data, err := publicProductListData(page)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, data)
 }
 
 func (h Handler) SearchPublicProducts(w http.ResponseWriter, r *http.Request, params gen.SearchPublicProductsParams) {
@@ -1167,7 +1173,12 @@ func (h Handler) SearchPublicProducts(w http.ResponseWriter, r *http.Request, pa
 		h.writeError(w, r, err)
 		return
 	}
-	httpx.WriteOK(w, r, publicSearchData(page))
+	data, err := publicSearchData(page)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, data)
 }
 
 func (h Handler) SuggestPublicProducts(w http.ResponseWriter, r *http.Request, params gen.SuggestPublicProductsParams) {
@@ -1205,7 +1216,12 @@ func (h Handler) ListMerchantProducts(w http.ResponseWriter, r *http.Request, pa
 		h.writeError(w, r, err)
 		return
 	}
-	httpx.WriteOK(w, r, productListData(page))
+	data, err := productListData(page)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, data)
 }
 
 func (h Handler) GetMerchantProduct(w http.ResponseWriter, r *http.Request, publicID gen.PublicID) {
@@ -1222,7 +1238,12 @@ func (h Handler) GetMerchantProduct(w http.ResponseWriter, r *http.Request, publ
 		h.writeError(w, r, err)
 		return
 	}
-	httpx.WriteOK(w, r, toGenProduct(product))
+	data, err := toGenProduct(product)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, data)
 }
 
 func (h Handler) CreateMerchantProduct(w http.ResponseWriter, r *http.Request, _ gen.CreateMerchantProductParams) {
@@ -1243,10 +1264,15 @@ func (h Handler) CreateMerchantProduct(w http.ResponseWriter, r *http.Request, _
 		h.writeError(w, r, err)
 		return
 	}
+	data, err := toGenProduct(product)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
 	// 创建成功返回 201；envelope 与成功响应 schema 一致。
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	_ = json.NewEncoder(w).Encode(gen.ProductSuccessResponse{Ok: true, Data: toGenProduct(product), RequestId: httpx.RequestIDFromContext(r.Context())})
+	_ = json.NewEncoder(w).Encode(gen.ProductSuccessResponse{Ok: true, Data: data, RequestId: httpx.RequestIDFromContext(r.Context())})
 }
 
 func (h Handler) UpdateMerchantProduct(w http.ResponseWriter, r *http.Request, publicID gen.PublicID, _ gen.UpdateMerchantProductParams) {
@@ -1267,7 +1293,12 @@ func (h Handler) UpdateMerchantProduct(w http.ResponseWriter, r *http.Request, p
 		h.writeError(w, r, err)
 		return
 	}
-	httpx.WriteOK(w, r, toGenProduct(product))
+	data, err := toGenProduct(product)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, data)
 }
 
 func (h Handler) PublishMerchantProduct(w http.ResponseWriter, r *http.Request, publicID gen.PublicID, _ gen.PublishMerchantProductParams) {
@@ -1284,7 +1315,12 @@ func (h Handler) PublishMerchantProduct(w http.ResponseWriter, r *http.Request, 
 		h.writeError(w, r, err)
 		return
 	}
-	httpx.WriteOK(w, r, toGenProduct(product))
+	data, err := toGenProduct(product)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, data)
 }
 
 // publicIDFromPath 归一化路径中的 public_id。
@@ -1551,53 +1587,73 @@ func productPatch(body gen.ProductUpdateRequest, clearSpec bool) catalog.Product
 	return patch
 }
 
-func productListData(page catalog.ProductPage) gen.ProductListData {
+func productListData(page catalog.ProductPage) (gen.ProductListData, error) {
 	items := make([]gen.Product, 0, len(page.Items))
 	for _, item := range page.Items {
-		items = append(items, toGenProduct(item))
+		product, err := toGenProduct(item)
+		if err != nil {
+			return gen.ProductListData{}, err
+		}
+		items = append(items, product)
 	}
-	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}
+	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}, nil
 }
 
 // publicProductListData 是匿名浏览的投影：供应商来源与内部标准分不属于买家可见信息。
 // 商家列表/详情继续使用 productListData，保留这些字段供商家核对。
-func publicProductListData(page catalog.ProductPage) gen.ProductListData {
+func publicProductListData(page catalog.ProductPage) (gen.ProductListData, error) {
 	items := make([]gen.Product, 0, len(page.Items))
 	for _, item := range page.Items {
-		items = append(items, publicProduct(item))
+		product, err := publicProduct(item)
+		if err != nil {
+			return gen.ProductListData{}, err
+		}
+		items = append(items, product)
 	}
-	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}
+	return gen.ProductListData{Items: items, Page: page.Page, PageSize: page.PageSize, Total: page.Total}, nil
 }
 
-func publicProduct(product catalog.Product) gen.Product {
-	item := toGenProduct(product)
+func publicProduct(product catalog.Product) (gen.Product, error) {
+	item, err := toGenProduct(product)
+	if err != nil {
+		return gen.Product{}, err
+	}
 	item.SourceRef = nil
 	item.StdScore = nil
 	for i := range item.Skus {
 		item.Skus[i].MerchantSkuCode = nil
 	}
-	return item
+	return item, nil
 }
 
-func publicSearchData(page catalog.SearchPage) gen.SearchProductData {
-	items := publicSearchProducts(page.Items)
-	recommendations := publicSearchProducts(page.Recommendations)
+func publicSearchData(page catalog.SearchPage) (gen.SearchProductData, error) {
+	items, err := publicSearchProducts(page.Items)
+	if err != nil {
+		return gen.SearchProductData{}, err
+	}
+	recommendations, err := publicSearchProducts(page.Recommendations)
+	if err != nil {
+		return gen.SearchProductData{}, err
+	}
 	data := gen.SearchProductData{Items: items, NextCursor: optionalString(page.NextCursor), Recommendations: recommendations}
 	if page.RecommendationReason != "" {
 		reason := gen.SearchProductDataReason(page.RecommendationReason)
 		data.Reason = &reason
 	}
-	return data
+	return data, nil
 }
 
-func publicSearchProducts(products []catalog.Product) []gen.Product {
+func publicSearchProducts(products []catalog.Product) ([]gen.Product, error) {
 	items := make([]gen.Product, 0, len(products))
 	for _, item := range products {
-		product := toGenProduct(item)
+		product, err := toGenProduct(item)
+		if err != nil {
+			return nil, err
+		}
 		product.SourceRef, product.StdScore = nil, nil
 		items = append(items, product)
 	}
-	return items
+	return items, nil
 }
 
 func categoryListData(page catalog.CategoryPage) gen.CategoryListData {
@@ -1619,16 +1675,24 @@ func toGenCategory(category catalog.Category) gen.Category {
 	}
 }
 
-func toGenProduct(product catalog.Product) gen.Product {
+func toGenProduct(product catalog.Product) (gen.Product, error) {
 	tiers := make(gen.ProductTierList, 0, len(product.Tiers))
 	for _, tier := range product.Tiers {
-		tiers = append(tiers, toGenTier(tier))
+		item, err := toGenTier(tier)
+		if err != nil {
+			return gen.Product{}, err
+		}
+		tiers = append(tiers, item)
 	}
 	skus := make(gen.SKUList, 0, len(product.SKUs))
 	for _, sku := range product.SKUs {
 		skuTiers := make(gen.ProductTierList, 0, len(sku.Tiers))
 		for _, tier := range sku.Tiers {
-			skuTiers = append(skuTiers, toGenTier(tier))
+			item, err := toGenTier(tier)
+			if err != nil {
+				return gen.Product{}, err
+			}
+			skuTiers = append(skuTiers, item)
 		}
 		item := gen.SKU{PublicId: sku.PublicID, AttributeValues: sku.AttributeValues, Status: gen.SKUStatus(sku.Status), Tiers: skuTiers}
 		if sku.MerchantSKUCode != "" {
@@ -1659,15 +1723,19 @@ func toGenProduct(product catalog.Product) gen.Product {
 		Unit:         product.Unit,
 		UpdatedAt:    product.UpdatedAt,
 		VolM3:        optionalString(product.VolumeM3),
-	}
+	}, nil
 }
 
-func toGenTier(tier catalog.Tier) gen.ProductTier {
-	minQty, err := strconv.ParseInt(tier.MinQty, 10, 64)
-	if err != nil || minQty < 1 {
-		panic("catalog tier min_qty must be a positive integer")
+func toGenTier(tier catalog.Tier) (gen.ProductTier, error) {
+	quantity, err := catalog.ParseDecimal(tier.MinQty, 3)
+	if err != nil {
+		return gen.ProductTier{}, fmt.Errorf("catalog tier min_qty %q must be a positive integer", tier.MinQty)
 	}
-	return gen.ProductTier{MinQty: minQty, UnitPriceE4: tier.UnitPriceE4}
+	minQty, err := strconv.ParseInt(quantity, 10, 64)
+	if err != nil || minQty < 1 {
+		return gen.ProductTier{}, fmt.Errorf("catalog tier min_qty %q must be a positive integer", tier.MinQty)
+	}
+	return gen.ProductTier{MinQty: minQty, UnitPriceE4: tier.UnitPriceE4}, nil
 }
 
 func toGenLocalized(text catalog.LocalizedText) gen.LocalizedText {

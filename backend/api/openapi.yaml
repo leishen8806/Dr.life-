@@ -1593,21 +1593,6 @@ components:
         request_id:
           type: string
           minLength: 1
-    OrderErrorBody:
-      type: object
-      additionalProperties: false
-      required: [code, message]
-      properties:
-        code: {$ref: "#/components/schemas/ErrorCode"}
-        message: {$ref: "#/components/schemas/Messages"}
-    OrderErrorEnvelope:
-      type: object
-      additionalProperties: false
-      required: [ok, error, request_id]
-      properties:
-        ok: {type: boolean, enum: [false]}
-        error: {$ref: "#/components/schemas/OrderErrorBody"}
-        request_id: {type: string, minLength: 1}
     PingData:
       type: object
       additionalProperties: false
@@ -3013,9 +2998,7 @@ components:
       content:
         application/json:
           schema:
-            oneOf:
-              - $ref: "#/components/schemas/ErrorEnvelope"
-              - $ref: "#/components/schemas/OrderErrorEnvelope"
+            $ref: "#/components/schemas/ErrorEnvelope"
     Unauthorized:
       description: Authentication required (error code 2001).
       content:
@@ -3096,9 +3079,7 @@ components:
       content:
         application/json:
           schema:
-            oneOf:
-              - $ref: "#/components/schemas/OrderErrorEnvelope"
-              - $ref: "#/components/schemas/ErrorEnvelope"
+            $ref: "#/components/schemas/ErrorEnvelope"
     RequestTooLarge:
       description: Request body exceeds the configured route limit (error code 1007).
       content:

@@ -4,7 +4,6 @@
 package gen
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -575,13 +574,13 @@ func (e ErrorCode) Valid() bool {
 
 // Defines values for ErrorEnvelopeOk.
 const (
-	ErrorEnvelopeOkFalse ErrorEnvelopeOk = false
+	False ErrorEnvelopeOk = false
 )
 
 // Valid indicates whether the value is a known member of the ErrorEnvelopeOk enum.
 func (e ErrorEnvelopeOk) Valid() bool {
 	switch e {
-	case ErrorEnvelopeOkFalse:
+	case False:
 		return true
 	default:
 		return false
@@ -786,21 +785,6 @@ const (
 func (e MerchantSuborderSuccessResponseOk) Valid() bool {
 	switch e {
 	case MerchantSuborderSuccessResponseOkTrue:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for OrderErrorEnvelopeOk.
-const (
-	OrderErrorEnvelopeOkFalse OrderErrorEnvelopeOk = false
-)
-
-// Valid indicates whether the value is a known member of the OrderErrorEnvelopeOk enum.
-func (e OrderErrorEnvelopeOk) Valid() bool {
-	switch e {
-	case OrderErrorEnvelopeOkFalse:
 		return true
 	default:
 		return false
@@ -2328,23 +2312,6 @@ type OrderCreateRequest struct {
 	ShippingAddressPublicId string `json:"shipping_address_public_id"`
 }
 
-// OrderErrorBody defines model for OrderErrorBody.
-type OrderErrorBody struct {
-	// Code Documented application error code; ranges are described in the API description.
-	Code    ErrorCode `json:"code"`
-	Message Messages  `json:"message"`
-}
-
-// OrderErrorEnvelope defines model for OrderErrorEnvelope.
-type OrderErrorEnvelope struct {
-	Error     OrderErrorBody       `json:"error"`
-	Ok        OrderErrorEnvelopeOk `json:"ok"`
-	RequestId string               `json:"request_id"`
-}
-
-// OrderErrorEnvelopeOk defines model for OrderErrorEnvelope.Ok.
-type OrderErrorEnvelopeOk bool
-
 // OrderLineSnapshot defines model for OrderLineSnapshot.
 type OrderLineSnapshot struct {
 	// LineTotalE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
@@ -2838,14 +2805,10 @@ type MethodNotAllowed = ErrorEnvelope
 type NotFound = ErrorEnvelope
 
 // OrderBadRequest defines model for OrderBadRequest.
-type OrderBadRequest struct {
-	union json.RawMessage
-}
+type OrderBadRequest = ErrorEnvelope
 
 // OrderConflict defines model for OrderConflict.
-type OrderConflict struct {
-	union json.RawMessage
-}
+type OrderConflict = ErrorEnvelope
 
 // RefreshSucceeded defines model for RefreshSucceeded.
 type RefreshSucceeded = RefreshSuccessResponse
@@ -3259,130 +3222,6 @@ type PostAuthRefreshJSONRequestBody = RefreshRequest
 
 // PostTelegramAuthJSONRequestBody defines body for PostTelegramAuth for application/json ContentType.
 type PostTelegramAuthJSONRequestBody = TelegramAuthRequest
-
-// AsErrorEnvelope returns the union data inside the OrderBadRequest as a ErrorEnvelope
-func (t OrderBadRequest) AsErrorEnvelope() (ErrorEnvelope, error) {
-	var body ErrorEnvelope
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromErrorEnvelope overwrites any union data inside the OrderBadRequest as the provided ErrorEnvelope
-func (t *OrderBadRequest) FromErrorEnvelope(v ErrorEnvelope) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeErrorEnvelope performs a merge with any union data inside the OrderBadRequest, using the provided ErrorEnvelope
-func (t *OrderBadRequest) MergeErrorEnvelope(v ErrorEnvelope) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsOrderErrorEnvelope returns the union data inside the OrderBadRequest as a OrderErrorEnvelope
-func (t OrderBadRequest) AsOrderErrorEnvelope() (OrderErrorEnvelope, error) {
-	var body OrderErrorEnvelope
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromOrderErrorEnvelope overwrites any union data inside the OrderBadRequest as the provided OrderErrorEnvelope
-func (t *OrderBadRequest) FromOrderErrorEnvelope(v OrderErrorEnvelope) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeOrderErrorEnvelope performs a merge with any union data inside the OrderBadRequest, using the provided OrderErrorEnvelope
-func (t *OrderBadRequest) MergeOrderErrorEnvelope(v OrderErrorEnvelope) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t OrderBadRequest) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *OrderBadRequest) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
-// AsOrderErrorEnvelope returns the union data inside the OrderConflict as a OrderErrorEnvelope
-func (t OrderConflict) AsOrderErrorEnvelope() (OrderErrorEnvelope, error) {
-	var body OrderErrorEnvelope
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromOrderErrorEnvelope overwrites any union data inside the OrderConflict as the provided OrderErrorEnvelope
-func (t *OrderConflict) FromOrderErrorEnvelope(v OrderErrorEnvelope) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeOrderErrorEnvelope performs a merge with any union data inside the OrderConflict, using the provided OrderErrorEnvelope
-func (t *OrderConflict) MergeOrderErrorEnvelope(v OrderErrorEnvelope) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsErrorEnvelope returns the union data inside the OrderConflict as a ErrorEnvelope
-func (t OrderConflict) AsErrorEnvelope() (ErrorEnvelope, error) {
-	var body ErrorEnvelope
-	err := json.Unmarshal(t.union, &body)
-	return body, err
-}
-
-// FromErrorEnvelope overwrites any union data inside the OrderConflict as the provided ErrorEnvelope
-func (t *OrderConflict) FromErrorEnvelope(v ErrorEnvelope) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeErrorEnvelope performs a merge with any union data inside the OrderConflict, using the provided ErrorEnvelope
-func (t *OrderConflict) MergeErrorEnvelope(v ErrorEnvelope) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t OrderConflict) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *OrderConflict) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
