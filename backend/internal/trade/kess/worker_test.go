@@ -197,19 +197,47 @@ func TestRecoverUnknownKeepsMissingOrderBeforeRecoveryWindow(t *testing.T) {
 	}
 }
 
-func TestRecoverUnknownMovesWaitingNotFoundToManualReview(t *testing.T) {
+func TestRecoverUnknownKeepsWaitingNotFoundInReviewAcrossRetries(t *testing.T) {
 	now := time.Date(2026, 11, 7, 9, 0, 0, 0, time.UTC)
 	sentAt := now.Add(-48 * time.Hour)
 	intent := Intent{ID: 12, TradeNo: "DRL-ORDER-10-1", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller", Status: StatusWaiting, LastCreateSentAt: &sentAt}
 	store := &memoryStore{intent: intent}
-	worker := newTestWorker(t, store, &queryClient{queryErr: ErrChannelMissing}, 24*time.Hour)
+	client := &queryClient{queryErr: ErrChannelMissing}
+	worker := newTestWorker(t, store, client, 24*time.Hour)
 	worker.now = func() time.Time { return now }
 
 	if err := worker.RecoverUnknown(context.Background(), intent.ID); err != nil {
 		t.Fatalf("RecoverUnknown error = %v, want manual-review transition", err)
 	}
-	if store.intent.Status != StatusUnknown {
-		t.Fatalf("status = %q, want UNKNOWN", store.intent.Status)
+	if store.intent.Status != StatusReview {
+		t.Fatalf("first status = %q, want REVIEW", store.intent.Status)
+	}
+	if err := worker.RecoverUnknown(context.Background(), intent.ID); !errors.Is(err, ErrChannelMissing) {
+		t.Fatalf("second RecoverUnknown error = %v, want ErrChannelMissing", err)
+	}
+	if store.intent.Status != StatusReview || client.queryCalls != 2 {
+		t.Fatalf("second status = %q queries = %d, want REVIEW/2", store.intent.Status, client.queryCalls)
+	}
+}
+
+func TestRecoverReviewOnlyAcceptsConfirmedSuccess(t *testing.T) {
+	intent := Intent{ID: 14, TradeNo: "DRL-ORDER-11-1", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller", Status: StatusReview}
+	store := &memoryStore{intent: intent}
+	client := &queryClient{result: ChannelOrder{TradeNo: intent.TradeNo, SellerCode: "seller", AmountE4: 10000, Currency: "USD", Status: "CLOSED"}}
+	worker := newTestWorker(t, store, client, 24*time.Hour)
+
+	if err := worker.RecoverUnknown(context.Background(), intent.ID); !errors.Is(err, ErrInvalidChannel) {
+		t.Fatalf("CLOSED RecoverUnknown error = %v, want ErrInvalidChannel", err)
+	}
+	if store.intent.Status != StatusReview {
+		t.Fatalf("CLOSED status = %q, want REVIEW", store.intent.Status)
+	}
+	client.result = ChannelOrder{TradeNo: intent.TradeNo, SellerCode: "seller", AmountE4: 10000, Currency: "USD", Status: "SUCCESS", TransactionID: "tx-review"}
+	if err := worker.RecoverUnknown(context.Background(), intent.ID); err != nil {
+		t.Fatalf("SUCCESS RecoverUnknown error = %v", err)
+	}
+	if store.intent.Status != StatusSuccess {
+		t.Fatalf("SUCCESS status = %q, want SUCCESS", store.intent.Status)
 	}
 }
 
@@ -322,7 +350,9 @@ func validMemoryTransition(from, to Status) bool {
 	case StatusPending:
 		return to == StatusPending || to == StatusWaiting || to == StatusUnknown
 	case StatusWaiting, StatusUnknown:
-		return to == StatusWaiting || to == StatusSuccess || to == StatusFailed || to == StatusClosed || to == StatusUnknown || to == StatusRefund
+		return to == StatusWaiting || to == StatusSuccess || to == StatusFailed || to == StatusClosed || to == StatusUnknown || to == StatusReview || to == StatusRefund
+	case StatusReview:
+		return to == StatusReview || to == StatusSuccess || to == StatusRefund
 	case StatusSuccess:
 		return to == StatusSuccess || to == StatusRefund
 	case StatusFailed, StatusClosed, StatusRefund:

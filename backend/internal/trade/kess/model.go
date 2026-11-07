@@ -19,6 +19,7 @@ const (
 	StatusFailed  Status = "FAILED"
 	StatusClosed  Status = "CLOSED"
 	StatusUnknown Status = "UNKNOWN"
+	StatusReview  Status = "REVIEW"
 	StatusRefund  Status = "REFUND"
 )
 

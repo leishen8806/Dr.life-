@@ -236,6 +236,11 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 		if _, err := pool.Exec(ctx, `UPDATE trade.kess_payment_intent SET status = 'WAITING' WHERE public_id = $1`, successID); err != nil {
 			t.Fatal(err)
 		}
+		if _, err := pool.Exec(ctx, `UPDATE trade.kess_payment_intent SET status = 'REVIEW' WHERE public_id = $1`, successID); err != nil {
+			t.Fatal(err)
+		}
+		_, err = tradeConn.Exec(ctx, `UPDATE trade.kess_payment_intent SET status = 'CLOSED' WHERE public_id = $1`, successID)
+		assertPGError(t, err, "P0001", "invalid kess payment intent status transition")
 		if _, err := pool.Exec(ctx, `UPDATE trade.kess_payment_intent SET status = 'SUCCESS' WHERE public_id = $1`, successID); err != nil {
 			t.Fatal(err)
 		}

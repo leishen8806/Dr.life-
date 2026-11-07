@@ -12,7 +12,7 @@ CREATE TABLE trade.kess_payment_intent (
     amount_e4 bigint NOT NULL CHECK (amount_e4 > 0 AND amount_e4 % 100 = 0),
     currency text NOT NULL CHECK (currency = 'USD'),
     seller_code text NOT NULL CHECK (btrim(seller_code) <> ''),
-    status text NOT NULL CHECK (status IN ('PENDING', 'WAITING', 'SUCCESS', 'FAILED', 'CLOSED', 'UNKNOWN', 'REFUND')),
+    status text NOT NULL CHECK (status IN ('PENDING', 'WAITING', 'SUCCESS', 'FAILED', 'CLOSED', 'UNKNOWN', 'REVIEW', 'REFUND')),
     channel_status text,
     channel_transaction_id text,
     payment_url text,
@@ -24,7 +24,7 @@ CREATE TABLE trade.kess_payment_intent (
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT ux_kess_payment_intent_company_source_attempt UNIQUE (company_id, source_ref, attempt_no)
 );
-CREATE INDEX ix_kess_payment_intent_recovery ON trade.kess_payment_intent (status, updated_at) WHERE status IN ('UNKNOWN', 'WAITING');
+CREATE INDEX ix_kess_payment_intent_recovery ON trade.kess_payment_intent (status, updated_at) WHERE status IN ('UNKNOWN', 'WAITING', 'REVIEW');
 
 -- Intent identity and receivable facts are immutable after persistence. The
 -- worker may only record channel facts and state observations.
@@ -46,7 +46,9 @@ BEGIN
         RAISE EXCEPTION 'kess payment intent receivable facts are immutable' USING ERRCODE = 'P0001';
     END IF;
     IF NOT ((OLD.status = 'PENDING' AND NEW.status IN ('PENDING', 'WAITING', 'UNKNOWN'))
-        OR (OLD.status IN ('WAITING', 'UNKNOWN') AND NEW.status IN ('WAITING', 'SUCCESS', 'FAILED', 'CLOSED', 'UNKNOWN', 'REFUND'))
+        OR (OLD.status = 'WAITING' AND NEW.status IN ('WAITING', 'SUCCESS', 'FAILED', 'CLOSED', 'UNKNOWN', 'REVIEW', 'REFUND'))
+        OR (OLD.status = 'UNKNOWN' AND NEW.status IN ('WAITING', 'SUCCESS', 'FAILED', 'CLOSED', 'UNKNOWN', 'REFUND'))
+        OR (OLD.status = 'REVIEW' AND NEW.status IN ('REVIEW', 'SUCCESS', 'REFUND'))
         OR (OLD.status = 'SUCCESS' AND NEW.status IN ('SUCCESS', 'REFUND'))
         OR (OLD.status IN ('FAILED', 'CLOSED', 'REFUND') AND NEW.status = OLD.status)) THEN
         RAISE EXCEPTION 'invalid kess payment intent status transition' USING ERRCODE = 'P0001';

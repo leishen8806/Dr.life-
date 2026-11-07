@@ -67,14 +67,14 @@ func (w *Worker) RecoverUnknown(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	if intent.Status != StatusUnknown && intent.Status != StatusWaiting {
+	if intent.Status != StatusUnknown && intent.Status != StatusWaiting && intent.Status != StatusReview {
 		return nil
 	}
 	order, err := w.client.Query(ctx, intent)
 	if err != nil {
 		if errors.Is(err, ErrChannelMissing) && intent.Status == StatusWaiting {
 			slog.WarnContext(ctx, "KESS confirmed order missing; manual review required", "payment_intent_id", id)
-			return w.store.RecordChannelResult(ctx, id, StatusWaiting, ChannelResult{Status: StatusUnknown, ChannelStatus: "NOT_FOUND"})
+			return w.store.RecordChannelResult(ctx, id, StatusWaiting, ChannelResult{Status: StatusReview, ChannelStatus: "NOT_FOUND"})
 		}
 		if errors.Is(err, ErrChannelMissing) && intent.Status == StatusUnknown && intent.LastCreateSentAt != nil && w.now().Sub(*intent.LastCreateSentAt) >= w.recoveryWindow {
 			return w.store.RecordChannelResult(ctx, id, intent.Status, ChannelResult{Status: StatusClosed, ChannelStatus: "NOT_FOUND"})
@@ -88,6 +88,9 @@ func (w *Worker) recordValidated(ctx context.Context, intent Intent, order Chann
 	status, err := validateOrder(intent, order, requireURL, w.paymentURLHost)
 	if err != nil {
 		return err
+	}
+	if intent.Status == StatusReview && status != StatusSuccess {
+		return ErrInvalidChannel
 	}
 	return w.store.RecordChannelResult(ctx, intent.ID, intent.Status, ChannelResult{
 		Status: status, ChannelStatus: order.Status, TransactionID: order.TransactionID, PaymentURL: order.PaymentURL, CreateSent: createSent,
