@@ -45,6 +45,63 @@
   "error.2002": "您没有执行此操作的权限。",
   "order.count.one": "{count} 个订单",
   "order.count.other": "{count} 个订单",
+  "order.suborders": "订单需求",
+  "order.buyer": "买家",
+  "order.merchant.all": "全部",
+  "order.merchant.delivery": "配送状态",
+  "order.merchant.itemsTitle": "商品明细",
+  "order.merchant.listEmpty": "暂无子订单",
+  "order.merchant.total": "订单总额",
+  "order.merchantStatus.awaiting_payment": "等待买家付款",
+  "order.merchantStatus.paid": "已付款，等待 RouteFit 仓配受理",
+  "order.merchantStatus.submitted": "已提交 RouteFit 仓配，等待受理",
+  "order.merchantStatus.accepted": "RouteFit 仓配已受理，准备拣货",
+  "order.merchantStatus.in_fulfillment": "RouteFit 仓配处理中，正在拣货打包",
+  "order.merchantStatus.shipped": "RouteFit 已发货，配送中",
+  "order.merchantStatus.delivered_verified": "已签收，等待售后观察期结束",
+  "order.merchantStatus.settled": "订单已完成，货款已结算",
+  "order.merchantStatus.rejected": "订单已拒绝",
+  "order.merchantStatus.cancelled": "订单已取消",
+  "order.merchantStatus.delivery_failed": "配送失败",
+  "order.merchantStatus.returning": "退货处理中",
+  "order.merchantStatus.returned": "已退货",
+  "order.merchantStatus.exception": "订单异常",
+  "order.pageTitle": "订单项目",
+  "order.detailTitle": "订单详情",
+  "order.listEmpty": "暂无订单",
+  "order.listError": "订单加载失败",
+  "order.viewDetails": "查看详情",
+  "order.mockNote": "接口桩数据：用于演示买家订单流程",
+  "order.items": "{count} 项商品",
+  "order.itemsTitle": "商品明细",
+  "order.merchant": "商家",
+  "order.createdAt": "创建时间",
+  "order.total": "订单总额",
+  "order.delivery": "配送进度",
+  "order.parentSummary": "父订单（按商家显示子订单）",
+  "order.subOrder": "子订单",
+  "order.subOrderCount": "{count} 个商家子订单",
+  "order.paymentStatus": "付款结果",
+  "order.paymentConfirming": "付款结果确认中，请勿重复支付",
+  "order.payment.pending": "等待付款确认",
+  "order.payment.confirming": "确认中",
+  "order.payment.succeeded": "付款成功",
+  "order.payment.failed": "付款失败",
+  "order.payment.refunded": "已退款",
+  "order.buyerStatus.awaiting_payment": "等待付款确认",
+  "order.buyerStatus.paid": "已付款，仓库处理中",
+  "order.buyerStatus.submitted": "仓库处理中，等待受理",
+  "order.buyerStatus.accepted": "仓库已受理，准备拣货",
+  "order.buyerStatus.in_fulfillment": "仓库处理中，正在拣货打包",
+  "order.buyerStatus.shipped": "已发货，配送中",
+  "order.buyerStatus.delivered_verified": "已签收，售后观察期中",
+  "order.buyerStatus.settled": "订单已完成",
+  "order.buyerStatus.cancelled": "订单已取消",
+  "order.buyerStatus.rejected": "订单已拒绝",
+  "order.buyerStatus.delivery_failed": "配送失败",
+  "order.buyerStatus.returning": "退货处理中",
+  "order.buyerStatus.returned": "已退货",
+  "order.buyerStatus.exception": "订单异常",
   "shell.currentLanguage": "当前语言：{language}",
   "shell.developmentMode": "开发模式：正在使用浏览器模拟数据",
   "shell.telegramMode": "Telegram Mini App 模式",
@@ -77,6 +134,16 @@
 ,"error.2007": "登录尝试过于频繁，请稍后再试。"
 ,"error.2007.countdown": "登录尝试过于频繁，请在 {seconds} 秒后重试。"
 ,"error.2008": "请先同意当前协议后再继续。"
+,"consent.title": "阅读并同意协议"
+,"consent.description": "继续使用前，必须同意当前法律文件。"
+,"consent.privacy": "隐私政策"
+,"consent.terms": "用户协议"
+,"consent.version": "版本 {version}"
+,"consent.read": "阅读文件"
+,"consent.required": "必选"
+,"consent.accept": "同意并继续"
+,"consent.loadFailed": "当前协议加载失败。"
+,"consent.acceptFailed": "协议保存失败，请重试。"
 ,"error.7001": "外部服务无法完成请求。"
 ,"error.circuitOpen": "服务暂时不可用，请稍后再试。"
 ,"product.list.title": "商品管理"
@@ -137,6 +204,22 @@
 ,"mall.leadDays": "{days} 天"
 ,"mall.tiers": "阶梯价（买得越多越便宜）"
 ,"mall.tierQuantity": "{quantity} 起"
+,"mall.cart": "采购单"
+,"mall.cartCount": "{count} 件"
+,"mall.cartEmpty": "采购单还是空的。"
+,"mall.browseProducts": "去商城逛逛"
+,"mall.cartQuantity": "数量"
+,"mall.cartAvailable": "可售：{quantity}"
+,"mall.cartOutOfStock": "数量超过可售量。"
+,"mall.cartBelowMoq": "数量低于起订量。"
+,"mall.cartRemove": "移除"
+,"mall.cartSubtotal": "商家小计"
+,"mall.cartTotal": "合计"
+,"mall.cartSplitPreview": "拆单预览"
+,"mall.cartMerchantCn": "中国供应商"
+,"mall.cartMerchantLocal": "本地供应商"
+,"mall.cartPlaceOrder": "提交订单"
+,"mall.cartEstimateNote": "金额为预估值，提交时以服务端返回为准。"
 ,"mall.supplier": "供应商"
 ,"mall.categoriesEmpty": "暂无商品分类"
 ,"mall.productsEmpty": "暂无在售商品"

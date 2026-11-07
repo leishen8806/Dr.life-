@@ -12,7 +12,7 @@ import (
 )
 
 type StepUpVerifier interface {
-	Verify(context.Context, string, string, string) (string, error)
+	Verify(context.Context, string, string, string, string) (string, error)
 }
 
 type JTIStore interface {
@@ -39,7 +39,7 @@ func RequireStepUp(scope string, verifier StepUpVerifier, used JTIStore) func(ht
 				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeStepUpInvalid))
 				return
 			}
-			jti, err := verifier.Verify(r.Context(), token, scope, identity.AccountID)
+			jti, err := verifier.Verify(r.Context(), token, scope, identity.AccountID, identity.SessionID)
 			if err != nil || !validOpaqueID(jti) {
 				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeStepUpInvalid))
 				return

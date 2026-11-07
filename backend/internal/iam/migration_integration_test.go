@@ -69,7 +69,7 @@ func TestIAMMigration(t *testing.T) {
 	}
 
 	t.Run("up down up is reversible", func(t *testing.T) {
-		assertIAMTableCount(t, database, 18)
+		assertIAMTableCount(t, database, 19)
 		if err := goose.DownTo(database, migrationsDir, 2); err != nil {
 			t.Fatal(err)
 		}
@@ -77,7 +77,7 @@ func TestIAMMigration(t *testing.T) {
 		if err := goose.Up(database, migrationsDir); err != nil {
 			t.Fatal(err)
 		}
-		assertIAMTableCount(t, database, 18)
+		assertIAMTableCount(t, database, 19)
 	})
 
 	admin, err := pgx.Connect(ctx, dsn)
@@ -96,7 +96,7 @@ func TestIAMMigration(t *testing.T) {
 			FROM information_schema.columns c WHERE c.table_schema = 'iam'`).Scan(&identityCount, &publicIDCount, &badTimestamp); err != nil {
 			t.Fatal(err)
 		}
-		if identityCount != 15 || publicIDCount != 15 || badTimestamp != 0 {
+		if identityCount != 16 || publicIDCount != 16 || badTimestamp != 0 {
 			t.Fatalf("identity columns=%d, public IDs=%d, bad timestamps=%d", identityCount, publicIDCount, badTimestamp)
 		}
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.person (public_id, tg_user_id) VALUES ('bad-ulid', 1)`)
@@ -104,6 +104,61 @@ func TestIAMMigration(t *testing.T) {
 	})
 
 	seedFixtures(t, ctx, admin)
+
+	t.Run("admin sessions retain the existing rotation storage", func(t *testing.T) {
+		const adminID = "01ARZ3NDEKTSV4RRFFQ69G5FB0"
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ($1,'Admin Session','admin-session@example.test','argon2-hash','finance','active')`, adminID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.session (public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB1',(SELECT id FROM iam.admin_user WHERE public_id=$1),'01ARZ3NDEKTSV4RRFFQ69G5FB1',decode('00','hex'),'test-kid',now()+interval '1 hour',now())`, adminID); err != nil {
+			t.Fatalf("admin session must share iam.session rotation storage: %v", err)
+		}
+	})
+
+	t.Run("admin sessions are active through the shared session checker", func(t *testing.T) {
+		const adminID = "01ARZ3NDEKTSV4RRFFQ69G5FB3"
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ($1,'Active Admin Session','active-admin-session@example.test','argon2-hash','finance','active')`, adminID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.session (public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB4',(SELECT id FROM iam.admin_user WHERE public_id=$1),'01ARZ3NDEKTSV4RRFFQ69G5FB4',decode('01','hex'),'test-kid',now()+interval '1 hour',now())`, adminID); err != nil {
+			t.Fatal(err)
+		}
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pool.Close()
+		checker := iam.DBSessionChecker{DB: pool, Cache: &sessionCacheMiss{}}
+		active, err := checker.Active(ctx, adminID, "01ARZ3NDEKTSV4RRFFQ69G5FB4")
+		if err != nil || !active {
+			t.Fatalf("admin session active=%v err=%v, want true nil", active, err)
+		}
+	})
+
+	t.Run("admin permission checker reads the seeded matrix and data scope", func(t *testing.T) {
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer pool.Close()
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,data_scope,status) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB2','Scoped Finance','scoped-finance@example.test','argon2-hash','finance',ARRAY['PP'],'active')`); err != nil {
+			t.Fatal(err)
+		}
+
+		checker := iam.AdminPermissionStore{DB: pool}
+		allowed, err := checker.Can(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB2", "fund", "view")
+		if err != nil || !allowed {
+			t.Fatalf("finance fund view allowed=%v err=%v, want true nil", allowed, err)
+		}
+		allowed, err = checker.Can(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB2", "rbac", "view")
+		if err != nil || allowed {
+			t.Fatalf("finance rbac view allowed=%v err=%v, want false nil", allowed, err)
+		}
+		scoped, err := checker.HasDataScope(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB2")
+		if err != nil || !scoped {
+			t.Fatalf("scoped administrator data scope=%v err=%v, want true nil", scoped, err)
+		}
+	})
 
 	t.Run("person and account constraints", func(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23505", fmt.Sprintf(`INSERT INTO iam.person (public_id, tg_user_id) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FA1', 1001)`))
@@ -189,6 +244,21 @@ func TestIAMMigration(t *testing.T) {
 		}
 		if count != 11 {
 			t.Fatalf("sensitive bytea column count=%d, want 11", count)
+		}
+		if _, err := admin.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FC0','Session Owner','session-owner@example.test','hash','ops')`); err != nil {
+			t.Fatal(err)
+		}
+		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.session (public_id,account_id,admin_user_id,family_id,refresh_token_hash,expires_at) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FC1',a.id,u.id,'01ARZ3NDEKTSV4RRFFQ69G5FC1','\x01',now()+interval '1 hour' FROM iam.account a,iam.admin_user u WHERE a.public_id='`+buyerPublicID+`' AND u.email='session-owner@example.test'`)
+		assertSQLState(t, ctx, admin, "23514", `INSERT INTO iam.session (public_id,account_id,admin_user_id,family_id,refresh_token_hash,expires_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FC2',NULL,NULL,'01ARZ3NDEKTSV4RRFFQ69G5FC2','\x02',now()+interval '1 hour')`)
+	})
+
+	t.Run("administrators default to no forced password change", func(t *testing.T) {
+		var nullable, defaultExpr string
+		if err := admin.QueryRow(ctx, `SELECT is_nullable,column_default FROM information_schema.columns WHERE table_schema='iam' AND table_name='admin_user' AND column_name='password_change_required'`).Scan(&nullable, &defaultExpr); err != nil {
+			t.Fatal(err)
+		}
+		if nullable != "NO" || defaultExpr != "false" {
+			t.Fatalf("password_change_required nullable=%q default=%q", nullable, defaultExpr)
 		}
 	})
 
@@ -664,4 +734,17 @@ func migrationDirectory(t *testing.T) string {
 		t.Fatal("cannot locate migration directory")
 	}
 	return filepath.Join(filepath.Dir(file), "..", "..", "migrations")
+}
+
+type sessionCacheMiss struct{}
+
+func (*sessionCacheMiss) Get(context.Context, string, string) (bool, bool, error) {
+	return false, false, nil
+}
+func (*sessionCacheMiss) Put(context.Context, string, string, int64, time.Duration) error {
+	return nil
+}
+func (*sessionCacheMiss) Revoke(context.Context, string, time.Duration) error { return nil }
+func (*sessionCacheMiss) SetAccountEpoch(context.Context, string, int64, time.Duration) error {
+	return nil
 }

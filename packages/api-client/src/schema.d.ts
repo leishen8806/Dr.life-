@@ -4,6 +4,163 @@
  */
 
 export interface paths {
+    "/v1/admin/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign in to the administration web application */
+        post: operations["postAdminAuthLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate the administration refresh cookie
+         * @description Requires an allowed admin Origin and X-Requested-With: drlife.
+         */
+        post: operations["postAdminAuthRefresh"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/auth/step-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exchange a fresh administrator TOTP for a scoped step-up token */
+        post: operations["postAdminAuthStepUp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change an administrator password and clear first-login restriction */
+        post: operations["changeAdminPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/admins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List administrator accounts */
+        get: operations["listAdminUsers"];
+        put?: never;
+        /** Create an administrator account */
+        post: operations["createAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/admins/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an administrator account */
+        get: operations["getAdminUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/admins/{public_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disable an administrator account */
+        post: operations["disableAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/admins/{public_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable an administrator account */
+        post: operations["enableAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/admins/{public_id}/role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change an administrator role and data scope */
+        patch: operations["updateAdminUserRole"];
+        trace?: never;
+    };
     "/v1/admin/financial-center": {
         parameters: {
             query?: never;
@@ -984,6 +1141,108 @@ export interface components {
             init_data: string;
             device_id?: string;
         };
+        AdminLoginRequest: {
+            /** Format: email */
+            email: string;
+            password: string;
+            totp_code: string;
+            device_id?: string;
+        };
+        AdminLoginData: {
+            access_token: string;
+            /** Format: int64 */
+            access_expires_in: number;
+        };
+        AdminStepUpRequest: {
+            totp_code: string;
+            /** @enum {string} */
+            scope: "withdrawal_review" | "withdrawal_paid" | "account_freeze" | "merchant_status_change" | "permission_change";
+        };
+        AdminStepUpData: {
+            step_up_token: string;
+            scope: string;
+            /** Format: date-time */
+            expires_at: string;
+        };
+        AdminStepUpSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["AdminStepUpData"];
+            request_id: string;
+        };
+        AdminLoginSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["AdminLoginData"];
+            request_id: string;
+        };
+        AdminUser: {
+            public_id: string;
+            name: string;
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "super" | "ops" | "finance" | "logi" | "cs" | "auditor";
+            data_scope: string[];
+            /** @enum {string} */
+            status: "active" | "disabled";
+            /** Format: date-time */
+            last_login_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        AdminUserCreateRequest: {
+            name: string;
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "super" | "ops" | "finance" | "logi" | "cs" | "auditor";
+            data_scope: string[];
+        };
+        AdminUserDisableRequest: {
+            reason: string;
+        };
+        AdminUserRoleUpdateRequest: {
+            /** @enum {string} */
+            role: "super" | "ops" | "finance" | "logi" | "cs" | "auditor";
+            data_scope: string[];
+        };
+        AdminPasswordChangeRequest: {
+            current_password: string;
+            new_password: string;
+            totp_code: string;
+        };
+        AdminUserData: {
+            admin: components["schemas"]["AdminUser"];
+        };
+        AdminUserListData: {
+            items: components["schemas"]["AdminUser"][];
+            next_cursor?: string | null;
+        };
+        AdminUserCreatedData: {
+            admin: components["schemas"]["AdminUser"];
+            initial_password: string;
+            /** Format: uri */
+            totp_provisioning_uri: string;
+        };
+        AdminUserSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["AdminUserData"];
+            request_id: string;
+        };
+        AdminUserListSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["AdminUserListData"];
+            request_id: string;
+        };
+        AdminUserCreatedSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["AdminUserCreatedData"];
+            request_id: string;
+        };
         TelegramAccount: {
             public_id: string;
             /** @enum {string} */
@@ -1507,6 +1766,24 @@ export interface components {
                 "application/json": components["schemas"]["AccountDeviceListSuccessResponse"];
             };
         };
+        /** @description Administrator account returned without credential material. */
+        AdminUserSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["AdminUserSuccessResponse"];
+            };
+        };
+        /** @description Refresh cookie rotated successfully; the refresh token is not returned in JSON. */
+        AdminRefreshSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["AdminLoginSuccessResponse"];
+            };
+        };
         /** @description Read-only ledger response. */
         LedgerReadSucceeded: {
             headers: {
@@ -1708,6 +1985,7 @@ export interface components {
         StatusFilter: "draft" | "review" | "on" | "off" | "rejected";
         /** @description Single-use token scoped to a declared high-risk action and account. */
         XStepUpToken: string;
+        AdminPublicID: string;
     };
     requestBodies: never;
     headers: {
@@ -1720,6 +1998,279 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    postAdminAuthLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Login succeeded and a host-only refresh cookie is set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminLoginSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["LoginFailed"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postAdminAuthRefresh: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Requested-With": "drlife";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AdminRefreshSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postAdminAuthStepUp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminStepUpRequest"];
+            };
+        };
+        responses: {
+            /** @description Step-up token issued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStepUpSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["LoginFailed"];
+            403: components["responses"]["Forbidden"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    changeAdminPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPasswordChangeRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ActionSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["LoginFailed"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listAdminUsers: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Administrator accounts in created-at keyset order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserListSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    createAdminUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Single-use token scoped to a declared high-risk action and account. */
+                "X-Step-Up-Token": components["parameters"]["XStepUpToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Administrator created; bootstrap credentials appear only in this response. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserCreatedSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getAdminUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                public_id: components["parameters"]["AdminPublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Administrator account. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserSuccessResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    disableAdminUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Single-use token scoped to a declared high-risk action and account. */
+                "X-Step-Up-Token": components["parameters"]["XStepUpToken"];
+            };
+            path: {
+                public_id: components["parameters"]["AdminPublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserDisableRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["AdminUserSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    enableAdminUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Single-use token scoped to a declared high-risk action and account. */
+                "X-Step-Up-Token": components["parameters"]["XStepUpToken"];
+            };
+            path: {
+                public_id: components["parameters"]["AdminPublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["AdminUserSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateAdminUserRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                /** @description Single-use token scoped to a declared high-risk action and account. */
+                "X-Step-Up-Token": components["parameters"]["XStepUpToken"];
+            };
+            path: {
+                public_id: components["parameters"]["AdminPublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserRoleUpdateRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["AdminUserSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
     getAdminFinancialCenter: {
         parameters: {
             query?: {

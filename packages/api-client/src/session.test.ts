@@ -31,6 +31,19 @@ function loginData(lang: string | null, needsLanguage: boolean) {
   };
 }
 
+function consentData(needsReaccept = false) {
+  return {
+    ok: true,
+    data: {
+      items: [
+        { kind: "privacy", version: "v1.0", accepted: !needsReaccept, needs_reaccept: needsReaccept },
+        { kind: "terms", version: "v1.0", accepted: !needsReaccept, needs_reaccept: needsReaccept }
+      ]
+    },
+    request_id: "req_consent"
+  };
+}
+
 function session(fetchMock: typeof fetch, end: "buyer" | "merchant" = "buyer") {
   return createTelegramSession({
     end,
@@ -45,7 +58,8 @@ describe("createTelegramSession", () => {
   it("replays initData for its own end and normalises the account", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
-      .mockResolvedValue(reply(loginData(null, true)));
+      .mockResolvedValueOnce(reply(loginData(null, true)))
+      .mockResolvedValueOnce(reply(consentData()));
 
     const account = await session(fetchMock, "merchant").login();
     const request = fetchMock.mock.calls[0]?.[0] as Request;
@@ -62,20 +76,39 @@ describe("createTelegramSession", () => {
       role: "buyer",
       lang: null,
       status: "active",
-      needsLanguage: true
+      needsLanguage: true,
+      needsConsent: false
     });
   });
 
   it("keeps a registered language and a frozen status from the login response", async () => {
     const frozen = loginData("km", false);
     frozen.data.account.status = "frozen";
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(reply(frozen));
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(reply(frozen))
+      .mockResolvedValueOnce(reply(consentData()));
 
     await expect(session(fetchMock).login()).resolves.toMatchObject({
       lang: "km",
       status: "frozen",
-      needsLanguage: false
+      needsLanguage: false,
+      needsConsent: false
     });
+  });
+
+  it("detects current legal documents that still need consent", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(reply(loginData("en", false)))
+      .mockResolvedValueOnce(reply(consentData(true)));
+
+    const account = await session(fetchMock).login();
+    const consentRequest = fetchMock.mock.calls[1]?.[0] as Request;
+
+    expect(consentRequest.method).toBe("GET");
+    expect(consentRequest.url).toBe(`${baseUrl}/v1/buyer/me/consents`);
+    expect(account.needsConsent).toBe(true);
   });
 
   it("reports a blocked account as 2006 with no retry window", async () => {
@@ -118,6 +151,7 @@ describe("createTelegramSession", () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(reply(loginData(null, true)))
+      .mockResolvedValueOnce(reply(consentData()))
       .mockResolvedValueOnce(
         reply({
           ok: true,
@@ -129,7 +163,7 @@ describe("createTelegramSession", () => {
     const current = session(fetchMock, "merchant");
     await current.login();
     const account = await current.registerLanguage("km");
-    const request = fetchMock.mock.calls[1]?.[0] as Request;
+    const request = fetchMock.mock.calls[2]?.[0] as Request;
 
     expect(request.method).toBe("PUT");
     expect(request.url).toBe(`${baseUrl}/v1/merchant/me/language`);

@@ -21,6 +21,8 @@ import {
   type ProductFieldError
 } from "./form";
 import { ProductFormView, ProductListView } from "./product-views";
+import { SuborderDetailView, SuborderListView } from "../orders/suborder-views";
+import type { MerchantSuborder, SuborderStatus } from "../orders/suborders";
 
 interface Editing {
   /** 缺省表示新建；带上商品表示在编辑它。 */
@@ -37,6 +39,9 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
   const [failure, setFailure] = useState<TranslationKey>();
   const [unpublishing, setUnpublishing] = useState<Product>();
   const [busy, setBusy] = useState(false);
+  const [subordersOpen, setSubordersOpen] = useState(false);
+  const [selectedSuborder, setSelectedSuborder] = useState<MerchantSuborder>();
+  const [suborderStatus, setSuborderStatus] = useState<SuborderStatus>();
 
   const reload = useCallback(async () => {
     try {
@@ -99,7 +104,22 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
 
   return (
     <main className="mini-shell">
-      <AppHeader slogan={t("brand.slogan")} actions={<LanguageSwitcher />} />
+      <AppHeader slogan={t("brand.slogan")} actions={<>
+        <LanguageSwitcher />
+        <button type="button" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</button>
+      </>} />
+      {subordersOpen ? (
+        selectedSuborder ? (
+          <SuborderDetailView order={selectedSuborder} language={language} translate={t} onBack={() => setSelectedSuborder(undefined)} />
+        ) : (
+          <>
+            <button type="button" className="merchant-back" onClick={() => setSubordersOpen(false)}>{t("common.back")}</button>
+            <h1>{t("order.suborders")}</h1>
+            <SuborderListView language={language} translate={t} selected={suborderStatus} onSelectStatus={setSuborderStatus} onOpen={setSelectedSuborder} />
+          </>
+        )
+      ) : null}
+      {!subordersOpen && <>
       <h1>{t("product.list.title")}</h1>
       {failure && (
         <ErrorState
@@ -164,6 +184,7 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
           );
         }}
       />
+      </>}
     </main>
   );
 }

@@ -45,6 +45,63 @@
   "error.2002": "[TODO-KM-REVIEW] អ្នកមិនមានសិទ្ធិធ្វើប្រតិបត្តិការនេះទេ។",
   "order.count.one": "[TODO-KM-REVIEW] ការបញ្ជាទិញ {count}",
   "order.count.other": "[TODO-KM-REVIEW] ការបញ្ជាទិញ {count}",
+  "order.suborders": "[TODO-KM-REVIEW] សំណើការបញ្ជាទិញ",
+  "order.buyer": "[TODO-KM-REVIEW] អ្នកទិញ",
+  "order.merchant.all": "[TODO-KM-REVIEW] ទាំងអស់",
+  "order.merchant.delivery": "[TODO-KM-REVIEW] ស្ថានភាពដឹកជញ្ជូន",
+  "order.merchant.itemsTitle": "[TODO-KM-REVIEW] ព័ត៌មានទំនិញ",
+  "order.merchant.listEmpty": "[TODO-KM-REVIEW] មិនទាន់មានការបញ្ជាទិញរង",
+  "order.merchant.total": "[TODO-KM-REVIEW] សរុបការបញ្ជាទិញ",
+  "order.merchantStatus.awaiting_payment": "[TODO-KM-REVIEW] រង់ចាំការទូទាត់ពីអ្នកទិញ",
+  "order.merchantStatus.paid": "[TODO-KM-REVIEW] បានបង់ប្រាក់ រង់ចាំ RouteFit ទទួលការរៀបចំ",
+  "order.merchantStatus.submitted": "[TODO-KM-REVIEW] បានដាក់ស្នើទៅ RouteFit រង់ចាំការទទួល",
+  "order.merchantStatus.accepted": "[TODO-KM-REVIEW] RouteFit បានទទួល រៀបចំរើសទំនិញ",
+  "order.merchantStatus.in_fulfillment": "[TODO-KM-REVIEW] RouteFit កំពុងរើស និងវេចខ្ចប់",
+  "order.merchantStatus.shipped": "[TODO-KM-REVIEW] RouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន",
+  "order.merchantStatus.delivered_verified": "[TODO-KM-REVIEW] បានទទួល រង់ចាំចប់ការសង្កេតបន្ទាប់ការលក់",
+  "order.merchantStatus.settled": "[TODO-KM-REVIEW] ការបញ្ជាទិញបានបញ្ចប់ ប្រាក់បានទូទាត់",
+  "order.merchantStatus.rejected": "[TODO-KM-REVIEW] បានបដិសេធ",
+  "order.merchantStatus.cancelled": "[TODO-KM-REVIEW] បានបោះបង់",
+  "order.merchantStatus.delivery_failed": "[TODO-KM-REVIEW] ដឹកជញ្ជូនបរាជ័យ",
+  "order.merchantStatus.returning": "[TODO-KM-REVIEW] កំពុងប្រគល់ត្រឡប់",
+  "order.merchantStatus.returned": "[TODO-KM-REVIEW] បានប្រគល់ត្រឡប់",
+  "order.merchantStatus.exception": "[TODO-KM-REVIEW] ការបញ្ជាទិញមានបញ្ហា",
+  "order.pageTitle": "[TODO-KM-REVIEW] ការបញ្ជាទិញ",
+  "order.detailTitle": "[TODO-KM-REVIEW] ព័ត៌មានការបញ្ជាទិញ",
+  "order.listEmpty": "[TODO-KM-REVIEW] មិនទាន់មានការបញ្ជាទិញ",
+  "order.listError": "[TODO-KM-REVIEW] ផ្ទុកការបញ្ជាទិញមិនបាន",
+  "order.viewDetails": "[TODO-KM-REVIEW] មើលព័ត៌មាន",
+  "order.mockNote": "[TODO-KM-REVIEW] ទិន្នន័យចំណុចប្រទាក់សម្រាប់សាកល្បង",
+  "order.items": "[TODO-KM-REVIEW] ទំនិញ {count} មុខ",
+  "order.itemsTitle": "[TODO-KM-REVIEW] ព័ត៌មានទំនិញ",
+  "order.merchant": "[TODO-KM-REVIEW] អ្នកលក់",
+  "order.createdAt": "[TODO-KM-REVIEW] បានបង្កើត",
+  "order.total": "[TODO-KM-REVIEW] សរុបការបញ្ជាទិញ",
+  "order.delivery": "[TODO-KM-REVIEW] វឌ្ឍនភាពដឹកជញ្ជូន",
+  "order.parentSummary": "[TODO-KM-REVIEW] ការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)",
+  "order.subOrder": "[TODO-KM-REVIEW] ការបញ្ជាទិញរង",
+  "order.subOrderCount": "[TODO-KM-REVIEW] ការបញ្ជាទិញរងរបស់អ្នកលក់ {count}",
+  "order.paymentStatus": "[TODO-KM-REVIEW] លទ្ធផលការទូទាត់",
+  "order.paymentConfirming": "[TODO-KM-REVIEW] កំពុងបញ្ជាក់លទ្ធផលការទូទាត់ សូមកុំបង់ប្រាក់ម្តងទៀត",
+  "order.payment.pending": "[TODO-KM-REVIEW] រង់ចាំការបញ្ជាក់ការទូទាត់",
+  "order.payment.confirming": "[TODO-KM-REVIEW] កំពុងបញ្ជាក់",
+  "order.payment.succeeded": "[TODO-KM-REVIEW] ការទូទាត់ជោគជ័យ",
+  "order.payment.failed": "[TODO-KM-REVIEW] ការទូទាត់បរាជ័យ",
+  "order.payment.refunded": "[TODO-KM-REVIEW] បានសងប្រាក់វិញ",
+  "order.buyerStatus.awaiting_payment": "[TODO-KM-REVIEW] រង់ចាំការបញ្ជាក់ការទូទាត់",
+  "order.buyerStatus.paid": "[TODO-KM-REVIEW] បានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំង",
+  "order.buyerStatus.submitted": "[TODO-KM-REVIEW] ឃ្លាំងកំពុងដំណើរការ រង់ចាំការទទួល",
+  "order.buyerStatus.accepted": "[TODO-KM-REVIEW] ឃ្លាំងបានទទួល រៀបចំរើសទំនិញ",
+  "order.buyerStatus.in_fulfillment": "[TODO-KM-REVIEW] ឃ្លាំងកំពុងរើស និងវេចខ្ចប់",
+  "order.buyerStatus.shipped": "[TODO-KM-REVIEW] បានផ្ញើ កំពុងដឹកជញ្ជូន",
+  "order.buyerStatus.delivered_verified": "[TODO-KM-REVIEW] បានទទួល កំពុងសង្កេតការលក់បន្ទាប់",
+  "order.buyerStatus.settled": "[TODO-KM-REVIEW] ការបញ្ជាទិញបានបញ្ចប់",
+  "order.buyerStatus.cancelled": "[TODO-KM-REVIEW] បានបោះបង់",
+  "order.buyerStatus.rejected": "[TODO-KM-REVIEW] បានបដិសេធ",
+  "order.buyerStatus.delivery_failed": "[TODO-KM-REVIEW] ដឹកជញ្ជូនបរាជ័យ",
+  "order.buyerStatus.returning": "[TODO-KM-REVIEW] កំពុងប្រគល់ត្រឡប់",
+  "order.buyerStatus.returned": "[TODO-KM-REVIEW] បានប្រគល់ត្រឡប់",
+  "order.buyerStatus.exception": "[TODO-KM-REVIEW] ការបញ្ជាទិញមានបញ្ហា",
   "shell.currentLanguage": "ភាសាបច្ចុប្បន្ន៖ {language}",
   "shell.developmentMode": "[TODO-KM-REVIEW] Development mode: browser mock data is active",
   "shell.telegramMode": "[TODO-KM-REVIEW] Telegram Mini App mode",
@@ -77,6 +134,16 @@
 ,"error.2007": "[TODO-KM-REVIEW] Too many login attempts. Please wait a moment."
 ,"error.2007.countdown": "[TODO-KM-REVIEW] Too many login attempts. Wait {seconds}s."
 ,"error.2008": "[TODO-KM-REVIEW] Please accept the current agreement to continue."
+,"consent.title": "[TODO-KM-REVIEW] Review and accept the agreements"
+,"consent.description": "[TODO-KM-REVIEW] You must accept the current legal documents before continuing."
+,"consent.privacy": "[TODO-KM-REVIEW] Privacy policy"
+,"consent.terms": "[TODO-KM-REVIEW] User agreement"
+,"consent.version": "[TODO-KM-REVIEW] Version {version}"
+,"consent.read": "[TODO-KM-REVIEW] Read document"
+,"consent.required": "[TODO-KM-REVIEW] Required"
+,"consent.accept": "[TODO-KM-REVIEW] Accept and continue"
+,"consent.loadFailed": "[TODO-KM-REVIEW] The current agreements could not be loaded."
+,"consent.acceptFailed": "[TODO-KM-REVIEW] The agreement could not be saved. Please try again."
 ,"error.7001": "[TODO-KM-REVIEW] The external service could not complete the request."
 ,"error.circuitOpen": "[TODO-KM-REVIEW] The service is temporarily unavailable. Try again later."
 ,"product.list.title": "[TODO-KM-REVIEW] ទំនិញ"
@@ -137,6 +204,22 @@
 ,"mall.leadDays": "[TODO-KM-REVIEW] {days} ថ្ងៃ"
 ,"mall.tiers": "តម្លៃតាមបរិមាណ (ទិញច្រើន ថោកជាង)"
 ,"mall.tierQuantity": "[TODO-KM-REVIEW] ចាប់ពី {quantity}"
+,"mall.cart": "[TODO-KM-REVIEW] បញ្ជីទិញ"
+,"mall.cartCount": "[TODO-KM-REVIEW] {count} មុខ"
+,"mall.cartEmpty": "[TODO-KM-REVIEW] បញ្ជីទិញរបស់អ្នកនៅទទេ។"
+,"mall.browseProducts": "[TODO-KM-REVIEW] ទៅមើលទំនិញ"
+,"mall.cartQuantity": "[TODO-KM-REVIEW] បរិមាណ"
+,"mall.cartAvailable": "[TODO-KM-REVIEW] មានលក់៖ {quantity}"
+,"mall.cartOutOfStock": "[TODO-KM-REVIEW] បរិមាណលើសស្តុកដែលមាន។"
+,"mall.cartBelowMoq": "[TODO-KM-REVIEW] បរិមាណទាបជាងចំនួនអប្បបរមា។"
+,"mall.cartRemove": "[TODO-KM-REVIEW] លុបចេញ"
+,"mall.cartSubtotal": "[TODO-KM-REVIEW] សរុបតាមអ្នកផ្គត់ផ្គង់"
+,"mall.cartTotal": "[TODO-KM-REVIEW] សរុប"
+,"mall.cartSplitPreview": "[TODO-KM-REVIEW] មើលការបំបែកការបញ្ជាទិញ"
+,"mall.cartMerchantCn": "[TODO-KM-REVIEW] អ្នកផ្គត់ផ្គង់ចិន"
+,"mall.cartMerchantLocal": "[TODO-KM-REVIEW] អ្នកផ្គត់ផ្គង់ក្នុងស្រុក"
+,"mall.cartPlaceOrder": "[TODO-KM-REVIEW] ដាក់បញ្ជាទិញ"
+,"mall.cartEstimateNote": "[TODO-KM-REVIEW] ចំនួនទឹកប្រាក់គ្រាន់តែជាការប៉ាន់ស្មាន លទ្ធផលពីម៉ាស៊ីនមេមានអាទិភាពពេលដាក់បញ្ជាទិញ។"
 ,"mall.supplier": "អ្នកផ្គត់ផ្គង់"
 ,"mall.categoriesEmpty": "[TODO-KM-REVIEW] គ្មានប្រភេទទំនិញ"
 ,"mall.productsEmpty": "[TODO-KM-REVIEW] គ្មានទំនិញលក់"

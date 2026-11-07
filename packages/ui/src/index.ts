@@ -17,6 +17,7 @@ export { StartupGate, useStartup, type Startup } from "./startup-gate";
 export {
   AccountBlockedView,
   BrandSplashView,
+  ConsentView,
   LanguageChoiceView,
   LoginFailedView,
   LoginThrottledView

@@ -62,6 +62,41 @@ func TestGroupedCORSSeparatesClients(t *testing.T) {
 	}
 }
 
+func TestAdminRefreshCSRFRequiresTrustedOriginAndRequestedWithHeader(t *testing.T) {
+	groups := OriginGroups{Admin: []string{"https://admin.settlecore.org"}}
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	handler := RequireAdminRefreshCSRF(groups)(next)
+
+	for name, mutate := range map[string]func(*http.Request){
+		"missing origin":         func(_ *http.Request) {},
+		"untrusted origin":       func(r *http.Request) { r.Header.Set("Origin", "https://evil.example") },
+		"missing requested with": func(r *http.Request) { r.Header.Set("Origin", "https://admin.settlecore.org") },
+		"wrong requested with": func(r *http.Request) {
+			r.Header.Set("Origin", "https://admin.settlecore.org")
+			r.Header.Set("X-Requested-With", "other")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/refresh", nil)
+			mutate(req)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+			if w.Code != http.StatusForbidden {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+		})
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/refresh", nil)
+	req.Header.Set("Origin", "https://admin.settlecore.org")
+	req.Header.Set("X-Requested-With", "drlife")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("trusted request status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestSecurityHeaders(t *testing.T) {
 	for _, env := range []string{"dev", "prod"} {
 		response := httptest.NewRecorder()
@@ -319,6 +354,31 @@ func TestIdempotencyFiveXXCanRetryAndLargeResponseIsNotReplayed(t *testing.T) {
 	}
 }
 
+func TestIdempotencyCompletedWithoutCachingSensitiveResponse(t *testing.T) {
+	store := NewMemoryIdempotencyStore()
+	final := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"initial_password":"secret","totp_provisioning_uri":"otpauth://secret"}`))
+	})
+	handler := RequireIdempotency(nil)(BindIdempotency(IdempotencyOptions{
+		Store:              store,
+		DoNotCacheResponse: func(*http.Request) bool { return true },
+	})(final))
+	r := httptest.NewRequest(http.MethodPost, "/v1/admin/admins", strings.NewReader(`{}`))
+	r.Header.Set("Idempotency-Key", "sensitive_response")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, r)
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	for _, item := range store.items {
+		if !item.entry.Truncated || len(item.entry.Body) != 0 || item.entry.ContentType != "" {
+			t.Fatalf("sensitive idempotency entry=%+v", item.entry)
+		}
+		return
+	}
+	t.Fatal("sensitive idempotency entry missing")
+}
+
 func TestMemoryIdempotencyExpiry(t *testing.T) {
 	now := time.Unix(100, 0)
 	store := NewMemoryIdempotencyStore()
@@ -381,8 +441,8 @@ func TestRedisSecurityStores(t *testing.T) {
 
 type fakeStepUpVerifier struct{}
 
-func (fakeStepUpVerifier) Verify(_ context.Context, token, scope, account string) (string, error) {
-	if token != "valid" || scope != "withdraw" || account != "a" {
+func (fakeStepUpVerifier) Verify(_ context.Context, token, scope, account, session string) (string, error) {
+	if token != "valid" || scope != "withdraw" || account != "a" || session != "s" {
 		return "", errors.New("invalid")
 	}
 	return "jti_1", nil
@@ -398,7 +458,7 @@ func TestStepUpCannotBeSpoofedAndJTIIsSingleUse(t *testing.T) {
 	}))
 	call := func(token string, spoof bool) int {
 		r := httptest.NewRequest(http.MethodPost, "/v1/buyer/withdrawals", nil)
-		withIdentity(r, Identity{AccountID: "a", Role: RoleBuyer})
+		withIdentity(r, Identity{AccountID: "a", Role: RoleBuyer, SessionID: "s"})
 		r.Header.Set("X-Step-Up-Token", token)
 		if spoof {
 			r.Header.Set("X-Step-Up-Verified", "true")
@@ -422,7 +482,7 @@ func TestIdempotentReplayDoesNotConsumeAnotherStepUp(t *testing.T) {
 	handler := RequireIdempotency(nil)(BindIdempotency(IdempotencyOptions{Store: NewMemoryIdempotencyStore()})(final))
 	call := func() *httptest.ResponseRecorder {
 		r := httptest.NewRequest(http.MethodPost, "/v1/buyer/withdrawals", strings.NewReader(`{}`))
-		withIdentity(r, Identity{AccountID: "a", Role: RoleBuyer})
+		withIdentity(r, Identity{AccountID: "a", Role: RoleBuyer, SessionID: "s"})
 		r.Header.Set("Idempotency-Key", "withdraw_one")
 		r.Header.Set("X-Step-Up-Token", "valid")
 		w := httptest.NewRecorder()

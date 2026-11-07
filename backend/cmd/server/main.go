@@ -32,6 +32,12 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
 )
 
+type adminStepUpVerifier struct{ tokens iam.TokenManager }
+
+func (v adminStepUpVerifier) Verify(ctx context.Context, raw, scope, adminID, sessionID string) (string, error) {
+	return v.tokens.VerifyStepUp(ctx, raw, scope, adminID, sessionID)
+}
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -259,11 +265,18 @@ func main() {
 		}
 	}
 	var loginService *iam.Service
+	var adminLoginService *iam.AdminLoginService
+	var adminStepUpService *iam.AdminStepUpService
+	var adminPasswordService *iam.AdminPasswordService
+	var adminManagementService *iam.AdminManagementService
 	var sessionService *iam.SessionService
 	var accountProfileService *iam.AccountProfileService
 	var accountLinkService *iam.AccountLinkService
 	var consentService *iam.ConsentService
 	var accountDirectory *iam.AccountDirectory
+	var adminPermissions *iam.AdminPermissionStore
+	var stepUpVerifier gateway.StepUpVerifier
+	var adminStepUpJTIStore gateway.JTIStore
 	var authenticator gateway.Authenticator
 	checks := []server.ReadinessCheck{database.Ping}
 	if reportReadiness != nil {
@@ -286,6 +299,7 @@ func main() {
 		}
 		defer iamDatabase.Close()
 		accountDirectory = &iam.AccountDirectory{DB: iamDatabase}
+		adminPermissions = &iam.AdminPermissionStore{DB: iamDatabase}
 		checks = append(checks, iamDatabase.Ping)
 		jwtKeys, keyErr := iam.LoadJWTKeyringFromEnvironment()
 		if keyErr != nil {
@@ -314,7 +328,7 @@ func main() {
 		}
 		checker := iam.DBSessionChecker{DB: iamDatabase, Cache: sessionCache, IdleTTL: cfg.SessionIdleTTL}
 		tokens := iam.TokenManager{Keys: jwtKeys, AccessTTL: cfg.AccessTokenTTL, Issuer: cfg.TokenIssuer, LegacyAcceptUntil: cfg.TokenLegacyAcceptUntil, Checker: checker}
-		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}}
+		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}, Audit: auditStore}
 		accountProfileService = &iam.AccountProfileService{DB: iamDatabase}
 		accountLinkService = iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: iamDatabase}, ids.NewULID)
 		consentService = iam.NewConsentService(iam.PostgresConsentRepository{DB: iamDatabase}, nil)
@@ -325,6 +339,38 @@ func main() {
 			Failures: &iam.FailureGuard{Limiter: limiter, Rule: gateway.Rule{Limit: cfg.LoginFailureLimit, Window: cfg.LoginFailureWindow}},
 			Metrics:  metrics.Business(),
 			Logger:   logger,
+		}
+		adminTokens := tokens
+		adminTokens.AccessTTL = 10 * time.Minute
+		sessionService.AdminTokens = adminTokens
+		var adminSecurity iam.AdminSecurityStore
+		if cfg.RedisURL != "" {
+			redisAdminSecurity, redisErr := iam.NewRedisAdminSecurityStore(cfg.RedisURL)
+			if redisErr != nil {
+				logger.Error("Redis administrator security configuration failed", "error", redisErr)
+			} else {
+				defer redisAdminSecurity.Close()
+				adminSecurity = redisAdminSecurity
+			}
+		}
+		adminLoginService = &iam.AdminLoginService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Audit: auditStore, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: sessionCache, Security: adminSecurity}
+		adminStepUpService = &iam.AdminStepUpService{DB: iamDatabase, Tokens: adminTokens, Cipher: envelope, Permissions: *adminPermissions, Audit: auditStore, Security: adminSecurity}
+		adminPasswordService = &iam.AdminPasswordService{DB: iamDatabase, Cipher: envelope, Audit: auditStore, SessionCache: sessionCache, Security: adminSecurity}
+		adminManagementService = &iam.AdminManagementService{DB: iamDatabase, Cipher: envelope, Audit: auditStore, SessionCache: sessionCache}
+		if auditStore != nil {
+			go iam.RunAdminAuditOutbox(ctx, iamDatabase, auditStore)
+		}
+		stepUpVerifier = adminStepUpVerifier{tokens: adminTokens}
+		if cfg.RedisURL != "" {
+			jtiStore, redisErr := gateway.NewRedisJTIStore(cfg.RedisURL)
+			if redisErr != nil {
+				logger.Error("Redis step-up state configuration failed", "error", redisErr)
+				os.Exit(1)
+			}
+			defer jtiStore.Close()
+			adminStepUpJTIStore = jtiStore
+		} else if cfg.AppEnv != "prod" {
+			adminStepUpJTIStore = gateway.NewMemoryJTIStore()
 		}
 		authenticator = iam.Authenticator{Tokens: tokens}
 	}
@@ -360,23 +406,30 @@ func main() {
 			FinancialPrefixes: cfg.FinancialPrefixes,
 		},
 		IdempotencyExempt: func(r *http.Request) bool {
-			return r.Method == http.MethodPost && (r.URL.Path == "/v1/public/auth/telegram" || r.URL.Path == "/v1/public/auth/refresh")
+			return r.Method == http.MethodPost && (r.URL.Path == "/v1/public/auth/telegram" || r.URL.Path == "/v1/public/auth/refresh" || r.URL.Path == "/v1/admin/auth/login" || r.URL.Path == "/v1/admin/auth/refresh" || r.URL.Path == "/v1/admin/auth/step-up" || r.URL.Path == "/v1/admin/auth/password")
 		},
-		Metrics:         metrics,
-		ErrorReporter:   reporter,
-		Catalog:         catalogService,
-		Merchants:       directory,
-		Logger:          logger,
-		Login:           loginService,
-		Audit:           auditStore,
-		Sessions:        sessionService,
-		AccountProfiles: accountProfileService,
-		AccountLinks:    accountLinkService,
-		Consents:        consentService,
-		Ledger:          ledgerReader,
-		Directory:       accountDirectory,
-		Files:           fileService,
-		Bulkhead:        bulkhead,
+		Metrics:             metrics,
+		ErrorReporter:       reporter,
+		Catalog:             catalogService,
+		Merchants:           directory,
+		Logger:              logger,
+		Login:               loginService,
+		AdminLogin:          adminLoginService,
+		AdminStepUp:         adminStepUpService,
+		AdminPassword:       adminPasswordService,
+		AdminStepUpVerifier: stepUpVerifier,
+		AdminStepUpJTIStore: adminStepUpJTIStore,
+		Audit:               auditStore,
+		Sessions:            sessionService,
+		AccountProfiles:     accountProfileService,
+		AccountLinks:        accountLinkService,
+		Consents:            consentService,
+		Ledger:              ledgerReader,
+		Directory:           accountDirectory,
+		AdminPermissions:    adminPermissions,
+		AdminManagement:     adminManagementService,
+		Files:               fileService,
+		Bulkhead:            bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)
 	// WriteTimeout stays unset so future real-time streams can remain open.

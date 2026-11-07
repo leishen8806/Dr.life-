@@ -75,7 +75,12 @@ func TestOpenAPIAuthorizationMatrix(t *testing.T) {
 			requestPath := replacePathParameters(path)
 			if len(roles) == 1 && roles[0] == "none" {
 				response := httptest.NewRecorder()
-				handler.ServeHTTP(response, httptest.NewRequest(strings.ToUpper(method), requestPath, nil))
+				request := httptest.NewRequest(strings.ToUpper(method), requestPath, nil)
+				if requestPath == "/v1/admin/auth/refresh" {
+					request.Header.Set("Origin", "http://localhost:5173")
+					request.Header.Set("X-Requested-With", "drlife")
+				}
+				handler.ServeHTTP(response, request)
 				if response.Code == http.StatusUnauthorized || response.Code == http.StatusForbidden {
 					t.Errorf("public %s %s returned %d", method, path, response.Code)
 				}
