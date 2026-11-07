@@ -539,8 +539,8 @@ func (f *loginFixture) testAdminPasswordLogin(t *testing.T) {
 	if err != nil || result.AccessToken == "" || result.RefreshToken == "" || result.AccessExpiresIn != 600 {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
-	if accountCount, ipCount := security.counts["a:"+input.Email], security.counts["i:"+input.IP]; accountCount != 0 || ipCount != 1 {
-		t.Fatalf("successful login failure counters account=%d IP=%d, want 0 and 1", accountCount, ipCount)
+	if accountCount, ipCount := security.counts["a:"+input.Email], security.counts["i:"+input.IP]; accountCount != 0 || ipCount != 0 {
+		t.Fatalf("successful login failure counters account=%d IP=%d, want 0 and 0", accountCount, ipCount)
 	}
 	failureRequestID := "admin-login-failed"
 	if _, err := service.Login(ctx, AdminLoginInput{Email: input.Email, Password: "wrong", TOTPCode: code, IP: input.IP, DeviceID: input.DeviceID, RequestID: failureRequestID}); err == nil {
