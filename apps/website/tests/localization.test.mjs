@@ -66,6 +66,27 @@ test("confirmed mobile layout keeps hero stats and ecosystem nodes compact", () 
   assert.match(styles, /@media\(max-width:520px\).*\.hero h1\{font-size:40px/s);
 });
 
+test("320px header moves language selection into the accessible hamburger menu", () => {
+  const header = readFileSync(fileURLToPath(new URL("../src/components/Header.astro", import.meta.url)), "utf8");
+
+  assert.match(header, /class="mobile-menu-languages"/);
+  assert.match(header, /data-language="zh"/);
+  assert.match(header, /data-language="en"/);
+  assert.match(header, /data-language="km"/);
+  assert.match(styles, /@media\(max-width:360px\)\{\.header-actions \.languages\{display:none\}\.mobile-menu-languages\{display:flex\}\}/);
+  assert.match(styles, /@media\(min-width:361px\)\{\.mobile-menu-languages\{display:none\}\}/);
+  assert.match(styles, /\.mobile-menu summary:focus-visible\{outline:3px solid var\(--gold\);outline-offset:4px\}/);
+});
+
+test("website navigation has keyboard-visible focus and images are explicitly absent or accessible", () => {
+  const pages = ["index", "merchant", "privacy", "terms", "contact", "delete-account", "404"]
+    .map((name) => readFileSync(fileURLToPath(new URL(`../src/pages/${name}.astro`, import.meta.url)), "utf8"))
+    .join("\n");
+
+  assert.match(styles, /a:focus-visible\{outline:3px solid var\(--gold\);outline-offset:4px\}/);
+  assert.doesNotMatch(pages, /<img(?![^>]*\balt=)/, "any image must have an alt attribute");
+});
+
 test("homepage and legal visible copy are i18n-backed", () => {
   for (const name of ["index", "merchant"]) {
     assert.doesNotMatch(page(name), cjk, `${name} page retains Chinese hard-coded copy`);
