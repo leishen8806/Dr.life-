@@ -111,12 +111,14 @@ BEGIN
     IF NEW.reservation_committed_at IS DISTINCT FROM OLD.reservation_committed_at THEN
         IF OLD.reservation_committed_at IS NOT NULL OR NEW.reservation_committed_at IS NULL
            OR NEW.reservation_released_at IS NOT NULL OR NEW.refund_required_at IS NOT NULL
+           OR NOT EXISTS (SELECT 1 FROM trade.merchant_order WHERE buyer_order_id=OLD.id)
            OR EXISTS (SELECT 1 FROM trade.merchant_order WHERE buyer_order_id=OLD.id AND status <> 'paid') THEN
             RAISE EXCEPTION 'trade.buyer_order reservation commit is irreversible and paid-only' USING ERRCODE = '55000';
         END IF;
     END IF;
     IF NEW.refund_required_at IS DISTINCT FROM OLD.refund_required_at THEN
         IF OLD.refund_required_at IS NOT NULL OR NEW.refund_required_at IS NULL
+           OR NOT EXISTS (SELECT 1 FROM trade.merchant_order WHERE buyer_order_id=OLD.id)
            OR EXISTS (SELECT 1 FROM trade.merchant_order WHERE buyer_order_id=OLD.id AND status <> 'paid') THEN
             RAISE EXCEPTION 'trade.buyer_order refund requirement is irreversible and paid-only' USING ERRCODE = '55000';
         END IF;
