@@ -63,9 +63,10 @@ func TestCatalogMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	migrations := catalogMigrationDirectory(t)
-	if err := goose.Up(database, migrations); err != nil {
+	if err := goose.UpTo(database, migrations, 55); err != nil {
 		t.Fatal(err)
 	}
+	assertIntegerMinQtyMigrationRejectsFractionalData(t, database, migrations)
 
 	t.Run("up down up is reversible", func(t *testing.T) {
 		assertCatalogTables(t, database, true)
@@ -525,6 +526,7 @@ func TestCatalogMigration(t *testing.T) {
 	t.Run("product_tier constraints", func(t *testing.T) {
 		assertSQLState(t, ctx, admin, "23505", fmt.Sprintf(`INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4) SELECT id, 10, 120000 FROM catalog.product WHERE public_id = '%s'`, firstProductPublicID))
 		assertSQLState(t, ctx, admin, "23514", fmt.Sprintf(`INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4) SELECT id, 0, 120000 FROM catalog.product WHERE public_id = '%s'`, firstProductPublicID))
+		assertSQLState(t, ctx, admin, "23514", fmt.Sprintf(`INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4) SELECT id, 50.5, 120000 FROM catalog.product WHERE public_id = '%s'`, firstProductPublicID))
 		assertSQLState(t, ctx, admin, "23514", fmt.Sprintf(`INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4) SELECT id, 50, -1 FROM catalog.product WHERE public_id = '%s'`, firstProductPublicID))
 		assertSQLState(t, ctx, admin, "23503", fmt.Sprintf(`INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4) VALUES (999999, 1, 1)`))
 	})
@@ -545,6 +547,7 @@ func TestCatalogMigration(t *testing.T) {
 		if _, err := admin.Exec(ctx, `INSERT INTO catalog.sku_tier (sku_id, min_qty, unit_price_e4) VALUES ($1, 1, 120000)`, skuID); err != nil {
 			t.Fatal(err)
 		}
+		assertSQLState(t, ctx, admin, "23514", fmt.Sprintf(`INSERT INTO catalog.sku_tier (sku_id, min_qty, unit_price_e4) VALUES (%d, 2.5, 120000)`, skuID))
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO catalog.category_attribute (category_id, key, name, type, is_sku_dimension) SELECT id, 'length', '{"zh":"长","en":"Length","km":"ប្រវែង"}'::jsonb, 'number', true FROM catalog.category LIMIT 1`)
 		assertSQLState(t, ctx, admin, "23514", `INSERT INTO catalog.category_attribute (category_id, key, name, type, value_json) SELECT id, 'color', '{"zh":"颜色","en":"Color","km":"ពណ៌"}'::jsonb, 'enum', '[]'::jsonb FROM catalog.category LIMIT 1`)
 		var attributePendingReview bool
@@ -637,6 +640,42 @@ func seedCatalogFixtures(t *testing.T, ctx context.Context, admin *pgx.Conn) {
 	}
 	if _, err := admin.Exec(ctx, `INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4) SELECT id, 100, 120000 FROM catalog.product WHERE public_id = $1`, firstProductPublicID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func assertIntegerMinQtyMigrationRejectsFractionalData(t *testing.T, database *sql.DB, migrations string) {
+	t.Helper()
+	const fixtures = `
+		INSERT INTO catalog.category (public_id, code, name, is_custom)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FD8', 'fractional_guard_test', '{"zh":"test","en":"test","km":"test"}'::jsonb, true);
+		INSERT INTO catalog.product (public_id, merchant_id, category_id, name, unit, origin)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD9', 42, id, '{"zh":"test","en":"test","km":"test"}'::jsonb, 'pcs', 'cn'
+		FROM catalog.category WHERE code = 'fractional_guard_test';
+		INSERT INTO catalog.product_tier (product_id, min_qty, unit_price_e4)
+		SELECT id, 1.5, 100 FROM catalog.product WHERE public_id = '01ARZ3NDEKTSV4RRFFQ69G5FD9';
+		INSERT INTO catalog.sku (public_id, product_id, attribute_values)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FDA', id, '{}'::jsonb FROM catalog.product WHERE public_id = '01ARZ3NDEKTSV4RRFFQ69G5FD9';
+		INSERT INTO catalog.sku_tier (sku_id, min_qty, unit_price_e4)
+		SELECT id, 2.5, 100 FROM catalog.sku WHERE public_id = '01ARZ3NDEKTSV4RRFFQ69G5FDA';`
+	if _, err := database.Exec(fixtures); err != nil {
+		t.Fatalf("seed fractional tier fixtures: %v", err)
+	}
+
+	err := goose.UpTo(database, migrations, 57)
+	if err == nil {
+		t.Fatal("migration 00057 accepted fractional catalog tier min_qty rows")
+	}
+	for _, want := range []string{"catalog.product_tier", "min_qty=1.500", "catalog.sku_tier", "min_qty=2.500"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("migration 00057 error %q does not list %q", err, want)
+		}
+	}
+
+	if _, err := database.Exec(`UPDATE catalog.product_tier SET min_qty = trunc(min_qty); UPDATE catalog.sku_tier SET min_qty = trunc(min_qty)`); err != nil {
+		t.Fatalf("repair test fixtures after expected migration failure: %v", err)
+	}
+	if err := goose.UpTo(database, migrations, 57); err != nil {
+		t.Fatalf("migration 00057 after integer fixture repair: %v", err)
 	}
 }
 
