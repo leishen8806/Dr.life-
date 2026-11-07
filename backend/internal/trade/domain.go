@@ -115,8 +115,7 @@ func Advance(from, to OrderStatus, source EventSource) (OrderStatus, error) {
 	if source.Reference == "" || (source.Type != SourceKESSResult && source.Type != SourceRouteFitEvent && source.Type != SourceSystem) {
 		return "", ErrEventSourceRequired
 	}
-	allowed := (from == AwaitingPayment && to == Cancelled) ||
-		(from == Paid && to == Submitted) || (from == Submitted && (to == Accepted || to == Rejected)) ||
+	allowed := (from == Paid && to == Submitted) || (from == Submitted && (to == Accepted || to == Rejected)) ||
 		(from == Accepted && to == InFulfillment) || (from == InFulfillment && to == Shipped) ||
 		(from == Shipped && to == DeliveredVerified) || (from == DeliveredVerified && to == Settled)
 	if !allowed {

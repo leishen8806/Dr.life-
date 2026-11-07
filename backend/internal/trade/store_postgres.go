@@ -142,6 +142,11 @@ func (s *PostgresStore) QueueReservationRelease(ctx context.Context, reservation
 	return err
 }
 
+func (s *PostgresStore) CompleteReservationRelease(ctx context.Context, key string) error {
+	_, err := s.db.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE reservation_key=$1 AND action='release'`, key)
+	return err
+}
+
 func loadCreateOrder(ctx context.Context, tx pgx.Tx, buyerOrderID int64, publicID string, buyerID int64, key, requestHash string, total int64) (CreateOrder, error) {
 	order := CreateOrder{PublicID: publicID, BuyerAccountID: buyerID, IdempotencyKey: key, RequestHash: requestHash, TotalE4: total}
 	rows, err := tx.Query(ctx, `SELECT id,merchant_id,total_e4 FROM trade.merchant_order WHERE buyer_order_id=$1 ORDER BY id`, buyerOrderID)
@@ -240,6 +245,10 @@ func (s *PostgresStore) ClaimReservationRelease(ctx context.Context, publicID st
 	if _, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET reservation_released_at=clock_timestamp(),updated_at=clock_timestamp() WHERE public_id=$1`, publicID); err != nil {
 		return Reservation{}, false, err
 	}
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
+		VALUES ($1,'release','order_cancelled') ON CONFLICT (reservation_key,action) DO NOTHING`, reservation.Key); err != nil {
+		return Reservation{}, false, err
+	}
 	return reservation, true, tx.Commit(ctx)
 }
 
@@ -287,6 +296,25 @@ func (s *PostgresStore) CompleteReservationCommit(ctx context.Context, key strin
 	return err
 }
 
+func (s *PostgresStore) RequireRefund(ctx context.Context, key string) error {
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var id int64
+	if err := tx.QueryRow(ctx, `SELECT id FROM trade.buyer_order WHERE buyer_account_id || ':' || idempotency_key=$1 FOR UPDATE`, key).Scan(&id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET refund_required_at=COALESCE(refund_required_at,clock_timestamp()),updated_at=clock_timestamp() WHERE id=$1`, id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE reservation_key=$1 AND action='commit'`, key); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 // Advance locks the suborder and binds each external source reference to one
 // buyer order before recording the transition.
 func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from, to OrderStatus, source EventSource) (bool, error) {
@@ -298,10 +326,20 @@ func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from
 		return false, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	var current string
 	var buyerOrderID int64
-	if err := tx.QueryRow(ctx, `SELECT status,buyer_order_id FROM trade.merchant_order WHERE id=$1 FOR UPDATE`, merchantOrderID).Scan(&current, &buyerOrderID); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT buyer_order_id FROM trade.merchant_order WHERE id=$1`, merchantOrderID).Scan(&buyerOrderID); err != nil {
 		return false, err
+	}
+	var refundRequired bool
+	if err := tx.QueryRow(ctx, `SELECT refund_required_at IS NOT NULL FROM trade.buyer_order WHERE id=$1 FOR UPDATE`, buyerOrderID).Scan(&refundRequired); err != nil {
+		return false, err
+	}
+	var current string
+	if err := tx.QueryRow(ctx, `SELECT status FROM trade.merchant_order WHERE id=$1 AND buyer_order_id=$2 FOR UPDATE`, merchantOrderID, buyerOrderID).Scan(&current); err != nil {
+		return false, err
+	}
+	if refundRequired && from == Paid && to == Submitted {
+		return false, ErrReservationReleased
 	}
 	var seenFrom, seenTo string
 	err = tx.QueryRow(ctx, `SELECT from_status,to_status FROM trade.order_event WHERE merchant_order_id=$1 AND source_type=$2 AND source_ref=$3`, merchantOrderID, string(source.Type), source.Reference).Scan(&seenFrom, &seenTo)
@@ -326,18 +364,6 @@ func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from
 	}
 	if sourceBuyerOrderID != buyerOrderID {
 		return false, ErrInvalidTransition
-	}
-	if from == AwaitingPayment && to == Cancelled {
-		if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref)
-			SELECT id,$1,$2,$3,$4,$5 FROM trade.merchant_order
-			WHERE buyer_order_id=$1 AND status=$2 ORDER BY id`, buyerOrderID, string(from), string(to), string(source.Type), source.Reference); err != nil {
-			return false, err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE trade.merchant_order SET status=$2,version=version+1,updated_at=clock_timestamp()
-			WHERE buyer_order_id=$1 AND status=$3`, buyerOrderID, string(to), string(from)); err != nil {
-			return false, err
-		}
-		return true, tx.Commit(ctx)
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) VALUES ($1,$2,$3,$4,$5,$6)`, merchantOrderID, buyerOrderID, string(from), string(to), string(source.Type), source.Reference); err != nil {
 		return false, err

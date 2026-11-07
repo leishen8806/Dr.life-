@@ -30,6 +30,7 @@ type Catalog interface {
 	// lines must fail without changing the existing reservation.
 	ResolveAndReserve(context.Context, string, []OrderLineInput) ([]CatalogLine, error)
 	// Release is idempotent for one reservation key.
+	// Release after Commit must be a no-op.
 	Release(context.Context, string) error
 	// Commit makes a paid reservation ineligible for timeout reclamation.
 	// Catalog must not reclaim on its own: timeout workers call
@@ -42,11 +43,13 @@ type Store interface {
 	FindByIdempotency(context.Context, int64, string, string) (CreateOrder, bool, error)
 	Create(context.Context, string, string, CreateOrder) (CreateOrder, error)
 	QueueReservationRelease(context.Context, string, string) error
+	CompleteReservationRelease(context.Context, string) error
 	ClaimReservationRelease(context.Context, string) (Reservation, bool, error)
 	ClaimReservationActions(context.Context, int) ([]ReservationAction, error)
 	CompleteReservationAction(context.Context, int64) error
 	FailReservationAction(context.Context, int64) error
 	CompleteReservationCommit(context.Context, string) error
+	RequireRefund(context.Context, string) error
 	ConfirmPayment(context.Context, string, int64, EventSource) (string, bool, error)
 }
 
@@ -166,6 +169,11 @@ func (s *Service) Place(ctx context.Context, buyer int64, idempotencyKey string,
 		if errors.Is(err, ErrIdempotencyConflict) {
 			return CreateOrder{}, err
 		}
+		if existing, found, confirmErr := s.store.FindByIdempotency(ctx, buyer, idempotencyKey, hash); confirmErr != nil {
+			return CreateOrder{}, errors.Join(err, confirmErr)
+		} else if found {
+			return existing, nil
+		}
 		return CreateOrder{}, errors.Join(err, s.releaseOrQueue(ctx, reservationKey, "create_failed"))
 	}
 	return stored, nil
@@ -199,7 +207,7 @@ func (s *Service) ReleaseReservations(ctx context.Context, buyerOrderPublicID st
 	if err := s.catalog.Release(ctx, reservation.Key); err != nil {
 		return errors.Join(err, s.store.QueueReservationRelease(ctx, reservation.Key, "release_failed"))
 	}
-	return nil
+	return s.store.CompleteReservationRelease(ctx, reservation.Key)
 }
 
 // ConfirmPayment atomically pays every child order, then commits the catalog
@@ -210,6 +218,9 @@ func (s *Service) ConfirmPayment(ctx context.Context, buyerOrderPublicID string,
 		return false, err
 	}
 	if err := s.catalog.Commit(ctx, key); err != nil {
+		if errors.Is(err, ErrReservationReleased) {
+			return applied, errors.Join(err, s.store.RequireRefund(ctx, key))
+		}
 		return applied, err
 	}
 	return applied, s.store.CompleteReservationCommit(ctx, key)
@@ -226,6 +237,14 @@ func (s *Service) ProcessReservationActions(ctx context.Context, limit int) erro
 		var actionErr error
 		if item.Action == "commit" {
 			actionErr = s.catalog.Commit(ctx, item.Key)
+			if errors.Is(actionErr, ErrReservationReleased) {
+				if err := s.store.RequireRefund(ctx, item.Key); err != nil {
+					result = errors.Join(result, actionErr, err, s.store.FailReservationAction(ctx, item.ID))
+				} else {
+					result = errors.Join(result, actionErr)
+				}
+				continue
+			}
 		} else {
 			actionErr = s.catalog.Release(ctx, item.Key)
 		}

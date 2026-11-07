@@ -9,6 +9,7 @@ CREATE TABLE trade.buyer_order (
     request_hash text NOT NULL CHECK (request_hash ~ '^[0-9a-f]{64}$'),
     total_e4 bigint NOT NULL CHECK (total_e4 >= 0),
     reservation_released_at timestamptz,
+    refund_required_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     CONSTRAINT ux_trade_buyer_order_idempotency UNIQUE (buyer_account_id, idempotency_key)
@@ -105,6 +106,12 @@ BEGIN
             RAISE EXCEPTION 'trade.buyer_order reservation release is irreversible and unpaid-only' USING ERRCODE = '55000';
         END IF;
     END IF;
+    IF NEW.refund_required_at IS DISTINCT FROM OLD.refund_required_at THEN
+        IF OLD.refund_required_at IS NOT NULL OR NEW.refund_required_at IS NULL
+           OR EXISTS (SELECT 1 FROM trade.merchant_order WHERE buyer_order_id=OLD.id AND status <> 'paid') THEN
+            RAISE EXCEPTION 'trade.buyer_order refund requirement is irreversible and paid-only' USING ERRCODE = '55000';
+        END IF;
+    END IF;
     RETURN NEW;
 END;
 $$;
@@ -136,6 +143,11 @@ BEGIN
         ) THEN
             RAISE EXCEPTION 'paid transition requires parent payment batch' USING ERRCODE = '55000';
         END IF;
+        IF OLD.status = 'paid' AND NEW.status = 'submitted' AND EXISTS (
+            SELECT 1 FROM trade.buyer_order WHERE id=OLD.buyer_order_id AND refund_required_at IS NOT NULL
+        ) THEN
+            RAISE EXCEPTION 'refund-required order cannot be submitted' USING ERRCODE = 'TR004';
+        END IF;
         IF NEW.version <> OLD.version + 1 OR NOT EXISTS (
             SELECT 1 FROM trade.order_event e
             WHERE e.merchant_order_id = OLD.id AND e.buyer_order_id = OLD.buyer_order_id
@@ -154,6 +166,26 @@ CREATE TRIGGER trg_trade_merchant_order_guard BEFORE UPDATE ON trade.merchant_or
     FOR EACH ROW EXECUTE FUNCTION trade.guard_merchant_order_update();
 
 -- +goose StatementBegin
+CREATE FUNCTION trade.assert_no_partial_cancellation() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    target_id bigint;
+BEGIN
+    IF TG_OP = 'DELETE' THEN target_id := OLD.buyer_order_id;
+    ELSE target_id := NEW.buyer_order_id;
+    END IF;
+    IF EXISTS (SELECT 1 FROM trade.merchant_order WHERE buyer_order_id=target_id AND status='cancelled')
+       AND EXISTS (SELECT 1 FROM trade.merchant_order WHERE buyer_order_id=target_id AND status='awaiting_payment') THEN
+        RAISE EXCEPTION 'parent order cannot mix cancelled and awaiting-payment children' USING ERRCODE = 'TR003';
+    END IF;
+    RETURN NULL;
+END;
+$$;
+-- +goose StatementEnd
+CREATE CONSTRAINT TRIGGER trg_trade_no_partial_cancellation
+    AFTER INSERT OR UPDATE OR DELETE ON trade.merchant_order
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION trade.assert_no_partial_cancellation();
+
+-- +goose StatementBegin
 CREATE FUNCTION trade.confirm_order_payment(p_public_id text, p_source_ref text, p_paid_amount_e4 bigint)
 RETURNS TABLE (reservation_key text, applied boolean)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, trade AS $$
@@ -163,22 +195,24 @@ DECLARE
     target_idempotency_key text;
     target_total_e4 bigint;
     target_released_at timestamptz;
+    target_refund_required_at timestamptz;
     target_reservation_key text;
     source_owner_id bigint;
     child_count integer;
     awaiting_count integer;
     paid_count integer;
+    cancelled_count integer;
 BEGIN
     IF p_source_ref IS NULL OR length(btrim(p_source_ref)) = 0 THEN
         RAISE EXCEPTION 'payment source is required' USING ERRCODE = '23514';
     END IF;
-    SELECT id,buyer_account_id,idempotency_key,total_e4,reservation_released_at
-      INTO target_id,target_buyer_id,target_idempotency_key,target_total_e4,target_released_at
+    SELECT id,buyer_account_id,idempotency_key,total_e4,reservation_released_at,refund_required_at
+      INTO target_id,target_buyer_id,target_idempotency_key,target_total_e4,target_released_at,target_refund_required_at
       FROM trade.buyer_order WHERE public_id=p_public_id FOR UPDATE;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'buyer order not found' USING ERRCODE = '23514';
     END IF;
-    IF target_released_at IS NOT NULL THEN
+    IF target_released_at IS NOT NULL OR target_refund_required_at IS NOT NULL THEN
         RAISE EXCEPTION 'order reservation already released' USING ERRCODE = 'TR001';
     END IF;
     IF p_paid_amount_e4 IS DISTINCT FROM target_total_e4 THEN
@@ -193,8 +227,11 @@ BEGIN
         RAISE EXCEPTION 'payment source belongs to another order' USING ERRCODE = '23514';
     END IF;
 
-    SELECT count(*),count(*) FILTER (WHERE status='awaiting_payment'),count(*) FILTER (WHERE status='paid')
-      INTO child_count,awaiting_count,paid_count FROM trade.merchant_order WHERE buyer_order_id=target_id;
+    SELECT count(*),count(*) FILTER (WHERE status='awaiting_payment'),count(*) FILTER (WHERE status='paid'),count(*) FILTER (WHERE status='cancelled')
+      INTO child_count,awaiting_count,paid_count,cancelled_count FROM trade.merchant_order WHERE buyer_order_id=target_id;
+    IF cancelled_count > 0 THEN
+        RAISE EXCEPTION 'order reservation already released' USING ERRCODE = 'TR001';
+    END IF;
     IF child_count = 0 OR (awaiting_count <> child_count AND paid_count <> child_count) THEN
         RAISE EXCEPTION 'parent payment requires one consistent child batch' USING ERRCODE = '23514';
     END IF;
@@ -342,7 +379,7 @@ REVOKE ALL ON trade.order_event, trade.order_event_source FROM trade_rw, report_
 REVOKE ALL ON trade.buyer_order, trade.merchant_order, trade.order_line FROM trade_rw, report_ro;
 REVOKE ALL ON trade.reservation_release_outbox FROM trade_rw, report_ro;
 GRANT SELECT, INSERT ON trade.buyer_order, trade.merchant_order, trade.order_line TO trade_rw;
-GRANT UPDATE (reservation_released_at, updated_at) ON trade.buyer_order TO trade_rw;
+GRANT UPDATE (reservation_released_at, refund_required_at, updated_at) ON trade.buyer_order TO trade_rw;
 GRANT UPDATE (status, version, updated_at) ON trade.merchant_order TO trade_rw;
 GRANT SELECT ON trade.buyer_order, trade.merchant_order, trade.order_line TO report_ro;
 GRANT SELECT, INSERT, UPDATE (reason, attempts, claimed_at, next_attempt_at, updated_at), DELETE ON trade.reservation_release_outbox TO trade_rw;
@@ -359,9 +396,12 @@ REVOKE UPDATE ON SEQUENCE trade.buyer_order_id_seq, trade.merchant_order_id_seq,
 REVOKE EXECUTE ON FUNCTION trade.guard_buyer_order_update(), trade.guard_merchant_order_update(),
     trade.guard_order_line_insert(), trade.reject_order_event_mutation(), trade.assert_merchant_order_total(),
     trade.assert_buyer_order_total(), trade.set_order_event_created_txid() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION trade.assert_no_partial_cancellation() FROM PUBLIC;
 
 -- +goose Down
 DROP FUNCTION trade.confirm_order_payment(text,text,bigint);
+DROP TRIGGER trg_trade_no_partial_cancellation ON trade.merchant_order;
+DROP FUNCTION trade.assert_no_partial_cancellation();
 DROP TRIGGER trg_trade_merchant_order_parent_total ON trade.merchant_order;
 DROP TRIGGER trg_trade_buyer_order_total ON trade.buyer_order;
 DROP TRIGGER trg_trade_order_line_total ON trade.order_line;

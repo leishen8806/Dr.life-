@@ -57,21 +57,26 @@ func (s *stubCatalog) Commit(_ context.Context, key string) error {
 }
 
 type stubOrders struct {
-	created     CreateOrder
-	queued      []string
-	reservation Reservation
-	marked      int
-	createErr   error
-	paymentKey  string
-	paymentOK   bool
-	paymentErr  error
-	outbox      []ReservationAction
-	completed   []int64
-	failed      []int64
-	commitDone  []string
+	created             CreateOrder
+	findCalls           int
+	queued              []string
+	reservation         Reservation
+	marked              int
+	createErr           error
+	commitCreateOnError bool
+	paymentKey          string
+	paymentOK           bool
+	paymentErr          error
+	outbox              []ReservationAction
+	completed           []int64
+	failed              []int64
+	commitDone          []string
+	releaseDone         []string
+	refundRequired      []string
 }
 
 func (s *stubOrders) FindByIdempotency(_ context.Context, _ int64, _ string, hash string) (CreateOrder, bool, error) {
+	s.findCalls++
 	if s.created.PublicID == "" {
 		return CreateOrder{}, false, nil
 	}
@@ -83,6 +88,10 @@ func (s *stubOrders) FindByIdempotency(_ context.Context, _ int64, _ string, has
 
 func (s *stubOrders) Create(_ context.Context, key, hash string, input CreateOrder) (CreateOrder, error) {
 	if s.createErr != nil {
+		if s.commitCreateOnError {
+			input.PublicID, input.IdempotencyKey, input.RequestHash = "buyer-order", key, hash
+			s.created = input
+		}
 		return CreateOrder{}, s.createErr
 	}
 	if s.created.PublicID != "" {
@@ -97,6 +106,10 @@ func (s *stubOrders) Create(_ context.Context, key, hash string, input CreateOrd
 }
 func (s *stubOrders) QueueReservationRelease(_ context.Context, key, reason string) error {
 	s.queued = append(s.queued, key+":"+reason)
+	return nil
+}
+func (s *stubOrders) CompleteReservationRelease(_ context.Context, key string) error {
+	s.releaseDone = append(s.releaseDone, key)
 	return nil
 }
 func (s *stubOrders) ClaimReservationRelease(context.Context, string) (Reservation, bool, error) {
@@ -120,6 +133,10 @@ func (s *stubOrders) FailReservationAction(_ context.Context, id int64) error {
 }
 func (s *stubOrders) CompleteReservationCommit(_ context.Context, key string) error {
 	s.commitDone = append(s.commitDone, key)
+	return nil
+}
+func (s *stubOrders) RequireRefund(_ context.Context, key string) error {
+	s.refundRequired = append(s.refundRequired, key)
 	return nil
 }
 func (s *stubOrders) ConfirmPayment(context.Context, string, int64, EventSource) (string, bool, error) {
@@ -255,6 +272,15 @@ func TestCreateFailureQueuesReleaseWhenImmediateReleaseFails(t *testing.T) {
 	}
 }
 
+func TestCreateUncertainResultConfirmsOrderBeforeRelease(t *testing.T) {
+	store := &stubOrders{createErr: errors.New("commit response lost"), commitCreateOnError: true}
+	catalog := catalogFixture()
+	order, err := NewService(store, stubAccounts{"active"}, catalog).Place(context.Background(), 1, "key", []OrderLineInput{{"A", 1}})
+	if err != nil || order.PublicID != "buyer-order" || store.findCalls != 2 || catalog.releases != 0 || len(store.queued) != 0 {
+		t.Fatalf("order=%+v err=%v finds=%d releases=%d queued=%v", order, err, store.findCalls, catalog.releases, store.queued)
+	}
+}
+
 func TestConfirmPaymentCommitsReservationOnFirstCallAndReplay(t *testing.T) {
 	store := &stubOrders{paymentKey: "1:key", paymentOK: true}
 	catalog := catalogFixture()
@@ -279,6 +305,9 @@ func TestConfirmPaymentSurfacesLostReservationForRefund(t *testing.T) {
 	if !applied || !errors.Is(err, ErrReservationReleased) {
 		t.Fatalf("applied=%v err=%v, want applied payment with ErrReservationReleased refund signal", applied, err)
 	}
+	if len(store.refundRequired) != 1 || store.refundRequired[0] != "1:key" {
+		t.Fatalf("refund required=%v, want [1:key]", store.refundRequired)
+	}
 }
 
 func TestProcessReservationActionsCompletesSuccessAndReschedulesFailure(t *testing.T) {
@@ -295,6 +324,16 @@ func TestProcessReservationActionsCompletesSuccessAndReschedulesFailure(t *testi
 	}
 	if len(store.completed) != 2 || store.completed[0] != 1 || store.completed[1] != 3 || len(store.failed) != 1 || store.failed[0] != 2 || len(catalog.commits) != 1 || catalog.commits[0] != "1:commit" {
 		t.Fatalf("completed=%v failed=%v commits=%v", store.completed, store.failed, catalog.commits)
+	}
+}
+
+func TestProcessReservationActionsTerminatesReleasedCommitForRefund(t *testing.T) {
+	store := &stubOrders{outbox: []ReservationAction{{ID: 4, Key: "1:lost", Action: "commit"}}}
+	catalog := catalogFixture()
+	catalog.commitErr = ErrReservationReleased
+	err := NewService(store, stubAccounts{"active"}, catalog).ProcessReservationActions(context.Background(), 1)
+	if !errors.Is(err, ErrReservationReleased) || len(store.refundRequired) != 1 || store.refundRequired[0] != "1:lost" || len(store.failed) != 0 {
+		t.Fatalf("err=%v refund=%v failed=%v", err, store.refundRequired, store.failed)
 	}
 }
 
