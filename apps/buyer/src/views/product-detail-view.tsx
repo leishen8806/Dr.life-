@@ -26,12 +26,14 @@ export function ProductDetailView({
   product,
   merchantName,
   actions,
-  onBack
+  onBack,
+  onAddToCart = () => undefined
 }: {
   product: Product;
   merchantName?: string;
   actions?: ReactNode;
   onBack: () => void;
+  onAddToCart?: () => void;
 } & LocaleProps) {
   const tiers = sortedTiers(product.tiers);
   const entry = entryTier(product.tiers);
@@ -60,6 +62,9 @@ export function ProductDetailView({
               <small> / {product.unit}</small>
             </p>
           )}
+          <button type="button" className="buyer-cart-primary" onClick={onAddToCart}>
+            {t("mall.cart")}
+          </button>
         </Card>
         <Card>
           <h2 className="buyer-section__title">{t("mall.tiers")}</h2>

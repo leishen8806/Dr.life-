@@ -6,17 +6,37 @@ export type Translate = (
   params?: Record<string, string | number>
 ) => string;
 
+export type ConsentKind = "privacy" | "terms";
+
+export interface ConsentStatus {
+  kind: ConsentKind;
+  version: string;
+  accepted: boolean;
+  needsReaccept: boolean;
+}
+
+export interface LegalDocument {
+  kind: ConsentKind;
+  version: string;
+  effectiveAt: string;
+  body: Record<Language, string>;
+}
+
 /** The account fields the startup flow reads; `@drlife/api-client`'s SessionAccount satisfies it. */
 export interface StartupAccount {
   lang: Language | null;
   status: "active" | "frozen" | "disabled";
   needsLanguage: boolean;
+  needsConsent: boolean;
 }
 
 /** Implemented per end, because the login endpoint takes the end and the role owns the /me path. */
 export interface StartupGateway {
   login(): Promise<StartupAccount>;
   registerLanguage(language: Language): Promise<StartupAccount>;
+  getConsentState(): Promise<ConsentStatus[]>;
+  getLegalDocuments(): Promise<LegalDocument[]>;
+  acceptConsent(kind: ConsentKind, version: string): Promise<StartupAccount>;
 }
 
 export type StartupPhase =
@@ -26,7 +46,7 @@ export type StartupPhase =
   /** First language registration; one language per account. */
   | { name: "language" }
   /** Agreement consent (A-09 / CMP-634) lands here in the next slice. */
-  | { name: "consent" }
+  | { name: "consent"; account: StartupAccount }
   | { name: "ready"; account: StartupAccount }
   /** 2006, and a frozen or disabled account on an otherwise successful login. */
   | { name: "blocked" }
@@ -73,6 +93,7 @@ export function failurePhase(error: unknown): StartupPhase {
 export function accountPhase(account: StartupAccount): StartupPhase {
   if (account.status !== "active") return { name: "blocked" };
   if (account.needsLanguage || !account.lang) return { name: "language" };
+  if (account.needsConsent) return { name: "consent", account };
   return { name: "ready", account };
 }
 

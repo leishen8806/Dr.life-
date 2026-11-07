@@ -10,12 +10,14 @@ import {
   failurePhase,
   throttleWaiting,
   tickSeconds,
+  type StartupAccount,
   type StartupGateway,
   type StartupPhase
 } from "./startup";
 import {
   AccountBlockedView,
   BrandSplashView,
+  ConsentView,
   LanguageChoiceView,
   LoginFailedView,
   LoginThrottledView
@@ -32,6 +34,7 @@ export interface Startup {
   skipBrand: () => void;
   retry: () => void;
   selectLanguage: (language: Language) => void;
+  completeConsent: (account: StartupAccount) => void;
 }
 
 /**
@@ -58,7 +61,10 @@ export function useStartup(gateway: StartupGateway): Startup {
     let live = true;
     gateway.login().then(
       (account) => {
-        if (live) setOutcome(accountPhase(account));
+        if (live) {
+          const next = accountPhase(account);
+          setOutcome(next.name === "consent" ? { ...next, account } : next);
+        }
       },
       (error: unknown) => {
         if (live) setOutcome(failurePhase(error));
@@ -86,7 +92,8 @@ export function useStartup(gateway: StartupGateway): Startup {
       gateway.registerLanguage(language).then(
         (account) => {
           setBusy(false);
-          setOutcome(accountPhase(account));
+          const next = accountPhase(account);
+          setOutcome(next.name === "consent" ? { ...next, account } : next);
         },
         (error: unknown) => {
           setBusy(false);
@@ -108,11 +115,15 @@ export function useStartup(gateway: StartupGateway): Startup {
     setOutcome(undefined);
     setAttempt((value) => value + 1);
   }, []);
+  const completeConsent = useCallback(
+    (account: StartupAccount) => setOutcome(accountPhase(account)),
+    []
+  );
   const phase: StartupPhase = brandHeld
     ? { name: "brand" }
     : (outcome ?? { name: "signingIn" });
 
-  return { phase, busy, languageFailed, skipBrand, retry, selectLanguage };
+  return { phase, busy, languageFailed, skipBrand, retry, selectLanguage, completeConsent };
 }
 
 /**
@@ -129,7 +140,7 @@ export function StartupGate({
   suggested?: Language;
   children: ReactNode;
 }) {
-  const { setLanguage, t } = useI18n();
+  const { language, setLanguage, t } = useI18n();
   const startup = useStartup(gateway);
   const { phase } = startup;
 
@@ -192,9 +203,15 @@ export function StartupGate({
         />
       );
     case "consent":
-      // A-09 (CMP-634) renders the agreement window here. Until it merges the flow never
-      // enters this phase, and nothing in this package invents a consent endpoint.
-      return null;
+      return (
+        <ConsentView
+          translate={t}
+          language={language}
+          gateway={gateway}
+          account={phase.account}
+          onComplete={startup.completeConsent}
+        />
+      );
     case "ready":
       return <>{children}</>;
   }

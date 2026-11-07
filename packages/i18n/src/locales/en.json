@@ -55,6 +55,16 @@
   "error.2007": "Too many login attempts. Please wait a moment.",
   "error.2007.countdown": "Too many login attempts. Wait {seconds}s.",
   "error.2008": "Please accept the current agreement to continue.",
+  "consent.title": "Review and accept the agreements",
+  "consent.description": "You must accept the current legal documents before continuing.",
+  "consent.privacy": "Privacy policy",
+  "consent.terms": "User agreement",
+  "consent.version": "Version {version}",
+  "consent.read": "Read document",
+  "consent.required": "Required",
+  "consent.accept": "Accept and continue",
+  "consent.loadFailed": "The current agreements could not be loaded.",
+  "consent.acceptFailed": "The agreement could not be saved. Please try again.",
   "error.7001": "The external service could not complete the request.",
   "error.circuitOpen": "The service is temporarily unavailable. Try again later.",
   "order.count.one": "{count} order",
@@ -80,6 +90,42 @@
   "order.merchantStatus.returning": "Return in progress",
   "order.merchantStatus.returned": "Returned",
   "order.merchantStatus.exception": "Order exception",
+  "order.pageTitle": "Orders",
+  "order.detailTitle": "Order details",
+  "order.listEmpty": "No orders yet",
+  "order.listError": "Could not load orders",
+  "order.viewDetails": "View details",
+  "order.mockNote": "Interface-stub data for the buyer order flow",
+  "order.items": "{count} item(s)",
+  "order.itemsTitle": "Items",
+  "order.merchant": "Merchant",
+  "order.createdAt": "Created",
+  "order.total": "Order total",
+  "order.delivery": "Delivery progress",
+  "order.parentSummary": "Parent order (sub-orders by merchant)",
+  "order.subOrder": "Sub-order",
+  "order.subOrderCount": "{count} merchant sub-order(s)",
+  "order.paymentStatus": "Payment result",
+  "order.paymentConfirming": "Payment result is being confirmed. Please do not pay again.",
+  "order.payment.pending": "Awaiting payment confirmation",
+  "order.payment.confirming": "Confirming",
+  "order.payment.succeeded": "Payment succeeded",
+  "order.payment.failed": "Payment failed",
+  "order.payment.refunded": "Refunded",
+  "order.buyerStatus.awaiting_payment": "Awaiting payment confirmation",
+  "order.buyerStatus.paid": "Paid, warehouse processing",
+  "order.buyerStatus.submitted": "Warehouse processing, awaiting acceptance",
+  "order.buyerStatus.accepted": "Warehouse accepted, preparing to pick",
+  "order.buyerStatus.in_fulfillment": "Warehouse processing, picking and packing",
+  "order.buyerStatus.shipped": "Shipped, in delivery",
+  "order.buyerStatus.delivered_verified": "Delivered, after-sales observation period",
+  "order.buyerStatus.settled": "Order completed",
+  "order.buyerStatus.cancelled": "Order cancelled",
+  "order.buyerStatus.rejected": "Order rejected",
+  "order.buyerStatus.delivery_failed": "Delivery failed",
+  "order.buyerStatus.returning": "Return in progress",
+  "order.buyerStatus.returned": "Returned",
+  "order.buyerStatus.exception": "Order exception",
   "shell.currentLanguage": "Current language: {language}",
   "shell.developmentMode": "Development mode: browser mock data is active",
   "shell.telegramMode": "Telegram Mini App mode",
@@ -158,6 +204,22 @@
 ,"mall.leadDays": "{days} days"
 ,"mall.tiers": "Tier pricing (more = cheaper)"
 ,"mall.tierQuantity": "{quantity} and up"
+,"mall.cart": "Purchase list"
+,"mall.cartCount": "{count} items"
+,"mall.cartEmpty": "Your purchase list is empty."
+,"mall.browseProducts": "Browse products"
+,"mall.cartQuantity": "Quantity"
+,"mall.cartAvailable": "Available: {quantity}"
+,"mall.cartOutOfStock": "Quantity exceeds available stock."
+,"mall.cartBelowMoq": "Quantity is below the minimum order quantity."
+,"mall.cartRemove": "Remove"
+,"mall.cartSubtotal": "Subtotal"
+,"mall.cartTotal": "Total"
+,"mall.cartSplitPreview": "Split-order preview"
+,"mall.cartMerchantCn": "China supplier"
+,"mall.cartMerchantLocal": "Local supplier"
+,"mall.cartPlaceOrder": "Submit order"
+,"mall.cartEstimateNote": "Amounts are estimates; the server response is authoritative at submission."
 ,"mall.supplier": "Supplier"
 ,"mall.categoriesEmpty": "No categories yet"
 ,"mall.productsEmpty": "No products on sale"
