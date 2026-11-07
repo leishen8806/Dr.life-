@@ -1013,7 +1013,11 @@ func assertLineAndParentTotalGuards(t *testing.T, ctx context.Context, pool *pgx
 				t.Fatal(err)
 			}
 			defer func() { _ = tx.Rollback(ctx) }()
-			if _, err := tx.Exec(ctx, statement, firstID, emptyID); err != nil {
+			args := []any{firstID}
+			if name == "move" {
+				args = append(args, emptyID)
+			}
+			if _, err := tx.Exec(ctx, statement, args...); err != nil {
 				t.Fatal(err)
 			}
 			assertPGCode(t, tx.Commit(ctx), "23514")

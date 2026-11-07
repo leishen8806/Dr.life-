@@ -229,7 +229,12 @@ BEGIN
     END IF;
     IF NOT source_was_known THEN
         INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref)
-        VALUES (target_id,'kess_result',p_source_ref);
+        VALUES (target_id,'kess_result',p_source_ref) ON CONFLICT (source_type,source_ref) DO NOTHING;
+        SELECT buyer_order_id INTO source_owner_id FROM trade.order_event_source
+          WHERE source_type='kess_result' AND source_ref=p_source_ref;
+        IF source_owner_id IS DISTINCT FROM target_id THEN
+            RAISE EXCEPTION 'payment source belongs to another order' USING ERRCODE = '23514';
+        END IF;
     END IF;
 
     SELECT count(*),count(*) FILTER (WHERE status='awaiting_payment'),count(*) FILTER (WHERE status='paid'),count(*) FILTER (WHERE status='cancelled')
