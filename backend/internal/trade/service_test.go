@@ -271,6 +271,16 @@ func TestConfirmPaymentCommitsReservationOnFirstCallAndReplay(t *testing.T) {
 	}
 }
 
+func TestConfirmPaymentSurfacesLostReservationForRefund(t *testing.T) {
+	store := &stubOrders{paymentKey: "1:key", paymentOK: true}
+	catalog := catalogFixture()
+	catalog.commitErr = ErrReservationReleased
+	applied, err := NewService(store, stubAccounts{"active"}, catalog).ConfirmPayment(context.Background(), "buyer-order", 500, EventSource{Type: SourceKESSResult, Reference: "payment"})
+	if !applied || !errors.Is(err, ErrReservationReleased) {
+		t.Fatalf("applied=%v err=%v, want applied payment with ErrReservationReleased refund signal", applied, err)
+	}
+}
+
 func TestProcessReservationActionsCompletesSuccessAndReschedulesFailure(t *testing.T) {
 	store := &stubOrders{outbox: []ReservationAction{{ID: 1, Key: "1:ok", Action: "release"}, {ID: 3, Key: "1:commit", Action: "commit"}}}
 	catalog := catalogFixture()

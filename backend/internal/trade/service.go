@@ -32,7 +32,10 @@ type Catalog interface {
 	// Release is idempotent for one reservation key.
 	Release(context.Context, string) error
 	// Commit makes a paid reservation ineligible for timeout reclamation.
-	// It must be idempotent because payment confirmation may be replayed.
+	// Catalog must not reclaim on its own: timeout workers call
+	// Service.ReleaseReservations so trade locks and cancels the order first.
+	// Commit is idempotent and returns ErrReservationReleased when stock was
+	// already reclaimed, which is the caller's signal to start a refund.
 	Commit(context.Context, string) error
 }
 type Store interface {

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -261,6 +262,10 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 
 	assertAmountConstraints(t, ctx, pool)
 	assertSharedSourceWithinBuyer(t, ctx, pool, store)
+	assertCancellationCascades(t, ctx, pool, store)
+	assertReservationReleaseCancelsAndQueuesFailures(t, ctx, pool, store)
+	assertPaymentSQLStates(t, ctx, pool, store)
+	assertCreatedTxidCannotBeForged(t, ctx, pool)
 	assertPaymentReleaseGuards(t, ctx, pool, store)
 	assertReservationReleaseOutbox(t, ctx, pool, store)
 	assertDifferentSourcesSerialize(t, ctx, db, pool, store)
@@ -299,9 +304,10 @@ func assertTradeRWCreateIsIdempotent(t *testing.T, ctx context.Context, dsn stri
 	if err := pool.QueryRow(ctx, `SELECT id FROM trade.merchant_order WHERE buyer_order_id=(SELECT id FROM trade.buyer_order WHERE public_id=$1)`, first.PublicID).Scan(&merchantOrderID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `UPDATE trade.merchant_order SET status='paid',version=version+1 WHERE id=$1`, merchantOrderID); err == nil {
-		t.Fatal("trade_rw direct child payment unexpectedly succeeded")
-	}
+	assertPGCode(t, func() error {
+		_, err := pool.Exec(ctx, `UPDATE trade.merchant_order SET status='paid',version=version+1 WHERE id=$1`, merchantOrderID)
+		return err
+	}(), "42501")
 	if key, applied, err := store.ConfirmPayment(ctx, first.PublicID, 200, EventSource{Type: SourceKESSResult, Reference: "rw-payment"}); err != nil || !applied || key != "88:rw-idem" {
 		t.Fatalf("trade_rw parent payment key=%q applied=%v err=%v", key, applied, err)
 	}
@@ -456,6 +462,149 @@ func assertSharedSourceWithinBuyer(t *testing.T, ctx context.Context, pool *pgxp
 	}
 }
 
+func assertCancellationCascades(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
+	t.Helper()
+	var buyerOrderID, firstChildID int64
+	if err := pool.QueryRow(ctx, `WITH buyer AS (
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FD0',40,'cancel-cascade',repeat('7',64),200) RETURNING id
+	), first_child AS (
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD1',id,401,100 FROM buyer RETURNING id,buyer_order_id
+	), second_child AS (
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD2',buyer_order_id,402,100 FROM first_child RETURNING id,merchant_id
+	), first_line AS (
+		INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
+		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FD3',1,100,100 FROM first_child
+	), second_line AS (
+		INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
+		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FD4',1,100,100 FROM second_child
+	) SELECT buyer_order_id,id FROM first_child`).Scan(&buyerOrderID, &firstChildID); err != nil {
+		t.Fatal(err)
+	}
+	source := EventSource{Type: SourceSystem, Reference: "cancel-parent-batch"}
+	if applied, err := store.Advance(ctx, firstChildID, AwaitingPayment, Cancelled, source); err != nil || !applied {
+		t.Fatalf("cancel child applied=%v err=%v", applied, err)
+	}
+	var cancelled, events int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.merchant_order WHERE buyer_order_id=$1 AND status='cancelled'`, buyerOrderID).Scan(&cancelled); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.order_event WHERE buyer_order_id=$1 AND source_ref=$2`, buyerOrderID, source.Reference).Scan(&events); err != nil {
+		t.Fatal(err)
+	}
+	if cancelled != 2 || events != 2 {
+		t.Fatalf("cancelled=%d events=%d, want 2/2", cancelled, events)
+	}
+}
+
+func assertReservationReleaseCancelsAndQueuesFailures(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
+	t.Helper()
+	var buyerOrderID int64
+	if err := pool.QueryRow(ctx, `WITH buyer AS (
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FD5',41,'release-cascade',repeat('8',64),200) RETURNING id
+	), children AS (
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD6',id,411,100 FROM buyer UNION ALL
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD7',id,412,100 FROM buyer RETURNING id,buyer_order_id,merchant_id
+	), lines AS (
+		INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
+		SELECT id,CASE merchant_id WHEN 411 THEN '01ARZ3NDEKTSV4RRFFQ69G5FD8' ELSE '01ARZ3NDEKTSV4RRFFQ69G5FD9' END,1,100,100 FROM children
+	) SELECT id FROM buyer`).Scan(&buyerOrderID); err != nil {
+		t.Fatal(err)
+	}
+	releaseErr := errors.New("catalog release unavailable")
+	service := NewService(store, stubAccounts{"active"}, &stubCatalog{releaseErr: releaseErr})
+	for attempt := 0; attempt < 2; attempt++ {
+		if err := service.ReleaseReservations(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FD5"); !errors.Is(err, releaseErr) {
+			t.Fatalf("release attempt %d error=%v, want catalog release unavailable", attempt+1, err)
+		}
+	}
+	var cancelled, queued int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.merchant_order WHERE buyer_order_id=$1 AND status='cancelled'`, buyerOrderID).Scan(&cancelled); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.reservation_release_outbox WHERE reservation_key='41:release-cascade' AND action='release'`).Scan(&queued); err != nil {
+		t.Fatal(err)
+	}
+	if cancelled != 2 || queued != 1 {
+		t.Fatalf("cancelled=%d queued=%d, want 2/1", cancelled, queued)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE reservation_key='41:release-cascade'`); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertPaymentSQLStates(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
+	t.Helper()
+	create := func(parentID, childID, skuID, key string, buyerID int64) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, `WITH buyer AS (
+			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
+			VALUES ($1,$2,$3,repeat('9',64),100) RETURNING id
+		), child AS (
+			INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
+			SELECT $4,id,$2+500,100 FROM buyer RETURNING id
+		) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
+		SELECT id,$5,1,100,100 FROM child`, parentID, buyerID, key, childID, skuID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	create("01ARZ3NDEKTSV4RRFFQ69G5FDA", "01ARZ3NDEKTSV4RRFFQ69G5FDB", "01ARZ3NDEKTSV4RRFFQ69G5FDC", "sqlstate-amount", 42)
+	assertPGCode(t, func() error {
+		_, err := pool.Exec(ctx, `SELECT * FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FDA','wrong-amount',99)`)
+		return err
+	}(), "TR002")
+	create("01ARZ3NDEKTSV4RRFFQ69G5FDD", "01ARZ3NDEKTSV4RRFFQ69G5FDE", "01ARZ3NDEKTSV4RRFFQ69G5FDF", "sqlstate-release", 43)
+	if _, claimed, err := store.ClaimReservationRelease(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FDD"); err != nil || !claimed {
+		t.Fatalf("release claim claimed=%v err=%v", claimed, err)
+	}
+	assertPGCode(t, func() error {
+		_, err := pool.Exec(ctx, `SELECT * FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FDD','released-payment',100)`)
+		return err
+	}(), "TR001")
+}
+
+func assertCreatedTxidCannotBeForged(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	var eventTxid, currentTxid int64
+	if err := pool.QueryRow(ctx, `WITH buyer AS (
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FDG',44,'txid-guard',repeat('a',64),100) RETURNING id
+	), child AS (
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FDH',id,544,100 FROM buyer RETURNING id,buyer_order_id
+	), line AS (
+		INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
+		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FDJ',1,100,100 FROM child
+	), source AS (
+		INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref)
+		SELECT buyer_order_id,'system','txid-forgery' FROM child
+	), event AS (
+		INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref,created_txid)
+		SELECT id,buyer_order_id,'awaiting_payment','cancelled','system','txid-forgery',0 FROM child RETURNING created_txid
+	) SELECT created_txid,txid_current() FROM event`).Scan(&eventTxid, &currentTxid); err != nil {
+		t.Fatal(err)
+	}
+	if eventTxid != currentTxid {
+		t.Fatalf("created_txid=%d, want server txid %d", eventTxid, currentTxid)
+	}
+}
+
+func assertPGCode(t *testing.T, err error, want string) {
+	t.Helper()
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != want {
+		got := ""
+		if pgErr != nil {
+			got = pgErr.Code
+		}
+		t.Fatalf("PostgreSQL error=%v code=%q, want %s", err, got, want)
+	}
+}
+
 func assertPaymentReleaseGuards(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
 	t.Helper()
 	createOrder := func(parentID, childID, skuID, key string, buyerID int64) {
@@ -543,6 +692,13 @@ func assertReservationReleaseOutbox(t *testing.T, ctx context.Context, pool *pgx
 	}
 	if again, err := store.ClaimReservationActions(ctx, 10); err != nil || len(again) != 0 {
 		t.Fatalf("concurrent claim=%+v err=%v", again, err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE trade.reservation_release_outbox SET claimed_at=clock_timestamp()-interval '6 minutes' WHERE id=$1`, items[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	items, err = store.ClaimReservationActions(ctx, 10)
+	if err != nil || len(items) != 1 || items[0].Key != "31:outbox" {
+		t.Fatalf("expired lease claim=%+v err=%v", items, err)
 	}
 	if err := store.FailReservationAction(ctx, items[0].ID); err != nil {
 		t.Fatal(err)

@@ -221,7 +221,21 @@ func (s *PostgresStore) ClaimReservationRelease(ctx context.Context, publicID st
 	if allCancelled {
 		reservation.Status = Cancelled
 	} else {
-		reservation.Status = AwaitingPayment
+		sourceRef := "reservation-release:" + publicID
+		if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref)
+			VALUES ($1,'system',$2) ON CONFLICT (source_type,source_ref) DO NOTHING`, buyerOrderID, sourceRef); err != nil {
+			return Reservation{}, false, err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref)
+			SELECT id,$1,'awaiting_payment','cancelled','system',$2 FROM trade.merchant_order
+			WHERE buyer_order_id=$1 AND status='awaiting_payment' ORDER BY id`, buyerOrderID, sourceRef); err != nil {
+			return Reservation{}, false, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE trade.merchant_order SET status='cancelled',version=version+1,updated_at=clock_timestamp()
+			WHERE buyer_order_id=$1 AND status='awaiting_payment'`, buyerOrderID); err != nil {
+			return Reservation{}, false, err
+		}
+		reservation.Status = Cancelled
 	}
 	if _, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET reservation_released_at=clock_timestamp(),updated_at=clock_timestamp() WHERE public_id=$1`, publicID); err != nil {
 		return Reservation{}, false, err
@@ -236,7 +250,8 @@ func (s *PostgresStore) ClaimReservationActions(ctx context.Context, limit int) 
 	rows, err := s.db.Query(ctx, `
 		WITH due AS (
 			SELECT id FROM trade.reservation_release_outbox
-			WHERE claimed_at IS NULL AND next_attempt_at <= clock_timestamp()
+			WHERE (claimed_at IS NULL OR claimed_at < clock_timestamp()-interval '5 minutes')
+			  AND next_attempt_at <= clock_timestamp()
 			ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED
 		)
 		UPDATE trade.reservation_release_outbox outbox
@@ -312,6 +327,18 @@ func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from
 	if sourceBuyerOrderID != buyerOrderID {
 		return false, ErrInvalidTransition
 	}
+	if from == AwaitingPayment && to == Cancelled {
+		if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref)
+			SELECT id,$1,$2,$3,$4,$5 FROM trade.merchant_order
+			WHERE buyer_order_id=$1 AND status=$2 ORDER BY id`, buyerOrderID, string(from), string(to), string(source.Type), source.Reference); err != nil {
+			return false, err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE trade.merchant_order SET status=$2,version=version+1,updated_at=clock_timestamp()
+			WHERE buyer_order_id=$1 AND status=$3`, buyerOrderID, string(to), string(from)); err != nil {
+			return false, err
+		}
+		return true, tx.Commit(ctx)
+	}
 	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) VALUES ($1,$2,$3,$4,$5,$6)`, merchantOrderID, buyerOrderID, string(from), string(to), string(source.Type), source.Reference); err != nil {
 		return false, err
 	}
@@ -336,9 +363,9 @@ func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID s
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
-		case "P0001":
+		case "TR001":
 			return "", false, ErrReservationReleased
-		case "22003":
+		case "TR002":
 			return "", false, ErrPaymentAmount
 		case "23514", "55000":
 			return "", false, ErrInvalidTransition

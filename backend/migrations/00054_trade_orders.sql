@@ -179,10 +179,10 @@ BEGIN
         RAISE EXCEPTION 'buyer order not found' USING ERRCODE = '23514';
     END IF;
     IF target_released_at IS NOT NULL THEN
-        RAISE EXCEPTION 'order reservation already released' USING ERRCODE = 'P0001';
+        RAISE EXCEPTION 'order reservation already released' USING ERRCODE = 'TR001';
     END IF;
     IF p_paid_amount_e4 IS DISTINCT FROM target_total_e4 THEN
-        RAISE EXCEPTION 'paid amount does not match order total' USING ERRCODE = '22003';
+        RAISE EXCEPTION 'paid amount does not match order total' USING ERRCODE = 'TR002';
     END IF;
 
     INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref)
@@ -247,6 +247,17 @@ CREATE TRIGGER trg_trade_order_event_immutable BEFORE UPDATE OR DELETE ON trade.
     FOR EACH ROW EXECUTE FUNCTION trade.reject_order_event_mutation();
 CREATE TRIGGER trg_trade_order_event_no_truncate BEFORE TRUNCATE ON trade.order_event
     FOR EACH STATEMENT EXECUTE FUNCTION trade.reject_order_event_mutation();
+
+-- +goose StatementBegin
+CREATE FUNCTION trade.set_order_event_created_txid() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.created_txid := txid_current();
+    RETURN NEW;
+END;
+$$;
+-- +goose StatementEnd
+CREATE TRIGGER trg_trade_order_event_created_txid BEFORE INSERT ON trade.order_event
+    FOR EACH ROW EXECUTE FUNCTION trade.set_order_event_created_txid();
 
 -- +goose StatementBegin
 CREATE FUNCTION trade.assert_merchant_order_total() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -347,7 +358,7 @@ REVOKE UPDATE ON SEQUENCE trade.buyer_order_id_seq, trade.merchant_order_id_seq,
     trade.order_event_id_seq, trade.order_event_source_id_seq, trade.reservation_release_outbox_id_seq FROM trade_rw;
 REVOKE EXECUTE ON FUNCTION trade.guard_buyer_order_update(), trade.guard_merchant_order_update(),
     trade.guard_order_line_insert(), trade.reject_order_event_mutation(), trade.assert_merchant_order_total(),
-    trade.assert_buyer_order_total() FROM PUBLIC;
+    trade.assert_buyer_order_total(), trade.set_order_event_created_txid() FROM PUBLIC;
 
 -- +goose Down
 DROP FUNCTION trade.confirm_order_payment(text,text,bigint);
@@ -363,6 +374,8 @@ DROP TRIGGER trg_trade_merchant_order_guard ON trade.merchant_order;
 DROP FUNCTION trade.guard_merchant_order_update();
 DROP TRIGGER trg_trade_buyer_order_guard ON trade.buyer_order;
 DROP FUNCTION trade.guard_buyer_order_update();
+DROP TRIGGER trg_trade_order_event_created_txid ON trade.order_event;
+DROP FUNCTION trade.set_order_event_created_txid();
 DROP TRIGGER trg_trade_order_event_no_truncate ON trade.order_event;
 DROP TRIGGER trg_trade_order_event_immutable ON trade.order_event;
 DROP FUNCTION trade.reject_order_event_mutation();
