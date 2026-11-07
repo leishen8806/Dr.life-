@@ -329,7 +329,7 @@ func assertTradeRWCreateIsIdempotent(t *testing.T, ctx context.Context, dsn stri
 	assertPGCode(t, func() error {
 		_, err := pool.Exec(ctx, `UPDATE trade.merchant_order SET status='paid',version=version+1 WHERE id=$1`, merchantOrderID)
 		return err
-	}(), "42501")
+	}(), "55000")
 	if key, applied, err := store.ConfirmPayment(ctx, first.PublicID, 200, EventSource{Type: SourceKESSResult, Reference: "rw-payment"}); err != nil || !applied || key != "88:rw-idem" {
 		t.Fatalf("trade_rw parent payment key=%q applied=%v err=%v", key, applied, err)
 	}
