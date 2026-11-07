@@ -3,18 +3,23 @@
 @media(max-width:520px){.stats{grid-template-columns:repeat(4,1fr);gap:8px;padding-block:20px}.stat strong{font-size:24px}.stat span{font-size:9px;line-height:1.35}.stages{margin-top:28px}.stage{padding:14px 0;gap:8px}.stage strong{font-size:30px}.stage h3{margin:0;font-size:16px}.stage p{margin:0;font-size:11px}.ecosystem-orbit{height:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:4px;transform:none;transform-origin:initial;margin-bottom:0}.ecosystem-orbit:before,.ecosystem-orbit:after,.ecosystem-orbit>strong{display:none}.ecosystem-node{position:static;width:auto;padding:10px}.ecosystem-node span{font-size:10px}.chain{grid-template-columns:1fr;margin-top:32px}.chain-step{padding:8px 0;display:grid;grid-template-columns:54px 1fr;column-gap:8px}.chain-step span{grid-row:span 2}.chain-step strong{font-size:16px}.chain-step small{font-size:11px}.section{padding-block:76px}.section-title{font-size:28px}.section-copy{font-size:13px}.partners{margin-top:28px}.partner{padding:18px}.partner h3{font-size:18px}.partner p{font-size:12px}}
 @media(max-width:520px){[data-lang="km"] .hero h1,[data-lang="km"] .subtitle,[data-lang="km"] .merchant-hero .section-title,[data-lang="km"] .legal-page h1{max-inline-size:100%;min-width:0;overflow-wrap:anywhere;word-break:break-word;letter-spacing:normal}}
 .not-found-page{max-width:760px;min-height:calc(100vh - 260px);margin:auto;padding:120px 48px}.not-found-page h1{font-family:"Noto Serif SC",serif;font-size:56px;line-height:1.15;margin:12px 0}.not-found-page>p:not(.eyebrow){max-width:560px;font-size:18px}.not-found-page__draft{color:var(--deep-gold);font-size:14px!important}[data-lang="km"] .not-found-page__draft[hidden]{display:block}[data-lang="km"] .hero h1,[data-lang="km"] .section-title,[data-lang="km"] .legal-page h1,[data-lang="km"] .category-card h3,[data-lang="km"] .chain-step strong,[data-lang="km"] .merchant-faq h3,[data-lang="km"] .merchant-cta h2,[data-lang="km"] .legal-content h2,[data-lang="km"] .not-found-page h1{font-family:"Noto Sans Khmer",sans-serif}
-/* Responsive release header: keep navigation usable at tablet and phone widths. */
-.mobile-menu summary{list-style:none;cursor:pointer;display:grid;place-items:center;width:44px;height:44px;border:1px solid currentColor}
-.mobile-menu summary::-webkit-details-marker{display:none}
-.mobile-menu summary span{display:block;width:18px;height:1px;background:currentColor;grid-column:1;grid-row:1;transition:transform .2s ease,opacity .2s ease}
-.mobile-menu summary span:nth-child(1){transform:translateY(-6px)}
-.mobile-menu summary span:nth-child(3){transform:translateY(6px)}
-.mobile-menu[open] summary span:nth-child(1){transform:rotate(45deg)}
-.mobile-menu[open] summary span:nth-child(2){opacity:0}
-.mobile-menu[open] summary span:nth-child(3){transform:rotate(-45deg)}
-.mobile-menu nav{position:absolute;right:20px;top:78px;z-index:20;min-width:220px;padding:12px;background:var(--deep);color:var(--ivory);border:1px solid var(--gold);box-shadow:0 12px 30px rgb(0 0 0 / .2)}
-.mobile-menu nav a{display:block;padding:12px 14px;text-decoration:none;min-height:44px}
-.mobile-menu nav a:focus-visible{outline-offset:-3px}
-@media(max-width:900px){.main-nav,.shop-link{display:none}.mobile-menu{display:block;margin-left:auto;position:relative}}
-@media(max-width:520px){.hero h1{font-size:60px;line-height:1.1}}
-@media(max-width:520px){.site-header{gap:12px}.header-actions{margin-left:auto}.languages{gap:2px}.languages a{padding:10px 6px;white-space:nowrap}.mobile-menu{margin-left:0}}
+ [data-lang="km"] .not-found-page h1{font-family:"Noto Sans Khmer",sans-serif}
+ /* Responsive release header: keep navigation usable at tablet and phone widths. */
+ .mobile-menu summary{list-style:none;cursor:pointer;display:grid;place-items:center;width:44px;height:44px;border:1px solid currentColor}
+ .mobile-menu summary::-webkit-details-marker{display:none}
+ .mobile-menu summary span{display:block;width:18px;height:1px;background:currentColor;grid-column:1;grid-row:1;transition:transform .2s ease,opacity .2s ease}
+ .mobile-menu summary span:nth-child(1){transform:translateY(-6px)}
+ .mobile-menu summary span:nth-child(3){transform:translateY(6px)}
+ .mobile-menu[open] summary span:nth-child(1){transform:rotate(45deg)}
+ .mobile-menu[open] summary span:nth-child(2){opacity:0}
+ .mobile-menu[open] summary span:nth-child(3){transform:rotate(-45deg)}
+ .mobile-menu nav{position:absolute;right:20px;top:78px;z-index:20;min-width:220px;padding:12px;background:var(--deep);color:var(--ivory);border:1px solid var(--gold);box-shadow:0 12px 30px rgb(0 0 0 / .2)}
+ .mobile-menu nav a{display:block;padding:12px 14px;text-decoration:none;min-height:44px}
+ .mobile-menu nav a:focus-visible{outline-offset:-3px}
+ .mobile-menu-languages{display:flex;gap:4px;border-top:1px solid #5b5f62;padding-top:10px}
+ .mobile-menu-languages a{padding-inline:8px}
+ .mobile-menu summary:focus-visible{outline:3px solid var(--gold);outline-offset:4px}
+ @media(max-width:900px){.main-nav,.shop-link{display:none}.mobile-menu{display:block;margin-left:auto;position:relative}}
+ @media(max-width:520px){.hero h1{font-size:60px;line-height:1.1}.site-header{gap:12px}.header-actions{margin-left:auto}.languages{gap:2px}.languages a{padding:10px 6px;white-space:nowrap}.mobile-menu{margin-left:0}}
+ @media(max-width:360px){.header-actions .languages{display:none}.mobile-menu-languages{display:flex}}
+ @media(min-width:361px){.mobile-menu-languages{display:none}}
