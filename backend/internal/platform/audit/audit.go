@@ -74,6 +74,11 @@ type Writer interface {
 	Append(context.Context, Entry) (Record, error)
 }
 
+type IdempotentWriter interface {
+	Writer
+	AppendOnce(context.Context, string, Entry) (Record, error)
+}
+
 type Metrics interface {
 	AuditAppend(bool)
 	AuditVerifyFailure()
@@ -105,6 +110,42 @@ func (s *Store) Append(ctx context.Context, entry Entry) (Record, error) {
 		return Record{}, err
 	}
 	return record, nil
+}
+
+func (s *Store) appendOnceTx(ctx context.Context, tx pgx.Tx, eventID string, entry Entry) (Record, error) {
+	if strings.TrimSpace(eventID) == "" {
+		return Record{}, errors.New("audit event ID is required")
+	}
+	if record, found, err := consumedRecord(ctx, tx, eventID); err != nil || found {
+		return record, err
+	}
+	record, err := s.appendTx(ctx, tx, entry)
+	if err != nil {
+		return Record{}, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO audit.event_seen (event_id, log_id) VALUES ($1,$2)`, eventID, record.ID); err != nil {
+		return Record{}, fmt.Errorf("mark audit event consumed: %w", err)
+	}
+	return record, nil
+}
+
+func (s *Store) AppendOnce(ctx context.Context, eventID string, entry Entry) (Record, error) {
+	if s == nil || s.DB == nil {
+		return Record{}, errors.New("audit database is unavailable")
+	}
+	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return Record{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	record, err := s.appendOnceTx(ctx, tx, eventID, entry)
+	if err != nil {
+		s.recordAppend(false)
+		return Record{}, err
+	}
+	err = tx.Commit(ctx)
+	s.recordAppend(err == nil)
+	return record, err
 }
 
 func (s *Store) appendTx(ctx context.Context, tx pgx.Tx, entry Entry) (Record, error) {

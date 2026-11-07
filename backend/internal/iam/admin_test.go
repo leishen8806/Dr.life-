@@ -4,11 +4,77 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 )
+
+func TestArgon2WorkHasIndependentConcurrencyLimit(t *testing.T) {
+	var active atomic.Int32
+	var peak atomic.Int32
+	started := make(chan struct{}, argon2ConcurrencyLimit*2)
+	release := make(chan struct{})
+	var wg sync.WaitGroup
+	for range argon2ConcurrencyLimit * 2 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := withArgon2Slot(context.Background(), func() []byte {
+				current := active.Add(1)
+				for {
+					old := peak.Load()
+					if current <= old || peak.CompareAndSwap(old, current) {
+						break
+					}
+				}
+				started <- struct{}{}
+				<-release
+				active.Add(-1)
+				return nil
+			})
+			if err != nil {
+				t.Errorf("Argon2 slot: %v", err)
+			}
+		}()
+	}
+	for range argon2ConcurrencyLimit {
+		<-started
+	}
+	select {
+	case <-started:
+		t.Fatal("more Argon2 work entered than the independent limit")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	wg.Wait()
+	if got := peak.Load(); got != argon2ConcurrencyLimit {
+		t.Fatalf("peak Argon2 work=%d, want %d", got, argon2ConcurrencyLimit)
+	}
+}
+
+func TestArgon2WaitHonorsContext(t *testing.T) {
+	for range argon2ConcurrencyLimit {
+		argon2Slots <- struct{}{}
+	}
+	t.Cleanup(func() {
+		for range argon2ConcurrencyLimit {
+			<-argon2Slots
+		}
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	ran := false
+	result, err := withArgon2Slot(ctx, func() []byte {
+		ran = true
+		return []byte("unexpected")
+	})
+	if !errors.Is(err, context.Canceled) || result != nil || ran {
+		t.Fatalf("cancelled wait result=%q err=%v ran=%v, want nil context.Canceled false", result, err, ran)
+	}
+}
 
 func TestDefaultAdminMatrixMatchesPolicyAndIsSeparationSafe(t *testing.T) {
 	matrix := DefaultAdminMatrix()

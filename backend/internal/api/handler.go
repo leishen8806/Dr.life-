@@ -21,6 +21,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // maxBodyBytes 限制请求体大小，避免超大 JSON 进入内存。
@@ -37,8 +38,21 @@ type TelegramLogin interface {
 	Login(context.Context, iam.LoginInput) (iam.LoginResult, error)
 }
 
+type AdminLogin interface {
+	Login(context.Context, iam.AdminLoginInput) (iam.AdminLoginResult, error)
+}
+
+type AdminStepUp interface {
+	Issue(context.Context, string, string, string, string, string, string) (iam.AdminStepUpResult, error)
+}
+
+type AdminPassword interface {
+	Change(context.Context, iam.AdminPasswordChangeInput) error
+}
+
 type SessionManagement interface {
 	Refresh(context.Context, string, string) (iam.RefreshResult, error)
+	RefreshEndpoint(context.Context, string, string, bool) (iam.RefreshResult, error)
 	ListSessions(context.Context, string) ([]iam.SessionInfo, error)
 	RevokeSession(context.Context, string, string, string) error
 }
@@ -79,6 +93,17 @@ type AdminPermissionChecker interface {
 	HasDataScope(context.Context, string) (bool, error)
 }
 
+// AdminManagement is the credential-safe IAM port for administrator records.
+// It deliberately has no method that returns hashes or encrypted TOTP values.
+type AdminManagement interface {
+	List(context.Context, string, int) ([]iam.AdminUser, string, error)
+	Get(context.Context, string) (iam.AdminUser, bool, error)
+	CreateWithAudit(context.Context, iam.AdminCreateInput, iam.AdminAuditInput) (iam.AdminCreateResult, error)
+	DisableWithAudit(context.Context, string, string, iam.AdminAuditInput) (iam.AdminUser, error)
+	EnableWithAudit(context.Context, string, iam.AdminAuditInput) (iam.AdminUser, error)
+	UpdateRoleWithAudit(context.Context, string, iam.Role, []string, iam.AdminAuditInput) (iam.AdminUser, error)
+}
+
 type LedgerReader interface {
 	ListAdminTransactions(context.Context, int) ([]ledger.AdminTransaction, error)
 	GetAdminTransaction(context.Context, string) (ledger.AdminTransaction, bool, error)
@@ -99,10 +124,14 @@ type FileManagement interface {
 // 零值 Handler 只提供 /v1/public/ping；商品接口在依赖未注入时返回 500，
 // 这样 server.NewHandler(nil) 与契约测试的既有行为保持不变。
 type Handler struct {
+	gen.Unimplemented
 	Catalog          *catalog.Service
 	Merchants        MerchantResolver
 	Logger           *slog.Logger
 	Login            TelegramLogin
+	AdminLogin       AdminLogin
+	AdminStepUp      AdminStepUp
+	AdminPassword    AdminPassword
 	Sessions         SessionManagement
 	AccountProfiles  AccountProfileManagement
 	AccountLinks     AccountLinkManagement
@@ -114,6 +143,12 @@ type Handler struct {
 	Directory        AccountDirectory
 	AdminPermissions AdminPermissionChecker
 	Files            FileManagement
+	AdminManagement  AdminManagement
+}
+
+type adminStepUpRequest struct {
+	TOTPCode string `json:"totp_code"`
+	Scope    string `json:"scope"`
 }
 
 func (Handler) GetPublicPing(w http.ResponseWriter, r *http.Request) {
@@ -282,6 +317,186 @@ func (h Handler) adminLedgerAccess(w http.ResponseWriter, r *http.Request) bool 
 	return true
 }
 
+func (h Handler) ListAdminUsers(w http.ResponseWriter, r *http.Request, params gen.ListAdminUsersParams) {
+	if !h.adminRBACAccess(w, r, "view") {
+		return
+	}
+	if h.AdminManagement == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	cursor := ""
+	if params.Cursor != nil {
+		cursor = *params.Cursor
+	}
+	limit := 50
+	if params.Limit != nil {
+		limit = *params.Limit
+	}
+	items, next, err := h.AdminManagement.List(r.Context(), cursor, limit)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	result := adminUsers(items)
+	data := gen.AdminUserListData{Items: result}
+	if next != "" {
+		data.NextCursor = &next
+	}
+	httpx.WriteOK(w, r, data)
+}
+
+func (h Handler) GetAdminUser(w http.ResponseWriter, r *http.Request, publicID gen.AdminPublicID) {
+	if !h.adminRBACAccess(w, r, "view") {
+		return
+	}
+	if h.AdminManagement == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	user, found, err := h.AdminManagement.Get(r.Context(), string(publicID))
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	if !found {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeResourceNotFound))
+		return
+	}
+	httpx.WriteOK(w, r, gen.AdminUserData{Admin: adminUser(user)})
+}
+
+func (h Handler) CreateAdminUser(w http.ResponseWriter, r *http.Request, _ gen.CreateAdminUserParams) {
+	if !h.adminRBACAccess(w, r, "edit") {
+		return
+	}
+	if !gateway.StepUpVerified(r.Context()) {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeStepUpInvalid))
+		return
+	}
+	if h.AdminManagement == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	body, ok := decodeJSON[gen.CreateAdminUserJSONRequestBody](w, r)
+	if !ok {
+		return
+	}
+	identity, _ := gateway.IdentityFromContext(r.Context())
+	created, err := h.AdminManagement.CreateWithAudit(r.Context(), iam.AdminCreateInput{
+		Name: body.Name, Email: string(body.Email), Role: iam.Role(body.Role), DataScope: body.DataScope,
+	}, iam.AdminAuditInput{ActorPublicID: identity.AccountID, IP: h.ClientIP.Resolve(r), RequestID: httpx.RequestIDFromContext(r.Context())})
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(gen.AdminUserCreatedSuccessResponse{
+		Ok:        gen.AdminUserCreatedSuccessResponseOkTrue,
+		Data:      gen.AdminUserCreatedData{Admin: adminUser(created.Admin), InitialPassword: created.InitialPassword, TotpProvisioningUri: created.TOTPProvisioningURI},
+		RequestId: httpx.RequestIDFromContext(r.Context()),
+	})
+}
+
+func (h Handler) DisableAdminUser(w http.ResponseWriter, r *http.Request, publicID gen.AdminPublicID, _ gen.DisableAdminUserParams) {
+	if !h.adminRBACAccess(w, r, "edit") || !h.adminManagementStepUp(w, r) {
+		return
+	}
+	body, ok := decodeJSON[gen.DisableAdminUserJSONRequestBody](w, r)
+	if !ok || strings.TrimSpace(body.Reason) == "" {
+		if ok {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	user, err := h.AdminManagement.DisableWithAudit(r.Context(), string(publicID), body.Reason, h.adminAuditInput(r))
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, gen.AdminUserData{Admin: adminUser(user)})
+}
+
+func (h Handler) EnableAdminUser(w http.ResponseWriter, r *http.Request, publicID gen.AdminPublicID, _ gen.EnableAdminUserParams) {
+	if !h.adminRBACAccess(w, r, "edit") || !h.adminManagementStepUp(w, r) {
+		return
+	}
+	user, err := h.AdminManagement.EnableWithAudit(r.Context(), string(publicID), h.adminAuditInput(r))
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, gen.AdminUserData{Admin: adminUser(user)})
+}
+
+func (h Handler) UpdateAdminUserRole(w http.ResponseWriter, r *http.Request, publicID gen.AdminPublicID, _ gen.UpdateAdminUserRoleParams) {
+	if !h.adminRBACAccess(w, r, "edit") || !h.adminManagementStepUp(w, r) {
+		return
+	}
+	body, ok := decodeJSON[gen.UpdateAdminUserRoleJSONRequestBody](w, r)
+	if !ok {
+		return
+	}
+	user, err := h.AdminManagement.UpdateRoleWithAudit(r.Context(), string(publicID), iam.Role(body.Role), body.DataScope, h.adminAuditInput(r))
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, gen.AdminUserData{Admin: adminUser(user)})
+}
+
+func (h Handler) adminManagementStepUp(w http.ResponseWriter, r *http.Request) bool {
+	if !gateway.StepUpVerified(r.Context()) {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeStepUpInvalid))
+		return false
+	}
+	if h.AdminManagement == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return false
+	}
+	return true
+}
+
+func (h Handler) adminAuditInput(r *http.Request) iam.AdminAuditInput {
+	identity, _ := gateway.IdentityFromContext(r.Context())
+	return iam.AdminAuditInput{ActorPublicID: identity.AccountID, IP: h.ClientIP.Resolve(r), RequestID: httpx.RequestIDFromContext(r.Context())}
+}
+
+func adminUsers(users []iam.AdminUser) []gen.AdminUser {
+	result := make([]gen.AdminUser, 0, len(users))
+	for _, user := range users {
+		result = append(result, adminUser(user))
+	}
+	return result
+}
+
+func adminUser(user iam.AdminUser) gen.AdminUser {
+	return gen.AdminUser{
+		PublicId: user.PublicID, Name: user.Name, Email: openapi_types.Email(user.Email),
+		Role: gen.AdminUserRole(user.Role), DataScope: user.DataScope,
+		Status: gen.AdminUserStatus(user.Status), LastLoginAt: user.LastLoginAt, CreatedAt: user.CreatedAt,
+	}
+}
+
+func (h Handler) adminRBACAccess(w http.ResponseWriter, r *http.Request, required string) bool {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return false
+	}
+	if identity.Role != gateway.RoleAdmin || h.AdminPermissions == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	allowed, err := h.AdminPermissions.Can(r.Context(), identity.AccountID, "rbac", required)
+	if err != nil || !allowed {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	return true
+}
+
 func (h Handler) walletTransactions(w http.ResponseWriter, r *http.Request, end string) {
 	owner, ok := h.walletOwner(w, r, end)
 	if !ok {
@@ -427,6 +642,100 @@ func (h Handler) PostTelegramAuth(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteOK(w, r, result)
 }
 
+func (h Handler) PostAdminAuthLogin(w http.ResponseWriter, r *http.Request) {
+	if h.AdminLogin == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	body, ok := decodeJSON[gen.AdminLoginRequest](w, r)
+	if !ok || body.Email == "" || body.Password == "" || body.TotpCode == "" {
+		if ok {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	device := ""
+	if body.DeviceId != nil {
+		device = *body.DeviceId
+	}
+	result, err := h.AdminLogin.Login(r.Context(), iam.AdminLoginInput{Email: string(body.Email), Password: body.Password, TOTPCode: body.TotpCode, DeviceID: device, IP: h.ClientIP.Resolve(r), RequestID: httpx.RequestIDFromContext(r.Context())})
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "drlife_admin_refresh", Value: result.RefreshToken, Path: "/v1/admin/auth", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
+	httpx.WriteOK(w, r, gen.AdminLoginData{AccessToken: result.AccessToken, AccessExpiresIn: result.AccessExpiresIn})
+}
+
+func (h Handler) PostAdminAuthRefresh(w http.ResponseWriter, r *http.Request, _ gen.PostAdminAuthRefreshParams) {
+	if h.Sessions == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	cookie, err := r.Cookie("drlife_admin_refresh")
+	if err != nil || cookie.Value == "" {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return
+	}
+	result, err := h.Sessions.RefreshEndpoint(r.Context(), cookie.Value, h.ClientIP.Resolve(r), true)
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: "drlife_admin_refresh", Value: result.RefreshToken, Path: "/v1/admin/auth", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode})
+	httpx.WriteOK(w, r, gen.AdminLoginData{AccessToken: result.AccessToken, AccessExpiresIn: result.AccessExpiresIn})
+}
+
+func (h Handler) PostAdminAuthStepUp(w http.ResponseWriter, r *http.Request) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok || identity.Role != gateway.RoleAdmin || h.AdminStepUp == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return
+	}
+	body, valid := decodeJSON[adminStepUpRequest](w, r)
+	if !valid || body.TOTPCode == "" || body.Scope == "" {
+		if valid {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	result, err := h.AdminStepUp.Issue(r.Context(), identity.AccountID, identity.SessionID, body.TOTPCode, body.Scope, h.ClientIP.Resolve(r), httpx.RequestIDFromContext(r.Context()))
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, result)
+}
+
+func (h Handler) ChangeAdminPassword(w http.ResponseWriter, r *http.Request) {
+	identity, authenticated := gateway.IdentityFromContext(r.Context())
+	if !authenticated || identity.Role != gateway.RoleAdmin {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return
+	}
+	if h.AdminPassword == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	body, ok := decodeJSON[gen.ChangeAdminPasswordJSONRequestBody](w, r)
+	if !ok || body.CurrentPassword == "" || body.NewPassword == "" || body.TotpCode == "" {
+		if ok {
+			httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		}
+		return
+	}
+	err := h.AdminPassword.Change(r.Context(), iam.AdminPasswordChangeInput{
+		AdminPublicID: identity.AccountID, SessionPublicID: identity.SessionID,
+		CurrentPassword: body.CurrentPassword, NewPassword: body.NewPassword, TOTPCode: body.TotpCode,
+		IP: h.ClientIP.Resolve(r), RequestID: httpx.RequestIDFromContext(r.Context()),
+	})
+	if err != nil {
+		httpx.WriteError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, map[string]bool{"changed": true})
+}
+
 func (h Handler) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {
 	if h.Sessions == nil {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
@@ -439,7 +748,7 @@ func (h Handler) PostAuthRefresh(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	result, err := h.Sessions.Refresh(r.Context(), body.RefreshToken, h.ClientIP.Resolve(r))
+	result, err := h.Sessions.RefreshEndpoint(r.Context(), body.RefreshToken, h.ClientIP.Resolve(r), false)
 	if err != nil {
 		httpx.WriteError(w, r, err)
 		return
@@ -1035,6 +1344,10 @@ func (h Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	code := httpx.CodeInternalError
 	var invalid *catalog.ValidationError
 	switch {
+	case errors.Is(err, iam.ErrAdminNotFound):
+		code = httpx.CodeResourceNotFound
+	case errors.Is(err, iam.ErrAdminSelfMutation), errors.Is(err, iam.ErrLastActiveSuper):
+		code = httpx.CodeAlreadyProcessed
 	case errors.Is(err, iam.ErrAccountLinkNotFound):
 		code = httpx.CodeResourceNotFound
 	case errors.Is(err, iam.ErrAccountLinkForbidden):

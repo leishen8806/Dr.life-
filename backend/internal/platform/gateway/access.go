@@ -68,6 +68,10 @@ func Authorize(publicWebhookPrefix string) func(http.Handler) http.Handler {
 				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
 				return
 			}
+			if identity.PasswordChangeOnly && r.URL.Path != "/v1/admin/auth/password" {
+				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+				return
+			}
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -79,6 +83,9 @@ func writeUnauthenticated(w http.ResponseWriter, r *http.Request) {
 }
 
 func classifyPath(path, publicWebhookPrefix string) audience {
+	if path == "/v1/admin/auth/login" || path == "/v1/admin/auth/refresh" {
+		return audience{public: true, known: true}
+	}
 	// RouteFit has one public, signature-verified callback. Do not widen this
 	// exception to the integrations prefix: all other integration paths fail
 	// closed at the gateway.
@@ -107,7 +114,7 @@ func classifyPath(path, publicWebhookPrefix string) audience {
 
 func unsafePath(r *http.Request) bool {
 	path := r.URL.Path
-	if strings.ToLower(path) != path || strings.Contains(path, "//") || strings.Contains(path, "\\") || r.URL.RawPath != "" {
+	if strings.Contains(path, "//") || strings.Contains(path, "\\") || r.URL.RawPath != "" {
 		return true
 	}
 	for _, segment := range strings.Split(path, "/") {

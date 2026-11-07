@@ -3,6 +3,7 @@ package api_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	api "github.com/leishen8806/Dr.life-/backend/internal/api"
+	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
@@ -48,6 +50,127 @@ func (f *fakeFiles) Complete(context.Context, int64, string) (files.File, error)
 }
 func (f *fakeFiles) DownloadURL(context.Context, int64, string) (storage.SignedURL, error) {
 	return storage.SignedURL{}, f.downloadErr
+}
+
+type fakeAdminLogin struct {
+	input  iam.AdminLoginInput
+	result iam.AdminLoginResult
+	err    error
+}
+
+type fakeAdminRefresh struct {
+	input  string
+	ip     string
+	result iam.RefreshResult
+	err    error
+}
+
+type fakeAdminStepUp struct {
+	adminID, code, scope, ip, requestID string
+	result                              iam.AdminStepUpResult
+	err                                 error
+}
+
+type adminStepUpAuthenticator struct{}
+
+func (adminStepUpAuthenticator) Authenticate(*http.Request) (gateway.Identity, bool, error) {
+	return gateway.Identity{AccountID: "admin-account", Role: gateway.RoleAdmin, SessionID: "admin-session"}, true, nil
+}
+
+func (f *fakeAdminStepUp) Issue(_ context.Context, adminID, _ string, code, scope, ip, requestID string) (iam.AdminStepUpResult, error) {
+	f.adminID, f.code, f.scope, f.ip, f.requestID = adminID, code, scope, ip, requestID
+	return f.result, f.err
+}
+
+func (f *fakeAdminRefresh) Refresh(_ context.Context, token, ip string) (iam.RefreshResult, error) {
+	f.input, f.ip = token, ip
+	return f.result, f.err
+}
+
+func (f *fakeAdminRefresh) RefreshEndpoint(ctx context.Context, token, ip string, _ bool) (iam.RefreshResult, error) {
+	return f.Refresh(ctx, token, ip)
+}
+
+func (*fakeAdminRefresh) ListSessions(context.Context, string) ([]iam.SessionInfo, error) {
+	return nil, nil
+}
+func (*fakeAdminRefresh) RevokeSession(context.Context, string, string, string) error { return nil }
+
+func (f *fakeAdminLogin) Login(_ context.Context, input iam.AdminLoginInput) (iam.AdminLoginResult, error) {
+	f.input = input
+	return f.result, f.err
+}
+
+func TestAdminLoginHandlerSetsHostOnlyRefreshCookieAndUnifiesFailures(t *testing.T) {
+	fake := &fakeAdminLogin{result: iam.AdminLoginResult{AccessToken: "access", AccessExpiresIn: 600, RefreshToken: "refresh"}}
+	req := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/login", strings.NewReader(`{"email":"admin@example.com","password":"not-logged","totp_code":"123456","device_id":"web:1"}`))
+	req.RemoteAddr = "198.51.100.7:42"
+	w := httptest.NewRecorder()
+	httpx.RequestID(http.HandlerFunc((api.Handler{AdminLogin: fake}).PostAdminAuthLogin)).ServeHTTP(w, req)
+	if w.Code != http.StatusOK || fake.input.IP != "198.51.100.7" || fake.input.Password != "not-logged" {
+		t.Fatalf("status/input=%d %+v", w.Code, fake.input)
+	}
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != "drlife_admin_refresh" || cookies[0].Path != "/v1/admin/auth" || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteStrictMode || cookies[0].Domain != "" {
+		t.Fatalf("cookie=%+v", cookies)
+	}
+	fake.err = httpx.NewAppError(httpx.CodeTelegramLoginFailed)
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/v1/admin/auth/login", strings.NewReader(`{"email":"admin@example.com","password":"secret","totp_code":"000000"}`))
+	httpx.RequestID(http.HandlerFunc((api.Handler{AdminLogin: fake}).PostAdminAuthLogin)).ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), `"code":2005`) || strings.Contains(w.Body.String(), "secret") {
+		t.Fatalf("body=%s", w.Body.String())
+	}
+}
+
+func TestAdminRefreshHandlerUsesHostOnlyCookieAndDoesNotExposeRefreshToken(t *testing.T) {
+	fake := &fakeAdminRefresh{result: iam.RefreshResult{AccessToken: "new-access", AccessExpiresIn: 600, RefreshToken: "new-refresh"}}
+	req := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/refresh", nil)
+	req.RemoteAddr = "198.51.100.7:42"
+	req.AddCookie(&http.Cookie{Name: "drlife_admin_refresh", Value: "old-refresh"})
+	w := httptest.NewRecorder()
+	handler := api.Handler{Sessions: fake}
+	httpx.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler.PostAdminAuthRefresh(w, r, gen.PostAdminAuthRefreshParams{})
+	})).ServeHTTP(w, req)
+	if w.Code != http.StatusOK || fake.input != "old-refresh" || fake.ip != "198.51.100.7" {
+		t.Fatalf("status/input=%d token=%q ip=%q", w.Code, fake.input, fake.ip)
+	}
+	if strings.Contains(w.Body.String(), "new-refresh") || !strings.Contains(w.Body.String(), "new-access") {
+		t.Fatalf("body=%s", w.Body.String())
+	}
+	cookies := w.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Name != "drlife_admin_refresh" || cookies[0].Value != "new-refresh" || cookies[0].Path != "/v1/admin/auth" || !cookies[0].HttpOnly || !cookies[0].Secure || cookies[0].SameSite != http.SameSiteStrictMode || cookies[0].Domain != "" {
+		t.Fatalf("cookie=%+v", cookies)
+	}
+}
+
+func TestAdminStepUpHandlerRequiresAdminIdentityAndNeverLeaksTokenOnFailure(t *testing.T) {
+	fake := &fakeAdminStepUp{result: iam.AdminStepUpResult{Token: "step-up-token", Scope: "withdrawal_review", ExpiresAt: time.Unix(1_800_000_300, 0)}}
+	handler := api.Handler{AdminStepUp: fake}
+	request := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/step-up", strings.NewReader(`{"totp_code":"123456","scope":"withdrawal_review"}`))
+	request.RemoteAddr = "198.51.100.7:42"
+	w := httptest.NewRecorder()
+	endpoint := httpx.RequestID(gateway.Authenticate(adminStepUpAuthenticator{}, "")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.PostAdminAuthStepUp(w, r) })))
+	endpoint.ServeHTTP(w, request)
+	if w.Code != http.StatusOK || fake.adminID != "admin-account" || fake.code != "123456" || fake.scope != "withdrawal_review" || !strings.Contains(w.Body.String(), "step-up-token") {
+		t.Fatalf("status=%d input=%+v body=%s", w.Code, fake, w.Body.String())
+	}
+	fake.err = httpx.NewAppError(httpx.CodeTelegramLoginFailed)
+	w = httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/v1/admin/auth/step-up", strings.NewReader(`{"totp_code":"123456","scope":"withdrawal_review"}`))
+	request.RemoteAddr = "198.51.100.7:42"
+	endpoint.ServeHTTP(w, request)
+	if w.Code != http.StatusUnauthorized || strings.Contains(w.Body.String(), "step-up-token") {
+		t.Fatalf("failure body=%s", w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/v1/admin/auth/step-up", strings.NewReader(`{"totp_code":"","scope":""}`))
+	request.RemoteAddr = "198.51.100.7:42"
+	endpoint.ServeHTTP(w, request)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("empty step-up fields status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 type fakeAccountLinks struct {
@@ -533,6 +656,86 @@ func (f fakeAdminPermissions) HasDataScope(context.Context, string) (bool, error
 	return f.scoped, nil
 }
 
+type fakeAdminManagement struct {
+	users       []iam.AdminUser
+	created     iam.AdminCreateResult
+	createIn    iam.AdminCreateInput
+	auditIn     iam.AdminAuditInput
+	createCalls int
+}
+
+type fakeAdminPassword struct {
+	input iam.AdminPasswordChangeInput
+	err   error
+}
+
+func (f *fakeAdminPassword) Change(_ context.Context, input iam.AdminPasswordChangeInput) error {
+	f.input = input
+	return f.err
+}
+
+func (f fakeAdminManagement) List(context.Context, string, int) ([]iam.AdminUser, string, error) {
+	return f.users, "", nil
+}
+
+func (f fakeAdminManagement) Get(_ context.Context, publicID string) (iam.AdminUser, bool, error) {
+	for _, user := range f.users {
+		if user.PublicID == publicID {
+			return user, true, nil
+		}
+	}
+	return iam.AdminUser{}, false, nil
+}
+
+func (f *fakeAdminManagement) CreateWithAudit(_ context.Context, input iam.AdminCreateInput, auditInput iam.AdminAuditInput) (iam.AdminCreateResult, error) {
+	f.createCalls++
+	f.createIn = input
+	f.auditIn = auditInput
+	return f.created, nil
+}
+
+func (f *fakeAdminManagement) DisableWithAudit(_ context.Context, publicID, _ string, auditInput iam.AdminAuditInput) (iam.AdminUser, error) {
+	f.auditIn = auditInput
+	for _, user := range f.users {
+		if user.PublicID == publicID {
+			user.Status = iam.AdminStatus("disabled")
+			return user, nil
+		}
+	}
+	return iam.AdminUser{}, errors.New("not found")
+}
+
+func (f *fakeAdminManagement) EnableWithAudit(_ context.Context, publicID string, auditInput iam.AdminAuditInput) (iam.AdminUser, error) {
+	f.auditIn = auditInput
+	for _, user := range f.users {
+		if user.PublicID == publicID {
+			user.Status = iam.AdminStatusActive
+			return user, nil
+		}
+	}
+	return iam.AdminUser{}, errors.New("not found")
+}
+
+func (f *fakeAdminManagement) UpdateRoleWithAudit(_ context.Context, publicID string, role iam.Role, scope []string, auditInput iam.AdminAuditInput) (iam.AdminUser, error) {
+	f.auditIn = auditInput
+	for _, user := range f.users {
+		if user.PublicID == publicID {
+			user.Role, user.DataScope = role, scope
+			return user, nil
+		}
+	}
+	return iam.AdminUser{}, errors.New("not found")
+}
+
+type fakeStepUpVerifier struct{ scope string }
+
+func (f fakeStepUpVerifier) Verify(_ context.Context, token, scope, _, _ string) (string, error) {
+	if scope != f.scope {
+		return "", errors.New("unexpected scope")
+	}
+	return token, nil
+}
+
 func ledgerHandler(auth gateway.Authenticator, reader api.LedgerReader, directory api.AccountDirectory, permissions api.AdminPermissionChecker) http.Handler {
 	return server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: auth, Ledger: reader, Directory: directory, AdminPermissions: permissions})
 }
@@ -568,6 +771,153 @@ func TestFinancialCenterUsesAuthorizedLedgerReader(t *testing.T) {
 	}
 	if reader.financial.From != time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC) || reader.financial.To != time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC) || reader.financial.MerchantLimit != 25 {
 		t.Fatalf("filter=%+v", reader.financial)
+	}
+}
+
+func TestAdminManagementListRequiresRBACViewAndOmitsCredentials(t *testing.T) {
+	manager := fakeAdminManagement{users: []iam.AdminUser{{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAA", Name: "Admin", Email: "admin@example.test", Role: iam.RoleSupport, Status: iam.AdminStatusActive, CreatedAt: time.Unix(1_800_000_000, 0)}}}
+	denied := server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, AdminPermissions: fakeAdminPermissions{allowed: false}, AdminManagement: &manager})
+	if got := serve(t, denied, httptest.NewRequest(http.MethodGet, "/v1/admin/admins", nil)); got.Code != http.StatusForbidden {
+		t.Fatalf("without rbac view status=%d body=%s", got.Code, got.Body.String())
+	}
+	allowed := server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, AdminPermissions: fakeAdminPermissions{allowed: true}, AdminManagement: &manager})
+	got := serve(t, allowed, httptest.NewRequest(http.MethodGet, "/v1/admin/admins?limit=50", nil))
+	if got.Code != http.StatusOK || !strings.Contains(got.Body.String(), "admin@example.test") || strings.Contains(got.Body.String(), "password_hash") || strings.Contains(got.Body.String(), "totp_secret_enc") {
+		t.Fatalf("list response status=%d body=%s", got.Code, got.Body.String())
+	}
+}
+
+func TestGetAdminUserRequiresRBACView(t *testing.T) {
+	manager := fakeAdminManagement{users: []iam.AdminUser{{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAB", Name: "Admin", Email: "admin@example.test", Role: iam.RoleSupport, Status: iam.AdminStatusActive, CreatedAt: time.Unix(1_800_000_000, 0)}}}
+	newHandler := func(allowed bool) http.Handler {
+		return server.NewHandlerWithGateway(nil, server.GatewayOptions{AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(), Authenticator: stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}}, AdminPermissions: fakeAdminPermissions{allowed: allowed}, AdminManagement: &manager})
+	}
+	path := "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB"
+	if got := serve(t, newHandler(false), httptest.NewRequest(http.MethodGet, path, nil)); got.Code != http.StatusForbidden {
+		t.Fatalf("without rbac view status=%d body=%s", got.Code, got.Body.String())
+	}
+	if got := serve(t, newHandler(true), httptest.NewRequest(http.MethodGet, path, nil)); got.Code != http.StatusOK || strings.Contains(got.Body.String(), "password_hash") || strings.Contains(got.Body.String(), "totp_secret_enc") {
+		t.Fatalf("get status=%d body=%s", got.Code, got.Body.String())
+	}
+}
+
+func TestAdminManagementCreateRequiresEditStepUpAndIdempotency(t *testing.T) {
+	manager := &fakeAdminManagement{created: iam.AdminCreateResult{
+		Admin:           iam.AdminUser{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAB", Name: "Created", Email: "created@example.test", Role: iam.RoleSupport, Status: iam.AdminStatusActive, CreatedAt: time.Unix(1_800_000_000, 0)},
+		InitialPassword: "bootstrap-password-only", TOTPProvisioningURI: "otpauth://totp/Dr.life%2B:created@example.test?secret=ABC",
+	}}
+	newHandler := func(allowed bool) http.Handler {
+		return server.NewHandlerWithGateway(nil, server.GatewayOptions{
+			AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+			Authenticator:    stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}},
+			AdminPermissions: fakeAdminPermissions{allowed: allowed}, AdminManagement: manager,
+			AdminStepUpVerifier: fakeStepUpVerifier{scope: "permission_change"}, AdminStepUpJTIStore: gateway.NewMemoryJTIStore(),
+		})
+	}
+	request := func(stepUp, idem string) *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/v1/admin/admins", strings.NewReader(`{"name":"Created","email":"created@example.test","role":"cs","data_scope":["KH-PP"]}`))
+		r.Header.Set("Content-Type", "application/json")
+		if stepUp != "" {
+			r.Header.Set("X-Step-Up-Token", stepUp)
+		}
+		if idem != "" {
+			r.Header.Set("Idempotency-Key", idem)
+		}
+		return r
+	}
+	if got := serve(t, newHandler(false), request("valid", "create-denied")); got.Code != http.StatusForbidden {
+		t.Fatalf("without rbac edit status=%d body=%s", got.Code, got.Body.String())
+	}
+	if got := serve(t, newHandler(true), request("", "create-missing-stepup")); got.Code != http.StatusUnauthorized {
+		t.Fatalf("without step-up status=%d body=%s", got.Code, got.Body.String())
+	}
+	if got := serve(t, newHandler(true), request("valid", "")); got.Code != http.StatusBadRequest {
+		t.Fatalf("without idempotency key status=%d body=%s", got.Code, got.Body.String())
+	}
+	got := serve(t, newHandler(true), request("valid", "create-success"))
+	if got.Code != http.StatusCreated || !strings.Contains(got.Body.String(), "bootstrap-password-only") || !strings.Contains(got.Body.String(), "otpauth://") || manager.createIn.Role != iam.RoleSupport || manager.auditIn.ActorPublicID != "admin" || manager.auditIn.RequestID == "" {
+		t.Fatalf("create status=%d input=%+v body=%s", got.Code, manager.createIn, got.Body.String())
+	}
+	store := gateway.NewMemoryIdempotencyStore()
+	jti := gateway.NewMemoryJTIStore()
+	handler := server.NewHandlerWithGateway(nil, server.GatewayOptions{
+		AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+		Authenticator:    stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin, SessionID: "admin-session"}},
+		AdminPermissions: fakeAdminPermissions{allowed: true}, AdminManagement: manager,
+		AdminStepUpVerifier: fakeStepUpVerifier{scope: "permission_change"}, AdminStepUpJTIStore: jti,
+		Idempotency: gateway.IdempotencyOptions{Store: store},
+	})
+	manager.createCalls = 0
+	first := serve(t, handler, request("stepup_1", "create-replay"))
+	replay := serve(t, handler, request("stepup_2", "create-replay"))
+	if first.Code != http.StatusCreated || replay.Code != http.StatusConflict || replay.Header().Get("Idempotent-Replayed") != "true" || strings.Contains(replay.Body.String(), "bootstrap-password-only") || strings.Contains(replay.Body.String(), "otpauth://") || manager.createCalls != 1 {
+		t.Fatalf("first=%d replay=%d calls=%d replay_body=%s", first.Code, replay.Code, manager.createCalls, replay.Body.String())
+	}
+}
+
+func TestAdminManagementMutationRoutesRequireRBACAndStepUp(t *testing.T) {
+	manager := &fakeAdminManagement{users: []iam.AdminUser{{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAB", Name: "Target", Email: "target@example.test", Role: iam.RoleSupport, Status: iam.AdminStatusActive, CreatedAt: time.Unix(1_800_000_000, 0)}}}
+	newHandler := func(allowed bool) http.Handler {
+		return server.NewHandlerWithGateway(nil, server.GatewayOptions{
+			AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+			Authenticator:    stubAuth{identity: gateway.Identity{AccountID: "admin", Role: gateway.RoleAdmin}},
+			AdminPermissions: fakeAdminPermissions{allowed: allowed}, AdminManagement: manager,
+			AdminStepUpVerifier: fakeStepUpVerifier{scope: "permission_change"}, AdminStepUpJTIStore: gateway.NewMemoryJTIStore(),
+		})
+	}
+	request := func(method, path, body, stepUp, idem string) *http.Request {
+		r := httptest.NewRequest(method, path, strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		if stepUp != "" {
+			r.Header.Set("X-Step-Up-Token", stepUp)
+		}
+		if idem != "" {
+			r.Header.Set("Idempotency-Key", idem)
+		}
+		return r
+	}
+
+	if got := serve(t, newHandler(false), request(http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`, "valid", "disable-denied")); got.Code != http.StatusForbidden {
+		t.Fatalf("without rbac edit status=%d body=%s", got.Code, got.Body.String())
+	}
+	if got := serve(t, newHandler(true), request(http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`, "", "disable-stepup")); got.Code != http.StatusUnauthorized {
+		t.Fatalf("without step-up status=%d body=%s", got.Code, got.Body.String())
+	}
+	for _, tc := range []struct {
+		method, path, body, token string
+	}{
+		{http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/disable", `{"reason":"review"}`, "disable-stepup-ok"},
+		{http.MethodPost, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/enable", ``, "enable-stepup-ok"},
+		{http.MethodPatch, "/v1/admin/admins/01ARZ3NDEKTSV4RRFFQ69G5FAB/role", `{"role":"ops","data_scope":["KH-PP"]}`, "role-stepup-ok"},
+	} {
+		if got := serve(t, newHandler(true), request(tc.method, tc.path, tc.body, tc.token, "mutation-success")); got.Code != http.StatusOK {
+			t.Fatalf("%s %s status=%d body=%s", tc.method, tc.path, got.Code, got.Body.String())
+		}
+	}
+}
+
+func TestChangeAdminPasswordUsesAuthenticatedRestrictedSession(t *testing.T) {
+	passwords := &fakeAdminPassword{}
+	newHandler := func(identity gateway.Identity) http.Handler {
+		return server.NewHandlerWithGateway(nil, server.GatewayOptions{
+			AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+			Authenticator: stubAuth{identity: identity}, AdminPassword: passwords,
+			IdempotencyExempt: func(r *http.Request) bool { return r.URL.Path == "/v1/admin/auth/password" },
+		})
+	}
+	request := func() *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/password", strings.NewReader(`{"current_password":"old-password","new_password":"a-very-long-new-password","totp_code":"123456"}`))
+		r.Header.Set("Content-Type", "application/json")
+		return r
+	}
+	if got := serve(t, newHandler(gateway.Identity{AccountID: "admin-1", Role: gateway.RoleAdmin, SessionID: "session-1", PasswordChangeOnly: true}), request()); got.Code != http.StatusOK || passwords.input.AdminPublicID != "admin-1" || passwords.input.SessionPublicID != "session-1" || passwords.input.RequestID == "" {
+		t.Fatalf("restricted password change status=%d input=%+v body=%s", got.Code, passwords.input, got.Body.String())
+	}
+	if got := serve(t, newHandler(gateway.Identity{AccountID: "admin-1", Role: gateway.RoleAdmin, SessionID: "session-1"}), request()); got.Code != http.StatusOK {
+		t.Fatalf("normal admin password change status=%d body=%s", got.Code, got.Body.String())
+	}
+	if got := serve(t, newHandler(gateway.Identity{AccountID: "buyer-1", Role: gateway.RoleBuyer, SessionID: "session-1"}), request()); got.Code != http.StatusForbidden {
+		t.Fatalf("non-admin password change status=%d body=%s", got.Code, got.Body.String())
 	}
 }
 
@@ -898,15 +1248,15 @@ func TestPublicSuggestRejectsOverlongQueryBeforeCatalogStoreAccess(t *testing.T)
 
 // 网关（unsafePath）拒绝含大写字母的路径，所以 public_id 在 URL 里必须是小写
 // （见 handler.publicIDFromPath）。这里钉住该约束，避免以后有人直接拼规范大写 ULID。
-func TestUppercasePublicIDInPathIsRejectedByTheGateway(t *testing.T) {
+func TestUppercasePublicIDInPathReachesTheGatewayRouteMatcher(t *testing.T) {
 	handler := catalogHandler(&stubStore{}, activeDirectory(), merchantAuth())
 
 	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/merchant/products/"+merchantULID, nil))
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403; body=%s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404; body=%s", recorder.Code, recorder.Body.String())
 	}
-	if code := decodeErrorCode(t, recorder); code != 2002 {
-		t.Fatalf("code = %d, want 2002", code)
+	if code := decodeErrorCode(t, recorder); code != 1003 {
+		t.Fatalf("code = %d, want 1003", code)
 	}
 }
 func validCreateBody() string {

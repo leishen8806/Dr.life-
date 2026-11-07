@@ -8,9 +8,12 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"runtime"
@@ -23,27 +26,95 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/pquerna/otp/totp"
 	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 )
 
+type testAdminSecurity struct {
+	mu     sync.Mutex
+	counts map[string]int
+	used   map[string]bool
+}
+
+func (s *testAdminSecurity) ReserveAttempt(_ context.Context, account, ip string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.counts == nil {
+		s.counts = make(map[string]int)
+	}
+	if s.counts["a:"+account] >= adminLoginFailureLimit || s.counts["i:"+ip] >= adminLoginIPFailureLimit {
+		return false, nil
+	}
+	s.counts["a:"+account]++
+	s.counts["i:"+ip]++
+	return true, nil
+}
+
+func (s *testAdminSecurity) Locked(_ context.Context, account, ip string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.counts["a:"+account] >= adminLoginFailureLimit || s.counts["i:"+ip] >= adminLoginIPFailureLimit, nil
+}
+
+func (s *testAdminSecurity) ClearAccountFailures(_ context.Context, account, ip string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.counts, "a:"+account)
+	if s.counts["i:"+ip] > 1 {
+		s.counts["i:"+ip]--
+	} else {
+		delete(s.counts, "i:"+ip)
+	}
+	return nil
+}
+
+func (s *testAdminSecurity) ConsumeTOTP(_ context.Context, adminID string, step int64, _ time.Duration) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.used == nil {
+		s.used = make(map[string]bool)
+	}
+	key := fmt.Sprintf("%s:%d", adminID, step)
+	if s.used[key] {
+		return false, nil
+	}
+	s.used[key] = true
+	return true, nil
+}
+
 type loginFixture struct {
-	pool     *pgxpool.Pool
-	dsn      string
-	envelope *secrets.Envelope
-	keys     *secrets.Keyring
-	now      time.Time
-	source   *telegram.DBPoolSource
-	service  *Service
-	tokens   map[telegram.End][]string
-	cache    *testSessionCache
+	pool      *pgxpool.Pool
+	auditPool *pgxpool.Pool
+	dsn       string
+	envelope  *secrets.Envelope
+	keys      *secrets.Keyring
+	now       time.Time
+	source    *telegram.DBPoolSource
+	service   *Service
+	tokens    map[telegram.End][]string
+	cache     *testSessionCache
+}
+
+type stepUpAuditWriter struct{ entries []platformaudit.Entry }
+
+func (w *stepUpAuditWriter) Append(_ context.Context, entry platformaudit.Entry) (platformaudit.Record, error) {
+	w.entries = append(w.entries, entry)
+	return platformaudit.Record{}, nil
+}
+
+type failingAdminAuditWriter struct{}
+
+func (failingAdminAuditWriter) Append(context.Context, platformaudit.Entry) (platformaudit.Record, error) {
+	return platformaudit.Record{}, errors.New("audit unavailable")
 }
 
 func TestTelegramLoginIntegration(t *testing.T) {
@@ -85,6 +156,12 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	if _, err := adminPool.Exec(ctx, `GRANT iam_rw TO app_iam_login_test`); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := adminPool.Exec(ctx, `CREATE ROLE app_audit_login_test LOGIN PASSWORD 'test-only'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adminPool.Exec(ctx, `GRANT audit_writer TO app_audit_login_test`); err != nil {
+		t.Fatal(err)
+	}
 	iamURL, err := url.Parse(dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -95,6 +172,13 @@ func TestTelegramLoginIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
+	auditURL := *iamURL
+	auditURL.User = url.UserPassword("app_audit_login_test", "test-only")
+	auditPool, err := pgxpool.New(ctx, auditURL.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(auditPool.Close)
 	master := make([]byte, 32)
 	signing := make([]byte, 32)
 	_, _ = rand.Read(master)
@@ -103,7 +187,7 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	jwtRing, _ := secrets.NewKeyring(map[string][]byte{"test": signing}, "test")
 	envelope, _ := secrets.NewEnvelope(masterRing)
 	now := time.Unix(1_800_000_000, 0)
-	f := &loginFixture{pool: pool, dsn: iamURL.String(), envelope: envelope, keys: jwtRing, now: now, tokens: map[telegram.End][]string{
+	f := &loginFixture{pool: pool, auditPool: auditPool, dsn: iamURL.String(), envelope: envelope, keys: jwtRing, now: now, tokens: map[telegram.End][]string{
 		telegram.Buyer: {"buyer-primary-token", "buyer-standby-token"}, telegram.Merchant: {"merchant-primary-token"}, telegram.Driver: {"driver-primary-token"},
 	}}
 	f.seedBots(t, ctx)
@@ -122,9 +206,70 @@ func TestTelegramLoginIntegration(t *testing.T) {
 	t.Run("failure ban expires", f.testFailureBan)
 	t.Run("refresh plaintext is absent", f.testRefreshNotStored)
 	t.Run("refresh rotation concurrency reuse and revocation", f.testSessionLifecycle)
+	t.Run("admin refresh rotation uses the shared session storage", f.testAdminSessionRefresh)
+	t.Run("admin password TOTP login locks per account and IP", f.testAdminPasswordLogin)
+	t.Run("admin first password login issues a restricted access token", f.testAdminFirstPasswordLogin)
+	t.Run("admin password change clears restriction and revokes other sessions", f.testAdminPasswordChange)
+	t.Run("admin creation returns bootstrap credentials only once", f.testAdminManagementCreate)
+	t.Run("admin status and role changes revoke sessions and audit", f.testAdminManagementStatusAndRole)
+	t.Run("admin step-up rejects replay and unauthorized scopes", f.testAdminStepUp)
+	t.Run("admin audit outbox dedupes concurrent delivery", f.testAdminAuditOutboxConcurrentDelivery)
 	t.Run("session ownership cache rebuild and fail policy", f.testSessionAccess)
 	t.Run("account language profile and safe devices", f.testAccountLanguageProfileAndSafeDevices)
 	t.Run("account status changes revoke sessions", f.testAccountStatus)
+}
+
+func (f *loginFixture) testAdminAuditOutboxConcurrentDelivery(t *testing.T) {
+	ctx := context.Background()
+	tx, err := f.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicID, err := queueAdminAudit(ctx, tx, platformaudit.Entry{Time: f.now, ActorID: 1, ActorRole: "admin", Action: platformaudit.ActionLogin, Target: "admin:outbox-race", Detail: []byte(`{"result":"failed"}`), IP: "198.51.100.9", RequestID: "outbox-race"})
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	writer := &platformaudit.Store{DB: f.auditPool}
+	var wg sync.WaitGroup
+	for range 12 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := deliverAdminAudit(ctx, f.pool, writer, publicID); err != nil {
+				t.Errorf("deliver: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+	var logs, seen int
+	if err := f.auditPool.QueryRow(ctx, `SELECT count(*) FROM audit.log WHERE target='admin:outbox-race'`).Scan(&logs); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.auditPool.QueryRow(ctx, `SELECT count(*) FROM audit.event_seen WHERE event_id=$1`, publicID).Scan(&seen); err != nil {
+		t.Fatal(err)
+	}
+	if logs != 1 || seen != 1 {
+		t.Fatalf("audit logs=%d event_seen=%d, want one idempotent append", logs, seen)
+	}
+	var cleanupIndex string
+	if err := f.pool.QueryRow(ctx, `SELECT indexdef FROM pg_indexes WHERE schemaname='iam' AND indexname='ix_admin_audit_outbox_delivered'`).Scan(&cleanupIndex); err != nil || !strings.Contains(cleanupIndex, "delivered_at") || !strings.Contains(cleanupIndex, "WHERE (delivered_at IS NOT NULL)") {
+		t.Fatalf("outbox cleanup index=%q err=%v, want partial delivered_at index", cleanupIndex, err)
+	}
+	oldID := mustULID(t)
+	if _, err := f.pool.Exec(ctx, `
+		INSERT INTO iam.admin_audit_outbox(public_id,occurred_at,actor_id,actor_role,action,target,detail,request_id,delivered_at)
+		VALUES($1,clock_timestamp()-interval '31 days',1,'admin','auth.login','admin:cleanup','{}','outbox-cleanup',clock_timestamp()-interval '31 days')`, oldID); err != nil {
+		t.Fatal(err)
+	}
+	flushAdminAuditOutbox(ctx, f.pool, writer)
+	var retained int
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.admin_audit_outbox WHERE public_id=$1`, oldID).Scan(&retained); err != nil || retained != 0 {
+		t.Fatalf("expired delivered outbox rows=%d err=%v, want cleanup", retained, err)
+	}
 }
 
 func (f *loginFixture) testAccountLanguageProfileAndSafeDevices(t *testing.T) {
@@ -192,6 +337,382 @@ func (f *loginFixture) testAccountLanguageProfileAndSafeDevices(t *testing.T) {
 	devices, err = profiles.Devices(ctx, first.Account.PublicID, noDeviceSession)
 	if err != nil || len(devices) != 2 || devices[0].IsCurrent || devices[1].IsCurrent {
 		t.Fatalf("no-device session devices=%+v err=%v", devices, err)
+	}
+}
+
+func (f *loginFixture) testAdminManagementCreate(t *testing.T) {
+	ctx := context.Background()
+	audit := &stepUpAuditWriter{}
+	service := &AdminManagementService{DB: f.pool, Cipher: f.envelope, Audit: audit, Now: func() time.Time { return f.now }}
+	actor, err := service.Create(ctx, AdminCreateInput{
+		Name: "Audit Actor", Email: "audit-actor@example.test", Role: RoleSuper,
+		DataScope: []string{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := service.CreateWithAudit(ctx, AdminCreateInput{
+		Name: "Created Admin", Email: "created-admin@example.test", Role: RoleSupport,
+		DataScope: []string{"KH-PP"},
+	}, AdminAuditInput{ActorPublicID: actor.Admin.PublicID, IP: "198.51.100.20", RequestID: "admin-create-audit"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Admin.PublicID == "" || created.InitialPassword == "" || len(created.InitialPassword) < 20 || created.TOTPProvisioningURI == "" {
+		t.Fatalf("unexpected creation result: %+v", created)
+	}
+	if !strings.HasPrefix(created.TOTPProvisioningURI, "otpauth://totp/") {
+		t.Fatalf("unexpected provisioning URI: %q", created.TOTPProvisioningURI)
+	}
+	var passwordHash string
+	var secret []byte
+	var required bool
+	if err := f.pool.QueryRow(ctx, `SELECT password_hash,totp_secret_enc,password_change_required FROM iam.admin_user WHERE public_id=$1`, created.Admin.PublicID).Scan(&passwordHash, &secret, &required); err != nil {
+		t.Fatal(err)
+	}
+	if !required || !VerifyPassword(passwordHash, created.InitialPassword) || len(secret) == 0 || bytes.Contains(secret, []byte(created.InitialPassword)) {
+		t.Fatalf("bootstrap credentials were not safely stored: required=%v hash=%q secret=%x", required, passwordHash, secret)
+	}
+	if len(audit.entries) != 1 || audit.entries[0].Action != platformaudit.ActionPermissionChanged || audit.entries[0].Target != "admin:"+created.Admin.PublicID || audit.entries[0].RequestID != "admin-create-audit" {
+		t.Fatalf("unexpected administrator creation audit entries: %#v", audit.entries)
+	}
+	durable := &AdminManagementService{DB: f.pool, Cipher: f.envelope, Audit: failingAdminAuditWriter{}, Now: func() time.Time { return f.now }}
+	queued, err := durable.CreateWithAudit(ctx, AdminCreateInput{Name: "Queued Admin", Email: "queued-admin@example.test", Role: RoleSupport}, AdminAuditInput{ActorPublicID: actor.Admin.PublicID, IP: "198.51.100.20", RequestID: "admin-create-queued"})
+	if err != nil || queued.Admin.PublicID == "" {
+		t.Fatalf("durable create result=%+v err=%v", queued, err)
+	}
+	var pending int
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.admin_audit_outbox WHERE request_id='admin-create-queued' AND delivered_at IS NULL`).Scan(&pending); err != nil || pending != 1 {
+		t.Fatalf("pending audit=%d err=%v, want durable outbox row", pending, err)
+	}
+	detail := string(audit.entries[0].Detail)
+	if !strings.Contains(detail, actor.Admin.PublicID) || !strings.Contains(detail, created.Admin.PublicID) || strings.Contains(detail, created.InitialPassword) || strings.Contains(detail, created.TOTPProvisioningURI) || strings.Contains(detail, "password_hash") || strings.Contains(detail, "totp_secret") {
+		t.Fatalf("administrator creation audit leaked credentials or omitted identities: %s", detail)
+	}
+}
+
+func (f *loginFixture) testAdminManagementStatusAndRole(t *testing.T) {
+	ctx := context.Background()
+	audit := &stepUpAuditWriter{}
+	service := &AdminManagementService{DB: f.pool, Cipher: f.envelope, Audit: audit, SessionCache: f.cache, Now: func() time.Time { return f.now }}
+	actor, err := service.Create(ctx, AdminCreateInput{Name: "Status Actor", Email: "status-actor@example.test", Role: RoleSuper, DataScope: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := service.Create(ctx, AdminCreateInput{Name: "Status Target", Email: "status-target@example.test", Role: RoleSupport, DataScope: []string{"KH-PP"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	insertSession := func(sessionID string) {
+		if _, err := f.pool.Exec(ctx, `INSERT INTO iam.session(public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES($1,(SELECT id FROM iam.admin_user WHERE public_id=$2),$1,convert_to($1,'UTF8'),'test-kid',$3,$4)`, sessionID, target.Admin.PublicID, f.now.Add(time.Hour), f.now); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.cache.Put(ctx, target.Admin.PublicID, sessionID, 0, time.Hour); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insertSession("01ARZ3NDEKTSV4RRFFQ69G5FD1")
+	input := AdminAuditInput{ActorPublicID: actor.Admin.PublicID, IP: "198.51.100.21", RequestID: "admin-status-change"}
+	disabled, err := service.DisableWithAudit(ctx, target.Admin.PublicID, "security review", input)
+	if err != nil || disabled.Status != AdminStatusDisabled {
+		t.Fatalf("disable result=%+v err=%v", disabled, err)
+	}
+	var revokedAt *time.Time
+	if err := f.pool.QueryRow(ctx, `SELECT revoked_at FROM iam.session WHERE public_id=$1`, "01ARZ3NDEKTSV4RRFFQ69G5FD1").Scan(&revokedAt); err != nil || revokedAt == nil {
+		t.Fatalf("disabled admin session remained active: revoked_at=%v err=%v", revokedAt, err)
+	}
+	if active, found, err := f.cache.Get(ctx, target.Admin.PublicID, "01ARZ3NDEKTSV4RRFFQ69G5FD1"); err != nil || !found || active {
+		t.Fatalf("disabled admin cache active=%v found=%v err=%v", active, found, err)
+	}
+	if _, err := service.EnableWithAudit(ctx, target.Admin.PublicID, input); err != nil {
+		t.Fatal(err)
+	}
+	insertSession("01ARZ3NDEKTSV4RRFFQ69G5FD2")
+	changed, err := service.UpdateRoleWithAudit(ctx, target.Admin.PublicID, RoleFinance, []string{}, input)
+	if err != nil || changed.Role != RoleFinance || changed.Status != AdminStatusActive {
+		t.Fatalf("role result=%+v err=%v", changed, err)
+	}
+	if err := f.pool.QueryRow(ctx, `SELECT revoked_at FROM iam.session WHERE public_id=$1`, "01ARZ3NDEKTSV4RRFFQ69G5FD2").Scan(&revokedAt); err != nil || revokedAt == nil {
+		t.Fatalf("role changed admin session remained active: revoked_at=%v err=%v", revokedAt, err)
+	}
+	if len(audit.entries) != 3 || !strings.Contains(string(audit.entries[0].Detail), "security review") {
+		t.Fatalf("unexpected status/role audit: %#v", audit.entries)
+	}
+	if _, err := service.DisableWithAudit(ctx, actor.Admin.PublicID, "self", input); !errors.Is(err, ErrAdminSelfMutation) {
+		t.Fatalf("self disable error=%v, want ErrAdminSelfMutation", err)
+	}
+	if _, err := service.EnableWithAudit(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FZZ", input); !errors.Is(err, ErrAdminNotFound) {
+		t.Fatalf("missing administrator error=%v, want ErrAdminNotFound", err)
+	}
+	lastSuper, err := service.Create(ctx, AdminCreateInput{Name: "Last Super", Email: "last-super@example.test", Role: RoleSuper, DataScope: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `UPDATE iam.admin_user SET role='ops' WHERE role='super' AND public_id<>$1`, lastSuper.Admin.PublicID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.DisableWithAudit(ctx, lastSuper.Admin.PublicID, "guard", input); !errors.Is(err, ErrLastActiveSuper) {
+		t.Fatalf("last super disable error=%v, want ErrLastActiveSuper", err)
+	}
+}
+
+func (f *loginFixture) testAdminStepUp(t *testing.T) {
+	ctx := context.Background()
+	password := "step-up-password"
+	hash, err := HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "JBSWY3DPEHPK3PXP"
+	adminID, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc, err := EncryptTOTPSecret(ctx, f.envelope, adminID, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status) VALUES($1,'Step Up Admin','step-up-admin@example.test',$2,$3,'finance','active')`, adminID, hash, enc); err != nil {
+		t.Fatal(err)
+	}
+	code, err := totp.GenerateCode(secret, f.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	audit := &stepUpAuditWriter{}
+	security := &testAdminSecurity{}
+	service := &AdminStepUpService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, Permissions: AdminPermissionStore{DB: f.pool}, Audit: audit, Security: security, Now: func() time.Time { return f.now }}
+	result, err := service.Issue(ctx, adminID, "admin-session", code, "withdrawal_review", "198.51.100.5", "step-up-test")
+	if err != nil || result.Token == "" || result.Scope != "withdrawal_review" {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if _, err := service.Issue(ctx, adminID, "admin-session", code, "withdrawal_review", "198.51.100.5", "step-up-replay"); err == nil {
+		t.Fatal("replayed TOTP accepted")
+	}
+	if _, err := service.Issue(ctx, adminID, "admin-session", code, `x","result":"ok`, "198.51.100.5", "step-up-invalid"); err == nil {
+		t.Fatal("non-whitelisted scope accepted")
+	}
+	if len(audit.entries) != 3 {
+		t.Fatalf("unexpected audit entries: %#v", audit.entries)
+	}
+	var firstDetail, lastDetail map[string]string
+	_ = json.Unmarshal(audit.entries[0].Detail, &firstDetail)
+	_ = json.Unmarshal(audit.entries[2].Detail, &lastDetail)
+	if firstDetail["result"] != "ok" || firstDetail["scope"] != "withdrawal_review" || lastDetail["result"] != "failed" || lastDetail["scope"] != "unknown" || string(audit.entries[0].Detail) == code || audit.entries[0].Action != platformaudit.ActionStepUp {
+		t.Fatalf("unexpected audit entries: %#v", audit.entries)
+	}
+	for i := 0; i < adminLoginFailureLimit; i++ {
+		_, _ = service.Issue(ctx, adminID, "admin-session", "000000", "withdrawal_review", "198.51.100.5", "step-up-limit")
+	}
+	if locked, _ := security.Locked(ctx, "step-up-admin@example.test", "198.51.100.5"); !locked {
+		t.Fatal("step-up failures did not use the administrator login limiter")
+	}
+}
+
+func (f *loginFixture) testAdminPasswordLogin(t *testing.T) {
+	ctx := context.Background()
+	password := "correct horse battery staple"
+	hash, err := HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "JBSWY3DPEHPK3PXP"
+	adminID, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc, err := EncryptTOTPSecret(ctx, f.envelope, adminID, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status) VALUES($1,'Login Admin','login-admin@example.test',$2,$3,'super','active')`, adminID, hash, enc); err != nil {
+		t.Fatal(err)
+	}
+	code, err := totp.GenerateCode(secret, f.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	security := &testAdminSecurity{}
+	service := &AdminLoginService{DB: f.pool, Tokens: TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}, Cipher: f.envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: f.cache, Security: security, Now: func() time.Time { return f.now }}
+	input := AdminLoginInput{Email: "login-admin@example.test", Password: password, TOTPCode: code, IP: "198.51.100.4", DeviceID: "web:1", RequestID: "admin-login-test"}
+	result, err := service.Login(ctx, input)
+	if err != nil || result.AccessToken == "" || result.RefreshToken == "" || result.AccessExpiresIn != 600 {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if accountCount, ipCount := security.counts["a:"+input.Email], security.counts["i:"+input.IP]; accountCount != 0 || ipCount != 0 {
+		t.Fatalf("successful login failure counters account=%d IP=%d, want 0 and 0", accountCount, ipCount)
+	}
+	failureRequestID := "admin-login-failed"
+	if _, err := service.Login(ctx, AdminLoginInput{Email: input.Email, Password: "wrong", TOTPCode: code, IP: input.IP, DeviceID: input.DeviceID, RequestID: failureRequestID}); err == nil {
+		t.Fatal("wrong password accepted")
+	}
+	var pendingFailure int
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.admin_audit_outbox WHERE request_id=$1 AND delivered_at IS NULL`, failureRequestID).Scan(&pendingFailure); err != nil || pendingFailure != 1 {
+		t.Fatalf("login failure outbox=%d err=%v, want one durable asynchronous record", pendingFailure, err)
+	}
+	for range 4 {
+		_, _ = service.Login(ctx, AdminLoginInput{Email: input.Email, Password: "wrong", TOTPCode: code, IP: input.IP, DeviceID: input.DeviceID, RequestID: input.RequestID})
+	}
+	if _, err := service.Login(ctx, input); err == nil {
+		t.Fatal("fifth consecutive failure did not lock the account/IP pair")
+	}
+	if _, err := service.Login(ctx, AdminLoginInput{Email: input.Email, Password: password, TOTPCode: "000000", IP: "198.51.100.5", DeviceID: input.DeviceID, RequestID: input.RequestID}); err == nil {
+		t.Fatal("invalid TOTP accepted")
+	}
+}
+
+func (f *loginFixture) testAdminFirstPasswordLogin(t *testing.T) {
+	ctx := context.Background()
+	password := "first password change only"
+	hash, err := HashPassword(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "JBSWY3DPEHPK3PXP"
+	adminID, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc, err := EncryptTOTPSecret(ctx, f.envelope, adminID, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status,password_change_required) VALUES($1,'First Password Admin','first-password-admin@example.test',$2,$3,'super','active',true)`, adminID, hash, enc); err != nil {
+		t.Fatal(err)
+	}
+	code, err := totp.GenerateCode(secret, f.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := TokenManager{Keys: f.keys, AccessTTL: 10 * time.Minute, Now: func() time.Time { return f.now }}
+	service := &AdminLoginService{DB: f.pool, Tokens: tokens, Cipher: f.envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, SessionCache: f.cache, Security: &testAdminSecurity{}, Now: func() time.Time { return f.now }}
+	result, err := service.Login(ctx, AdminLoginInput{Email: "first-password-admin@example.test", Password: password, TOTPCode: code, IP: "198.51.100.6", DeviceID: "web:1", RequestID: "first-password-login"})
+	if err != nil {
+		t.Fatalf("login: %v", err)
+	}
+	identity, _, err := tokens.ParseAccess(ctx, result.AccessToken)
+	if err != nil || !identity.PasswordChangeOnly {
+		t.Fatalf("identity=%+v err=%v, want password-change-only access", identity, err)
+	}
+	// A refresh must preserve the first-password restriction. In particular it
+	// must never turn a cookie obtained at restricted login into a normal admin
+	// token, even though the shared mobile-session manager has a longer TTL.
+	refreshService := &SessionService{
+		DB:          f.pool,
+		Tokens:      TokenManager{Keys: f.keys, AccessTTL: 15 * time.Minute, Now: func() time.Time { return f.now }},
+		AdminTokens: tokens,
+		Cache:       f.cache, IdleTTL: 15 * time.Minute, AbsoluteTTL: 8 * time.Hour,
+		Now: func() time.Time { return f.now },
+	}
+	if _, err := refreshService.RefreshEndpoint(ctx, result.RefreshToken, "198.51.100.6", false); err == nil {
+		t.Fatal("administrator refresh token accepted by public endpoint")
+	}
+	refreshed, err := refreshService.RefreshEndpoint(ctx, result.RefreshToken, "198.51.100.6", true)
+	if err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	refreshedIdentity, _, err := tokens.ParseAccess(ctx, refreshed.AccessToken)
+	if err != nil || !refreshedIdentity.PasswordChangeOnly || refreshed.AccessExpiresIn != int64((10*time.Minute)/time.Second) {
+		t.Fatalf("refreshed identity=%+v expires=%d err=%v, want restricted 10-minute access", refreshedIdentity, refreshed.AccessExpiresIn, err)
+	}
+	var sessionID string
+	if err := f.pool.QueryRow(ctx, `SELECT public_id FROM iam.session WHERE admin_user_id=(SELECT id FROM iam.admin_user WHERE public_id=$1)`, adminID).Scan(&sessionID); err != nil {
+		t.Fatal(err)
+	}
+	f.cache.mu.Lock()
+	cacheTTL := f.cache.sessions[sessionID].ttl
+	f.cache.mu.Unlock()
+	if cacheTTL > adminSessionIdleTTL || cacheTTL < adminSessionIdleTTL-time.Second {
+		t.Fatalf("administrator cache ttl=%s, want 15m", cacheTTL)
+	}
+	refreshService.Now = func() time.Time { return f.now.Add(adminSessionIdleTTL + time.Second) }
+	if _, err := refreshService.RefreshEndpoint(ctx, refreshed.RefreshToken, "198.51.100.6", true); err == nil {
+		t.Fatal("administrator session accepted after 15 minutes idle")
+	}
+	protected := gateway.Authenticate(Authenticator{Tokens: tokens}, "")(gateway.Authorize("")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})))
+	request := httptest.NewRequest(http.MethodGet, "/v1/admin/admins", nil)
+	request.Header.Set("Authorization", "Bearer "+refreshed.AccessToken)
+	response := httptest.NewRecorder()
+	protected.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("refreshed restricted token protected route status=%d, want %d", response.Code, http.StatusForbidden)
+	}
+}
+
+func (f *loginFixture) testAdminPasswordChange(t *testing.T) {
+	ctx := context.Background()
+	oldPassword := "first password to replace"
+	newPassword := "a newly selected administrator password"
+	hash, err := HashPassword(oldPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "JBSWY3DPEHPK3PXP"
+	adminID, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	enc, err := EncryptTOTPSecret(ctx, f.envelope, adminID, secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status,password_change_required) VALUES($1,'Password Change Admin','password-change-admin@example.test',$2,$3,'super','active',true)`, adminID, hash, enc); err != nil {
+		t.Fatal(err)
+	}
+	currentSession := "01ARZ3NDEKTSV4RRFFQ69G5FE1"
+	otherSession := "01ARZ3NDEKTSV4RRFFQ69G5FE2"
+	for _, sessionID := range []string{currentSession, otherSession} {
+		if _, err := f.pool.Exec(ctx, `INSERT INTO iam.session(public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES($1,(SELECT id FROM iam.admin_user WHERE public_id=$2),$1,convert_to($1,'UTF8'),'test-kid',$3,$4)`, sessionID, adminID, f.now.Add(time.Hour), f.now); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.cache.Put(ctx, adminID, sessionID, 0, time.Hour); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, err := totp.GenerateCode(secret, f.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	audit := &stepUpAuditWriter{}
+	service := &AdminPasswordService{DB: f.pool, Cipher: f.envelope, Audit: audit, SessionCache: f.cache, Security: &testAdminSecurity{}, Now: func() time.Time { return f.now }}
+	failureRequestID := "admin-password-change-failed"
+	err = service.Change(ctx, AdminPasswordChangeInput{AdminPublicID: adminID, SessionPublicID: currentSession, CurrentPassword: "wrong password", NewPassword: newPassword, TOTPCode: code, IP: "198.51.100.7", RequestID: failureRequestID})
+	if err == nil {
+		t.Fatal("wrong current password accepted")
+	}
+	var pendingFailure int
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.admin_audit_outbox WHERE request_id=$1 AND delivered_at IS NULL`, failureRequestID).Scan(&pendingFailure); err != nil || pendingFailure != 1 {
+		t.Fatalf("password failure outbox=%d err=%v, want one durable record", pendingFailure, err)
+	}
+	err = service.Change(ctx, AdminPasswordChangeInput{AdminPublicID: adminID, SessionPublicID: currentSession, CurrentPassword: oldPassword, NewPassword: newPassword, TOTPCode: code, IP: "198.51.100.7", RequestID: "admin-password-change"})
+	if err != nil {
+		t.Fatalf("change password: %v", err)
+	}
+	var required bool
+	var updatedHash string
+	if err := f.pool.QueryRow(ctx, `SELECT password_change_required,password_hash FROM iam.admin_user WHERE public_id=$1`, adminID).Scan(&required, &updatedHash); err != nil {
+		t.Fatal(err)
+	}
+	if required || !VerifyPassword(updatedHash, newPassword) || VerifyPassword(updatedHash, oldPassword) {
+		t.Fatalf("password update required=%v", required)
+	}
+	var currentRevoked, otherRevoked *time.Time
+	if err := f.pool.QueryRow(ctx, `SELECT revoked_at FROM iam.session WHERE public_id=$1`, currentSession).Scan(&currentRevoked); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.pool.QueryRow(ctx, `SELECT revoked_at FROM iam.session WHERE public_id=$1`, otherSession).Scan(&otherRevoked); err != nil {
+		t.Fatal(err)
+	}
+	if currentRevoked != nil || otherRevoked == nil {
+		t.Fatalf("session revocation current=%v other=%v", currentRevoked, otherRevoked)
+	}
+	if active, _, err := f.cache.Get(ctx, adminID, otherSession); err != nil || active {
+		t.Fatalf("other session cache active=%v err=%v", active, err)
+	}
+	if len(audit.entries) != 1 || audit.entries[0].Action != platformaudit.ActionAccountChanged || strings.Contains(string(audit.entries[0].Detail), oldPassword) || strings.Contains(string(audit.entries[0].Detail), newPassword) || strings.Contains(string(audit.entries[0].Detail), code) {
+		t.Fatalf("password audit=%#v", audit.entries)
 	}
 }
 
