@@ -22,6 +22,7 @@ CREATE TABLE trade.reservation_release_outbox (
     reason text NOT NULL CHECK (length(btrim(reason)) > 0),
     attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
     claimed_at timestamptz,
+    completed_at timestamptz,
     next_attempt_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -187,7 +188,7 @@ CREATE CONSTRAINT TRIGGER trg_trade_no_partial_cancellation
 
 -- +goose StatementBegin
 CREATE FUNCTION trade.confirm_order_payment(p_public_id text, p_source_ref text, p_paid_amount_e4 bigint)
-RETURNS TABLE (reservation_key text, applied boolean)
+RETURNS TABLE (reservation_key text, applied boolean, reconciliation_required boolean)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, trade AS $$
 DECLARE
     target_id bigint;
@@ -198,6 +199,7 @@ DECLARE
     target_refund_required_at timestamptz;
     target_reservation_key text;
     source_owner_id bigint;
+    source_was_known boolean;
     child_count integer;
     awaiting_count integer;
     paid_count integer;
@@ -219,12 +221,15 @@ BEGIN
         RAISE EXCEPTION 'paid amount does not match order total' USING ERRCODE = 'TR002';
     END IF;
 
-    INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref)
-    VALUES (target_id,'kess_result',p_source_ref) ON CONFLICT (source_type,source_ref) DO NOTHING;
     SELECT buyer_order_id INTO source_owner_id FROM trade.order_event_source
       WHERE source_type='kess_result' AND source_ref=p_source_ref;
-    IF source_owner_id IS DISTINCT FROM target_id THEN
+    source_was_known := FOUND;
+    IF source_was_known AND source_owner_id IS DISTINCT FROM target_id THEN
         RAISE EXCEPTION 'payment source belongs to another order' USING ERRCODE = '23514';
+    END IF;
+    IF NOT source_was_known THEN
+        INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref)
+        VALUES (target_id,'kess_result',p_source_ref);
     END IF;
 
     SELECT count(*),count(*) FILTER (WHERE status='awaiting_payment'),count(*) FILTER (WHERE status='paid'),count(*) FILTER (WHERE status='cancelled')
@@ -239,10 +244,10 @@ BEGIN
     reservation_key := target_reservation_key;
     INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
       VALUES (target_reservation_key,'commit','payment_confirmed')
-      ON CONFLICT ON CONSTRAINT ux_trade_reservation_action DO UPDATE
-      SET reason=EXCLUDED.reason,claimed_at=NULL,next_attempt_at=clock_timestamp(),updated_at=clock_timestamp();
+      ON CONFLICT ON CONSTRAINT ux_trade_reservation_action DO NOTHING;
     IF paid_count = child_count THEN
         applied := false;
+        reconciliation_required := NOT source_was_known;
         RETURN NEXT;
         RETURN;
     END IF;
@@ -255,6 +260,7 @@ BEGIN
       WHERE buyer_order_id=target_id;
     DELETE FROM trade.payment_transition_guard WHERE txid=txid_current() AND buyer_order_id=target_id;
     applied := true;
+    reconciliation_required := false;
     RETURN NEXT;
 END;
 $$;
@@ -382,7 +388,7 @@ GRANT SELECT, INSERT ON trade.buyer_order, trade.merchant_order, trade.order_lin
 GRANT UPDATE (reservation_released_at, refund_required_at, updated_at) ON trade.buyer_order TO trade_rw;
 GRANT UPDATE (status, version, updated_at) ON trade.merchant_order TO trade_rw;
 GRANT SELECT ON trade.buyer_order, trade.merchant_order, trade.order_line TO report_ro;
-GRANT SELECT, INSERT, UPDATE (reason, attempts, claimed_at, next_attempt_at, updated_at), DELETE ON trade.reservation_release_outbox TO trade_rw;
+GRANT SELECT, INSERT, UPDATE (attempts, claimed_at, completed_at, next_attempt_at, updated_at) ON trade.reservation_release_outbox TO trade_rw;
 GRANT SELECT, INSERT ON trade.order_event, trade.order_event_source TO trade_rw;
 GRANT USAGE, SELECT ON SEQUENCE trade.buyer_order_id_seq, trade.merchant_order_id_seq, trade.order_line_id_seq,
     trade.order_event_id_seq, trade.order_event_source_id_seq, trade.reservation_release_outbox_id_seq TO trade_rw;

@@ -138,12 +138,12 @@ func (s *PostgresStore) Create(ctx context.Context, idempotencyKey, requestHash 
 
 func (s *PostgresStore) QueueReservationRelease(ctx context.Context, reservationKey, reason string) error {
 	_, err := s.db.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
-		VALUES ($1,'release',$2) ON CONFLICT (reservation_key,action) DO UPDATE SET reason=EXCLUDED.reason,claimed_at=NULL,next_attempt_at=clock_timestamp(),updated_at=clock_timestamp()`, reservationKey, reason)
+		VALUES ($1,'release',$2) ON CONFLICT (reservation_key,action) DO NOTHING`, reservationKey, reason)
 	return err
 }
 
 func (s *PostgresStore) CompleteReservationRelease(ctx context.Context, key string) error {
-	_, err := s.db.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE reservation_key=$1 AND action='release'`, key)
+	_, err := s.db.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=COALESCE(completed_at,clock_timestamp()),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='release'`, key)
 	return err
 }
 
@@ -196,6 +196,8 @@ func loadCreateOrder(ctx context.Context, tx pgx.Tx, buyerOrderID int64, publicI
 	return order, nil
 }
 
+// ClaimReservationRelease is worker-only. It deliberately accepts no buyer
+// identity; buyer-facing callers must use a separate ownership-scoped entry.
 func (s *PostgresStore) ClaimReservationRelease(ctx context.Context, publicID string) (Reservation, bool, error) {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -259,7 +261,8 @@ func (s *PostgresStore) ClaimReservationActions(ctx context.Context, limit int) 
 	rows, err := s.db.Query(ctx, `
 		WITH due AS (
 			SELECT id FROM trade.reservation_release_outbox
-			WHERE (claimed_at IS NULL OR claimed_at < clock_timestamp()-interval '5 minutes')
+			WHERE completed_at IS NULL
+			  AND (claimed_at IS NULL OR claimed_at < clock_timestamp()-interval '5 minutes')
 			  AND next_attempt_at <= clock_timestamp()
 			ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED
 		)
@@ -282,17 +285,17 @@ func (s *PostgresStore) ClaimReservationActions(ctx context.Context, limit int) 
 }
 
 func (s *PostgresStore) CompleteReservationAction(ctx context.Context, id int64) error {
-	_, err := s.db.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE id=$1`, id)
+	_, err := s.db.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=COALESCE(completed_at,clock_timestamp()),claimed_at=NULL,updated_at=clock_timestamp() WHERE id=$1`, id)
 	return err
 }
 
 func (s *PostgresStore) FailReservationAction(ctx context.Context, id int64) error {
-	_, err := s.db.Exec(ctx, `UPDATE trade.reservation_release_outbox SET claimed_at=NULL,next_attempt_at=clock_timestamp()+interval '30 seconds',updated_at=clock_timestamp() WHERE id=$1`, id)
+	_, err := s.db.Exec(ctx, `UPDATE trade.reservation_release_outbox SET claimed_at=NULL,next_attempt_at=clock_timestamp()+interval '30 seconds',updated_at=clock_timestamp() WHERE id=$1 AND completed_at IS NULL`, id)
 	return err
 }
 
 func (s *PostgresStore) CompleteReservationCommit(ctx context.Context, key string) error {
-	_, err := s.db.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE reservation_key=$1 AND action='commit'`, key)
+	_, err := s.db.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=COALESCE(completed_at,clock_timestamp()),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='commit'`, key)
 	return err
 }
 
@@ -309,7 +312,7 @@ func (s *PostgresStore) RequireRefund(ctx context.Context, key string) error {
 	if _, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET refund_required_at=COALESCE(refund_required_at,clock_timestamp()),updated_at=clock_timestamp() WHERE id=$1`, id); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE reservation_key=$1 AND action='commit'`, key); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=COALESCE(completed_at,clock_timestamp()),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='commit'`, key); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -381,9 +384,12 @@ func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID s
 		return "", false, ErrEventSourceRequired
 	}
 	var key string
-	var applied bool
-	err := s.db.QueryRow(ctx, `SELECT reservation_key,applied FROM trade.confirm_order_payment($1,$2,$3)`, buyerOrderPublicID, source.Reference, paidAmountE4).Scan(&key, &applied)
+	var applied, reconciliationRequired bool
+	err := s.db.QueryRow(ctx, `SELECT reservation_key,applied,reconciliation_required FROM trade.confirm_order_payment($1,$2,$3)`, buyerOrderPublicID, source.Reference, paidAmountE4).Scan(&key, &applied, &reconciliationRequired)
 	if err == nil {
+		if reconciliationRequired {
+			return key, false, ErrPaymentReconciliation
+		}
 		return key, applied, nil
 	}
 	var pgErr *pgconn.PgError

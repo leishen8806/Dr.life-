@@ -45,6 +45,8 @@ type Store interface {
 	Create(context.Context, string, string, CreateOrder) (CreateOrder, error)
 	QueueReservationRelease(context.Context, string, string) error
 	CompleteReservationRelease(context.Context, string) error
+	// ClaimReservationRelease is an internal worker operation. A future buyer
+	// HTTP endpoint must add buyer ownership to this contract and its SQL.
 	ClaimReservationRelease(context.Context, string) (Reservation, bool, error)
 	ClaimReservationActions(context.Context, int) ([]ReservationAction, error)
 	CompleteReservationAction(context.Context, int64) error

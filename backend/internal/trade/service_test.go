@@ -318,6 +318,24 @@ func TestReleaseReservationsIsIdempotentAndQueuesFailures(t *testing.T) {
 	}
 }
 
+func TestReleaseReservationsDoesNotReleasePartialCancellation(t *testing.T) {
+	store := &stubOrders{reservation: Reservation{Key: "1:key"}}
+	store.paymentErr = ErrInvalidTransition
+	store.reservation.Released = true
+	catalog := &stubCatalog{reservations: map[string]bool{"1:key": true}}
+	blocked := &releaseBlockedStore{stubOrders: store}
+	err := NewService(blocked, stubAccounts{"active"}, catalog).ReleaseReservations(context.Background(), "buyer-order")
+	if !errors.Is(err, ErrInvalidTransition) || catalog.releases != 0 {
+		t.Fatalf("error=%v releases=%d, want ErrInvalidTransition and no catalog release", err, catalog.releases)
+	}
+}
+
+type releaseBlockedStore struct{ *stubOrders }
+
+func (s *releaseBlockedStore) ClaimReservationRelease(context.Context, string) (Reservation, bool, error) {
+	return Reservation{}, false, ErrInvalidTransition
+}
+
 func TestCreateFailureQueuesReleaseWhenImmediateReleaseFails(t *testing.T) {
 	store := &stubOrders{createErr: errors.New("db unavailable")}
 	catalog := catalogFixture()
