@@ -83,7 +83,7 @@ func (s *AdminPasswordService) Change(ctx context.Context, input AdminPasswordCh
 		}
 		return httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
-	if err := s.Security.ClearAccountFailures(ctx, email); err != nil {
+	if err := s.Security.ClearAccountFailures(ctx, email, input.IP); err != nil {
 		return httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 	hash, err := HashPasswordContext(ctx, input.NewPassword)

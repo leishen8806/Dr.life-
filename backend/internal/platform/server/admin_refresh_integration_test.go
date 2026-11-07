@@ -43,7 +43,7 @@ type serverAdminSecurity struct {
 func (*serverAdminSecurity) ReserveAttempt(context.Context, string, string) (bool, error) {
 	return true, nil
 }
-func (*serverAdminSecurity) ClearAccountFailures(context.Context, string) error { return nil }
+func (*serverAdminSecurity) ClearAccountFailures(context.Context, string, string) error { return nil }
 func (s *serverAdminSecurity) ConsumeTOTP(_ context.Context, _ string, step int64, _ time.Duration) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

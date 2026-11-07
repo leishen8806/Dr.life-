@@ -65,10 +65,15 @@ func (s *testAdminSecurity) Locked(_ context.Context, account, ip string) (bool,
 	return s.counts["a:"+account] >= adminLoginFailureLimit || s.counts["i:"+ip] >= adminLoginIPFailureLimit, nil
 }
 
-func (s *testAdminSecurity) ClearAccountFailures(_ context.Context, account string) error {
+func (s *testAdminSecurity) ClearAccountFailures(_ context.Context, account, ip string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.counts, "a:"+account)
+	if s.counts["i:"+ip] > 1 {
+		s.counts["i:"+ip]--
+	} else {
+		delete(s.counts, "i:"+ip)
+	}
 	return nil
 }
 

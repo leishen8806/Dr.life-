@@ -76,14 +76,14 @@ func TestRedisAdminSecurityStateIsShared(t *testing.T) {
 	if locked, err := second.Locked(ctx, "admin@example.test", "192.0.2.2"); err != nil || !locked {
 		t.Fatalf("shared account lock locked=%v err=%v", locked, err)
 	}
-	if err := second.ClearAccountFailures(ctx, "admin@example.test"); err != nil {
+	if err := second.ClearAccountFailures(ctx, "admin@example.test", "192.0.2.1"); err != nil {
 		t.Fatal(err)
 	}
 	if locked, err := first.Locked(ctx, "admin@example.test", "192.0.2.1"); err != nil || locked {
 		t.Fatalf("cleared lock locked=%v err=%v", locked, err)
 	}
-	if count, err := first.client.Get(ctx, ipKey).Int(); err != nil || count != adminLoginFailureLimit {
-		t.Fatalf("successful account clear changed IP count=%d err=%v, want %d", count, err, adminLoginFailureLimit)
+	if count, err := first.client.Get(ctx, ipKey).Int(); err != nil || count != adminLoginFailureLimit-1 {
+		t.Fatalf("successful account clear IP count=%d err=%v, want %d", count, err, adminLoginFailureLimit-1)
 	}
 	sharedIP := "192.0.2.20"
 	for attempt := 0; attempt < adminLoginFailureLimit*4; attempt++ {
@@ -94,6 +94,25 @@ func TestRedisAdminSecurityStateIsShared(t *testing.T) {
 	}
 	if ok, err := first.ReserveAttempt(ctx, "admin-over-limit@example.test", sharedIP); err != nil || ok {
 		t.Fatalf("shared IP over-limit allowed=%v err=%v, want denied at %d", ok, err, adminLoginFailureLimit*4)
+	}
+	successIP := "192.0.2.30"
+	for attempt := 0; attempt < 25; attempt++ {
+		account := "successful-" + strconv.Itoa(attempt) + "@example.test"
+		if ok, err := first.ReserveAttempt(ctx, account, successIP); err != nil || !ok {
+			t.Fatalf("successful attempt %d allowed=%v err=%v, want allowed", attempt+1, ok, err)
+		}
+		if err := first.ClearAccountFailures(ctx, account, successIP); err != nil {
+			t.Fatalf("successful attempt %d clear: %v", attempt+1, err)
+		}
+	}
+	failureIP := "192.0.2.40"
+	for attempt := 0; attempt < adminLoginIPFailureLimit; attempt++ {
+		if ok, err := first.ReserveAttempt(ctx, "failed-"+strconv.Itoa(attempt)+"@example.test", failureIP); err != nil || !ok {
+			t.Fatalf("failed attempt %d allowed=%v err=%v, want allowed", attempt+1, ok, err)
+		}
+	}
+	if locked, err := first.Locked(ctx, "another@example.test", failureIP); err != nil || !locked {
+		t.Fatalf("IP after %d failures locked=%v err=%v, want locked", adminLoginIPFailureLimit, locked, err)
 	}
 	if fresh, err := first.ConsumeTOTP(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB0", 123, time.Minute); err != nil || !fresh {
 		t.Fatalf("first TOTP consume fresh=%v err=%v", fresh, err)

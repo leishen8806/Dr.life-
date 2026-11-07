@@ -15,7 +15,7 @@ import (
 // across all application instances. Authentication fails closed on store errors.
 type AdminSecurityStore interface {
 	ReserveAttempt(context.Context, string, string) (bool, error)
-	ClearAccountFailures(context.Context, string) error
+	ClearAccountFailures(context.Context, string, string) error
 	ConsumeTOTP(context.Context, string, int64, time.Duration) (bool, error)
 }
 
@@ -57,8 +57,16 @@ return 1`, keys, adminLoginFailureLimit, adminLoginIPFailureLimit, adminLoginFai
 	return result == 1, err
 }
 
-func (s *RedisAdminSecurityStore) ClearAccountFailures(ctx context.Context, account string) error {
-	return s.client.Del(ctx, adminFailureKeys(account, "")[0]).Err()
+func (s *RedisAdminSecurityStore) ClearAccountFailures(ctx context.Context, account, ip string) error {
+	_, err := s.client.Eval(ctx, `
+redis.call('DEL', KEYS[1])
+local ip_count = tonumber(redis.call('GET', KEYS[2]) or '0')
+if ip_count > 0 then
+  ip_count = redis.call('DECR', KEYS[2])
+  if ip_count <= 0 then redis.call('DEL', KEYS[2]) end
+end
+return 1`, adminFailureKeys(account, ip)).Result()
+	return err
 }
 
 func (s *RedisAdminSecurityStore) ConsumeTOTP(ctx context.Context, adminPublicID string, step int64, ttl time.Duration) (bool, error) {

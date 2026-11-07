@@ -96,7 +96,7 @@ func (s *AdminStepUpService) Issue(ctx context.Context, adminPublicID, sessionPu
 		}
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
-	if err := s.Security.ClearAccountFailures(ctx, email); err != nil {
+	if err := s.Security.ClearAccountFailures(ctx, email, ip); err != nil {
 		return AdminStepUpResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 	token, expiresAt, err := s.Tokens.IssueStepUp(ctx, adminPublicID, sessionPublicID, scope)

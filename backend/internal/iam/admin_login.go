@@ -112,7 +112,7 @@ func (s *AdminLoginService) Login(ctx context.Context, input AdminLoginInput) (A
 		}
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeTelegramLoginFailed)
 	}
-	if err := s.Security.ClearAccountFailures(ctx, email); err != nil {
+	if err := s.Security.ClearAccountFailures(ctx, email, input.IP); err != nil {
 		return AdminLoginResult{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
 
