@@ -14,7 +14,7 @@
 |---|---|---|
 | `iam` | 账号与权限 | 人、账号、Bot 池、登录、会话、商户员工、平台管理员与角色、账号关联 |
 | `catalog` | 商品与目录 | 分类、商品、阶梯价、导入、标准分、搜索词 |
-| `trade` | 订单与项目 | 订单、询价与报价、装修项目与分批计划、付款凭证、售后 |
+| `trade` | 订单与项目 | 订单、询价与报价、装修项目与分批计划、KESS 付款状态、售后；`payment_proof` 仅保留停用的历史表 |
 | `wms` | 仓储 | 仓库分区、库位、库存、入仓、库存流水、仓储费计提与账单 |
 | `logistics` | 物流 | 配送单、节点、司机、任务、配送费规则、签收凭证 |
 | `ledger` | **账务（核心）** | 账户、流水、分录、余额、冻结、提现、对账 |
@@ -92,7 +92,7 @@
 |---|---|
 | `order` | id, order_no unique, buyer_account_id, merchant_id, status (`unpaid/paid_proof/shipped/arrived/closed/problem/cancelled`), total_e4, delivery_mode (`zto/self`), delivery_fee_hold_txn_id, delivery_fee_release_txn_id, problem_note, closed_at |
 | `order_item` | order_id, product_id, qty, unit_price_e4（下单时快照，含阶梯匹配结果）, vol_m3 |
-| `payment_proof` | id, order_id / plan_batch_id, amount_e4, ref, proof_file_id, recorded_by, created_at | **货款凭证，不进账务分录**（线下付款，只留痕）；流水页通过视图并列显示 |
+| `payment_proof` | id, order_id / plan_batch_id, amount_e4, ref, proof_file_id, recorded_by, created_at | **停用（2026-10-29，被 KESS 取代，见 6-B）**；表仅保留兼容历史数据，服务不再写入 |
 | `rfq` | id, buyer_account_id, name, area/loc, category_id, qty_text, budget_e4, due_date, target_merchant_id, status |
 | `quote` | id, rfq_id, merchant_id, price_e4, lead_days, valid_until, note, selected boolean；`UNIQUE(rfq_id,merchant_id)` |
 | `project` | id, buyer_account_id, company_merchant_id, name, area, budget_e4, status |
@@ -299,7 +299,7 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 | 6.17 | **应付中通付款** | `carrier_pay` | DR `PAYABLE_CARRIER` / CR `BANK_DEDICATED` | 对应中通对账单；双人复核 |
 | 6.18 | **冲销** | `reversal` | 原交易分录**借贷互换**（逐条对称） | 指向 `reverses_txn_id`；已冲销的交易不得再次冲销；需"资金"编辑权限并写审计 |
 | 6.19 | **对账差异调整** | `bank_diff` | 差异金额入 `SUSPENSE`（DR/CR `BANK_DEDICATED` 对 `SUSPENSE`） | **`SUSPENSE` 余额必须在 N 天内清零**，超期告警 |
-| — | **货款凭证**（买家线下付商家） | 不入账 | 写 `trade.payment_proof` | **不进分录**，流水页并列显示"凭证（仅留痕）" |
+| — | **货款凭证（停用）** | 不入账 | `trade.payment_proof` | **停用（2026-10-29，被 KESS 取代，见 6-B）**；只保留历史数据，不再写入 |
 
 #### 6.18 冲销补充规则
 
@@ -312,6 +312,8 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 
 依据：项目负责人 2026-10-29 的决定（《试点上线最小范围清单》第 1、6 节；《Dr.life+与Dr.RouteFit对接契约》v0.2 第 4.5、7、8、10 节）。
 
+- **D1 金额精度：** 金额一律为 `bigint`，单位 0.0001 美元；对外收款的商品单价、运费和支付意向必须是整分（`e4 % 100 = 0`），不做舍入，不满足时直接拒绝。
+- **D2 父单付款：** 一次付款对应整张父订单；KESS 成功后在同一事务先入买家钱包，再为每个子订单建立托管并把子订单推进到 `paid`。
 - Dr.life+ 只做商城，仓储与配送由 Dr.RouteFit 承担。
 - 入金优先走 KESS。
 - 商户包邮或买家付运费，两种情况下运费都结算给 RouteFit。
