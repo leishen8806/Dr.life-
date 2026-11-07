@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -276,6 +277,7 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	assertBuyerIsolationAndForeignEvent(t, ctx, pool)
 	assertLineAndParentTotalGuards(t, ctx, pool)
 	assertDifferentPaymentSourcesSerialize(t, ctx, pool, store)
+	assertTransitionMatrix(t, ctx, pool, store)
 	assertDifferentSourcesSerialize(t, ctx, db, pool, store)
 	assertSiblingTransitionsSerialize(t, ctx, pool, store)
 	assertTradeRWCreateIsIdempotent(t, ctx, dsn)
@@ -972,6 +974,14 @@ func assertBuyerIsolationAndForeignEvent(t *testing.T, ctx context.Context, pool
 		_, err := pool.Exec(ctx, `UPDATE trade.buyer_order SET reservation_released_at=clock_timestamp()+interval '1 second' WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FC3'`)
 		return err
 	}(), "55000")
+	assertPGCode(t, func() error {
+		_, err := pool.Exec(ctx, `UPDATE trade.buyer_order SET refund_required_at=clock_timestamp() WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FE4'`)
+		return err
+	}(), "55000")
+	assertPGCode(t, func() error {
+		_, err := pool.Exec(ctx, `UPDATE trade.buyer_order SET refund_required_at=NULL WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FDK'`)
+		return err
+	}(), "55000")
 }
 
 func assertLineAndParentTotalGuards(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
@@ -1078,6 +1088,48 @@ func assertDifferentPaymentSourcesSerialize(t *testing.T, ctx context.Context, p
 	}
 	if applied != 1 || reconciliation != 1 {
 		t.Fatalf("applied=%d reconciliation=%d, want 1/1", applied, reconciliation)
+	}
+}
+
+func assertTransitionMatrix(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
+	t.Helper()
+	statuses := []OrderStatus{AwaitingPayment, Paid, Submitted, Accepted, InFulfillment, Shipped, DeliveredVerified, Settled, Rejected, Cancelled, DeliveryFailed, Returning, Returned, Exception}
+	allowed := map[[2]OrderStatus]bool{
+		{Paid, Submitted}: true, {Submitted, Accepted}: true, {Submitted, Rejected}: true,
+		{Accepted, InFulfillment}: true, {InFulfillment, Shipped}: true,
+		{Shipped, DeliveredVerified}: true, {DeliveredVerified, Settled}: true,
+	}
+	nextID := int64(0)
+	for _, from := range statuses {
+		for _, to := range statuses {
+			nextID++
+			merchantID := int64(-1)
+			if allowed[[2]OrderStatus{from, to}] {
+				parentPublicID, err := ids.NewULID()
+				if err != nil {
+					t.Fatal(err)
+				}
+				childPublicID, err := ids.NewULID()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := pool.QueryRow(ctx, `WITH buyer AS (
+					INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
+					VALUES ($1,$2,$3,repeat('f',64),0) RETURNING id
+				) INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,status,total_e4)
+				SELECT $4,id,$2,$5,0 FROM buyer RETURNING id`, parentPublicID, 1000+nextID, fmt.Sprintf("matrix-%d", nextID), childPublicID, string(from)).Scan(&merchantID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			applied, err := store.Advance(ctx, merchantID, from, to, EventSource{Type: SourceSystem, Reference: fmt.Sprintf("matrix-%d", nextID)})
+			if allowed[[2]OrderStatus{from, to}] {
+				if err != nil || !applied {
+					t.Fatalf("matrix %s -> %s applied=%v err=%v", from, to, applied, err)
+				}
+			} else if !errors.Is(err, ErrInvalidTransition) || applied {
+				t.Fatalf("matrix %s -> %s applied=%v err=%v, want ErrInvalidTransition", from, to, applied, err)
+			}
+		}
 	}
 }
 
