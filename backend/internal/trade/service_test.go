@@ -420,8 +420,8 @@ func TestProcessReservationActionsCompletesSuccessAndReschedulesFailure(t *testi
 	if err := NewService(store, stubAccounts{"active"}, catalog).ProcessReservationActions(context.Background(), 1); err == nil {
 		t.Fatal("expected release failure")
 	}
-	if len(store.completed) != 2 || store.completed[0] != 1 || store.completed[1] != 3 || len(store.failed) != 1 || store.failed[0] != 2 || len(catalog.commits) != 1 || catalog.commits[0] != "1:commit" {
-		t.Fatalf("completed=%v failed=%v commits=%v", store.completed, store.failed, catalog.commits)
+	if len(store.completed) != 1 || store.completed[0] != 1 || len(store.commitDone) != 1 || store.commitDone[0] != "1:commit" || len(store.failed) != 1 || store.failed[0] != 2 || len(catalog.commits) != 1 || catalog.commits[0] != "1:commit" {
+		t.Fatalf("completed=%v commit_done=%v failed=%v commits=%v", store.completed, store.commitDone, store.failed, catalog.commits)
 	}
 }
 

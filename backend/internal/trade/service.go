@@ -251,6 +251,12 @@ func (s *Service) ProcessReservationActions(ctx context.Context, limit int) erro
 				}
 				continue
 			}
+			if actionErr == nil {
+				actionErr = s.store.CompleteReservationCommit(ctx, item.Key)
+				if actionErr == nil {
+					continue
+				}
+			}
 		} else if item.Action == "review_release" {
 			var exists bool
 			exists, actionErr = s.store.ReservationExists(ctx, item.Key)

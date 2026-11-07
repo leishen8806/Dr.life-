@@ -138,13 +138,13 @@ func (s *PostgresStore) Create(ctx context.Context, idempotencyKey, requestHash 
 
 func (s *PostgresStore) QueueReservationRelease(ctx context.Context, reservationKey, reason string) error {
 	_, err := s.db.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
-		VALUES ($1,'release',$2) ON CONFLICT (reservation_key,action) DO NOTHING`, reservationKey, reason)
+		VALUES ($1,'release',$2) ON CONFLICT (reservation_key,action) WHERE completed_at IS NULL DO NOTHING`, reservationKey, reason)
 	return err
 }
 
 func (s *PostgresStore) QueueReservationReview(ctx context.Context, reservationKey, reason string) error {
 	_, err := s.db.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
-		VALUES ($1,'review_release',$2) ON CONFLICT (reservation_key,action) DO NOTHING`, reservationKey, reason)
+		VALUES ($1,'review_release',$2) ON CONFLICT (reservation_key,action) WHERE completed_at IS NULL DO NOTHING`, reservationKey, reason)
 	return err
 }
 
@@ -155,7 +155,7 @@ func (s *PostgresStore) ReservationExists(ctx context.Context, key string) (bool
 }
 
 func (s *PostgresStore) CompleteReservationRelease(ctx context.Context, key string) error {
-	_, err := s.db.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=COALESCE(completed_at,clock_timestamp()),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='release'`, key)
+	_, err := s.db.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=clock_timestamp(),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='release' AND completed_at IS NULL`, key)
 	return err
 }
 
@@ -238,7 +238,7 @@ func (s *PostgresStore) ClaimReservationRelease(ctx context.Context, publicID st
 		return Reservation{}, false, ErrInvalidTransition
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
-		VALUES ($1,'release','order_cancelled') ON CONFLICT (reservation_key,action) DO NOTHING`, reservation.Key); err != nil {
+		VALUES ($1,'release','order_cancelled') ON CONFLICT (reservation_key,action) WHERE completed_at IS NULL DO NOTHING`, reservation.Key); err != nil {
 		return Reservation{}, false, err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET reservation_released_at=clock_timestamp(),updated_at=clock_timestamp() WHERE public_id=$1`, publicID); err != nil {
@@ -320,7 +320,7 @@ func (s *PostgresStore) CompleteReservationCommit(ctx context.Context, key strin
 	if command.RowsAffected() != 1 {
 		return ErrOrderNotVisible
 	}
-	if _, err := tx.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=COALESCE(completed_at,clock_timestamp()),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='commit'`, key); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=clock_timestamp(),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='commit' AND completed_at IS NULL`, key); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -339,7 +339,7 @@ func (s *PostgresStore) RequireRefund(ctx context.Context, key string) error {
 	if _, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET refund_required_at=COALESCE(refund_required_at,clock_timestamp()),updated_at=clock_timestamp() WHERE id=$1`, id); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=COALESCE(completed_at,clock_timestamp()),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='commit'`, key); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=clock_timestamp(),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='commit' AND completed_at IS NULL`, key); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

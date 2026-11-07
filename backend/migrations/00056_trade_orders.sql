@@ -26,9 +26,10 @@ CREATE TABLE trade.reservation_release_outbox (
     completed_at timestamptz,
     next_attempt_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-    updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-    CONSTRAINT ux_trade_reservation_action UNIQUE (reservation_key,action)
+    updated_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
+CREATE UNIQUE INDEX ux_trade_reservation_action_pending ON trade.reservation_release_outbox (reservation_key,action)
+    WHERE completed_at IS NULL;
 
 CREATE TABLE trade.merchant_order (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -76,6 +77,15 @@ CREATE TABLE trade.payment_transition_guard (
     PRIMARY KEY (txid, buyer_order_id)
 );
 REVOKE ALL ON trade.payment_transition_guard FROM PUBLIC, trade_rw, report_ro;
+
+CREATE TABLE trade.payment_reconciliation_task (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    buyer_order_id bigint NOT NULL REFERENCES trade.buyer_order(id),
+    source_ref text NOT NULL UNIQUE CHECK (length(btrim(source_ref)) > 0),
+    paid_amount_e4 bigint NOT NULL CHECK (paid_amount_e4 >= 0),
+    detected_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+REVOKE ALL ON trade.payment_reconciliation_task FROM PUBLIC, trade_rw, report_ro;
 
 CREATE TABLE trade.order_event (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -156,6 +166,16 @@ CREATE TRIGGER trg_trade_merchant_order_insert BEFORE INSERT ON trade.merchant_o
     FOR EACH ROW EXECUTE FUNCTION trade.guard_merchant_order_insert();
 
 -- +goose StatementBegin
+CREATE FUNCTION trade.has_payment_transition_guard(p_buyer_order_id bigint) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = trade, pg_temp AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM payment_transition_guard
+        WHERE txid=txid_current() AND buyer_order_id=p_buyer_order_id
+    );
+$$;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE FUNCTION trade.guard_merchant_order_update() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF NEW.public_id <> OLD.public_id OR NEW.buyer_order_id <> OLD.buyer_order_id
@@ -173,10 +193,8 @@ BEGIN
             OR (OLD.status = 'delivered_verified' AND NEW.status = 'settled')) THEN
             RAISE EXCEPTION 'invalid merchant order transition % -> %', OLD.status, NEW.status USING ERRCODE = '23514';
         END IF;
-        IF OLD.status = 'awaiting_payment' AND NEW.status = 'paid' AND NOT EXISTS (
-            SELECT 1 FROM trade.payment_transition_guard guard
-            WHERE guard.txid=txid_current() AND guard.buyer_order_id=OLD.buyer_order_id
-        ) THEN
+        IF OLD.status = 'awaiting_payment' AND NEW.status = 'paid'
+           AND NOT trade.has_payment_transition_guard(OLD.buyer_order_id) THEN
             RAISE EXCEPTION 'paid transition requires parent payment batch' USING ERRCODE = '55000';
         END IF;
         IF OLD.status = 'paid' AND NEW.status = 'submitted' AND EXISTS (
@@ -241,20 +259,22 @@ DECLARE
     target_idempotency_key text;
     target_total_e4 bigint;
     target_released_at timestamptz;
+    target_committed_at timestamptz;
     target_refund_required_at timestamptz;
     target_reservation_key text;
     source_owner_id bigint;
     source_was_known boolean;
+    source_was_applied boolean;
+    source_requires_reconciliation boolean;
     child_count integer;
     awaiting_count integer;
-    paid_count integer;
     cancelled_count integer;
 BEGIN
     IF p_source_ref IS NULL OR length(btrim(p_source_ref)) = 0 THEN
         RAISE EXCEPTION 'payment source is required' USING ERRCODE = '23514';
     END IF;
-    SELECT id,buyer_account_id,idempotency_key,total_e4,reservation_released_at,refund_required_at
-      INTO target_id,target_buyer_id,target_idempotency_key,target_total_e4,target_released_at,target_refund_required_at
+    SELECT id,buyer_account_id,idempotency_key,total_e4,reservation_released_at,reservation_committed_at,refund_required_at
+      INTO target_id,target_buyer_id,target_idempotency_key,target_total_e4,target_released_at,target_committed_at,target_refund_required_at
       FROM trade.buyer_order WHERE public_id=p_public_id FOR UPDATE;
     IF NOT FOUND THEN
         RAISE EXCEPTION 'buyer order not found' USING ERRCODE = '23514';
@@ -282,25 +302,48 @@ BEGIN
         END IF;
     END IF;
 
-    SELECT count(*),count(*) FILTER (WHERE status='awaiting_payment'),count(*) FILTER (WHERE status='paid'),count(*) FILTER (WHERE status='cancelled')
-      INTO child_count,awaiting_count,paid_count,cancelled_count FROM trade.merchant_order WHERE buyer_order_id=target_id;
+    SELECT EXISTS (
+        SELECT 1 FROM trade.order_event
+        WHERE buyer_order_id=target_id AND source_type='kess_result' AND source_ref=p_source_ref
+          AND from_status='awaiting_payment' AND to_status='paid'
+    ) INTO source_was_applied;
+    SELECT EXISTS (
+        SELECT 1 FROM trade.payment_reconciliation_task
+        WHERE buyer_order_id=target_id AND source_ref=p_source_ref
+    ) INTO source_requires_reconciliation;
+    SELECT count(*),count(*) FILTER (WHERE status='awaiting_payment'),count(*) FILTER (WHERE status='cancelled')
+      INTO child_count,awaiting_count,cancelled_count FROM trade.merchant_order WHERE buyer_order_id=target_id;
     IF cancelled_count > 0 THEN
         RAISE EXCEPTION 'order reservation already released' USING ERRCODE = 'TR001';
     END IF;
-    IF child_count = 0 OR (awaiting_count <> child_count AND paid_count <> child_count) THEN
+    IF child_count = 0 THEN
         RAISE EXCEPTION 'parent payment requires one consistent child batch' USING ERRCODE = '23514';
     END IF;
     target_reservation_key := target_buyer_id || ':' || target_idempotency_key;
     reservation_key := target_reservation_key;
-    INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
-      VALUES (target_reservation_key,'commit','payment_confirmed')
-      ON CONFLICT ON CONSTRAINT ux_trade_reservation_action DO NOTHING;
-    IF paid_count = child_count THEN
+    IF source_was_applied THEN
+        IF target_committed_at IS NULL THEN
+            INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
+            VALUES (target_reservation_key,'commit','payment_confirmed')
+            ON CONFLICT (reservation_key,action) WHERE completed_at IS NULL DO NOTHING;
+        END IF;
         applied := false;
-        reconciliation_required := NOT source_was_known;
+        reconciliation_required := false;
         RETURN NEXT;
         RETURN;
     END IF;
+    IF source_requires_reconciliation OR awaiting_count <> child_count THEN
+        INSERT INTO trade.payment_reconciliation_task (buyer_order_id,source_ref,paid_amount_e4)
+        VALUES (target_id,p_source_ref,p_paid_amount_e4) ON CONFLICT (source_ref) DO NOTHING;
+        applied := false;
+        reconciliation_required := true;
+        RETURN NEXT;
+        RETURN;
+    END IF;
+
+    INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
+    VALUES (target_reservation_key,'commit','payment_confirmed')
+    ON CONFLICT (reservation_key,action) WHERE completed_at IS NULL DO NOTHING;
 
     INSERT INTO trade.payment_transition_guard (txid,buyer_order_id) VALUES (txid_current(),target_id);
     INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref)
@@ -434,6 +477,7 @@ CREATE CONSTRAINT TRIGGER trg_trade_merchant_order_parent_total
 REVOKE ALL ON trade.order_event, trade.order_event_source FROM trade_rw, report_ro;
 REVOKE ALL ON trade.buyer_order, trade.merchant_order, trade.order_line FROM trade_rw, report_ro;
 REVOKE ALL ON trade.reservation_release_outbox FROM trade_rw, report_ro;
+REVOKE ALL ON SEQUENCE trade.payment_reconciliation_task_id_seq FROM PUBLIC, trade_rw, report_ro;
 GRANT SELECT, INSERT ON trade.buyer_order, trade.merchant_order, trade.order_line TO trade_rw;
 GRANT UPDATE (reservation_released_at, reservation_committed_at, refund_required_at, updated_at) ON trade.buyer_order TO trade_rw;
 GRANT UPDATE (status, version, updated_at) ON trade.merchant_order TO trade_rw;
@@ -445,6 +489,8 @@ GRANT USAGE, SELECT ON SEQUENCE trade.buyer_order_id_seq, trade.merchant_order_i
 GRANT SELECT ON trade.order_event, trade.order_event_source TO report_ro;
 REVOKE EXECUTE ON FUNCTION trade.confirm_order_payment(text,text,bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION trade.confirm_order_payment(text,text,bigint) TO trade_rw;
+REVOKE EXECUTE ON FUNCTION trade.has_payment_transition_guard(bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION trade.has_payment_transition_guard(bigint) TO trade_rw;
 REVOKE UPDATE, DELETE, TRUNCATE ON trade.order_line FROM trade_rw;
 REVOKE DELETE, TRUNCATE ON trade.buyer_order, trade.merchant_order FROM trade_rw;
 REVOKE UPDATE ON SEQUENCE trade.buyer_order_id_seq, trade.merchant_order_id_seq, trade.order_line_id_seq,
@@ -468,6 +514,7 @@ DROP TRIGGER trg_trade_order_line_insert ON trade.order_line;
 DROP FUNCTION trade.guard_order_line_insert();
 DROP TRIGGER trg_trade_merchant_order_guard ON trade.merchant_order;
 DROP FUNCTION trade.guard_merchant_order_update();
+DROP FUNCTION trade.has_payment_transition_guard(bigint);
 DROP TRIGGER trg_trade_merchant_order_insert ON trade.merchant_order;
 DROP FUNCTION trade.guard_merchant_order_insert();
 DROP TRIGGER trg_trade_buyer_order_guard ON trade.buyer_order;
@@ -478,6 +525,7 @@ DROP TRIGGER trg_trade_order_event_no_truncate ON trade.order_event;
 DROP TRIGGER trg_trade_order_event_immutable ON trade.order_event;
 DROP FUNCTION trade.reject_order_event_mutation();
 DROP TABLE trade.order_event;
+DROP TABLE trade.payment_reconciliation_task;
 DROP TABLE trade.payment_transition_guard;
 DROP TABLE trade.order_event_source;
 DROP TABLE trade.order_line;

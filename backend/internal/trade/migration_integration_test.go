@@ -22,6 +22,15 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 )
 
+type singleActionStore struct {
+	*PostgresStore
+	action ReservationAction
+}
+
+func (s *singleActionStore) ClaimReservationActions(context.Context, int) ([]ReservationAction, error) {
+	return []ReservationAction{s.action}, nil
+}
+
 func TestTradeOrderMigration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -113,7 +122,7 @@ func findMigration(t *testing.T, directory, suffix string) string {
 
 func assertTradeTables(t *testing.T, db *sql.DB, want bool) {
 	t.Helper()
-	for _, table := range []string{"buyer_order", "reservation_release_outbox", "merchant_order", "order_line", "order_event_source", "order_event", "payment_transition_guard"} {
+	for _, table := range []string{"buyer_order", "reservation_release_outbox", "merchant_order", "order_line", "order_event_source", "order_event", "payment_transition_guard", "payment_reconciliation_task"} {
 		var exists bool
 		if err := db.QueryRow(`SELECT to_regclass('trade.' || $1) IS NOT NULL`, table).Scan(&exists); err != nil {
 			t.Fatal(err)
@@ -282,6 +291,7 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	assertDifferentSourcesSerialize(t, ctx, db, pool, store)
 	assertSiblingTransitionsSerialize(t, ctx, pool, store)
 	assertTradeRWCreateIsIdempotent(t, ctx, dsn)
+	assertTradeRWConnectionReuse(t, ctx, pool, dsn)
 }
 
 func assertTradeRWCreateIsIdempotent(t *testing.T, ctx context.Context, dsn string) {
@@ -364,6 +374,69 @@ func assertTradeRWCreateIsIdempotent(t *testing.T, ctx context.Context, dsn stri
 		_, err := tx.Exec(ctx, `UPDATE trade.merchant_order SET status='cancelled',version=version+1 WHERE id=$1`, secondMerchantID)
 		return err
 	}(), "TR007")
+}
+
+func assertTradeRWConnectionReuse(t *testing.T, ctx context.Context, owner *pgxpool.Pool, dsn string) {
+	t.Helper()
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.MaxConns = 1
+	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, `SET ROLE trade_rw`)
+		return err
+	}
+	rolePool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rolePool.Close()
+	connection, err := rolePool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Release()
+	store := NewPostgresStore(connection.Conn())
+	for i := 0; i < 10; i++ {
+		parentID, err := ids.NewULID()
+		if err != nil {
+			t.Fatal(err)
+		}
+		childID, err := ids.NewULID()
+		if err != nil {
+			t.Fatal(err)
+		}
+		skuID, err := ids.NewULID()
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := fmt.Sprintf("connection-reuse-%d", i)
+		if _, err := owner.Exec(ctx, `WITH buyer AS (
+			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
+			VALUES ($1,$2,$3,repeat('6',64),100) RETURNING id
+		), child AS (
+			INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
+			SELECT $4,id,$5,100 FROM buyer RETURNING id
+		) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
+		SELECT id,$6,1,100,100 FROM child`, parentID, 2000+i, key, childID, 3000+i, skuID); err != nil {
+			t.Fatal(err)
+		}
+		reservationKey, applied, err := store.ConfirmPayment(ctx, parentID, 100, EventSource{Type: SourceKESSResult, Reference: fmt.Sprintf("connection-payment-%d", i)})
+		if err != nil || !applied {
+			t.Fatalf("payment %d key=%q applied=%v err=%v", i, reservationKey, applied, err)
+		}
+		if err := store.CompleteReservationCommit(ctx, reservationKey); err != nil {
+			t.Fatal(err)
+		}
+		var merchantOrderID int64
+		if err := owner.QueryRow(ctx, `SELECT id FROM trade.merchant_order WHERE public_id=$1`, childID).Scan(&merchantOrderID); err != nil {
+			t.Fatal(err)
+		}
+		if advanced, err := store.Advance(ctx, merchantOrderID, Paid, Submitted, EventSource{Type: SourceSystem, Reference: fmt.Sprintf("connection-submit-%d", i)}); err != nil || !advanced {
+			t.Fatalf("same-session advance %d applied=%v err=%v", i, advanced, err)
+		}
+	}
 }
 
 func assertReservationCommitRequiredBeforeSubmission(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
@@ -936,11 +1009,20 @@ func assertReservationReleaseOutbox(t *testing.T, ctx context.Context, pool *pgx
 	if err := pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE completed_at IS NULL),max(attempts),min(reason),bool_and(completed_at IS NOT NULL) FROM trade.reservation_release_outbox WHERE reservation_key='31:outbox'`).Scan(&remaining, &attempts, &reason, &completed); err != nil || remaining != 0 || attempts != 3 || reason != "test" || !completed {
 		t.Fatalf("remaining=%d attempts=%d reason=%q completed=%v err=%v", remaining, attempts, reason, completed, err)
 	}
-	if err := store.QueueReservationRelease(ctx, "31:outbox", "overwritten"); err != nil {
+	if err := store.QueueReservationRelease(ctx, "31:outbox", "release_failed"); err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.QueryRow(ctx, `SELECT reason FROM trade.reservation_release_outbox WHERE reservation_key='31:outbox' AND action='release'`).Scan(&reason); err != nil || reason != "test" {
-		t.Fatalf("requeue reason=%q err=%v, want original reason", reason, err)
+	var retryID int64
+	if err := pool.QueryRow(ctx, `SELECT id,reason FROM trade.reservation_release_outbox WHERE reservation_key='31:outbox' AND action='release' AND completed_at IS NULL`).Scan(&retryID, &reason); err != nil || reason != "release_failed" {
+		t.Fatalf("requeue id=%d reason=%q err=%v", retryID, reason, err)
+	}
+	workerStore := &singleActionStore{PostgresStore: store, action: ReservationAction{ID: retryID, Key: "31:outbox", Action: "release"}}
+	if err := NewService(workerStore, stubAccounts{"active"}, catalogFixture()).ProcessReservationActions(ctx, 1); err != nil {
+		t.Fatal(err)
+	}
+	var rows, pending int
+	if err := pool.QueryRow(ctx, `SELECT count(*),count(*) FILTER (WHERE completed_at IS NULL) FROM trade.reservation_release_outbox WHERE reservation_key='31:outbox' AND action='release'`).Scan(&rows, &pending); err != nil || rows != 2 || pending != 0 {
+		t.Fatalf("requeued rows=%d pending=%d err=%v, want 2/0", rows, pending, err)
 	}
 	if err := store.QueueReservationReview(ctx, "31:unknown-create", "create_result_unknown"); err != nil {
 		t.Fatal(err)
@@ -959,25 +1041,46 @@ func assertDuplicatePaymentSignal(t *testing.T, ctx context.Context, pool *pgxpo
 	if _, err := pool.Exec(ctx, `WITH buyer AS (
 		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
 		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FE0',60,'duplicate-payment',repeat('d',64),100) RETURNING id
-	), child AS (
+	), children AS (
 		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FE1',id,660,100 FROM buyer RETURNING id
+		SELECT child.public_id,buyer.id,child.merchant_id,50 FROM buyer CROSS JOIN (VALUES
+			('01ARZ3NDEKTSV4RRFFQ69G5FE1',660),
+			('01ARZ3NDEKTSV4RRFFQ69G5FE2',661)
+		) child(public_id,merchant_id) RETURNING id,merchant_id
 	) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
-	SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FE2',1,100,100 FROM child`); err != nil {
+	SELECT id,CASE merchant_id WHEN 660 THEN '01ARZ3NDEKTSV4RRFFQ69G5FEA' ELSE '01ARZ3NDEKTSV4RRFFQ69G5FEB' END,1,50,50 FROM children`); err != nil {
 		t.Fatal(err)
 	}
-	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 100, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-a"}); err != nil || !applied {
+	key, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 100, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-a"})
+	if err != nil || !applied {
 		t.Fatalf("first payment applied=%v err=%v", applied, err)
+	}
+	if err := store.CompleteReservationCommit(ctx, key); err != nil {
+		t.Fatal(err)
+	}
+	var firstChild int64
+	if err := pool.QueryRow(ctx, `SELECT min(id) FROM trade.merchant_order WHERE buyer_order_id=(SELECT id FROM trade.buyer_order WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FE0')`).Scan(&firstChild); err != nil {
+		t.Fatal(err)
+	}
+	if advanced, err := store.Advance(ctx, firstChild, Paid, Submitted, EventSource{Type: SourceSystem, Reference: "duplicate-payment-partial-submit"}); err != nil || !advanced {
+		t.Fatalf("partial submit applied=%v err=%v", advanced, err)
 	}
 	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 100, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-b"}); !errors.Is(err, ErrPaymentReconciliation) || applied {
 		t.Fatalf("second payment applied=%v err=%v, want ErrPaymentReconciliation", applied, err)
 	}
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 100, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-b"}); !errors.Is(err, ErrPaymentReconciliation) || applied {
+		t.Fatalf("reconciliation replay applied=%v err=%v, want durable ErrPaymentReconciliation", applied, err)
+	}
 	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 100, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-a"}); err != nil || applied {
 		t.Fatalf("same-source replay applied=%v err=%v", applied, err)
 	}
-	var sources int
+	var sources, tasks int
+	var taskAmount int64
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.order_event_source WHERE source_ref IN ('duplicate-payment-a','duplicate-payment-b')`).Scan(&sources); err != nil || sources != 2 {
 		t.Fatalf("payment sources=%d err=%v, want 2 for reconciliation", sources, err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT count(*),COALESCE(max(paid_amount_e4),0) FROM trade.payment_reconciliation_task WHERE source_ref='duplicate-payment-b'`).Scan(&tasks, &taskAmount); err != nil || tasks != 1 || taskAmount != 100 {
+		t.Fatalf("reconciliation tasks=%d amount=%d err=%v, want 1/100", tasks, taskAmount, err)
 	}
 }
 
@@ -997,8 +1100,8 @@ func assertNoChildOrderHandling(t *testing.T, ctx context.Context, pool *pgxpool
 
 func assertTradeSecurityDefinerAndPrivileges(t *testing.T, ctx context.Context, db *sql.DB, dsn string) {
 	t.Helper()
-	var owner, config string
-	var securityDefiner, publicExecute, tradeExecute, outboxDelete bool
+	var owner, config, guardOwner, guardConfig string
+	var securityDefiner, guardSecurityDefiner, publicExecute, tradeExecute, guardPublicExecute, guardTradeExecute, outboxDelete bool
 	if err := db.QueryRow(`SELECT pg_get_userbyid(p.proowner),p.prosecdef,array_to_string(p.proconfig,',')
 		FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
 		WHERE n.nspname='trade' AND p.proname='confirm_order_payment'`).Scan(&owner, &securityDefiner, &config); err != nil {
@@ -1007,13 +1110,23 @@ func assertTradeSecurityDefinerAndPrivileges(t *testing.T, ctx context.Context, 
 	if owner == "trade_rw" || !securityDefiner || config != "search_path=pg_catalog, trade" {
 		t.Fatalf("confirm_order_payment owner=%q security_definer=%v config=%q", owner, securityDefiner, config)
 	}
-	if err := db.QueryRow(`SELECT has_function_privilege('public','trade.confirm_order_payment(text,text,bigint)','EXECUTE'),
-		has_function_privilege('trade_rw','trade.confirm_order_payment(text,text,bigint)','EXECUTE'),
-		has_table_privilege('trade_rw','trade.reservation_release_outbox','DELETE')`).Scan(&publicExecute, &tradeExecute, &outboxDelete); err != nil {
+	if err := db.QueryRow(`SELECT pg_get_userbyid(p.proowner),p.prosecdef,array_to_string(p.proconfig,',')
+		FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+		WHERE n.nspname='trade' AND p.proname='has_payment_transition_guard'`).Scan(&guardOwner, &guardSecurityDefiner, &guardConfig); err != nil {
 		t.Fatal(err)
 	}
-	if publicExecute || !tradeExecute || outboxDelete {
-		t.Fatalf("function public_execute=%v trade_execute=%v outbox_delete=%v", publicExecute, tradeExecute, outboxDelete)
+	if guardOwner == "trade_rw" || !guardSecurityDefiner || guardConfig != "search_path=trade, pg_temp" {
+		t.Fatalf("has_payment_transition_guard owner=%q security_definer=%v config=%q", guardOwner, guardSecurityDefiner, guardConfig)
+	}
+	if err := db.QueryRow(`SELECT has_function_privilege('public','trade.confirm_order_payment(text,text,bigint)','EXECUTE'),
+		has_function_privilege('trade_rw','trade.confirm_order_payment(text,text,bigint)','EXECUTE'),
+		has_function_privilege('public','trade.has_payment_transition_guard(bigint)','EXECUTE'),
+		has_function_privilege('trade_rw','trade.has_payment_transition_guard(bigint)','EXECUTE'),
+		has_table_privilege('trade_rw','trade.reservation_release_outbox','DELETE')`).Scan(&publicExecute, &tradeExecute, &guardPublicExecute, &guardTradeExecute, &outboxDelete); err != nil {
+		t.Fatal(err)
+	}
+	if publicExecute || !tradeExecute || guardPublicExecute || !guardTradeExecute || outboxDelete {
+		t.Fatalf("payment public_execute=%v trade_execute=%v guard_public_execute=%v guard_trade_execute=%v outbox_delete=%v", publicExecute, tradeExecute, guardPublicExecute, guardTradeExecute, outboxDelete)
 	}
 	configPool, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
@@ -1034,7 +1147,7 @@ func assertTradeSecurityDefinerAndPrivileges(t *testing.T, ctx context.Context, 
 	}(), "42501")
 	assertPGCode(t, func() error { _, err := rolePool.Exec(ctx, `DELETE FROM trade.payment_transition_guard`); return err }(), "42501")
 	assertPGCode(t, func() error { _, err := rolePool.Exec(ctx, `DELETE FROM trade.reservation_release_outbox`); return err }(), "42501")
-	for _, sequence := range []string{"buyer_order_id_seq", "merchant_order_id_seq", "order_line_id_seq", "order_event_id_seq", "order_event_source_id_seq", "reservation_release_outbox_id_seq"} {
+	for _, sequence := range []string{"buyer_order_id_seq", "merchant_order_id_seq", "order_line_id_seq", "order_event_id_seq", "order_event_source_id_seq", "reservation_release_outbox_id_seq", "payment_reconciliation_task_id_seq"} {
 		var update bool
 		qualified := "trade." + sequence
 		if err := db.QueryRow(`SELECT has_sequence_privilege('trade_rw',$1,'UPDATE')`, qualified).Scan(&update); err != nil {
@@ -1205,6 +1318,7 @@ func assertTransitionMatrix(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 		for _, to := range statuses {
 			nextID++
 			merchantID := int64(-1)
+			reservationKey := fmt.Sprintf("%d:matrix-%d", 1000+nextID, nextID)
 			if allowed[[2]OrderStatus{from, to}] {
 				parentPublicID, err := ids.NewULID()
 				if err != nil {
@@ -1222,7 +1336,12 @@ func assertTransitionMatrix(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 					t.Fatal(err)
 				}
 				if from == Paid && to == Submitted {
-					if _, err := pool.Exec(ctx, `UPDATE trade.buyer_order SET reservation_committed_at=clock_timestamp() WHERE public_id=$1`, parentPublicID); err != nil {
+					var actionID int64
+					if err := pool.QueryRow(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason) VALUES ($1,'commit','worker_test') RETURNING id`, reservationKey).Scan(&actionID); err != nil {
+						t.Fatal(err)
+					}
+					workerStore := &singleActionStore{PostgresStore: store, action: ReservationAction{ID: actionID, Key: reservationKey, Action: "commit"}}
+					if err := NewService(workerStore, stubAccounts{"active"}, catalogFixture()).ProcessReservationActions(ctx, 1); err != nil {
 						t.Fatal(err)
 					}
 				}
