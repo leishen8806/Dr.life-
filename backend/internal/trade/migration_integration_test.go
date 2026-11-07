@@ -277,6 +277,7 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	assertBuyerIsolationAndForeignEvent(t, ctx, pool)
 	assertLineAndParentTotalGuards(t, ctx, pool)
 	assertDifferentPaymentSourcesSerialize(t, ctx, pool, store)
+	assertReservationCommitRequiredBeforeSubmission(t, ctx, pool, store)
 	assertTransitionMatrix(t, ctx, pool, store)
 	assertDifferentSourcesSerialize(t, ctx, db, pool, store)
 	assertSiblingTransitionsSerialize(t, ctx, pool, store)
@@ -322,6 +323,79 @@ func assertTradeRWCreateIsIdempotent(t *testing.T, ctx context.Context, dsn stri
 	if key, applied, err := store.ConfirmPayment(ctx, first.PublicID, 200, EventSource{Type: SourceKESSResult, Reference: "rw-payment"}); err != nil || !applied || key != "88:rw-idem" {
 		t.Fatalf("trade_rw parent payment key=%q applied=%v err=%v", key, applied, err)
 	}
+	assertPGCode(t, func() error {
+		_, err := pool.Exec(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,status,total_e4,version)
+			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF1',id,990,'shipped',1,7 FROM trade.buyer_order WHERE public_id=$1`, first.PublicID)
+		return err
+	}(), "TR006")
+	assertPGCode(t, func() error {
+		_, err := pool.Exec(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
+			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF2',id,991,1 FROM trade.buyer_order WHERE public_id=$1`, first.PublicID)
+		return err
+	}(), "TR006")
+
+	second, err := store.Create(ctx, "rw-guards", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertPGCode(t, func() error {
+		_, err := pool.Exec(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
+			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF3',id,992,0 FROM trade.buyer_order WHERE public_id=$1`, second.PublicID)
+		return err
+	}(), "TR006")
+	var secondMerchantID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM trade.merchant_order WHERE buyer_order_id=(SELECT id FROM trade.buyer_order WHERE public_id=$1)`, second.PublicID).Scan(&secondMerchantID); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref)
+		SELECT id,'system','direct-cancel-without-release' FROM trade.buyer_order WHERE public_id=$1`, second.PublicID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref)
+		SELECT $1,id,'awaiting_payment','cancelled','system','direct-cancel-without-release' FROM trade.buyer_order WHERE public_id=$2`, secondMerchantID, second.PublicID); err != nil {
+		t.Fatal(err)
+	}
+	assertPGCode(t, func() error {
+		_, err := tx.Exec(ctx, `UPDATE trade.merchant_order SET status='cancelled',version=version+1 WHERE id=$1`, secondMerchantID)
+		return err
+	}(), "TR007")
+}
+
+func assertReservationCommitRequiredBeforeSubmission(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
+	t.Helper()
+	var merchantOrderID int64
+	if err := pool.QueryRow(ctx, `WITH buyer AS (
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FF4',990,'commit-guard',repeat('9',64),100) RETURNING id
+	), merchant AS (
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF5',id,991,100 FROM buyer RETURNING id
+	) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
+		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FF6',1,100,100 FROM merchant RETURNING merchant_order_id`).Scan(&merchantOrderID); err != nil {
+		t.Fatal(err)
+	}
+	key, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FF4", 100, EventSource{Type: SourceKESSResult, Reference: "commit-guard-payment"})
+	if err != nil || !applied {
+		t.Fatalf("payment key=%q applied=%v err=%v", key, applied, err)
+	}
+	if applied, err := store.Advance(ctx, merchantOrderID, Paid, Submitted, EventSource{Type: SourceSystem, Reference: "before-catalog-commit"}); !errors.Is(err, ErrInvalidTransition) || applied {
+		t.Fatalf("advance before commit applied=%v err=%v", applied, err)
+	}
+	if err := store.CompleteReservationCommit(ctx, key); err != nil {
+		t.Fatal(err)
+	}
+	var committed bool
+	if err := pool.QueryRow(ctx, `SELECT reservation_committed_at IS NOT NULL FROM trade.buyer_order WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FF4'`).Scan(&committed); err != nil || !committed {
+		t.Fatalf("reservation committed=%v err=%v", committed, err)
+	}
+	if applied, err := store.Advance(ctx, merchantOrderID, Paid, Submitted, EventSource{Type: SourceSystem, Reference: "after-catalog-commit"}); err != nil || !applied {
+		t.Fatalf("advance after commit applied=%v err=%v", applied, err)
+	}
 }
 
 func assertAmountConstraints(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
@@ -359,6 +433,9 @@ func assertDifferentSourcesSerialize(t *testing.T, ctx context.Context, db *sql.
 	}
 	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB3", 100, EventSource{Type: SourceKESSResult, Reference: "payment-before-serialize"}); err != nil || !applied {
 		t.Fatalf("prepare paid order applied=%v err=%v", applied, err)
+	}
+	if err := store.CompleteReservationCommit(ctx, "4:idem-5"); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := db.Exec(`CREATE FUNCTION trade.test_block_order_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(540054); RETURN NEW; END $$; CREATE TRIGGER trg_test_block_order_event BEFORE INSERT ON trade.order_event FOR EACH ROW EXECUTE FUNCTION trade.test_block_order_event()`); err != nil {
 		t.Fatal(err)
@@ -444,6 +521,9 @@ func assertSiblingTransitionsSerialize(t *testing.T, ctx context.Context, pool *
 	}
 	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FDP", 200, EventSource{Type: SourceKESSResult, Reference: "sibling-payment"}); err != nil || !applied {
 		t.Fatalf("sibling payment applied=%v err=%v", applied, err)
+	}
+	if err := store.CompleteReservationCommit(ctx, "46:sibling-lock"); err != nil {
+		t.Fatal(err)
 	}
 	type outcome struct {
 		applied bool
@@ -855,6 +935,16 @@ func assertReservationReleaseOutbox(t *testing.T, ctx context.Context, pool *pgx
 	if err := pool.QueryRow(ctx, `SELECT reason FROM trade.reservation_release_outbox WHERE reservation_key='31:outbox' AND action='release'`).Scan(&reason); err != nil || reason != "test" {
 		t.Fatalf("requeue reason=%q err=%v, want original reason", reason, err)
 	}
+	if err := store.QueueReservationReview(ctx, "31:unknown-create", "create_result_unknown"); err != nil {
+		t.Fatal(err)
+	}
+	items, err = store.ClaimReservationActions(ctx, 10)
+	if err != nil || len(items) != 1 || items[0].Key != "31:unknown-create" || items[0].Action != "review_release" {
+		t.Fatalf("review claim=%+v err=%v", items, err)
+	}
+	if exists, err := store.ReservationExists(ctx, "31:unknown-create"); err != nil || exists {
+		t.Fatalf("unknown reservation exists=%v err=%v", exists, err)
+	}
 }
 
 func assertDuplicatePaymentSignal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
@@ -1123,6 +1213,11 @@ func assertTransitionMatrix(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 				) INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,status,total_e4)
 				SELECT $4,id,$2,$5,0 FROM buyer RETURNING id`, parentPublicID, 1000+nextID, fmt.Sprintf("matrix-%d", nextID), childPublicID, string(from)).Scan(&merchantID); err != nil {
 					t.Fatal(err)
+				}
+				if from == Paid && to == Submitted {
+					if _, err := pool.Exec(ctx, `UPDATE trade.buyer_order SET reservation_committed_at=clock_timestamp() WHERE public_id=$1`, parentPublicID); err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 			applied, err := store.Advance(ctx, merchantID, from, to, EventSource{Type: SourceSystem, Reference: fmt.Sprintf("matrix-%d", nextID)})

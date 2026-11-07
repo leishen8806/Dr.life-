@@ -142,6 +142,18 @@ func (s *PostgresStore) QueueReservationRelease(ctx context.Context, reservation
 	return err
 }
 
+func (s *PostgresStore) QueueReservationReview(ctx context.Context, reservationKey, reason string) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
+		VALUES ($1,'review_release',$2) ON CONFLICT (reservation_key,action) DO NOTHING`, reservationKey, reason)
+	return err
+}
+
+func (s *PostgresStore) ReservationExists(ctx context.Context, key string) (bool, error) {
+	var exists bool
+	err := s.db.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM trade.buyer_order WHERE buyer_account_id || ':' || idempotency_key=$1)`, key).Scan(&exists)
+	return exists, err
+}
+
 func (s *PostgresStore) CompleteReservationRelease(ctx context.Context, key string) error {
 	_, err := s.db.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=COALESCE(completed_at,clock_timestamp()),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='release'`, key)
 	return err
@@ -225,6 +237,13 @@ func (s *PostgresStore) ClaimReservationRelease(ctx context.Context, publicID st
 	if !allowed {
 		return Reservation{}, false, ErrInvalidTransition
 	}
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
+		VALUES ($1,'release','order_cancelled') ON CONFLICT (reservation_key,action) DO NOTHING`, reservation.Key); err != nil {
+		return Reservation{}, false, err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET reservation_released_at=clock_timestamp(),updated_at=clock_timestamp() WHERE public_id=$1`, publicID); err != nil {
+		return Reservation{}, false, err
+	}
 	if allCancelled {
 		reservation.Status = Cancelled
 	} else {
@@ -243,13 +262,6 @@ func (s *PostgresStore) ClaimReservationRelease(ctx context.Context, publicID st
 			return Reservation{}, false, err
 		}
 		reservation.Status = Cancelled
-	}
-	if _, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET reservation_released_at=clock_timestamp(),updated_at=clock_timestamp() WHERE public_id=$1`, publicID); err != nil {
-		return Reservation{}, false, err
-	}
-	if _, err := tx.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
-		VALUES ($1,'release','order_cancelled') ON CONFLICT (reservation_key,action) DO NOTHING`, reservation.Key); err != nil {
-		return Reservation{}, false, err
 	}
 	return reservation, true, tx.Commit(ctx)
 }
@@ -295,8 +307,23 @@ func (s *PostgresStore) FailReservationAction(ctx context.Context, id int64) err
 }
 
 func (s *PostgresStore) CompleteReservationCommit(ctx context.Context, key string) error {
-	_, err := s.db.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=COALESCE(completed_at,clock_timestamp()),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='commit'`, key)
-	return err
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	command, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET reservation_committed_at=COALESCE(reservation_committed_at,clock_timestamp()),updated_at=clock_timestamp()
+		WHERE buyer_account_id || ':' || idempotency_key=$1`, key)
+	if err != nil {
+		return err
+	}
+	if command.RowsAffected() != 1 {
+		return ErrOrderNotVisible
+	}
+	if _, err := tx.Exec(ctx, `UPDATE trade.reservation_release_outbox SET completed_at=COALESCE(completed_at,clock_timestamp()),claimed_at=NULL,updated_at=clock_timestamp() WHERE reservation_key=$1 AND action='commit'`, key); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *PostgresStore) RequireRefund(ctx context.Context, key string) error {
@@ -333,8 +360,8 @@ func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from
 	if err := tx.QueryRow(ctx, `SELECT buyer_order_id FROM trade.merchant_order WHERE id=$1`, merchantOrderID).Scan(&buyerOrderID); err != nil {
 		return false, err
 	}
-	var refundRequired bool
-	if err := tx.QueryRow(ctx, `SELECT refund_required_at IS NOT NULL FROM trade.buyer_order WHERE id=$1 FOR UPDATE`, buyerOrderID).Scan(&refundRequired); err != nil {
+	var refundRequired, reservationCommitted bool
+	if err := tx.QueryRow(ctx, `SELECT refund_required_at IS NOT NULL,reservation_committed_at IS NOT NULL FROM trade.buyer_order WHERE id=$1 FOR UPDATE`, buyerOrderID).Scan(&refundRequired, &reservationCommitted); err != nil {
 		return false, err
 	}
 	var current string
@@ -343,6 +370,9 @@ func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from
 	}
 	if refundRequired && from == Paid && to == Submitted {
 		return false, ErrReservationReleased
+	}
+	if !reservationCommitted && from == Paid && to == Submitted {
+		return false, ErrInvalidTransition
 	}
 	var seenFrom, seenTo string
 	err = tx.QueryRow(ctx, `SELECT from_status,to_status FROM trade.order_event WHERE merchant_order_id=$1 AND source_type=$2 AND source_ref=$3`, merchantOrderID, string(source.Type), source.Reference).Scan(&seenFrom, &seenTo)

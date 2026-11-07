@@ -44,6 +44,8 @@ type Store interface {
 	FindByIdempotency(context.Context, int64, string, string) (CreateOrder, bool, error)
 	Create(context.Context, string, string, CreateOrder) (CreateOrder, error)
 	QueueReservationRelease(context.Context, string, string) error
+	QueueReservationReview(context.Context, string, string) error
+	ReservationExists(context.Context, string) (bool, error)
 	CompleteReservationRelease(context.Context, string) error
 	// ClaimReservationRelease is an internal worker operation. A future buyer
 	// HTTP endpoint must add buyer ownership to this contract and its SQL.
@@ -174,7 +176,7 @@ func (s *Service) Place(ctx context.Context, buyer int64, idempotencyKey string,
 			return CreateOrder{}, err
 		}
 		if existing, found, confirmErr := s.store.FindByIdempotency(ctx, buyer, idempotencyKey, hash); confirmErr != nil {
-			return CreateOrder{}, errors.Join(err, confirmErr)
+			return CreateOrder{}, errors.Join(err, confirmErr, s.store.QueueReservationReview(ctx, reservationKey, "create_result_unknown"))
 		} else if found {
 			return existing, nil
 		}
@@ -248,6 +250,12 @@ func (s *Service) ProcessReservationActions(ctx context.Context, limit int) erro
 					result = errors.Join(result, actionErr)
 				}
 				continue
+			}
+		} else if item.Action == "review_release" {
+			var exists bool
+			exists, actionErr = s.store.ReservationExists(ctx, item.Key)
+			if actionErr == nil && !exists {
+				actionErr = s.catalog.Release(ctx, item.Key)
 			}
 		} else {
 			actionErr = s.catalog.Release(ctx, item.Key)
