@@ -143,3 +143,19 @@ func matchesPath(paths []string, path string) bool {
 	}
 	return false
 }
+
+// RequireAdminRefreshCSRF confines the cookie-bearing admin refresh endpoint to
+// the configured administration origin. The custom header makes cross-site form
+// submissions fail even if a browser's cookie policy changes.
+func RequireAdminRefreshCSRF(groups OriginGroups) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && r.URL.Path == "/v1/admin/auth/refresh" &&
+				(!containsOrigin(groups.Admin, r.Header.Get("Origin")) || r.Header.Get("X-Requested-With") != "drlife") {
+				httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}

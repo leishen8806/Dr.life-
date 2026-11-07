@@ -57,7 +57,7 @@
 | `account_bot` | account_id, bot_id, bound_at, write_access boolean, unreachable_at | 用户在哪些 Bot 点过开始/允许私信；发送时据此选 Bot（第二章） |
 | `login_event` | id, person_id, bot_id, valid_by_bot_id, tried_count, auth_date, ip, device_id, result, created_at | 登录审计；`result` 含 `ambiguous_account`；`iam_rw` 仅可 SELECT/INSERT，禁止 UPDATE/DELETE/TRUNCATE/TRIGGER/REFERENCES，校验命中的 Bot、尝试次数 |
 | `account_status_log` | id, public_id, account_id, from_status, to_status, reason, actor_type, actor_id, created_at | 账号状态变更只追加日志；冻结、停用及恢复均须填写原因；`iam_rw` 仅可 SELECT/INSERT，拒绝修改、删除和截断；`report_ro` 不可读取 `reason` |
-| `session` | id, account_id, family_id, refresh_token_hash, previous_hash, rotated_at, rotation, refresh_kid, device_id, ip, expires_at, last_used_at, revoked_at, revoked_reason | 刷新令牌只存哈希；旋转使用前一哈希和时间实现宽限期重放，冻结/停用时按 family 批量作废 |
+| `session` | id, account_id / admin_user_id（二选一）, family_id, refresh_token_hash, previous_hash, rotated_at, rotation, refresh_kid, device_id, ip, expires_at, last_used_at, revoked_at, revoked_reason | 刷新令牌只存哈希；买家/商家等账号与管理员复用旋转链，但会话类型不可混用；管理员固定 15 分钟空闲、8 小时绝对有效期；冻结/停用时按 family 批量作废 |
 | `security_event` | account_id, session_family_id, event, reason, created_at | 会话安全事件；不含令牌或哈希 |
 | `merchant` | id, public_id, name jsonb, type, area, svc jsonb, description jsonb, phone_enc, address_enc, contact_enc, kind (`self/verified/pending`), status, owner_account_id | 商户资料；电话、地址、联系人由应用层加密后存放；`kind=verified` 须核验 |
 | `merchant_staff` | id, public_id, merchant_id, account_id(可空,未接受前), name, phone_enc, phone_hash, tg_username, note, role (`manager/sales/warehouse/finance`), status (`invited/active/off`), invite_code unique, invited_by, last_login_at | 员工上限 10（应用层校验）；`phone_enc` 存密文，`phone_hash` 存规范化手机号的不可逆摘要并用于同一商户内唯一性 |
@@ -65,7 +65,8 @@
 | `merchant_role_perm_template` | role, module, level | 四类商户角色的默认权限模板；创建商户时由应用复制到 `merchant_role_perm` |
 | `merchant_op_log` | id, merchant_id, actor_account_id, action, detail, created_at | 员工操作记录（只追加） |
 | `account_link` | id, buyer_account_id, merchant_account_id, linked_at, unlinked_at | 一键关联；`UNIQUE(buyer,merchant)` 且仅一条未解除；**只保存关联，不改变任何资金/订单归属** |
-| `admin_user` | id, public_id, name, email, password_hash(argon2), totp_secret_enc, role, data_scope text[], status, last_login_at | 密码只存 Argon2 哈希，TOTP 密钥由应用层信封加密后存放（AAD=`admin_totp:<public_id>`）；平台与物流仓储 Web 账号；超级管理员至少 1 位启用（应用层 + 数据库触发器 + 定期审计） |
+| `admin_user` | id, public_id, name, email, password_hash(argon2), totp_secret_enc, role, data_scope text[], status, last_login_at | 密码只存 Argon2 哈希，TOTP 密钥由应用层信封加密后存放（AAD=`admin_totp:<public_id>`）；Argon2 创建与校验共用独立的 8 槽并发上限；平台与物流仓储 Web 账号；超级管理员至少 1 位启用（应用层 + 数据库触发器 + 定期审计） |
+| `admin_audit_outbox` | id, public_id, occurred_at, actor_id, actor_role, action, target, detail jsonb, ip, request_id, attempts, last_error, delivered_at | 管理员登录、step-up、改密、创建、停用和角色变更先持久化落箱；投递以 `FOR UPDATE SKIP LOCKED` 认领，并用 `public_id` 在审计链 `event_seen` 唯一去重；失败保留重试，已投递超过 30 天的行通过 `delivered_at IS NOT NULL` 部分索引分批清理 |
 | `admin_role_perm` | role (`super/ops/finance/logi/cs/auditor`), module(17 个), level | 对应《权限与审计规范》矩阵；`super` 固定全 `edit` |
 | `actor` | id, kind (`account/admin/system/external`), ref_id | 统一"操作人"，供 `created_by`、审计、流水引用 |
 
@@ -369,6 +370,14 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 | R-04 | 6-B.8b、8c、8d、6-B.9 |
 
 所有新增类型、科目与类别，用**同一个新迁移**追加到 `ledger.txn.type`、`ledger.account.kind`、`ledger.posting.category` 的 CHECK 中，由 GoSenior 或 DBEngineer 实现，经代码审查 → SecurityReviewer → LedgerAuditor 三道复核。
+
+#### 6-B.12a KESS 付款意向（P-01）
+
+`trade.kess_payment_intent` 只保存服务端应收快照和 KESS 渠道事实，不记余额、不产生分录。一个父订单的每次付款尝试只有一条意向，唯一键为 `(company_id, source_ref, attempt_no)`；`trade_no` 由父订单编号与尝试号确定，重试不得换号。金额使用 USD e4，跨 KESS 边界时必须整分（`amount_e4 % 100 = 0`）。
+
+初始状态只能是 `PENDING`，且渠道状态、交易号、付款链接、领取时间与 `create_sent_at` 均为空。worker 以 `FOR UPDATE SKIP LOCKED` 加有期限的领取标记，避免两个进程同时调用 createOrder；只有确定请求尚未发出时才释放领取标记并保留 `PENDING`。已经领取过的租约即使过期也不得再次调用 createOrder，而是转 `UNKNOWN` 后按原 `trade_no` 查单；`create_sent_at` 记录首次可能发出 createOrder 的时间，进程在请求后失联时以领取时间作保守代理。请求可能已经发出后的超时、断线、5xx、解码或验签失败一律转 `UNKNOWN`。createOrder 即使返回终态也只转 `UNKNOWN`；`WAITING` 与 `UNKNOWN` 都必须周期性主动查单，付款成功仅认服务端 queryorder 返回的 `SUCCESS`，且支付号、商户、金额、币种必须与意向一致。超过以 `create_sent_at` 起算的可配置窗口仍查无此单才转 `CLOSED`，并由订单域释放对应预占。
+
+状态更新必须带旧状态条件，影响 0 行视为冲突；没有新付款链接时保留旧链接。收款响应未带 `sign` 时依赖 TLS，带 `sign` 时必须校验；响应签名与回调签名的最终规则仍列为 KESS 外部待确认项。
 
 #### 6-B.13 账务审计后的修订（2026-10-29，回应 LedgerAuditor 在 CMP-655 的 B1–B3 与 A1–A3；**与上文冲突处以本节为准**）
 

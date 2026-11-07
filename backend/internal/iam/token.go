@@ -32,8 +32,15 @@ type PassSessionChecker struct{}
 func (PassSessionChecker) Active(context.Context, string, string) (bool, error) { return true, nil }
 
 type AccessClaims struct {
-	Role string `json:"role"`
-	SID  string `json:"sid"`
+	Role               string `json:"role"`
+	SID                string `json:"sid"`
+	PasswordChangeOnly bool   `json:"password_change_only,omitempty"`
+	jwt.RegisteredClaims
+}
+
+type StepUpClaims struct {
+	Scope string `json:"scope"`
+	SID   string `json:"sid"`
 	jwt.RegisteredClaims
 }
 
@@ -66,7 +73,104 @@ func (m TokenManager) IssueAccess(ctx context.Context, accountPublicID, role, se
 	return m.signAccess(accountPublicID, role, sessionPublicID, kid, key, now, jti)
 }
 
+// IssueRestrictedAdminAccess issues an administrator token that the gateway
+// permits only for the first-password-change endpoint.
+func (m TokenManager) IssueRestrictedAdminAccess(ctx context.Context, adminPublicID, sessionPublicID string) (string, error) {
+	if m.Keys == nil || m.AccessTTL <= 0 || adminPublicID == "" || sessionPublicID == "" {
+		return "", ErrInvalidToken
+	}
+	now := time.Now()
+	if m.Now != nil {
+		now = m.Now()
+	}
+	kid, key, err := m.Keys.ActiveKey(ctx)
+	if err != nil {
+		return "", ErrInvalidToken
+	}
+	defer wipe(key)
+	jti, err := randomToken(16)
+	if err != nil {
+		return "", err
+	}
+	return m.signAccessWithRestriction(adminPublicID, "admin", sessionPublicID, kid, key, now, jti, true)
+}
+
+func (m TokenManager) IssueStepUp(ctx context.Context, adminPublicID, sessionPublicID, scope string) (string, time.Time, error) {
+	if m.Keys == nil || adminPublicID == "" || sessionPublicID == "" || scope == "" {
+		return "", time.Time{}, ErrInvalidToken
+	}
+	now := time.Now()
+	if m.Now != nil {
+		now = m.Now()
+	}
+	kid, key, err := m.Keys.ActiveKey(ctx)
+	if err != nil {
+		return "", time.Time{}, ErrInvalidToken
+	}
+	defer wipe(key)
+	jti, err := randomToken(16)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	issuer := m.Issuer
+	if issuer == "" {
+		issuer = "drlife"
+	}
+	expiresAt := now.Add(5 * time.Minute)
+	claims := StepUpClaims{Scope: scope, SID: sessionPublicID, RegisteredClaims: jwt.RegisteredClaims{Issuer: issuer, Subject: adminPublicID, Audience: jwt.ClaimStrings{"drlife:admin"}, IssuedAt: jwt.NewNumericDate(now), ExpiresAt: jwt.NewNumericDate(expiresAt), ID: jti}}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token.Header["kid"] = kid
+	token.Header["typ"] = "su+jwt"
+	raw, err := token.SignedString(key)
+	if err != nil {
+		return "", time.Time{}, ErrInvalidToken
+	}
+	return raw, expiresAt, nil
+}
+
+func (m TokenManager) VerifyStepUp(ctx context.Context, raw, expectedScope, expectedAdminID, expectedSessionID string) (string, error) {
+	if m.Keys == nil || raw == "" || expectedScope == "" || expectedAdminID == "" || expectedSessionID == "" {
+		return "", ErrInvalidToken
+	}
+	claims := new(StepUpClaims)
+	now := time.Now
+	if m.Now != nil {
+		now = m.Now
+	}
+	var tokenType string
+	parsed, err := jwt.ParseWithClaims(raw, claims, func(token *jwt.Token) (any, error) {
+		if token.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, ErrInvalidToken
+		}
+		kid, ok := token.Header["kid"].(string)
+		if !ok || kid == "" {
+			return nil, ErrInvalidToken
+		}
+		tokenType, _ = token.Header["typ"].(string)
+		return m.Keys.KeyByID(ctx, kid)
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired(), jwt.WithTimeFunc(now))
+	issuer := m.Issuer
+	if issuer == "" {
+		issuer = "drlife"
+	}
+	if err != nil || !parsed.Valid || tokenType != "su+jwt" || claims.Issuer != issuer || len(claims.Audience) != 1 || claims.Audience[0] != "drlife:admin" || claims.Subject != expectedAdminID || claims.SID != expectedSessionID || claims.Scope != expectedScope || claims.ID == "" {
+		return "", ErrInvalidToken
+	}
+	return claims.ID, nil
+}
+
 func (m TokenManager) IssueRotatedAccess(ctx context.Context, accountPublicID, role, sessionPublicID, kid string, rotation int64, issuedAt time.Time) (string, error) {
+	return m.issueRotatedAccess(ctx, accountPublicID, role, sessionPublicID, kid, rotation, issuedAt, false)
+}
+
+// IssueRotatedRestrictedAdminAccess reissues a restricted administrator token
+// during refresh. The restriction must survive refresh until the administrator
+// completes the required password change.
+func (m TokenManager) IssueRotatedRestrictedAdminAccess(ctx context.Context, accountPublicID, sessionPublicID, kid string, rotation int64, issuedAt time.Time) (string, error) {
+	return m.issueRotatedAccess(ctx, accountPublicID, "admin", sessionPublicID, kid, rotation, issuedAt, true)
+}
+
+func (m TokenManager) issueRotatedAccess(ctx context.Context, accountPublicID, role, sessionPublicID, kid string, rotation int64, issuedAt time.Time, passwordChangeOnly bool) (string, error) {
 	if m.Keys == nil || m.AccessTTL <= 0 || accountPublicID == "" || sessionPublicID == "" || kid == "" || !validRole(role) {
 		return "", ErrInvalidToken
 	}
@@ -76,15 +180,19 @@ func (m TokenManager) IssueRotatedAccess(ctx context.Context, accountPublicID, r
 	}
 	defer wipe(key)
 	jti := derivedToken(key, "access", sessionPublicID, rotation)
-	return m.signAccess(accountPublicID, role, sessionPublicID, kid, key, issuedAt, jti)
+	return m.signAccessWithRestriction(accountPublicID, role, sessionPublicID, kid, key, issuedAt, jti, passwordChangeOnly)
 }
 
 func (m TokenManager) signAccess(accountPublicID, role, sessionPublicID, kid string, key []byte, issuedAt time.Time, jti string) (string, error) {
+	return m.signAccessWithRestriction(accountPublicID, role, sessionPublicID, kid, key, issuedAt, jti, false)
+}
+
+func (m TokenManager) signAccessWithRestriction(accountPublicID, role, sessionPublicID, kid string, key []byte, issuedAt time.Time, jti string, passwordChangeOnly bool) (string, error) {
 	issuer := m.Issuer
 	if issuer == "" {
 		issuer = "drlife"
 	}
-	claims := AccessClaims{Role: role, SID: sessionPublicID, RegisteredClaims: jwt.RegisteredClaims{
+	claims := AccessClaims{Role: role, SID: sessionPublicID, PasswordChangeOnly: passwordChangeOnly, RegisteredClaims: jwt.RegisteredClaims{
 		Issuer: issuer, Subject: accountPublicID, Audience: jwt.ClaimStrings{audienceForRole(role)},
 		IssuedAt: jwt.NewNumericDate(issuedAt), ExpiresAt: jwt.NewNumericDate(issuedAt.Add(m.AccessTTL)), ID: jti,
 	}}
@@ -154,7 +262,7 @@ func (m TokenManager) parseAccess(ctx context.Context, raw, expectedAudience str
 	if err != nil && !(allowUnavailable && errors.Is(err, ErrSessionStoreUnavailable)) || err == nil && !active {
 		return gateway.Identity{}, "", ErrInvalidToken
 	}
-	return gateway.Identity{AccountID: claims.Subject, Role: gateway.Role(claims.Role), SessionID: claims.SID}, claims.SID, nil
+	return gateway.Identity{AccountID: claims.Subject, Role: gateway.Role(claims.Role), SessionID: claims.SID, PasswordChangeOnly: claims.PasswordChangeOnly}, claims.SID, nil
 }
 
 type Authenticator struct{ Tokens TokenManager }
@@ -248,7 +356,7 @@ func ordinaryRead(r *http.Request) bool {
 }
 
 func validRole(role string) bool {
-	return role == string(gateway.RoleBuyer) || role == string(gateway.RoleMerchant) || role == string(gateway.RoleDriver)
+	return role == string(gateway.RoleBuyer) || role == string(gateway.RoleMerchant) || role == string(gateway.RoleDriver) || role == string(gateway.RoleAdmin) || role == string(gateway.RoleWMS)
 }
 
 func wipe(value []byte) {

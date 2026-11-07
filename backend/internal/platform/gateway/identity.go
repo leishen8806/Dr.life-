@@ -16,10 +16,11 @@ const (
 )
 
 type Identity struct {
-	AccountID   string
-	Role        Role
-	SessionID   string
-	Permissions map[string]string
+	AccountID          string
+	Role               Role
+	SessionID          string
+	PasswordChangeOnly bool
+	Permissions        map[string]string
 }
 
 func (i Identity) HasPermission(module, level string) bool {

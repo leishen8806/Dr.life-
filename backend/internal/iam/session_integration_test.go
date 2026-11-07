@@ -12,12 +12,14 @@ import (
 	"time"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 )
 
 type cachedTestSession struct {
 	account string
 	epoch   int64
 	revoked bool
+	ttl     time.Duration
 }
 
 type testSessionCache struct {
@@ -41,7 +43,7 @@ func (c *testSessionCache) Get(_ context.Context, accountID, sessionID string) (
 	item, ok := c.sessions[sessionID]
 	return ok && !item.revoked && item.account == accountID && item.epoch == c.epochs[accountID], ok, nil
 }
-func (c *testSessionCache) Put(_ context.Context, accountID, sessionID string, epoch int64, _ time.Duration) error {
+func (c *testSessionCache) Put(_ context.Context, accountID, sessionID string, epoch int64, ttl time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.unavailable {
@@ -50,7 +52,7 @@ func (c *testSessionCache) Put(_ context.Context, accountID, sessionID string, e
 	if c.epochs[accountID] <= epoch {
 		c.epochs[accountID] = epoch
 	}
-	c.sessions[sessionID] = cachedTestSession{account: accountID, epoch: epoch}
+	c.sessions[sessionID] = cachedTestSession{account: accountID, epoch: epoch, ttl: ttl}
 	return nil
 }
 func (c *testSessionCache) Revoke(_ context.Context, sessionID string, _ time.Duration) error {
@@ -101,6 +103,9 @@ func (f *loginFixture) testSessionLifecycle(t *testing.T) {
 	}
 	metrics, alert := &testSessionMetrics{}, &testAlerter{}
 	sessions := &SessionService{DB: f.pool, Tokens: f.service.Tokens, Cache: f.cache, Grace: 10 * time.Second, IdleTTL: 24 * time.Hour, AbsoluteTTL: 7 * 24 * time.Hour, Metrics: metrics, Alerter: alert, Now: func() time.Time { return f.now }}
+	if _, err := sessions.RefreshEndpoint(ctx, login.RefreshToken, "203.0.113.43", true); err == nil {
+		t.Fatal("buyer refresh token accepted by administrator endpoint")
+	}
 
 	const count = 50
 	results := make(chan RefreshResult, count)
@@ -158,6 +163,42 @@ func (f *loginFixture) testSessionLifecycle(t *testing.T) {
 	}
 	if metrics.results["buyer:reuse"] != 1 {
 		t.Fatalf("reuse metric=%v", metrics.results)
+	}
+}
+
+func (f *loginFixture) testAdminSessionRefresh(t *testing.T) {
+	ctx := context.Background()
+	const adminID = "01ARZ3NDEKTSV4RRFFQ69G5FC0"
+	const sessionID = "01ARZ3NDEKTSV4RRFFQ69G5FC1"
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.admin_user (public_id,name,email,password_hash,role,status) VALUES ($1,'Refresh Admin','refresh-admin@example.test','argon2-hash','finance','active')`, adminID); err != nil {
+		t.Fatal(err)
+	}
+	refresh, refreshHash, kid, err := f.service.Tokens.IssueRefresh(ctx, sessionID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `INSERT INTO iam.session (public_id,admin_user_id,family_id,refresh_token_hash,refresh_kid,expires_at,last_used_at) VALUES ($1,(SELECT id FROM iam.admin_user WHERE public_id=$2),$1,$3,$4,$5,$5)`, sessionID, adminID, refreshHash, kid, f.now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	now := f.now
+	adminTokens := f.service.Tokens
+	adminTokens.AccessTTL = 10 * time.Minute
+	sessions := &SessionService{DB: f.pool, Tokens: f.service.Tokens, AdminTokens: adminTokens, Cache: f.cache, Grace: 10 * time.Second, IdleTTL: 24 * time.Hour, AbsoluteTTL: 7 * 24 * time.Hour, Now: func() time.Time { return now }}
+	result, err := sessions.Refresh(ctx, refresh, "203.0.113.50")
+	if err != nil {
+		t.Fatalf("refresh admin session: %v", err)
+	}
+	identity, _, err := f.service.Tokens.ParseAccess(ctx, result.AccessToken)
+	if err != nil || identity.AccountID != adminID || identity.Role != gateway.RoleAdmin {
+		t.Fatalf("admin refresh access=%+v err=%v", identity, err)
+	}
+	now = now.Add(11 * time.Second)
+	if _, err := sessions.Refresh(ctx, refresh, "203.0.113.50"); err == nil {
+		t.Fatal("admin refresh token reuse outside grace was accepted")
+	}
+	var revoked int
+	if err := f.pool.QueryRow(ctx, `SELECT count(*) FROM iam.session WHERE family_id=$1 AND revoked_at IS NOT NULL`, sessionID).Scan(&revoked); err != nil || revoked != 1 {
+		t.Fatalf("admin family revoked=%d err=%v", revoked, err)
 	}
 }
 

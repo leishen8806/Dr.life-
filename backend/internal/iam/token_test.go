@@ -149,6 +149,48 @@ func TestAccessTokenTypeAudienceIssuerAndLegacyWindow(t *testing.T) {
 	}
 }
 
+func TestAdminAccessTokenHasAdminAudienceAndTenMinuteLifetime(t *testing.T) {
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+	ring, _ := secrets.NewKeyring(map[string][]byte{"active": key}, "active")
+	now := time.Unix(1_800_000_000, 0)
+	manager := TokenManager{Keys: ring, AccessTTL: 10 * time.Minute, Issuer: "drlife", Now: func() time.Time { return now }}
+	raw, err := manager.IssueAccess(context.Background(), "admin-user", "admin", "admin-session")
+	if err != nil {
+		t.Fatalf("issue admin access token: %v", err)
+	}
+	parsed, _, err := jwt.NewParser().ParseUnverified(raw, new(AccessClaims))
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims := parsed.Claims.(*AccessClaims)
+	if len(claims.Audience) != 1 || claims.Audience[0] != "drlife:admin" || claims.ExpiresAt.Time.Sub(now) != 10*time.Minute {
+		t.Fatalf("admin claims=%+v", claims.RegisteredClaims)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/v1/admin/ledger/txns", nil)
+	req.Header.Set("Authorization", "Bearer "+raw)
+	identity, ok, err := (Authenticator{Tokens: manager}).Authenticate(req)
+	if err != nil || !ok || identity.Role != gateway.RoleAdmin || identity.AccountID != "admin-user" {
+		t.Fatalf("admin auth=%+v ok=%v err=%v", identity, ok, err)
+	}
+}
+
+func TestRestrictedAdminAccessTokenCarriesPasswordChangeOnlyClaim(t *testing.T) {
+	now := time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC)
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+	ring, _ := secrets.NewKeyring(map[string][]byte{"active": key}, "active")
+	manager := TokenManager{Keys: ring, AccessTTL: 10 * time.Minute, Now: func() time.Time { return now }}
+	raw, err := manager.IssueRestrictedAdminAccess(context.Background(), "admin-user", "admin-session")
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity, _, err := manager.ParseAccess(context.Background(), raw)
+	if err != nil || !identity.PasswordChangeOnly || identity.Role != gateway.RoleAdmin || identity.AccountID != "admin-user" {
+		t.Fatalf("identity=%+v err=%v", identity, err)
+	}
+}
+
 func TestWrongAudienceIsUnauthenticatedBeforeRoleAuthorization(t *testing.T) {
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
@@ -221,5 +263,29 @@ func TestJWTAuthenticatorThroughGateway(t *testing.T) {
 	handler.ServeHTTP(w, req)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expired status=%d", w.Code)
+	}
+}
+
+func TestStepUpTokenBindsAdminScopeAndExpiresInFiveMinutes(t *testing.T) {
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+	ring, _ := secrets.NewKeyring(map[string][]byte{"active": key}, "active")
+	now := time.Unix(1_800_000_000, 0)
+	manager := TokenManager{Keys: ring, Issuer: "drlife", Now: func() time.Time { return now }}
+	raw, expiresAt, err := manager.IssueStepUp(context.Background(), "admin-account", "admin-session", "withdrawal_review")
+	if err != nil || !expiresAt.Equal(now.Add(5*time.Minute)) {
+		t.Fatalf("issue expires=%s err=%v", expiresAt, err)
+	}
+	if _, err := manager.VerifyStepUp(context.Background(), raw, "withdrawal_review", "admin-account", "admin-session"); err != nil {
+		t.Fatalf("verify valid step-up: %v", err)
+	}
+	for _, check := range []struct{ scope, account, session string }{{"withdrawal_paid", "admin-account", "admin-session"}, {"withdrawal_review", "other-admin", "admin-session"}, {"withdrawal_review", "admin-account", "other-session"}} {
+		if _, err := manager.VerifyStepUp(context.Background(), raw, check.scope, check.account, check.session); err == nil {
+			t.Fatalf("accepted scope=%q account=%q session=%q", check.scope, check.account, check.session)
+		}
+	}
+	manager.Now = func() time.Time { return now.Add(5*time.Minute + time.Second) }
+	if _, err := manager.VerifyStepUp(context.Background(), raw, "withdrawal_review", "admin-account", "admin-session"); err == nil {
+		t.Fatal("accepted expired step-up")
 	}
 }

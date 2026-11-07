@@ -148,12 +148,13 @@ func (s *RedisIdempotencyStore) Delete(ctx context.Context, key string) error {
 func (s *RedisIdempotencyStore) Close() error { return s.client.Close() }
 
 type IdempotencyOptions struct {
-	Store             IdempotencyStore
-	FallbackStore     IdempotencyStore
-	TTL               time.Duration
-	MaxResponseBytes  int
-	FinancialPrefixes []string
-	OnDegraded        func()
+	Store              IdempotencyStore
+	FallbackStore      IdempotencyStore
+	TTL                time.Duration
+	MaxResponseBytes   int
+	FinancialPrefixes  []string
+	OnDegraded         func()
+	DoNotCacheResponse func(*http.Request) bool
 }
 
 func BindIdempotency(options IdempotencyOptions) func(http.Handler) http.Handler {
@@ -257,8 +258,10 @@ func BindIdempotency(options IdempotencyOptions) func(http.Handler) http.Handler
 				return
 			}
 			entry.State, entry.Status = "done", recorder.status
-			entry.ContentType = recorder.Header().Get("Content-Type")
-			if recorder.body.Len() <= options.MaxResponseBytes {
+			if options.DoNotCacheResponse != nil && options.DoNotCacheResponse(r) {
+				entry.Truncated = true
+			} else if recorder.body.Len() <= options.MaxResponseBytes {
+				entry.ContentType = recorder.Header().Get("Content-Type")
 				entry.Body = append([]byte(nil), recorder.body.Bytes()...)
 			} else {
 				entry.Truncated = true
