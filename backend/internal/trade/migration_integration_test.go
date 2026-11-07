@@ -628,6 +628,13 @@ func assertPartialCancellationRejected(t *testing.T, ctx context.Context, pool *
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason)
+		VALUES ('40:cancel-cascade','release','partial_cancel_test')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE trade.buyer_order SET reservation_released_at=clock_timestamp() WHERE id=$1`, buyerOrderID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref) VALUES ($1,'system','partial-cancel')`, buyerOrderID); err != nil {
 		t.Fatal(err)
 	}
