@@ -1040,18 +1040,18 @@ func assertDuplicatePaymentSignal(t *testing.T, ctx context.Context, pool *pgxpo
 	t.Helper()
 	if _, err := pool.Exec(ctx, `WITH buyer AS (
 		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FE0',60,'duplicate-payment',repeat('d',64),100) RETURNING id
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FE0',60,'duplicate-payment',repeat('d',64),200) RETURNING id
 	), children AS (
 		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT child.public_id,buyer.id,child.merchant_id,50 FROM buyer CROSS JOIN (VALUES
+		SELECT child.public_id,buyer.id,child.merchant_id,100 FROM buyer CROSS JOIN (VALUES
 			('01ARZ3NDEKTSV4RRFFQ69G5FE1',660),
 			('01ARZ3NDEKTSV4RRFFQ69G5FE2',661)
 		) child(public_id,merchant_id) RETURNING id,merchant_id
 	) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
-	SELECT id,CASE merchant_id WHEN 660 THEN '01ARZ3NDEKTSV4RRFFQ69G5FEA' ELSE '01ARZ3NDEKTSV4RRFFQ69G5FEB' END,1,50,50 FROM children`); err != nil {
+	SELECT id,CASE merchant_id WHEN 660 THEN '01ARZ3NDEKTSV4RRFFQ69G5FEA' ELSE '01ARZ3NDEKTSV4RRFFQ69G5FEB' END,1,100,100 FROM children`); err != nil {
 		t.Fatal(err)
 	}
-	key, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 100, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-a"})
+	key, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 200, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-a"})
 	if err != nil || !applied {
 		t.Fatalf("first payment applied=%v err=%v", applied, err)
 	}
@@ -1065,13 +1065,13 @@ func assertDuplicatePaymentSignal(t *testing.T, ctx context.Context, pool *pgxpo
 	if advanced, err := store.Advance(ctx, firstChild, Paid, Submitted, EventSource{Type: SourceSystem, Reference: "duplicate-payment-partial-submit"}); err != nil || !advanced {
 		t.Fatalf("partial submit applied=%v err=%v", advanced, err)
 	}
-	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 100, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-b"}); !errors.Is(err, ErrPaymentReconciliation) || applied {
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 200, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-b"}); !errors.Is(err, ErrPaymentReconciliation) || applied {
 		t.Fatalf("second payment applied=%v err=%v, want ErrPaymentReconciliation", applied, err)
 	}
-	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 100, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-b"}); !errors.Is(err, ErrPaymentReconciliation) || applied {
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 200, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-b"}); !errors.Is(err, ErrPaymentReconciliation) || applied {
 		t.Fatalf("reconciliation replay applied=%v err=%v, want durable ErrPaymentReconciliation", applied, err)
 	}
-	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 100, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-a"}); err != nil || applied {
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE0", 200, EventSource{Type: SourceKESSResult, Reference: "duplicate-payment-a"}); err != nil || applied {
 		t.Fatalf("same-source replay applied=%v err=%v", applied, err)
 	}
 	var sources, tasks int
@@ -1079,8 +1079,8 @@ func assertDuplicatePaymentSignal(t *testing.T, ctx context.Context, pool *pgxpo
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.order_event_source WHERE source_ref IN ('duplicate-payment-a','duplicate-payment-b')`).Scan(&sources); err != nil || sources != 2 {
 		t.Fatalf("payment sources=%d err=%v, want 2 for reconciliation", sources, err)
 	}
-	if err := pool.QueryRow(ctx, `SELECT count(*),COALESCE(max(paid_amount_e4),0) FROM trade.payment_reconciliation_task WHERE source_ref='duplicate-payment-b'`).Scan(&tasks, &taskAmount); err != nil || tasks != 1 || taskAmount != 100 {
-		t.Fatalf("reconciliation tasks=%d amount=%d err=%v, want 1/100", tasks, taskAmount, err)
+	if err := pool.QueryRow(ctx, `SELECT count(*),COALESCE(max(paid_amount_e4),0) FROM trade.payment_reconciliation_task WHERE source_ref='duplicate-payment-b'`).Scan(&tasks, &taskAmount); err != nil || tasks != 1 || taskAmount != 200 {
+		t.Fatalf("reconciliation tasks=%d amount=%d err=%v, want 1/200", tasks, taskAmount, err)
 	}
 }
 
