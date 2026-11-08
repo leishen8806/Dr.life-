@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -52,26 +51,23 @@ func TestTradeOrderMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	migrations := migrationDirectory(t)
-	orderMigration := findMigration(t, migrations, "_trade_orders.sql")
-	upgradeMigrations := t.TempDir()
-	copyMigrationsExcept(t, migrations, upgradeMigrations, filepath.Base(orderMigration))
-	if err := goose.Up(db, upgradeMigrations); err != nil {
+	const orderMigrationVersion int64 = 56
+	if err := goose.UpTo(db, migrations, orderMigrationVersion-1); err != nil {
 		t.Fatal(err)
 	}
 	baselineVersion, err := goose.GetDBVersion(db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	copyMigration(t, orderMigration, filepath.Join(upgradeMigrations, filepath.Base(orderMigration)))
-	if err := goose.Up(db, upgradeMigrations); err != nil {
+	if err := goose.UpTo(db, migrations, orderMigrationVersion); err != nil {
 		t.Fatal(err)
 	}
 	assertTradeTables(t, db, true)
-	if err := goose.DownTo(db, upgradeMigrations, baselineVersion); err != nil {
+	if err := goose.DownTo(db, migrations, baselineVersion); err != nil {
 		t.Fatal(err)
 	}
 	assertTradeTables(t, db, false)
-	if err := goose.Up(db, upgradeMigrations); err != nil {
+	if err := goose.Up(db, migrations); err != nil {
 		t.Fatal(err)
 	}
 	assertTradeTables(t, db, true)
@@ -84,40 +80,6 @@ func migrationDirectory(t *testing.T) string {
 		t.Fatal("cannot locate migrations")
 	}
 	return filepath.Join(filepath.Dir(file), "..", "..", "migrations")
-}
-
-func copyMigrationsExcept(t *testing.T, source, destination, excluded string) {
-	t.Helper()
-	entries, err := os.ReadDir(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" || entry.Name() == excluded {
-			continue
-		}
-		copyMigration(t, filepath.Join(source, entry.Name()), filepath.Join(destination, entry.Name()))
-	}
-}
-
-func copyMigration(t *testing.T, source, destination string) {
-	t.Helper()
-	content, err := os.ReadFile(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(destination, content, 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func findMigration(t *testing.T, directory, suffix string) string {
-	t.Helper()
-	matches, err := filepath.Glob(filepath.Join(directory, "*"+suffix))
-	if err != nil || len(matches) != 1 {
-		t.Fatalf("find migration %q: matches=%v err=%v", suffix, matches, err)
-	}
-	return matches[0]
 }
 
 func assertTradeTables(t *testing.T, db *sql.DB, want bool) {
