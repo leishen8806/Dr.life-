@@ -40,7 +40,7 @@
 
 | 项 | 建议 |
 |---|---|
-| 客户端 | 跨平台框架一套代码出 Android + iOS（团队熟悉哪种用哪种），原生模块只用于定位、相机/扫码、推送、后台任务 |
+| 客户端 | 客户端用 React Native（Expo）+ TypeScript，一套代码打包 Android 和 iOS；定位、相机/扫码、推送（FCM/APNs/华为 HMS）、后台任务优先用 Expo 和社区插件，不满足时再写原生模块；支持 Expo Updates 热更新（仅限 JS 层修复，原生改动仍走应用商店） |
 | 接口 | **共用同一个统一 API 网关 `adminapi.settlecore.org`**，按路径和角色区分（`/v1/buyer`、`/merchant`、`/driver`、`/wms`），**业务规则不再复制到 App 里** |
 | 登录 | 新增手机号 + 验证码登录；**与 Telegram 账号绑定**（App 里可"用 Telegram 登录"并绑定同一个"人"），保证 Mini App 与 App 是同一个账号、同一份数据 |
 | 推送 | Android：FCM；iOS：APNs；华为手机（无谷歌服务）：HMS Push（**已确认必须接**）；启动时识别手机类型，用户可手动选择 |
@@ -49,6 +49,18 @@
 | 安全 | 令牌放系统安全存储；支持生物识别解锁；提现等高风险操作二次验证；越狱/Root 检测（建议）；接口证书校验 |
 | 版本管理 | 强制更新机制（低于最低版本提示更新）；灰度发布；崩溃与性能监控 |
 | 多语言 | 中 / English / ខ្មែរ，与 Mini App 同一套词条；字体兼容高棉语 |
+
+### 多端代码共用
+
+- **共用：** `packages/api-client`（由 OpenAPI 生成的 TypeScript 客户端）、`packages/i18n`（三语词条）、金额格式化、表单校验、订单与付款状态文案。这些包不得依赖浏览器 DOM 或 Telegram SDK，Mini App 和 App 都直接引用。
+- **不共用：** 界面组件（Mini App 用网页组件，App 用 React Native 组件）、登录方式、平台相关能力。
+- **后续评估：** App 稳定后，评估是否用 `react-native-web` 把 Mini App 界面迁移到同一套代码；现阶段不做。
+
+### iOS / Android 前置条件
+
+- iOS 需要 Apple 开发者账号；构建优先使用 Expo EAS 云构建，可以不自备 Mac。
+- Android 需要 Google Play 开发者账号。
+- 华为渠道需要 AppGallery 账号。
 
 ---
 
@@ -120,4 +132,9 @@
 | 华为手机无谷歌服务 | 接 HMS Push；华为 AppGallery 上架 |
 | 柬埔寨网络与设备差异 | 离线优先、轻量包体、低端机适配、高棉语字体 |
 | 账号安全（手机号换号、Telegram 号丢失） | 高风险操作二次验证；账号找回流程；平台人工复核 |
-| 跨平台框架与团队技能 | 团队确认后再选；原型阶段做关键能力（定位、扫码、推送）验证 |
+| 跨平台框架与团队技能 | 已决定：React Native（Expo）（负责人 2026-11-08），理由：与现有 React + TypeScript 前端同一技术栈，业务代码可共用；原型阶段验证定位、扫码、推送（含 HMS） |
+
+### 待决定
+
+1. **App 端登录方式：** App 内没有 Telegram `initData`，登录与现有账号绑定方式待决定。
+2. **AI 会员等数字服务在应用商店的计费方式：** 待决定；需结合第六章“应用内购买规则”所列风险确认。
