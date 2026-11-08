@@ -12,12 +12,15 @@ function translator(language: Language): Translate {
 const noop = () => undefined;
 
 function payment(status: "pending" | "confirming" | "succeeded" | "failed" | "expired") {
+  const attempt = status === "expired"
+    ? { status: "failed" as const, expiresAt: "2020-01-01T00:00:00Z", idempotencyKey: "idem-ORD-1001" }
+    : { status, idempotencyKey: "idem-ORD-1001", paymentNumber: "PAY-ORD-1001" };
   return renderToStaticMarkup(
     <PaymentView
       t={translator("en")}
       language="en"
       order={mockOrders[0]!}
-      attempt={{ status, idempotencyKey: "idem-ORD-1001", paymentNumber: "PAY-ORD-1001" }}
+      attempt={attempt}
       onBack={noop}
       onPay={noop}
       onRetry={noop}
@@ -31,7 +34,7 @@ describe("payment confirmation view", () => {
     const markup = payment("pending");
     expect(markup).toContain("Pay now");
     expect(markup).toContain("Free shipping");
-    expect(markup).toContain("Shipping quote valid until 2026-11-01");
+    expect(markup).toContain("Shipping quote valid until");
   });
 
   it("hides payment actions while confirming", () => {
@@ -44,6 +47,6 @@ describe("payment confirmation view", () => {
   it("covers succeeded and failed/expired outcomes", () => {
     expect(payment("succeeded")).toContain("Paid, warehouse processing");
     expect(payment("failed")).toContain("Payment was not completed.");
-    expect(payment("expired")).toContain("Pay again");
+    expect(payment("expired")).toContain("Payment has expired.");
   });
 });

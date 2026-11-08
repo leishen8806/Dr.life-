@@ -232,6 +232,7 @@
 ,"payment.retry": "重新付款"
 ,"payment.succeeded": "已付款，仓库处理中"
 ,"payment.failed": "付款未完成。"
+,"payment.expired": "付款已过期。"
 ,"payment.shipping": "运费"
 ,"payment.freeShipping": "包邮"
 ,"payment.quoteExpires": "运费报价有效期至 {date}"

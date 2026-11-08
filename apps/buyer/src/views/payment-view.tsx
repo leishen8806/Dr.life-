@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { AppHeader, Card } from "@drlife/ui";
 import { localized } from "../localized";
@@ -25,6 +25,12 @@ export function PaymentView({
   }, [attempt.status, onRefresh]);
 
   const payable = order.subOrders.reduce((total, item) => total + payableAmountE4(item), 0n);
+  const [now] = useState(() => Date.now());
+  const expired = attempt.status === "failed" && attempt.expiresAt !== undefined && Date.parse(attempt.expiresAt) <= now;
+  const quoteDate = (value: string) => new Intl.DateTimeFormat(language, {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(new Date(value));
   return (
     <div className="buyer-page">
       <AppHeader slogan={t("payment.pageTitle")} actions={actions} />
@@ -35,9 +41,9 @@ export function PaymentView({
           <p>{t("payment.number")}: {attempt.paymentNumber ?? t("payment.notStarted")}</p>
           {attempt.status === "confirming" && <p className="buyer-order-warning" role="status">{t("order.paymentConfirming")}</p>}
           {attempt.status === "succeeded" && <p role="status">{t("payment.succeeded")}</p>}
-          {(attempt.status === "failed" || attempt.status === "expired") && <p className="buyer-cart-error" role="alert">{t("payment.failed")}</p>}
+          {attempt.status === "failed" && <p className="buyer-cart-error" role="alert">{t(expired ? "payment.expired" : "payment.failed")}</p>}
           {attempt.status === "pending" && <button type="button" className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</button>}
-          {(attempt.status === "failed" || attempt.status === "expired") && <button type="button" className="buyer-cart-primary" onClick={onRetry}>{t("payment.retry")}</button>}
+          {attempt.status === "failed" && <button type="button" className="buyer-cart-primary" onClick={onRetry}>{t("payment.retry")}</button>}
         </Card>
         {order.subOrders.map((subOrder) => (
           <Card key={subOrder.publicId}>
@@ -52,7 +58,7 @@ export function PaymentView({
               <span>{t("payment.shipping")}</span>
               <strong>{subOrder.shippingAmountE4 === 0n ? t("payment.freeShipping") : formatPriceE4(subOrder.shippingAmountE4)}</strong>
             </div>
-            <small>{t("payment.quoteExpires", { date: subOrder.shippingQuoteExpiresAt.slice(0, 10) })}</small>
+            <small>{t("payment.quoteExpires", { date: quoteDate(subOrder.shippingQuoteExpiresAt) })}</small>
             <p className="buyer-order-total"><span>{t("payment.subtotal")}</span><strong>{formatPriceE4(payableAmountE4(subOrder))}</strong></p>
           </Card>
         ))}

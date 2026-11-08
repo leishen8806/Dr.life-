@@ -232,6 +232,7 @@
 ,"payment.retry": "បង់ប្រាក់ម្តងទៀត"
 ,"payment.succeeded": "បានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំង"
 ,"payment.failed": "ការបង់ប្រាក់មិនបានបញ្ចប់។"
+,"payment.expired": "ការបង់ប្រាក់បានផុតកំណត់។"
 ,"payment.shipping": "ថ្លៃដឹកជញ្ជូន"
 ,"payment.freeShipping": "ដឹកជញ្ជូនឥតគិតថ្លៃ"
 ,"payment.quoteExpires": "តម្លៃដឹកជញ្ជូនមានសុពលភាពដល់ {date}"

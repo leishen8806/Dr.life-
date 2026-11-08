@@ -10,7 +10,7 @@ import {
 } from "./api";
 import { appendFeed, firstFeed, nextPage, type ProductFeed } from "./feed";
 import { mockOrders, type BuyerOrder } from "./orders";
-import { createMockPaymentAttempt, pendingPaymentAttempt, type PaymentAttempt } from "./payment";
+import { createMockPaymentAttempt, createPaymentIdempotencyKey, pendingPaymentAttempt, type PaymentAttempt } from "./payment";
 import { addProduct, cartCount, stepQuantity, updateQuantity, type CartItem } from "./cart";
 import { errorMessageKey, type Resource } from "./resource";
 import type { Category, Product } from "./types";
@@ -234,7 +234,7 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
   const openOrders = useCallback(() => push({ name: "orders" }), [push]);
   const openOrder = useCallback((order: BuyerOrder) => push({ name: "order", order }), [push]);
   const openPayment = useCallback((order: BuyerOrder) => {
-    const idempotencyKey = paymentAttempts[order.publicId]?.idempotencyKey ?? `idem-${order.publicId}`;
+    const idempotencyKey = paymentAttempts[order.publicId]?.idempotencyKey ?? createPaymentIdempotencyKey();
     push({
       name: "payment",
       order,
@@ -242,7 +242,7 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
     });
   }, [paymentAttempts, push]);
   const payOrder = useCallback((order: BuyerOrder) => {
-    const idempotencyKey = paymentAttempts[order.publicId]?.idempotencyKey ?? `idem-${order.publicId}`;
+    const idempotencyKey = paymentAttempts[order.publicId]?.idempotencyKey ?? createPaymentIdempotencyKey();
     const attemptNumber = (paymentSequences[order.publicId] ?? 0) + 1;
     const attempt = createMockPaymentAttempt(order, idempotencyKey, attemptNumber);
     setPaymentAttempts((current) => ({ ...current, [order.publicId]: attempt }));
@@ -261,11 +261,15 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
     const attempt = { ...current, status: "succeeded" as const };
     setPaymentAttempts((items) => ({ ...items, [order.publicId]: attempt }));
     setStack((items) => items.map((item, index) =>
-      index === items.length - 1 && item.name === "payment" ? { ...item, attempt } : item
+      index === items.length - 1 && item.name === "payment"
+        ? { ...item, attempt, order: { ...item.order, paymentStatus: "succeeded" } }
+        : item.name === "order" && item.order.publicId === order.publicId
+          ? { ...item, order: { ...item.order, paymentStatus: "succeeded" } }
+          : item
     ));
   }, [paymentAttempts]);
   const retryPayment = useCallback((order: BuyerOrder) => {
-    const idempotencyKey = `idem-${order.publicId}-${Date.now()}`;
+    const idempotencyKey = createPaymentIdempotencyKey();
     const attempt = pendingPaymentAttempt(order, idempotencyKey);
     setPaymentAttempts((current) => ({ ...current, [order.publicId]: attempt }));
     setStack((current) => current.map((item, index) =>

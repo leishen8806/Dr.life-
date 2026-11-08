@@ -232,6 +232,7 @@
 ,"payment.retry": "Pay again"
 ,"payment.succeeded": "Paid, warehouse processing"
 ,"payment.failed": "Payment was not completed."
+,"payment.expired": "Payment has expired."
 ,"payment.shipping": "Shipping"
 ,"payment.freeShipping": "Free shipping"
 ,"payment.quoteExpires": "Shipping quote valid until {date}"
