@@ -40,6 +40,14 @@ func TestEpochCacheWriterReportsFailureAndRetries(t *testing.T) {
 	}
 }
 
+func TestDBSessionCheckerFailsClosedWhenCacheUnavailable(t *testing.T) {
+	cache := &epochWriterTestCache{getErr: ErrSessionStoreUnavailable}
+	active, err := (DBSessionChecker{Cache: cache}).Active(context.Background(), "account-1", "session-1")
+	if active || !errors.Is(err, ErrSessionStoreUnavailable) {
+		t.Fatalf("active=%v err=%v, want false and ErrSessionStoreUnavailable", active, err)
+	}
+}
+
 type epochWriterTestMetrics struct{ count int }
 
 func (m *epochWriterTestMetrics) SessionEpochCacheWriteFailed(string) { m.count++ }
@@ -47,11 +55,12 @@ func (m *epochWriterTestMetrics) SessionEpochCacheWriteFailed(string) { m.count+
 type epochWriterTestCache struct {
 	mu     sync.Mutex
 	err    error
+	getErr error
 	epochs map[string]int64
 }
 
 func (c *epochWriterTestCache) Get(context.Context, string, string) (bool, bool, error) {
-	return false, false, nil
+	return false, false, c.getErr
 }
 func (c *epochWriterTestCache) Put(context.Context, string, string, int64, time.Duration) error {
 	return nil
