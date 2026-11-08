@@ -62,26 +62,31 @@ func (e *AppError) Error() string {
 }
 
 var appErrors = map[ErrorCode]AppError{
-	CodeInternalError:        {Code: CodeInternalError, StatusCode: http.StatusInternalServerError, Message: Messages{ZH: "服务器内部错误", EN: "Internal server error", KM: "Internal server error"}},
-	CodeInvalidArgument:      {Code: CodeInvalidArgument, StatusCode: http.StatusBadRequest, Message: Messages{ZH: "请求参数无效", EN: "Invalid request parameters", KM: "Invalid request parameters"}},
-	CodeResourceNotFound:     {Code: CodeResourceNotFound, StatusCode: http.StatusNotFound, Message: Messages{ZH: "请求的资源不存在", EN: "The requested resource was not found", KM: "The requested resource was not found"}},
-	CodeTooManyRequests:      {Code: CodeTooManyRequests, StatusCode: http.StatusTooManyRequests, Message: Messages{ZH: "请求过于频繁", EN: "Too many requests", KM: "Too many requests"}},
-	CodeServiceUnavailable:   {Code: CodeServiceUnavailable, StatusCode: http.StatusServiceUnavailable, Message: Messages{ZH: "服务暂时不可用", EN: "Service temporarily unavailable", KM: "Service temporarily unavailable"}},
-	CodeMethodNotAllowed:     {Code: CodeMethodNotAllowed, StatusCode: http.StatusMethodNotAllowed, Message: Messages{ZH: "请求方法不允许", EN: "Method not allowed", KM: "Method not allowed"}},
-	CodeRequestTooLarge:      {Code: CodeRequestTooLarge, StatusCode: http.StatusRequestEntityTooLarge, Message: Messages{ZH: "请求内容过大", EN: "Request body too large", KM: "Request body too large"}},
-	CodeUnsupportedMedia:     {Code: CodeUnsupportedMedia, StatusCode: http.StatusUnsupportedMediaType, Message: Messages{ZH: "不支持的内容类型", EN: "Unsupported content type", KM: "Unsupported content type"}},
-	CodeIdempotencyConflict:  {Code: CodeIdempotencyConflict, StatusCode: http.StatusUnprocessableEntity, Message: Messages{ZH: "幂等键与请求内容冲突", EN: "Idempotency key conflicts with request content", KM: "Idempotency key conflicts with request content"}},
-	CodeIdempotencyPending:   {Code: CodeIdempotencyPending, StatusCode: http.StatusConflict, Message: Messages{ZH: "相同请求正在处理中", EN: "An identical request is being processed", KM: "An identical request is being processed"}},
-	CodeAlreadyProcessed:     {Code: CodeAlreadyProcessed, StatusCode: http.StatusConflict, Message: Messages{ZH: "请求已处理，响应不可重放", EN: "Request was processed but its response cannot be replayed", KM: "Request was processed but its response cannot be replayed"}},
-	CodeUnauthenticated:      {Code: CodeUnauthenticated, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "请先登录", EN: "Authentication required", KM: "Authentication required"}},
-	CodePermissionDenied:     {Code: CodePermissionDenied, StatusCode: http.StatusForbidden, Message: Messages{ZH: "无权执行此操作", EN: "Permission denied", KM: "Permission denied"}},
-	CodeStepUpRequired:       {Code: CodeStepUpRequired, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "需要二次验证", EN: "Step-up verification required", KM: "Step-up verification required"}},
-	CodeStepUpInvalid:        {Code: CodeStepUpInvalid, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "二次验证无效", EN: "Invalid step-up verification", KM: "Invalid step-up verification"}},
-	CodeTelegramLoginFailed:  {Code: CodeTelegramLoginFailed, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "登录验证失败", EN: "Login validation failed", KM: "Login validation failed"}},
-	CodeAccountBlocked:       {Code: CodeAccountBlocked, StatusCode: http.StatusForbidden, Message: Messages{ZH: "账号暂不可用", EN: "Account is unavailable", KM: "Account is unavailable"}},
-	CodeLoginTooManyAttempts: {Code: CodeLoginTooManyAttempts, StatusCode: http.StatusTooManyRequests, Message: Messages{ZH: "登录尝试过于频繁", EN: "Too many login attempts", KM: "Too many login attempts"}},
-	CodeConsentRequired:      {Code: CodeConsentRequired, StatusCode: http.StatusForbidden, Message: Messages{ZH: "请先阅读并同意当前协议", EN: "Current legal documents must be accepted", KM: "សូមយល់ព្រមលើឯកសារផ្លូវច្បាប់បច្ចុប្បន្នជាមុន"}},
-	CodeWebhookInvalid:       {Code: CodeWebhookInvalid, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "回调验证失败", EN: "Webhook verification failed", KM: "Webhook verification failed"}},
+	CodeInternalError:            {Code: CodeInternalError, StatusCode: http.StatusInternalServerError, Message: Messages{ZH: "服务器内部错误", EN: "Internal server error", KM: "Internal server error"}},
+	CodeInvalidArgument:          {Code: CodeInvalidArgument, StatusCode: http.StatusBadRequest, Message: Messages{ZH: "请求参数无效", EN: "Invalid request parameters", KM: "Invalid request parameters"}},
+	CodeResourceNotFound:         {Code: CodeResourceNotFound, StatusCode: http.StatusNotFound, Message: Messages{ZH: "请求的资源不存在", EN: "The requested resource was not found", KM: "The requested resource was not found"}},
+	CodeTooManyRequests:          {Code: CodeTooManyRequests, StatusCode: http.StatusTooManyRequests, Message: Messages{ZH: "请求过于频繁", EN: "Too many requests", KM: "Too many requests"}},
+	CodeServiceUnavailable:       {Code: CodeServiceUnavailable, StatusCode: http.StatusServiceUnavailable, Message: Messages{ZH: "服务暂时不可用", EN: "Service temporarily unavailable", KM: "Service temporarily unavailable"}},
+	CodeMethodNotAllowed:         {Code: CodeMethodNotAllowed, StatusCode: http.StatusMethodNotAllowed, Message: Messages{ZH: "请求方法不允许", EN: "Method not allowed", KM: "Method not allowed"}},
+	CodeRequestTooLarge:          {Code: CodeRequestTooLarge, StatusCode: http.StatusRequestEntityTooLarge, Message: Messages{ZH: "请求内容过大", EN: "Request body too large", KM: "Request body too large"}},
+	CodeUnsupportedMedia:         {Code: CodeUnsupportedMedia, StatusCode: http.StatusUnsupportedMediaType, Message: Messages{ZH: "不支持的内容类型", EN: "Unsupported content type", KM: "Unsupported content type"}},
+	CodeIdempotencyConflict:      {Code: CodeIdempotencyConflict, StatusCode: http.StatusUnprocessableEntity, Message: Messages{ZH: "幂等键与请求内容冲突", EN: "Idempotency key conflicts with request content", KM: "Idempotency key conflicts with request content"}},
+	CodeIdempotencyPending:       {Code: CodeIdempotencyPending, StatusCode: http.StatusConflict, Message: Messages{ZH: "相同请求正在处理中", EN: "An identical request is being processed", KM: "An identical request is being processed"}},
+	CodeAlreadyProcessed:         {Code: CodeAlreadyProcessed, StatusCode: http.StatusConflict, Message: Messages{ZH: "请求已处理，响应不可重放", EN: "Request was processed but its response cannot be replayed", KM: "Request was processed but its response cannot be replayed"}},
+	CodeUnauthenticated:          {Code: CodeUnauthenticated, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "请先登录", EN: "Authentication required", KM: "Authentication required"}},
+	CodePermissionDenied:         {Code: CodePermissionDenied, StatusCode: http.StatusForbidden, Message: Messages{ZH: "无权执行此操作", EN: "Permission denied", KM: "Permission denied"}},
+	CodeStepUpRequired:           {Code: CodeStepUpRequired, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "需要二次验证", EN: "Step-up verification required", KM: "Step-up verification required"}},
+	CodeStepUpInvalid:            {Code: CodeStepUpInvalid, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "二次验证无效", EN: "Invalid step-up verification", KM: "Invalid step-up verification"}},
+	CodeTelegramLoginFailed:      {Code: CodeTelegramLoginFailed, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "登录验证失败", EN: "Login validation failed", KM: "Login validation failed"}},
+	CodeAccountBlocked:           {Code: CodeAccountBlocked, StatusCode: http.StatusForbidden, Message: Messages{ZH: "账号暂不可用", EN: "Account is unavailable", KM: "Account is unavailable"}},
+	CodeLoginTooManyAttempts:     {Code: CodeLoginTooManyAttempts, StatusCode: http.StatusTooManyRequests, Message: Messages{ZH: "登录尝试过于频繁", EN: "Too many login attempts", KM: "Too many login attempts"}},
+	CodeConsentRequired:          {Code: CodeConsentRequired, StatusCode: http.StatusForbidden, Message: Messages{ZH: "请先阅读并同意当前协议", EN: "Current legal documents must be accepted", KM: "សូមយល់ព្រមលើឯកសារផ្លូវច្បាប់បច្ចុប្បន្នជាមុន"}},
+	CodeOrderInvalidItem:         {Code: CodeOrderInvalidItem, StatusCode: http.StatusBadRequest, Message: Messages{ZH: "商品或数量无效", EN: "Invalid order item or quantity", KM: "Invalid order item or quantity"}},
+	CodeOrderInsufficientStock:   {Code: CodeOrderInsufficientStock, StatusCode: http.StatusConflict, Message: Messages{ZH: "库存不足", EN: "Insufficient stock", KM: "Insufficient stock"}},
+	CodeOrderCancelledOrReleased: {Code: CodeOrderCancelledOrReleased, StatusCode: http.StatusConflict, Message: Messages{ZH: "订单已取消或库存已释放", EN: "Order was cancelled or its stock was released", KM: "Order was cancelled or its stock was released"}},
+	CodeOrderAmountMismatch:      {Code: CodeOrderAmountMismatch, StatusCode: http.StatusConflict, Message: Messages{ZH: "付款金额与订单不符", EN: "Payment amount does not match the order", KM: "Payment amount does not match the order"}},
+	CodeOrderStateConflict:       {Code: CodeOrderStateConflict, StatusCode: http.StatusConflict, Message: Messages{ZH: "订单状态不允许此操作；付款确认中请稍后", EN: "The order state does not allow this action; payment confirmation may be in progress", KM: "The order state does not allow this action; payment confirmation may be in progress"}},
+	CodeWebhookInvalid:           {Code: CodeWebhookInvalid, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "回调验证失败", EN: "Webhook verification failed", KM: "Webhook verification failed"}},
 }
 
 // TODO-KM-REVIEW: English placeholders in KM fields require review by a Khmer native speaker.
@@ -112,6 +117,10 @@ type errorResponse struct {
 
 func WriteOK(w http.ResponseWriter, r *http.Request, data any) {
 	writeJSON(w, http.StatusOK, successResponse{OK: true, Data: data, RequestID: RequestIDFromContext(r.Context())})
+}
+
+func WriteCreated(w http.ResponseWriter, r *http.Request, data any) {
+	writeJSON(w, http.StatusCreated, successResponse{OK: true, Data: data, RequestID: RequestIDFromContext(r.Context())})
 }
 
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {

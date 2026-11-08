@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
+	"time"
 )
 
 type stubAccounts struct{ status string }
@@ -22,6 +23,55 @@ type stubCatalog struct {
 	lastInput    []OrderLineInput
 	resolveCalls int
 	commits      []string
+}
+
+type stubAddresses struct{ snapshot AddressSnapshot }
+
+func (s stubAddresses) Resolve(context.Context, int64, string) (AddressSnapshot, error) {
+	return s.snapshot, nil
+}
+
+type stubQuotes struct{ quotes []ShippingQuote }
+
+func (s stubQuotes) Quote(context.Context, AddressSnapshot, []ChildOrder) ([]ShippingQuote, error) {
+	return s.quotes, nil
+}
+
+func TestPlaceForDeliverySnapshotsAddressAndWholeCentShipping(t *testing.T) {
+	catalog := catalogFixture()
+	catalog.lines["A"] = CatalogLine{SKUPublicID: "A", MerchantID: 10, MerchantPublicID: "merchant-10", Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: 100}}, OnSale: true}
+	store := &stubOrders{}
+	service := NewService(store, stubAccounts{status: "active"}, catalog)
+	expires := time.Unix(1_800_000_000, 0)
+	service.ConfigureHTTP(stubAddresses{snapshot: AddressSnapshot{PublicID: "address-1", RecipientName: "Buyer", AddressText: "Phnom Penh", Phone: "012345678"}}, stubQuotes{quotes: []ShippingQuote{{MerchantID: 10, AmountE4: 200, ExpiresAt: expires}}}, nil)
+	order, err := service.PlaceForDelivery(context.Background(), 7, "delivery-1", "address-1", []OrderLineInput{{SKUPublicID: "A", Quantity: 2}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if order.GoodsAmountE4 != 200 || order.ShippingAmountE4 != 200 || order.PayableAmountE4 != 400 || order.ShippingAddress.Phone != "012345678" || len(order.Children) != 1 || order.Children[0].MerchantPublicID != "merchant-10" || !order.Children[0].ShippingQuoteExpiresAt.Equal(expires) {
+		t.Fatalf("order=%+v", order)
+	}
+}
+
+func TestPlaceForDeliveryRejectsIncompleteCatalogAndExpiredQuote(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		merchantPublic string
+		expires        time.Time
+	}{
+		{name: "missing merchant public id", expires: time.Now().Add(time.Hour)},
+		{name: "expired quote", merchantPublic: "merchant-10", expires: time.Now().Add(-time.Minute)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			catalog := catalogFixture()
+			catalog.lines["A"] = CatalogLine{SKUPublicID: "A", MerchantID: 10, MerchantPublicID: test.merchantPublic, Tiers: []Tier{{MinQuantity: 1, UnitPriceE4: 100}}, OnSale: true}
+			service := NewService(&stubOrders{}, stubAccounts{status: "active"}, catalog)
+			service.ConfigureHTTP(stubAddresses{snapshot: AddressSnapshot{PublicID: "address-1", RecipientName: "Buyer", AddressText: "Phnom Penh", Phone: "012345678"}}, stubQuotes{quotes: []ShippingQuote{{MerchantID: 10, AmountE4: 0, ExpiresAt: test.expires}}}, nil)
+			if _, err := service.PlaceForDelivery(context.Background(), 7, "delivery-1", "address-1", []OrderLineInput{{SKUPublicID: "A", Quantity: 1}}); !errors.Is(err, ErrInvalidOrderLine) {
+				t.Fatalf("error=%v", err)
+			}
+		})
+	}
 }
 
 func (s *stubCatalog) ResolveAndReserve(_ context.Context, key string, input []OrderLineInput) ([]CatalogLine, error) {

@@ -53,8 +53,12 @@ func TestTradeOrderMigration(t *testing.T) {
 	}
 	migrations := migrationDirectory(t)
 	orderMigration := findMigration(t, migrations, "_trade_orders.sql")
+	orderHTTPMigration := findMigration(t, migrations, "_trade_order_http.sql")
 	upgradeMigrations := t.TempDir()
 	copyMigrationsExcept(t, migrations, upgradeMigrations, filepath.Base(orderMigration))
+	if err := os.Remove(filepath.Join(upgradeMigrations, filepath.Base(orderHTTPMigration))); err != nil {
+		t.Fatal(err)
+	}
 	if err := goose.Up(db, upgradeMigrations); err != nil {
 		t.Fatal(err)
 	}
@@ -75,6 +79,144 @@ func TestTradeOrderMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertTradeTables(t, db, true)
+}
+
+func TestOrderHTTPMigrationUsesPayableAndPersistsReconciliation(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	dsn := os.Getenv("DRLIFE_ORDER_HTTP_TEST_DATABASE_URL")
+	if dsn == "" {
+		c, err := postgres.Run(ctx, "postgres:16-alpine", postgres.WithDatabase("trade_http"), postgres.WithUsername("test_admin"), postgres.WithPassword("test-only"), postgres.BasicWaitStrategies())
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = testcontainers.TerminateContainer(c) })
+		dsn, err = c.ConnectionString(ctx, "sslmode=disable")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatal(err)
+	}
+	migrations := migrationDirectory(t)
+	if err := goose.Up(db, migrations); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO trade.buyer_order(public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at,shipping_address_public_id,shipping_recipient_name,shipping_address_text,shipping_phone)
+		VALUES('01ARZ3NDEKTSV4RRFFQ69G5FC1',7,'http-order',repeat('a',64),100,100,100,200,now()+interval '1 hour','address-1','Buyer','Phnom Penh','012345678');
+		INSERT INTO trade.merchant_order(public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		VALUES('01ARZ3NDEKTSV4RRFFQ69G5FC2',1,9,'merchant-9',100,100,100,200,now()+interval '1 hour');
+		INSERT INTO trade.order_line(merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES(1,'01ARZ3NDEKTSV4RRFFQ69G5FC3',1,100,100)`); err != nil {
+		t.Fatal(err)
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	store := NewPostgresStore(pool)
+	buyerView, err := store.FindBuyerOrderDetail(ctx, 7, "01ARZ3NDEKTSV4RRFFQ69G5FC1")
+	if err != nil || buyerView.PayableAmountE4 != 200 || buyerView.PaymentStatus != "pending" || len(buyerView.Children) != 1 || buyerView.Children[0].MerchantPublicID != "merchant-9" || buyerView.ShippingAddress.Phone != "012345678" {
+		t.Fatalf("buyer detail=%+v err=%v", buyerView, err)
+	}
+	if _, err := store.FindBuyerOrderDetail(ctx, 8, "01ARZ3NDEKTSV4RRFFQ69G5FC1"); !errors.Is(err, ErrOrderNotVisible) {
+		t.Fatalf("other buyer error=%v", err)
+	}
+	merchantView, err := store.FindMerchantOrderDetail(ctx, 9, "01ARZ3NDEKTSV4RRFFQ69G5FC2")
+	if err != nil || merchantView.PayableAmountE4 != 200 || len(merchantView.Lines) != 1 {
+		t.Fatalf("merchant detail=%+v err=%v", merchantView, err)
+	}
+	if _, err := store.FindMerchantOrderDetail(ctx, 10, "01ARZ3NDEKTSV4RRFFQ69G5FC2"); !errors.Is(err, ErrOrderNotVisible) {
+		t.Fatalf("other merchant error=%v", err)
+	}
+	attempt, err := store.PaymentAttempt(ctx, 7, "01ARZ3NDEKTSV4RRFFQ69G5FC1")
+	if err != nil || attempt.AmountE4 != 200 || attempt.AttemptNo != 1 || attempt.Existing != nil {
+		t.Fatalf("payment attempt=%+v err=%v", attempt, err)
+	}
+	if _, err := db.Exec(`
+		BEGIN;
+		INSERT INTO trade.buyer_order(public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES('01ARZ3NDEKTSV4RRFFQ69G5FD1',8,'cancel-order',repeat('b',64),100,100,100,200);
+		INSERT INTO trade.merchant_order(public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD2',id,10,'merchant-10',100,100,100,200 FROM trade.buyer_order WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD1';
+		INSERT INTO trade.order_line(merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
+		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FD3',1,100,100 FROM trade.merchant_order WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD2';
+		INSERT INTO trade.kess_payment_intent(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status,expires_at)
+		VALUES('01ARZ3NDEKTSV4RRFFQ69G5FD4',1,'kess','DRL-01ARZ3NDEKTSV4RRFFQ69G5FD1-1','01ARZ3NDEKTSV4RRFFQ69G5FD1',1,200,'USD','seller','PENDING',now()+interval '1 hour');
+		UPDATE trade.kess_payment_intent SET status='WAITING' WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD4';
+		UPDATE trade.kess_payment_intent SET status='UNKNOWN' WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD4';
+		COMMIT`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PaymentAttempt(ctx, 8, "01ARZ3NDEKTSV4RRFFQ69G5FD1"); !errors.Is(err, ErrPaymentConfirming) {
+		t.Fatalf("confirming payment attempt error=%v", err)
+	}
+	if _, _, err := store.ClaimBuyerReservationRelease(ctx, 8, "01ARZ3NDEKTSV4RRFFQ69G5FD1"); !errors.Is(err, ErrPaymentConfirming) {
+		t.Fatalf("confirming cancel error=%v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM trade.kess_payment_intent WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD4'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, claimed, err := store.ClaimBuyerReservationRelease(ctx, 8, "01ARZ3NDEKTSV4RRFFQ69G5FD1"); err != nil || !claimed {
+		t.Fatalf("cancel claimed=%v err=%v", claimed, err)
+	}
+	if _, claimed, err := store.ClaimBuyerReservationRelease(ctx, 8, "01ARZ3NDEKTSV4RRFFQ69G5FD1"); err != nil || !claimed {
+		t.Fatalf("cancel replay claimed=%v err=%v", claimed, err)
+	}
+	var cancelled bool
+	if err := db.QueryRow(`SELECT reservation_released_at IS NOT NULL AND bool_and(child.status='cancelled') AND count(outbox.*)=1
+		FROM trade.buyer_order buyer JOIN trade.merchant_order child ON child.buyer_order_id=buyer.id
+		JOIN trade.reservation_release_outbox outbox ON outbox.reservation_key=buyer.buyer_account_id || ':' || buyer.idempotency_key AND outbox.action='release'
+		WHERE buyer.public_id='01ARZ3NDEKTSV4RRFFQ69G5FD1' GROUP BY buyer.id`).Scan(&cancelled); err != nil || !cancelled {
+		t.Fatalf("cancelled=%v err=%v", cancelled, err)
+	}
+	assertDatabaseSQLState(t, db, `SELECT * FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-wrong',100)`, `TR002`)
+	var applied bool
+	if err := db.QueryRow(`SELECT applied FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-ok',200)`).Scan(&applied); err != nil || !applied {
+		t.Fatalf("payable confirmation applied=%v err=%v", applied, err)
+	}
+	if _, err := db.Exec(`UPDATE trade.buyer_order SET refund_required_at=clock_timestamp() WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FC1'`); err != nil {
+		t.Fatal(err)
+	}
+	var reconciliation bool
+	if err := db.QueryRow(`SELECT reconciliation_required FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-second',300)`).Scan(&reconciliation); err != nil || !reconciliation {
+		t.Fatalf("different-source reconciliation=%v err=%v", reconciliation, err)
+	}
+	var amount int64
+	if err := db.QueryRow(`SELECT paid_amount_e4 FROM trade.payment_reconciliation_task WHERE source_ref='pay-second'`).Scan(&amount); err != nil || amount != 300 {
+		t.Fatalf("reconciliation amount=%d err=%v", amount, err)
+	}
+	if err := goose.DownTo(db, migrations, 57); err != nil {
+		t.Fatal(err)
+	}
+	var columnExists bool
+	if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='trade' AND table_name='buyer_order' AND column_name='payable_amount_e4')`).Scan(&columnExists); err != nil || columnExists {
+		t.Fatalf("down payable column exists=%v err=%v", columnExists, err)
+	}
+	if err := goose.Up(db, migrations); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertDatabaseSQLState(t *testing.T, db *sql.DB, statement, want string) {
+	t.Helper()
+	_, err := db.Exec(statement)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != want {
+		t.Fatalf("SQLSTATE=%v error=%v, want %s", func() string {
+			if pgErr == nil {
+				return ""
+			}
+			return pgErr.Code
+		}(), err, want)
+	}
 }
 
 func migrationDirectory(t *testing.T) string {

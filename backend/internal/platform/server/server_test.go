@@ -224,6 +224,18 @@ func (f *countingAuthenticator) Authenticate(*http.Request) (gateway.Identity, b
 
 type countingIdempotencyStore struct{ calls atomic.Int64 }
 
+func TestBuyerCannotAccessMerchantOrderRoutes(t *testing.T) {
+	rule := gateway.Rule{Limit: 100, Window: time.Minute}
+	handler := NewHandlerWithGateway(nil, GatewayOptions{AppEnv: "dev", OriginGroups: gateway.DefaultOriginGroups("dev"), Limiter: gateway.NewMemoryLimiter(), Authenticator: &countingAuthenticator{}, IPRules: gateway.RuleSet{Default: rule}, AccountRules: gateway.RuleSet{Default: rule}, Bulkhead: overload.New(overload.DefaultConfig())})
+	request := httptest.NewRequest(http.MethodGet, "/v1/merchant/suborders", nil)
+	request.Header.Set("Authorization", "Bearer test")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func (f *countingIdempotencyStore) Begin(context.Context, string, string, time.Duration) (gateway.IdempotencyEntry, bool, error) {
 	f.calls.Add(1)
 	return gateway.IdempotencyEntry{}, true, nil
