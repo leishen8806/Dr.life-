@@ -53,12 +53,8 @@ func TestTradeOrderMigration(t *testing.T) {
 	}
 	migrations := migrationDirectory(t)
 	orderMigration := findMigration(t, migrations, "_trade_orders.sql")
-	orderHTTPMigration := findMigration(t, migrations, "_trade_order_http.sql")
 	upgradeMigrations := t.TempDir()
-	copyMigrationsExcept(t, migrations, upgradeMigrations, filepath.Base(orderMigration))
-	if err := os.Remove(filepath.Join(upgradeMigrations, filepath.Base(orderHTTPMigration))); err != nil {
-		t.Fatal(err)
-	}
+	copyMigrationsBefore(t, migrations, upgradeMigrations, filepath.Base(orderMigration))
 	if err := goose.Up(db, upgradeMigrations); err != nil {
 		t.Fatal(err)
 	}
@@ -228,14 +224,14 @@ func migrationDirectory(t *testing.T) string {
 	return filepath.Join(filepath.Dir(file), "..", "..", "migrations")
 }
 
-func copyMigrationsExcept(t *testing.T, source, destination, excluded string) {
+func copyMigrationsBefore(t *testing.T, source, destination, exclusiveUpperBound string) {
 	t.Helper()
 	entries, err := os.ReadDir(source)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" || entry.Name() == excluded {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" || entry.Name() >= exclusiveUpperBound {
 			continue
 		}
 		copyMigration(t, filepath.Join(source, entry.Name()), filepath.Join(destination, entry.Name()))
@@ -300,7 +296,7 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	if err := goose.Up(db, migrations); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAV', 1, 'idem-1', repeat('0',64), 100); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAW', 1, 9, 100); INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES (1,'01ARZ3NDEKTSV4RRFFQ69G5FAX',1,100,100)`); err != nil {
+	if _, err := db.Exec(`INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAV', 1, 'idem-1', repeat('0',64), 100,100,0,100); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAW', 1, 9, 100,100,0,100); INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES (1,'01ARZ3NDEKTSV4RRFFQ69G5FAX',1,100,100)`); err != nil {
 		t.Fatal(err)
 	}
 	pool, err := pgxpool.New(ctx, dsn)
