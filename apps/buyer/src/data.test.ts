@@ -6,7 +6,7 @@ import { localized } from "./localized";
 import { errorMessageKey } from "./resource";
 import type { Product, ProductPage, ProductTier } from "./types";
 
-function tier(min_qty: string, unit_price_e4: number): ProductTier {
+function tier(min_qty: number, unit_price_e4: number): ProductTier {
   return { min_qty, unit_price_e4 };
 }
 
@@ -19,7 +19,7 @@ function product(public_id: string): Product {
     origin: "cn",
     status: "on",
     source: "manual",
-    tiers: [tier("1", 95_000)],
+    tiers: [tier(1, 95_000)],
     skus: [],
     updated_at: "2026-10-29T00:00:00Z"
   };
@@ -66,8 +66,8 @@ describe("compareQuantity", () => {
 
 describe("entryTier", () => {
   it("picks the tier with the smallest minimum quantity regardless of input order", () => {
-    const tiers = [tier("500", 82_000), tier("1", 95_000), tier("100", 88_000)];
-    expect(entryTier(tiers)).toEqual(tier("1", 95_000));
+    const tiers = [tier(500, 82_000), tier(1, 95_000), tier(100, 88_000)];
+    expect(entryTier(tiers)).toEqual(tier(1, 95_000));
   });
 
   it("returns undefined when a product carries no tier", () => {

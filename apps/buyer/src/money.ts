@@ -35,7 +35,7 @@ export function compareQuantity(a: string, b: string): number {
 }
 
 export function sortedTiers(tiers: readonly ProductTier[]): ProductTier[] {
-  return [...tiers].sort((a, b) => compareQuantity(a.min_qty, b.min_qty));
+  return [...tiers].sort((a, b) => compareQuantity(String(a.min_qty), String(b.min_qty)));
 }
 
 /** The tier a buyer reaches first: the lowest minimum quantity on offer. */

@@ -31,7 +31,7 @@ export function tierForQuantity(
   quantity: string
 ): ProductTier | undefined {
   return sortedTiers(tiers).reduce<ProductTier | undefined>(
-    (current, tier) => (compareQuantity(tier.min_qty, quantity) <= 0 ? tier : current),
+    (current, tier) => (compareQuantity(String(tier.min_qty), quantity) <= 0 ? tier : current),
     undefined
   );
 }
@@ -64,7 +64,7 @@ export function addProduct(
   availableQuantity = "100",
   merchant: { id: string; name: LocalizedText } = mockMerchantFor(product)
 ): CartUpdate {
-  const minimum = sortedTiers(product.tiers)[0]?.min_qty ?? "0";
+  const minimum = String(sortedTiers(product.tiers)[0]?.min_qty ?? 0);
   const existing = cart.find((item) => item.product.public_id === product.public_id);
   if (!existing) {
     const minimumUnits = quantityUnits(minimum);
@@ -117,7 +117,7 @@ export function updateQuantity(
   if (next === 0n) return { cart: cart.filter((entry) => entry.product.public_id !== publicId) };
   const maximum = quantityUnits(availableQuantity ?? item.availableQuantity);
   if (maximum !== undefined && next > maximum) return { cart: [...cart], error: "overAvailable" };
-  const minimum = sortedTiers(item.product.tiers)[0]?.min_qty ?? "0";
+  const minimum = String(sortedTiers(item.product.tiers)[0]?.min_qty ?? 0);
   if (compareQuantity(quantity, minimum) < 0) return { cart: [...cart], error: "belowMoq" };
   return {
     cart: cart.map((entry) =>

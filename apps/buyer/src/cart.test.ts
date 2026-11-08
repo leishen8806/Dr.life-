@@ -20,9 +20,9 @@ const product: Product = {
   status: "on",
   source: "manual",
   tiers: [
-    { min_qty: "500", unit_price_e4: 82_000 },
-    { min_qty: "1", unit_price_e4: 95_000 },
-    { min_qty: "100", unit_price_e4: 88_000 }
+    { min_qty: 500, unit_price_e4: 82_000 },
+    { min_qty: 1, unit_price_e4: 95_000 },
+    { min_qty: 100, unit_price_e4: 88_000 }
   ],
   skus: [],
   updated_at: "2026-11-06T00:00:00Z"

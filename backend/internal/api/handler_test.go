@@ -1176,7 +1176,7 @@ func TestCreateProductReturnsCreatedEnvelope(t *testing.T) {
 
 // 验收：公开浏览接口无需登录即可访问。
 func TestPublicProductListIsOpen(t *testing.T) {
-	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOn, Name: completeName}}}
+	store := &stubStore{products: []catalog.Product{{PublicID: merchantULID, MerchantID: merchantID, CategoryCode: "c1", Status: catalog.StatusOn, Name: completeName, Tiers: []catalog.Tier{{MinQty: "1.000", UnitPriceE4: 100}}}}}
 	handler := catalogHandler(store, activeDirectory(), nil)
 
 	recorder := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/public/products?category=c1", nil))
@@ -1185,6 +1185,26 @@ func TestPublicProductListIsOpen(t *testing.T) {
 	}
 	if store.filter.Status != catalog.StatusOn || store.plan.Category != "c1" {
 		t.Fatalf("filter/plan = %+v/%+v", store.filter, store.plan)
+	}
+}
+
+func TestPublicProductListReturns500ForFractionalTierWithoutPanic(t *testing.T) {
+	store := &stubStore{products: []catalog.Product{{
+		PublicID: merchantULID,
+		Status:   catalog.StatusOn,
+		Name:     completeName,
+		Tiers:    []catalog.Tier{{MinQty: "1.5", UnitPriceE4: 100}},
+	}}}
+	handler := api.Handler{Catalog: catalog.New(store, catalog.Options{Merchants: activeDirectory()})}
+	recorder := httptest.NewRecorder()
+
+	handler.ListPublicProducts(recorder, httptest.NewRequest(http.MethodGet, "/v1/public/products", nil), gen.ListPublicProductsParams{})
+
+	if recorder.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if code := decodeErrorCode(t, recorder); code != 1001 {
+		t.Fatalf("code = %d, want 1001", code)
 	}
 }
 
@@ -1261,7 +1281,7 @@ func TestUppercasePublicIDInPathReachesTheGatewayRouteMatcher(t *testing.T) {
 }
 func validCreateBody() string {
 	return `{"category_code":"c1","name":{"zh":"瓷砖","en":"Tiles","km":"ក្បឿង"},"origin":"cn","unit":"pcs",` +
-		`"tiers":[{"min_qty":"10","unit_price_e4":140000},{"min_qty":"100","unit_price_e4":120000}]}`
+		`"tiers":[{"min_qty":10,"unit_price_e4":140000},{"min_qty":100,"unit_price_e4":120000}]}`
 }
 
 // 验收：PATCH {"spec":{}} 表示「清空规格」（存储层写 NULL），必须与「字段缺省」区分开；
@@ -1346,7 +1366,7 @@ func TestCreateRejectsIllegalNumbers(t *testing.T) {
 func TestCreateSKUTextLengthBounds(t *testing.T) {
 	handler := catalogHandler(&stubStore{}, activeDirectory(), merchantAuth())
 	requestFor := func(code, unit string) *httptest.ResponseRecorder {
-		body := `{"category_code":"c1","name":{"zh":"瓷砖","en":"Tiles","km":"ក្បឿង"},"origin":"cn","unit":"pcs","skus":[{"merchant_sku_code":"` + code + `","unit":"` + unit + `","spec_values":[],"tiers":[{"min_qty":"1","unit_price_e4":2},{"min_qty":"2","unit_price_e4":1}]}]}`
+		body := `{"category_code":"c1","name":{"zh":"瓷砖","en":"Tiles","km":"ក្បឿង"},"origin":"cn","unit":"pcs","skus":[{"merchant_sku_code":"` + code + `","unit":"` + unit + `","spec_values":[],"tiers":[{"min_qty":1,"unit_price_e4":2},{"min_qty":2,"unit_price_e4":1}]}]}`
 		request := httptest.NewRequest(http.MethodPost, "/v1/merchant/products", strings.NewReader(body))
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Idempotency-Key", "test-sku-length-"+strconv.Itoa(len(code))+"-"+strconv.Itoa(len(unit)))

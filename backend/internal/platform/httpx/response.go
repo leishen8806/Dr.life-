@@ -18,26 +18,31 @@ const (
 	ErrorCodeAIBase        ErrorCode = 6000
 	ErrorCodeExternalBase  ErrorCode = 7000
 
-	CodeInternalError        ErrorCode = 1001
-	CodeInvalidArgument      ErrorCode = 1002
-	CodeResourceNotFound     ErrorCode = 1003
-	CodeTooManyRequests      ErrorCode = 1004
-	CodeServiceUnavailable   ErrorCode = 1005
-	CodeMethodNotAllowed     ErrorCode = 1006
-	CodeRequestTooLarge      ErrorCode = 1007
-	CodeUnsupportedMedia     ErrorCode = 1008
-	CodeIdempotencyConflict  ErrorCode = 1009
-	CodeIdempotencyPending   ErrorCode = 1010
-	CodeAlreadyProcessed     ErrorCode = 1011
-	CodeUnauthenticated      ErrorCode = 2001
-	CodePermissionDenied     ErrorCode = 2002
-	CodeStepUpRequired       ErrorCode = 2003
-	CodeStepUpInvalid        ErrorCode = 2004
-	CodeTelegramLoginFailed  ErrorCode = 2005
-	CodeAccountBlocked       ErrorCode = 2006
-	CodeLoginTooManyAttempts ErrorCode = 2007
-	CodeConsentRequired      ErrorCode = 2008
-	CodeWebhookInvalid       ErrorCode = 7001
+	CodeInternalError            ErrorCode = 1001
+	CodeInvalidArgument          ErrorCode = 1002
+	CodeResourceNotFound         ErrorCode = 1003
+	CodeTooManyRequests          ErrorCode = 1004
+	CodeServiceUnavailable       ErrorCode = 1005
+	CodeMethodNotAllowed         ErrorCode = 1006
+	CodeRequestTooLarge          ErrorCode = 1007
+	CodeUnsupportedMedia         ErrorCode = 1008
+	CodeIdempotencyConflict      ErrorCode = 1009
+	CodeIdempotencyPending       ErrorCode = 1010
+	CodeAlreadyProcessed         ErrorCode = 1011
+	CodeUnauthenticated          ErrorCode = 2001
+	CodePermissionDenied         ErrorCode = 2002
+	CodeStepUpRequired           ErrorCode = 2003
+	CodeStepUpInvalid            ErrorCode = 2004
+	CodeTelegramLoginFailed      ErrorCode = 2005
+	CodeAccountBlocked           ErrorCode = 2006
+	CodeLoginTooManyAttempts     ErrorCode = 2007
+	CodeConsentRequired          ErrorCode = 2008
+	CodeOrderInvalidItem         ErrorCode = 3001
+	CodeOrderInsufficientStock   ErrorCode = 3002
+	CodeOrderCancelledOrReleased ErrorCode = 3003
+	CodeOrderAmountMismatch      ErrorCode = 3004
+	CodeOrderStateConflict       ErrorCode = 3005
+	CodeWebhookInvalid           ErrorCode = 7001
 )
 
 type Messages struct {
