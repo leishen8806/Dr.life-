@@ -20,9 +20,9 @@ const product: Product = {
   status: "on",
   source: "manual",
   tiers: [
-    { min_qty: "500", unit_price_e4: 82_000 },
-    { min_qty: "1", unit_price_e4: 95_000 },
-    { min_qty: "100", unit_price_e4: 88_000 }
+    { min_qty: 500, unit_price_e4: 82_000 },
+    { min_qty: 1, unit_price_e4: 95_000 },
+    { min_qty: 100, unit_price_e4: 88_000 }
   ],
   skus: [],
   updated_at: "2026-11-06T00:00:00Z"
@@ -48,25 +48,34 @@ describe("buyer cart pricing and quantity guards", () => {
     expect(cartCount(hundred.cart)).toBe("100");
   });
 
-  it("keeps fractional quantity estimates on whole cents", () => {
+  it("rejects fractional quantities without changing the cart", () => {
     const result = addProduct([], product);
     const fractional = updateQuantity(result.cart, product.public_id, "1.5");
-    expect(lineTotalE4(fractional.cart[0]!)).toBe(142_500n);
-    expect(lineTotalE4(fractional.cart[0]!) % 100n).toBe(0n);
+    expect(fractional.error).toBe("invalidQuantity");
+    expect(fractional.cart[0]?.quantity).toBe("1");
+  });
+
+  it("matches integer tier boundaries and multiplies estimated money with bigint", () => {
+    const result = addProduct([], product);
+    const hundred = updateQuantity(result.cart, product.public_id, "100");
+    expect(hundred.error).toBeUndefined();
+    expect(tierForQuantity(product.tiers, hundred.cart[0]!.quantity)?.unit_price_e4).toBe(88_000);
+    expect(lineTotalE4(hundred.cart[0]!)).toBe(8_800_000n);
   });
 
   it("removes at quantity zero and rejects below MOQ or over available", () => {
-    const added = addProduct([], product);
+    const moqTwo = { ...product, tiers: [{ min_qty: "2", unit_price_e4: 95_000 }] };
+    const added = addProduct([], moqTwo);
     const zero = updateQuantity(added.cart, product.public_id, "0");
     expect(zero.error).toBeUndefined();
     expect(zero.cart).toHaveLength(0);
 
-    const below = updateQuantity(added.cart, product.public_id, "0.5");
+    const below = updateQuantity(added.cart, product.public_id, "1");
     expect(below.error).toBe("belowMoq");
-    expect(below.cart[0]?.quantity).toBe("1");
+    expect(below.cart[0]?.quantity).toBe("2");
 
     const over = updateQuantity(added.cart, product.public_id, "101", "100");
     expect(over.error).toBe("overAvailable");
-    expect(over.cart[0]?.quantity).toBe("1");
+    expect(over.cart[0]?.quantity).toBe("2");
   });
 });

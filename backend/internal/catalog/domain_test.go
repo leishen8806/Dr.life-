@@ -54,7 +54,8 @@ func TestValidateTiersEnforcesMinimumTwoAndUniqueMOQ(t *testing.T) {
 	}{
 		{name: "empty", tiers: nil, wantField: "tiers"},
 		{name: "single tier", tiers: valid[:1], wantField: "tiers"},
-		{name: "duplicate moq spelling", tiers: []catalog.Tier{{MinQty: "10", UnitPriceE4: 1}, {MinQty: "10.0", UnitPriceE4: 2}}, wantField: "tiers[1].min_qty"},
+		{name: "duplicate moq", tiers: []catalog.Tier{{MinQty: "10", UnitPriceE4: 1}, {MinQty: "10", UnitPriceE4: 2}}, wantField: "tiers[1].min_qty"},
+		{name: "fractional moq", tiers: []catalog.Tier{{MinQty: "1.5", UnitPriceE4: 1}, {MinQty: "5", UnitPriceE4: 2}}, wantField: "tiers[0].min_qty"},
 		{name: "zero moq", tiers: []catalog.Tier{{MinQty: "0", UnitPriceE4: 1}, {MinQty: "5", UnitPriceE4: 2}}, wantField: "tiers[0].min_qty"},
 		{name: "negative price", tiers: []catalog.Tier{{MinQty: "1", UnitPriceE4: -1}, {MinQty: "5", UnitPriceE4: 2}}, wantField: "tiers[0].unit_price_e4"},
 	}

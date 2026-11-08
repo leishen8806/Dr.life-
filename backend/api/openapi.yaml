@@ -677,6 +677,132 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/orders:
+    get:
+      tags: [buyer]
+      operationId: listBuyerOrders
+      summary: List the authenticated buyer parent orders
+      description: Returns parent-order summaries and their merchant suborders using cursor pagination.
+      x-roles: [buyer]
+      parameters:
+        - name: cursor
+          in: query
+          description: Opaque cursor returned by the previous page.
+          schema: {type: string, maxLength: 128}
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Parent orders owned by the authenticated buyer.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/BuyerOrderListSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+    post:
+      tags: [buyer]
+      operationId: createBuyerOrder
+      summary: Create one parent order and split it into merchant suborders
+      description: Prices, merchant ownership and payable amounts are resolved and snapshotted by the server.
+      x-roles: [buyer]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/OrderCreateRequest"}
+      responses:
+        "201":
+          description: Parent order and server-created merchant suborders.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/BuyerOrderSuccessResponse"}
+        "400": {$ref: "#/components/responses/OrderBadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "409": {$ref: "#/components/responses/OrderConflict"}
+        "415": {$ref: "#/components/responses/UnsupportedMediaType"}
+        "422": {$ref: "#/components/responses/UnprocessableEntity"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/buyer/orders/{public_id}:
+    parameters:
+      - $ref: "#/components/parameters/PublicID"
+    get:
+      tags: [buyer]
+      operationId: getBuyerOrder
+      summary: Read one parent order owned by the authenticated buyer
+      x-roles: [buyer]
+      responses:
+        "200":
+          description: Parent order with payment status, summary status and merchant suborders.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/BuyerOrderSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/buyer/orders/{public_id}/payments:
+    parameters:
+      - $ref: "#/components/parameters/PublicID"
+    post:
+      tags: [buyer]
+      operationId: createBuyerOrderPayment
+      summary: Create a KESS payment for one parent order
+      description: A payment that has expired is replaced by a new payment number. Payment success is accepted only after server-side KESS order query; no buyer confirmation endpoint is provided.
+      x-roles: [buyer]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: KESS payment details for the complete parent order.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OrderPaymentSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/OrderConflict"}
+        "422": {$ref: "#/components/responses/UnprocessableEntity"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/buyer/orders/{public_id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/PublicID"
+    post:
+      tags: [buyer]
+      operationId: cancelBuyerOrder
+      summary: Cancel one parent order before payment
+      description: Cancellation is allowed only while every suborder remains awaiting_payment and payment_status is not confirming. A confirming payment returns 409 with the user-facing message "付款确认中，请稍后".
+      x-roles: [buyer]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Cancelled parent order and suborders.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/BuyerOrderSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/OrderConflict"}
+        "422": {$ref: "#/components/responses/UnprocessableEntity"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
   /v1/buyer/wallet/transactions:
     get:
       tags: [buyer]
@@ -993,6 +1119,53 @@ paths:
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalServerError" }
         "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /v1/merchant/suborders:
+    get:
+      tags: [merchant]
+      operationId: listMerchantSuborders
+      summary: List suborders belonging to the authenticated merchant
+      description: The server scopes every item, address reference and amount to the authenticated merchant and never returns sibling suborder data.
+      x-roles: [merchant]
+      parameters:
+        - name: cursor
+          in: query
+          description: Opaque cursor returned by the previous page.
+          schema: {type: string, maxLength: 128}
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Suborders owned by the authenticated merchant.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MerchantSuborderListSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/merchant/suborders/{public_id}:
+    parameters:
+      - $ref: "#/components/parameters/PublicID"
+    get:
+      tags: [merchant]
+      operationId: getMerchantSuborder
+      summary: Read one suborder belonging to the authenticated merchant
+      description: A merchant cannot read sibling merchants' products, address references or amounts through this endpoint.
+      x-roles: [merchant]
+      responses:
+        "200":
+          description: One suborder owned by the authenticated merchant.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MerchantSuborderSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
   /v1/merchant/products:
     get:
       tags: [merchant]
@@ -1347,7 +1520,7 @@ components:
       type: integer
       format: int32
       description: Documented application error code; ranges are described in the API description.
-      enum: [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 7001]
+      enum: [1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 3001, 3002, 3003, 3004, 3005, 7001]
       x-enum-varnames:
         - InternalError
         - InvalidArgument
@@ -1368,6 +1541,11 @@ components:
         - AccountBlocked
         - LoginTooManyAttempts
         - ConsentRequired
+        - OrderInvalidItem
+        - OrderInsufficientStock
+        - OrderCancelledOrReleased
+        - OrderAmountMismatch
+        - OrderStateConflict
         - WebhookInvalid
     Messages:
       type: object
@@ -1988,9 +2166,10 @@ components:
       required: [min_qty, unit_price_e4]
       properties:
         min_qty:
-          type: string
-          description: Minimum order quantity as a decimal string; never a floating-point number.
-          pattern: "^(0|[1-9][0-9]*)(\\.[0-9]{1,3})?$"
+          type: integer
+          format: int64
+          minimum: 1
+          description: Minimum order quantity. Trial orders accept whole units only; fractional quantities are rejected.
         unit_price_e4:
           type: integer
           format: int64
@@ -2331,6 +2510,316 @@ components:
         request_id:
           type: string
           minLength: 1
+    OrderStatus:
+      type: string
+      description: Authoritative merchant-suborder state. Parent-order status is a derived summary only.
+      enum:
+        - awaiting_payment
+        - paid
+        - submitted
+        - accepted
+        - in_fulfillment
+        - shipped
+        - delivered_verified
+        - settled
+        - rejected
+        - cancelled
+        - delivery_failed
+        - returning
+        - returned
+        - exception
+    PaymentStatus:
+      type: string
+      description: Payment result tracked independently from merchant-suborder state. The latest parent-order payment intent maps PENDING/WAITING to pending, UNKNOWN/REVIEW to confirming, SUCCESS to succeeded, FAILED/CLOSED to failed, REFUND to refunded, and no intent to pending.
+      enum: [pending, confirming, succeeded, failed, refunded]
+    OrderSummaryStatus:
+      type: string
+      description: Server-derived display summary. When every suborder has the same status, use that status; otherwise use mixed. Suborder status remains authoritative.
+      enum:
+        - awaiting_payment
+        - paid
+        - submitted
+        - accepted
+        - in_fulfillment
+        - shipped
+        - delivered_verified
+        - settled
+        - rejected
+        - cancelled
+        - delivery_failed
+        - returning
+        - returned
+        - exception
+        - mixed
+    OrderMoneyE4:
+      type: integer
+      format: int64
+      minimum: 0
+      multipleOf: 100
+      description: Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+    OrderCreateItem:
+      type: object
+      additionalProperties: false
+      required: [sku_public_id, quantity]
+      properties:
+        sku_public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        quantity:
+          type: integer
+          format: int64
+          minimum: 1
+    OrderCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [items, shipping_address_public_id]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/OrderCreateItem"}
+        shipping_address_public_id:
+          type: string
+          description: Reference to a saved address owned by the authenticated buyer; address details are resolved by the server.
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+    OrderLineSnapshot:
+      type: object
+      additionalProperties: false
+      required: [sku_public_id, quantity, unit_price_e4, line_total_e4]
+      properties:
+        sku_public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        quantity:
+          type: integer
+          format: int64
+          minimum: 1
+        unit_price_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
+        line_total_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
+    BuyerShippingAddressSnapshot:
+      type: object
+      additionalProperties: false
+      description: Full delivery-address snapshot saved by trade when the buyer places the order. It is returned only on buyer-owned order responses.
+      required: [recipient_name, address_text, phone]
+      properties:
+        recipient_name: {type: string, minLength: 1, maxLength: 120}
+        address_text: {type: string, minLength: 1, maxLength: 500}
+        phone:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: Full recipient phone number visible only to the owning buyer.
+    MerchantShippingAddressSnapshot:
+      type: object
+      additionalProperties: false
+      description: Delivery-address snapshot visible to the scoped merchant. The server masks the phone before serialization; the merchant never receives the full number.
+      required: [recipient_name, address_text, phone]
+      properties:
+        recipient_name: {type: string, minLength: 1, maxLength: 120}
+        address_text: {type: string, minLength: 1, maxLength: 500}
+        phone:
+          type: string
+          pattern: "^\\*{4}[0-9]{4}$"
+          example: "****1234"
+          description: Server-masked phone containing exactly four asterisks and the final four digits.
+    BuyerSuborder:
+      type: object
+      additionalProperties: false
+      required: [public_id, merchant_public_id, status, items, goods_amount_e4, shipping_amount_e4, payable_amount_e4, shipping_quote_expires_at]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        merchant_public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        status: {$ref: "#/components/schemas/OrderStatus"}
+        items:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/OrderLineSnapshot"}
+        goods_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Snapshotted merchandise subtotal for this suborder.
+        shipping_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: RouteFit real-time shipping quote snapshotted when the order is placed; 0 when shipping is free to the buyer.
+        payable_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Buyer payable snapshot for this suborder, equal to goods_amount_e4 plus shipping_amount_e4.
+        shipping_quote_expires_at:
+          type: string
+          format: date-time
+          description: Expiry of the RouteFit quote used for the shipping snapshot.
+    BuyerOrder:
+      type: object
+      additionalProperties: false
+      required: [public_id, shipping_address_public_id, shipping_address, payment_status, summary_status, suborders, goods_amount_e4, shipping_amount_e4, payable_amount_e4, created_at, updated_at]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        shipping_address_public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        shipping_address: {$ref: "#/components/schemas/BuyerShippingAddressSnapshot"}
+        payment_status: {$ref: "#/components/schemas/PaymentStatus"}
+        summary_status: {$ref: "#/components/schemas/OrderSummaryStatus"}
+        suborders:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/BuyerSuborder"}
+        goods_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Sum of suborder merchandise snapshots.
+        shipping_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Sum of snapshotted RouteFit shipping quotes; free-shipping suborders contribute 0.
+        payable_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Parent-order payable snapshot, equal to goods_amount_e4 plus shipping_amount_e4.
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    BuyerOrderSummary:
+      type: object
+      additionalProperties: false
+      description: Buyer-owned list projection. The full delivery-address snapshot is intentionally omitted and is available from the detail endpoint.
+      required: [public_id, shipping_address_public_id, payment_status, summary_status, suborders, goods_amount_e4, shipping_amount_e4, payable_amount_e4, created_at, updated_at]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        shipping_address_public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        payment_status: {$ref: "#/components/schemas/PaymentStatus"}
+        summary_status: {$ref: "#/components/schemas/OrderSummaryStatus"}
+        suborders:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/BuyerSuborder"}
+        goods_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Sum of suborder merchandise snapshots.
+        shipping_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Sum of snapshotted RouteFit shipping quotes; free-shipping suborders contribute 0.
+        payable_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Parent-order payable snapshot, equal to goods_amount_e4 plus shipping_amount_e4.
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    BuyerOrderListData:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/BuyerOrderSummary"}
+        next_cursor:
+          type: string
+          nullable: true
+          maxLength: 128
+    BuyerOrderSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/BuyerOrder"}
+        request_id: {type: string, minLength: 1}
+    BuyerOrderListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/BuyerOrderListData"}
+        request_id: {type: string, minLength: 1}
+    MerchantSuborder:
+      type: object
+      additionalProperties: false
+      description: One suborder scoped to the authenticated merchant; sibling merchant data is never included.
+      required: [public_id, parent_public_id, status, items, shipping_address_public_id, shipping_address, goods_amount_e4, shipping_amount_e4, payable_amount_e4, shipping_quote_expires_at, created_at, updated_at]
+      properties:
+        public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        parent_public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        status: {$ref: "#/components/schemas/OrderStatus"}
+        items:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/OrderLineSnapshot"}
+        shipping_address_public_id:
+          type: string
+          pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+        shipping_address: {$ref: "#/components/schemas/MerchantShippingAddressSnapshot"}
+        goods_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Snapshotted merchandise subtotal for this suborder.
+        shipping_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: RouteFit real-time shipping quote snapshotted when the order is placed; 0 when shipping is free to the buyer.
+        payable_amount_e4:
+          allOf: [{$ref: "#/components/schemas/OrderMoneyE4"}]
+          description: Buyer payable snapshot for this suborder, equal to goods_amount_e4 plus shipping_amount_e4.
+        shipping_quote_expires_at:
+          type: string
+          format: date-time
+          description: Expiry of the RouteFit quote used for the shipping snapshot.
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    MerchantSuborderListData:
+      type: object
+      additionalProperties: false
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: {$ref: "#/components/schemas/MerchantSuborder"}
+        next_cursor:
+          type: string
+          nullable: true
+          maxLength: 128
+    MerchantSuborderSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/MerchantSuborder"}
+        request_id: {type: string, minLength: 1}
+    MerchantSuborderListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/MerchantSuborderListData"}
+        request_id: {type: string, minLength: 1}
+    OrderPaymentData:
+      type: object
+      additionalProperties: false
+      required: [payment_link, expires_at, payment_no]
+      properties:
+        payment_link: {type: string, format: uri}
+        expires_at: {type: string, format: date-time}
+        payment_no:
+          type: string
+          minLength: 1
+          maxLength: 128
+    OrderPaymentSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/OrderPaymentData"}
+        request_id: {type: string, minLength: 1}
     AuditRecord:
       type: object
       additionalProperties: false
@@ -2504,6 +2993,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorEnvelope"
+    OrderBadRequest:
+      description: Invalid order request or item (error code 1002 or 3001).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
     Unauthorized:
       description: Authentication required (error code 2001).
       content:
@@ -2569,6 +3064,15 @@ components:
             $ref: "#/components/schemas/ErrorEnvelope"
     Conflict:
       description: Request is already processing or its completed response cannot be replayed (error code 1010 or 1011).
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    OrderConflict:
+      description: Order cannot proceed because stock is insufficient, the order was cancelled or released, an amount differs from the server snapshot, payment is confirming, the current state disallows the action, or an idempotent request is still processing/cannot be replayed (error code 3002, 3003, 3004, 3005, 1010, or 1011).
       headers:
         Retry-After:
           $ref: "#/components/headers/RetryAfter"

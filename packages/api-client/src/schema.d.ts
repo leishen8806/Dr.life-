@@ -609,6 +609,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/buyer/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the authenticated buyer parent orders
+         * @description Returns parent-order summaries and their merchant suborders using cursor pagination.
+         */
+        get: operations["listBuyerOrders"];
+        put?: never;
+        /**
+         * Create one parent order and split it into merchant suborders
+         * @description Prices, merchant ownership and payable amounts are resolved and snapshotted by the server.
+         */
+        post: operations["createBuyerOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/buyer/orders/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        /** Read one parent order owned by the authenticated buyer */
+        get: operations["getBuyerOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/buyer/orders/{public_id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a KESS payment for one parent order
+         * @description A payment that has expired is replaced by a new payment number. Payment success is accepted only after server-side KESS order query; no buyer confirmation endpoint is provided.
+         */
+        post: operations["createBuyerOrderPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/buyer/orders/{public_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel one parent order before payment
+         * @description Cancellation is allowed only while every suborder remains awaiting_payment and payment_status is not confirming. A confirming payment returns 409 with the user-facing message "付款确认中，请稍后".
+         */
+        post: operations["cancelBuyerOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/buyer/wallet/transactions": {
         parameters: {
             query?: never;
@@ -975,6 +1065,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/merchant/suborders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List suborders belonging to the authenticated merchant
+         * @description The server scopes every item, address reference and amount to the authenticated merchant and never returns sibling suborder data.
+         */
+        get: operations["listMerchantSuborders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merchant/suborders/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Read one suborder belonging to the authenticated merchant
+         * @description A merchant cannot read sibling merchants' products, address references or amounts through this endpoint.
+         */
+        get: operations["getMerchantSuborder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/merchant/products": {
         parameters: {
             query?: never;
@@ -1103,7 +1236,7 @@ export interface components {
          * @description Documented application error code; ranges are described in the API description.
          * @enum {integer}
          */
-        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 7001;
+        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 3001 | 3002 | 3003 | 3004 | 3005 | 7001;
         Messages: {
             zh: string;
             en: string;
@@ -1476,8 +1609,11 @@ export interface components {
             body: components["schemas"]["LocalizedText"];
         };
         ProductTier: {
-            /** @description Minimum order quantity as a decimal string; never a floating-point number. */
-            min_qty: string;
+            /**
+             * Format: int64
+             * @description Minimum order quantity. Trial orders accept whole units only; fractional quantities are rejected.
+             */
+            min_qty: number;
             /**
              * Format: int64
              * @description Unit price in ten-thousandths of a US dollar.
@@ -1626,6 +1762,182 @@ export interface components {
             /** @enum {boolean} */
             ok: true;
             data: components["schemas"]["Product"];
+            request_id: string;
+        };
+        /**
+         * @description Authoritative merchant-suborder state. Parent-order status is a derived summary only.
+         * @enum {string}
+         */
+        OrderStatus: "awaiting_payment" | "paid" | "submitted" | "accepted" | "in_fulfillment" | "shipped" | "delivered_verified" | "settled" | "rejected" | "cancelled" | "delivery_failed" | "returning" | "returned" | "exception";
+        /**
+         * @description Payment result tracked independently from merchant-suborder state. The latest parent-order payment intent maps PENDING/WAITING to pending, UNKNOWN/REVIEW to confirming, SUCCESS to succeeded, FAILED/CLOSED to failed, REFUND to refunded, and no intent to pending.
+         * @enum {string}
+         */
+        PaymentStatus: "pending" | "confirming" | "succeeded" | "failed" | "refunded";
+        /**
+         * @description Server-derived display summary. When every suborder has the same status, use that status; otherwise use mixed. Suborder status remains authoritative.
+         * @enum {string}
+         */
+        OrderSummaryStatus: "awaiting_payment" | "paid" | "submitted" | "accepted" | "in_fulfillment" | "shipped" | "delivered_verified" | "settled" | "rejected" | "cancelled" | "delivery_failed" | "returning" | "returned" | "exception" | "mixed";
+        /**
+         * Format: int64
+         * @description Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+         */
+        OrderMoneyE4: number;
+        OrderCreateItem: {
+            sku_public_id: string;
+            /** Format: int64 */
+            quantity: number;
+        };
+        OrderCreateRequest: {
+            items: components["schemas"]["OrderCreateItem"][];
+            /** @description Reference to a saved address owned by the authenticated buyer; address details are resolved by the server. */
+            shipping_address_public_id: string;
+        };
+        OrderLineSnapshot: {
+            sku_public_id: string;
+            /** Format: int64 */
+            quantity: number;
+            unit_price_e4: components["schemas"]["OrderMoneyE4"];
+            line_total_e4: components["schemas"]["OrderMoneyE4"];
+        };
+        /** @description Full delivery-address snapshot saved by trade when the buyer places the order. It is returned only on buyer-owned order responses. */
+        BuyerShippingAddressSnapshot: {
+            recipient_name: string;
+            address_text: string;
+            /** @description Full recipient phone number visible only to the owning buyer. */
+            phone: string;
+        };
+        /** @description Delivery-address snapshot visible to the scoped merchant. The server masks the phone before serialization; the merchant never receives the full number. */
+        MerchantShippingAddressSnapshot: {
+            recipient_name: string;
+            address_text: string;
+            /**
+             * @description Server-masked phone containing exactly four asterisks and the final four digits.
+             * @example ****1234
+             */
+            phone: string;
+        };
+        BuyerSuborder: {
+            public_id: string;
+            merchant_public_id: string;
+            status: components["schemas"]["OrderStatus"];
+            items: components["schemas"]["OrderLineSnapshot"][];
+            /** @description Snapshotted merchandise subtotal for this suborder. */
+            goods_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description RouteFit real-time shipping quote snapshotted when the order is placed; 0 when shipping is free to the buyer. */
+            shipping_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Buyer payable snapshot for this suborder, equal to goods_amount_e4 plus shipping_amount_e4. */
+            payable_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /**
+             * Format: date-time
+             * @description Expiry of the RouteFit quote used for the shipping snapshot.
+             */
+            shipping_quote_expires_at: string;
+        };
+        BuyerOrder: {
+            public_id: string;
+            shipping_address_public_id: string;
+            shipping_address: components["schemas"]["BuyerShippingAddressSnapshot"];
+            payment_status: components["schemas"]["PaymentStatus"];
+            summary_status: components["schemas"]["OrderSummaryStatus"];
+            suborders: components["schemas"]["BuyerSuborder"][];
+            /** @description Sum of suborder merchandise snapshots. */
+            goods_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Sum of snapshotted RouteFit shipping quotes; free-shipping suborders contribute 0. */
+            shipping_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Parent-order payable snapshot, equal to goods_amount_e4 plus shipping_amount_e4. */
+            payable_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description Buyer-owned list projection. The full delivery-address snapshot is intentionally omitted and is available from the detail endpoint. */
+        BuyerOrderSummary: {
+            public_id: string;
+            shipping_address_public_id: string;
+            payment_status: components["schemas"]["PaymentStatus"];
+            summary_status: components["schemas"]["OrderSummaryStatus"];
+            suborders: components["schemas"]["BuyerSuborder"][];
+            /** @description Sum of suborder merchandise snapshots. */
+            goods_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Sum of snapshotted RouteFit shipping quotes; free-shipping suborders contribute 0. */
+            shipping_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Parent-order payable snapshot, equal to goods_amount_e4 plus shipping_amount_e4. */
+            payable_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        BuyerOrderListData: {
+            items: components["schemas"]["BuyerOrderSummary"][];
+            next_cursor: string | null;
+        };
+        BuyerOrderSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["BuyerOrder"];
+            request_id: string;
+        };
+        BuyerOrderListSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["BuyerOrderListData"];
+            request_id: string;
+        };
+        /** @description One suborder scoped to the authenticated merchant; sibling merchant data is never included. */
+        MerchantSuborder: {
+            public_id: string;
+            parent_public_id: string;
+            status: components["schemas"]["OrderStatus"];
+            items: components["schemas"]["OrderLineSnapshot"][];
+            shipping_address_public_id: string;
+            shipping_address: components["schemas"]["MerchantShippingAddressSnapshot"];
+            /** @description Snapshotted merchandise subtotal for this suborder. */
+            goods_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description RouteFit real-time shipping quote snapshotted when the order is placed; 0 when shipping is free to the buyer. */
+            shipping_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /** @description Buyer payable snapshot for this suborder, equal to goods_amount_e4 plus shipping_amount_e4. */
+            payable_amount_e4: components["schemas"]["OrderMoneyE4"];
+            /**
+             * Format: date-time
+             * @description Expiry of the RouteFit quote used for the shipping snapshot.
+             */
+            shipping_quote_expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        MerchantSuborderListData: {
+            items: components["schemas"]["MerchantSuborder"][];
+            next_cursor: string | null;
+        };
+        MerchantSuborderSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["MerchantSuborder"];
+            request_id: string;
+        };
+        MerchantSuborderListSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["MerchantSuborderListData"];
+            request_id: string;
+        };
+        OrderPaymentData: {
+            /** Format: uri */
+            payment_link: string;
+            /** Format: date-time */
+            expires_at: string;
+            payment_no: string;
+        };
+        OrderPaymentSuccessResponse: {
+            /** @enum {boolean} */
+            ok: true;
+            data: components["schemas"]["OrderPaymentData"];
             request_id: string;
         };
         AuditRecord: {
@@ -1829,6 +2141,15 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
+        /** @description Invalid order request or item (error code 1002 or 3001). */
+        OrderBadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
         /** @description Authentication required (error code 2001). */
         Unauthorized: {
             headers: {
@@ -1922,6 +2243,16 @@ export interface components {
         };
         /** @description Request is already processing or its completed response cannot be replayed (error code 1010 or 1011). */
         Conflict: {
+            headers: {
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description Order cannot proceed because stock is insufficient, the order was cancelled or released, an amount differs from the server snapshot, payment is confirming, the current state disallows the action, or an idempotent request is still processing/cannot be replayed (error code 3002, 3003, 3004, 3005, 1010, or 1011). */
+        OrderConflict: {
             headers: {
                 "Retry-After": components["headers"]["RetryAfter"];
                 [name: string]: unknown;
@@ -2787,6 +3118,173 @@ export interface operations {
             500: components["responses"]["InternalServerError"];
         };
     };
+    listBuyerOrders: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor returned by the previous page. */
+                cursor?: string;
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Parent orders owned by the authenticated buyer. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuyerOrderListSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createBuyerOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OrderCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Parent order and server-created merchant suborders. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuyerOrderSuccessResponse"];
+                };
+            };
+            400: components["responses"]["OrderBadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["OrderConflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getBuyerOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Parent order with payment status, summary status and merchant suborders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuyerOrderSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createBuyerOrderPayment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description KESS payment details for the complete parent order. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderPaymentSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["OrderConflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    cancelBuyerOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled parent order and suborders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuyerOrderSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["OrderConflict"];
+            422: components["responses"]["UnprocessableEntity"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     getBuyerWalletTransactions: {
         parameters: {
             query?: never;
@@ -3321,6 +3819,67 @@ export interface operations {
                     "application/json": components["schemas"]["AccountLinkDeletedSuccessResponse"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listMerchantSuborders: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor returned by the previous page. */
+                cursor?: string;
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Suborders owned by the authenticated merchant. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MerchantSuborderListSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getMerchantSuborder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One suborder owned by the authenticated merchant. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MerchantSuborderSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

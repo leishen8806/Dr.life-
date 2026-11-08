@@ -72,8 +72,8 @@ const (
 	SourceCSV    = "csv"
 )
 
-// Tier 是阶梯价档位。MinQty 为十进制字符串（对应 numeric(18,3)），
-// UnitPriceE4 为 bigint 万分之一美元；全链路不出现 float64。
+// Tier 是阶梯价档位。MinQty 保留字符串以对接 numeric 列，但试点只接受正整数；
+// UnitPriceE4 为 bigint 万分之一美元，全链路不出现 float64。
 type Tier struct {
 	MinQty      string
 	UnitPriceE4 int64

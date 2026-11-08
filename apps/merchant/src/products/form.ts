@@ -12,7 +12,7 @@ type Tier = components["schemas"]["ProductTier"];
 const languages = ["zh", "en", "km"] as const;
 type LanguageKey = (typeof languages)[number];
 
-const qtyScale = 3; // catalog.product_tier.min_qty numeric(18,3)
+const qtyScale = 0; // 试点只收整数数量；数据库 numeric 列暂保留兼容性
 const priceScale = 4; // unit_price_e4 以万分之一美元计，全程不经浮点
 const volumeScale = 4; // catalog.product.vol_m3 numeric(12,4)
 const volumeIntegerDigits = 8;
@@ -137,7 +137,7 @@ export function draftFromProduct(product: Product): ProductDraft {
     leadDays: product.lead_days == null ? "" : String(product.lead_days),
     volM3: product.vol_m3 ?? "",
     tiers: product.tiers.map((tier) => ({
-      minQty: tier.min_qty,
+      minQty: String(tier.min_qty),
       unitPrice: formatPriceE4(tier.unit_price_e4)
     }))
   };
@@ -152,19 +152,21 @@ function checkTiers(draft: ProductDraft, errors: ProductFieldError[]): Tier[] {
   const seen = new Set<string>();
   draft.tiers.forEach((tier, index) => {
     const minQty = normalizeDecimal(tier.minQty, qtyScale);
+    const minQtyValue = minQty === undefined ? undefined : Number(minQty);
+    const validMinQty = minQtyValue !== undefined && Number.isSafeInteger(minQtyValue) && minQtyValue > 0;
     const unitPriceE4 = parsePriceE4(tier.unitPrice);
-    if (minQty === undefined || minQty === "0") {
+    if (!validMinQty) {
       errors.push({
         field: `tiers[${index}].min_qty`,
         messageKey: "product.error.minQtyInvalid"
       });
-    } else if (seen.has(minQty)) {
+    } else if (seen.has(minQty!)) {
       errors.push({
         field: `tiers[${index}].min_qty`,
         messageKey: "product.error.minQtyDuplicate"
       });
     } else {
-      seen.add(minQty);
+      seen.add(minQty!);
     }
     if (unitPriceE4 === undefined) {
       errors.push({
@@ -172,8 +174,8 @@ function checkTiers(draft: ProductDraft, errors: ProductFieldError[]): Tier[] {
         messageKey: "product.error.unitPriceInvalid"
       });
     }
-    if (minQty !== undefined && unitPriceE4 !== undefined) {
-      tiers.push({ min_qty: minQty, unit_price_e4: unitPriceE4 });
+    if (validMinQty && unitPriceE4 !== undefined) {
+      tiers.push({ min_qty: minQtyValue!, unit_price_e4: unitPriceE4 });
     }
   });
   return tiers;
