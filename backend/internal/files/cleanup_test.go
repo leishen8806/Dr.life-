@@ -12,6 +12,7 @@ func TestCleanupWorkerDeletesObjectBeforeWritingTerminalStatus(t *testing.T) {
 	store := &cleanupMemoryStore{candidates: []cleanupCandidate{
 		{ObjectKey: "objects/pending", Status: StatusPending, CreatedAt: now.Add(-25 * time.Hour)},
 		{ObjectKey: "objects/retained", Status: StatusReady, RetentionUntil: ptrTime(now.Add(-time.Second))},
+		{ObjectKey: "objects/unexpired", Status: StatusReady, RetentionUntil: ptrTime(now.Add(time.Second))},
 	}}
 	objects := &cleanupObjects{}
 	worker := NewCleanupWorker(store, objects, func() time.Time { return now })
@@ -28,6 +29,9 @@ func TestCleanupWorkerDeletesObjectBeforeWritingTerminalStatus(t *testing.T) {
 	}
 	if got := store.terminal["objects/retained"]; got != StatusDeleted {
 		t.Fatalf("retained terminal status=%q, want deleted", got)
+	}
+	if _, changed := store.terminal["objects/unexpired"]; changed {
+		t.Fatal("unexpired retained object was cleaned")
 	}
 }
 
