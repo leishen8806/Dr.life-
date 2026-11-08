@@ -212,6 +212,7 @@
 ,"mall.cartAvailable": "Available: {quantity}"
 ,"mall.cartOutOfStock": "Quantity exceeds available stock."
 ,"mall.cartBelowMoq": "Quantity is below the minimum order quantity."
+,"mall.cartIntegerOnly": "Quantity must be a whole number."
 ,"mall.cartRemove": "Remove"
 ,"mall.cartSubtotal": "Subtotal"
 ,"mall.cartTotal": "Total"

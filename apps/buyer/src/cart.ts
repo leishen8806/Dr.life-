@@ -1,8 +1,6 @@
 import type { LocalizedText, Product, ProductTier } from "./types";
 import { compareQuantity, sortedTiers } from "./money";
 
-const quantityScale = 10_000n;
-
 export type CartError = "belowMoq" | "overAvailable" | "invalidQuantity";
 
 export interface CartItem {
@@ -20,15 +18,12 @@ export interface CartUpdate {
 
 function quantityUnits(value: string): bigint | undefined {
   const normalized = value.trim();
-  if (!/^\d+(?:\.\d{1,4})?$/.test(normalized)) return undefined;
-  const [whole, fraction = ""] = normalized.split(".");
-  return BigInt(whole ?? "0") * quantityScale + BigInt(fraction.padEnd(4, "0"));
+  if (!/^\d+$/.test(normalized)) return undefined;
+  return BigInt(normalized);
 }
 
 function displayQuantity(units: bigint): string {
-  const whole = units / quantityScale;
-  const fraction = (units % quantityScale).toString().padStart(4, "0").replace(/0+$/, "");
-  return fraction ? `${whole}.${fraction}` : whole.toString();
+  return units.toString();
 }
 
 export function tierForQuantity(
@@ -45,11 +40,11 @@ export function lineUnitPrice(item: CartItem): number {
   return tierForQuantity(item.product.tiers, item.quantity)?.unit_price_e4 ?? 0;
 }
 
-/** Money remains e4 bigint; fractional quantities are converted without floating point. */
+/** Money remains e4 bigint; quantity is restricted to positive integers. */
 export function lineTotalE4(item: CartItem): bigint {
   const units = quantityUnits(item.quantity);
   if (units === undefined) return 0n;
-  const rawE4 = (BigInt(lineUnitPrice(item)) * units) / quantityScale;
+  const rawE4 = BigInt(lineUnitPrice(item)) * units;
   // Cart totals are estimates until the server prices the order. Keep mock values
   // on whole cents (e4 % 100 === 0); #139 remains the source of truth.
   return rawE4 - (rawE4 % 100n);
@@ -151,9 +146,9 @@ export function stepQuantity(
     cart,
     publicId,
     displayQuantity(
-      current + BigInt(delta) * quantityScale < 0n
+      current + BigInt(delta) < 0n
         ? 0n
-        : current + BigInt(delta) * quantityScale
+        : current + BigInt(delta)
     )
   );
 }
