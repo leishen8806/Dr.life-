@@ -39,7 +39,7 @@ createRoot(document.getElementById("root")!).render(
         gateway={session}
         suggested={supportedLanguage(environment.languageCode)}
       >
-        <BuyerApp isTelegram={environment.isTelegram} />
+        <BuyerApp isTelegram={environment.isTelegram} client={session.client} />
       </StartupGate>
     </I18nProvider>
   </StrictMode>

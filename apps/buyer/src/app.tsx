@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type Language, type TranslationKey, useI18n } from "@drlife/i18n";
+import { type TranslationKey, useI18n } from "@drlife/i18n";
 import { LanguageSwitcher, useBackButton } from "@drlife/ui";
 import {
   type BuyerApiClient,
-  createBuyerApiClient,
   loadCategories,
-  loadProducts
+  loadProducts,
+  loadBuyerOrders,
+  loadBuyerOrder
 } from "./api";
 import { appendFeed, firstFeed, nextPage, type ProductFeed } from "./feed";
-import { mockOrders, type BuyerOrder } from "./orders";
+import type { BuyerOrder } from "./orders";
 import { addProduct, cartCount, stepQuantity, updateQuantity, type CartItem } from "./cart";
 import { errorMessageKey, type Resource } from "./resource";
 import type { Category, Product } from "./types";
@@ -62,13 +63,6 @@ function useLoaded<T>(
  * A language switch gives the client a new `Accept-Language`, which reloads the
  * catalogue. The lists keep showing the previous data until the reload lands.
  */
-function useBuyerClient(language: Language): BuyerApiClient {
-  return useMemo(
-    () => createBuyerApiClient({ getLanguage: () => language }),
-    [language]
-  );
-}
-
 type FeedLoader = (signal: AbortSignal) => Promise<ProductFeed>;
 
 /** The pages appended after the first, tied to the loader that produced them. */
@@ -180,9 +174,8 @@ function CategoryPage({
   );
 }
 
-export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
+export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: BuyerApiClient }) {
   const { language, t } = useI18n();
-  const client = useBuyerClient(language);
 
   const [stack, setStack] = useState<Route[]>([{ name: "home" }]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -227,12 +220,22 @@ export function BuyerApp({ isTelegram }: { isTelegram: boolean }) {
     [push]
   );
   const openOrders = useCallback(() => push({ name: "orders" }), [push]);
-  const openOrder = useCallback((order: BuyerOrder) => push({ name: "order", order }), [push]);
   const loadOrders = useCallback(
-    async () => (import.meta.env.DEV ? mockOrders : []),
-    []
+    (signal: AbortSignal) => loadBuyerOrders(client, signal),
+    [client]
   );
   const [orders, retryOrders] = useLoaded(loadOrders);
+  const openOrder = useCallback((order: BuyerOrder) => {
+    push({ name: "order", order });
+    loadBuyerOrder(client, order.publicId).then((detail) =>
+      setStack((current) => {
+        const route = current.at(-1);
+        return route?.name === "order" && route.order.publicId === order.publicId
+          ? [...current.slice(0, -1), { name: "order", order: detail }]
+          : current;
+      })
+    ).catch(() => undefined);
+  }, [client, push]);
 
   const addToCart = useCallback((product: Product) => {
     const result = addProduct(cart, product);

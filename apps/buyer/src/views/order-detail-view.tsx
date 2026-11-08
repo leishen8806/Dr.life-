@@ -46,6 +46,7 @@ export function OrderDetailView({
               ))}
             </div>
             <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(subOrder.totalE4)}</strong></p>
+            <p className="buyer-order-detail__meta">{t("order.shipping")}: {subOrder.shippingAmountE4 === 0n ? t("order.free") : formatPriceE4(subOrder.shippingAmountE4)}</p>
             <h3 className="buyer-section__title">{t("order.delivery")}</h3>
             <ol className="buyer-order-events">
               {subOrder.events.map((event) => (
@@ -58,9 +59,10 @@ export function OrderDetailView({
           </Card>
         ))}
         <Card>
+          <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(order.goodsAmountE4)}</strong></p>
+          <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{order.shippingAmountE4 === 0n ? t("order.free") : formatPriceE4(order.shippingAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(order.totalE4)}</strong></p>
         </Card>
-        <p className="buyer-order-note">{t("order.mockNote")}</p>
       </main>
     </div>
   );

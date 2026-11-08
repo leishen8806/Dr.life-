@@ -14,7 +14,8 @@ export type OrderStatus =
   | "delivery_failed"
   | "returning"
   | "returned"
-  | "exception";
+  | "exception"
+  | "mixed";
 
 export type PaymentStatus = "pending" | "confirming" | "succeeded" | "failed" | "refunded";
 
@@ -38,6 +39,8 @@ export interface BuyerSubOrder {
   status: OrderStatus;
   lines: readonly OrderLine[];
   totalE4: bigint;
+  shippingAmountE4: bigint;
+  shippingQuoteExpiresAt: string;
   events: readonly OrderEvent[];
 }
 
@@ -45,6 +48,8 @@ export interface BuyerOrder {
   publicId: string;
   createdAt: string;
   totalE4: bigint;
+  goodsAmountE4: bigint;
+  shippingAmountE4: bigint;
   paymentStatus: PaymentStatus;
   subOrders: readonly BuyerSubOrder[];
 }
@@ -76,6 +81,8 @@ function subOrder(
     merchantName,
     lines,
     totalE4: lines.reduce((total, item) => total + item.totalE4, 0n),
+    shippingAmountE4: 0n,
+    shippingQuoteExpiresAt: `2026-11-${day}T10:30:00Z`,
     events: [{ label: status, at: `2026-11-${day}T09:30:00Z` }]
   };
 }
@@ -85,6 +92,8 @@ function order(publicId: string, day: string, subOrders: readonly BuyerSubOrder[
     publicId,
     createdAt: `2026-11-${day}T09:30:00Z`,
     totalE4: subOrders.reduce((total, item) => total + item.totalE4, 0n),
+    goodsAmountE4: subOrders.reduce((total, item) => total + item.totalE4, 0n),
+    shippingAmountE4: subOrders.reduce((total, item) => total + item.shippingAmountE4, 0n),
     paymentStatus: "succeeded",
     subOrders
   };

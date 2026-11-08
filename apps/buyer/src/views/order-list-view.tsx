@@ -70,9 +70,6 @@ export function OrderListView({
             ))}
           </section>
         )}
-        {orders.status === "ready" && orders.value.length > 0 && (
-          <p className="buyer-order-note">{t("order.mockNote")}</p>
-        )}
       </main>
     </div>
   );

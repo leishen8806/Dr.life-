@@ -21,8 +21,8 @@ function text(markup: string): string[] {
     .filter(Boolean);
 }
 
-describe("buyer order mock flow", () => {
-  it("covers parent orders, split merchants, payment confirmation and the interface-stub label", () => {
+describe("buyer order views", () => {
+  it("covers parent orders, split merchants and payment confirmation", () => {
     const markup = renderToStaticMarkup(
       <OrderListView
         t={translator("en")}
@@ -34,7 +34,6 @@ describe("buyer order mock flow", () => {
       />
     );
     expect(mockOrders).toHaveLength(16);
-    expect(text(markup)).toContain("Interface-stub data for the buyer order flow");
     expect(text(markup)).toContain("Awaiting payment confirmation");
     expect(text(markup)).toContain("Warehouse processing, awaiting acceptance");
     expect(text(markup)).toContain("$114.00");

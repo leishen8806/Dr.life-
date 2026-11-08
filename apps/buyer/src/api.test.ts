@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@drlife/api-client";
-import { createBuyerApiClient, loadCategories, loadProducts } from "./api";
+import { createBuyerApiClient, loadCategories, loadProducts, loadBuyerOrders, loadBuyerOrder } from "./api";
 import type { Category, Product } from "./types";
 
 const category: Category = {
@@ -177,5 +177,68 @@ describe("loadProducts", () => {
     await expect(loadProducts(client(transport), {})).rejects.toBeInstanceOf(
       ApiError
     );
+  });
+});
+
+const apiOrder = {
+  public_id: "01JORDER",
+  shipping_address_public_id: "01JADDRESS",
+  shipping_address: { recipient_name: "Buyer", address_text: "Phnom Penh", phone: "+85512345678" },
+  payment_status: "pending" as const,
+  summary_status: "awaiting_payment" as const,
+  suborders: [{
+    public_id: "01JSUBORDER",
+    merchant_public_id: "01JMERCHANT",
+    status: "awaiting_payment" as const,
+    items: [{ sku_public_id: "01JSKU", quantity: 2, unit_price_e4: 95_000, line_total_e4: 190_000 }],
+    goods_amount_e4: 190_000,
+    shipping_amount_e4: 0,
+    payable_amount_e4: 190_000,
+    shipping_quote_expires_at: "2026-11-08T10:00:00Z"
+  }],
+  goods_amount_e4: 190_000,
+  shipping_amount_e4: 0,
+  payable_amount_e4: 190_000,
+  created_at: "2026-11-08T09:00:00Z",
+  updated_at: "2026-11-08T09:00:00Z"
+};
+
+describe("loadBuyerOrders", () => {
+  it("follows cursor pages and maps server money to bigint without mock data", async () => {
+    const second = { ...apiOrder, public_id: "01JORDER2" };
+    const { urls, transport } = recordingFetch((call) =>
+      call === 0
+        ? success({ items: [apiOrder], next_cursor: "next-page" })
+        : success({ items: [second], next_cursor: null })
+    );
+
+    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject([
+      { publicId: "01JORDER", totalE4: 190_000n, subOrders: [{ totalE4: 190_000n }] },
+      { publicId: "01JORDER2" }
+    ]);
+    expect(urls).toEqual([
+      "http://api.test/v1/buyer/orders?page_size=100",
+      "http://api.test/v1/buyer/orders?cursor=next-page&page_size=100"
+    ]);
+  });
+
+  it("loads one detail and preserves a server error code", async () => {
+    const { urls, transport } = recordingFetch((call) =>
+      call === 0 ? success(apiOrder) : failure(2008, 403)
+    );
+    await expect(loadBuyerOrder(client(transport), "01JORDER")).resolves.toMatchObject({
+      publicId: "01JORDER",
+      goodsAmountE4: 190_000n,
+      shippingAmountE4: 0n
+    });
+    await expect(loadBuyerOrder(client(transport), "01JORDER")).rejects.toMatchObject({
+      name: "ApiError",
+      code: 2008,
+      messageKey: "error.2008"
+    });
+    expect(urls).toEqual([
+      "http://api.test/v1/buyer/orders/01JORDER",
+      "http://api.test/v1/buyer/orders/01JORDER"
+    ]);
   });
 });
