@@ -47,6 +47,8 @@ type Intent struct {
 	CreateAttempts     int
 	CreatedAt          time.Time
 	LastCreateSentAt   *time.Time
+	ExpiresAt          *time.Time
+	PaymentURL         string
 }
 
 // ReceivableSnapshot is produced by the server-side order total calculation.
@@ -58,6 +60,7 @@ type ReceivableSnapshot struct {
 	AmountE4   int64
 	Currency   string
 	SellerCode string
+	ExpiresAt  *time.Time
 }
 
 type ChannelOrder struct {

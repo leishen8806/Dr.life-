@@ -1236,7 +1236,7 @@ export interface components {
          * @description Documented application error code; ranges are described in the API description.
          * @enum {integer}
          */
-        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 3001 | 3002 | 3003 | 3004 | 3005 | 7001;
+        ErrorCode: 1001 | 1002 | 1003 | 1004 | 1005 | 1006 | 1007 | 1008 | 1009 | 1010 | 1011 | 2001 | 2002 | 2003 | 2004 | 2005 | 2006 | 2007 | 2008 | 3001 | 3002 | 3003 | 3004 | 3005 | 3006 | 7001;
         Messages: {
             zh: string;
             en: string;
@@ -2251,7 +2251,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorEnvelope"];
             };
         };
-        /** @description Order cannot proceed because stock is insufficient, the order was cancelled or released, an amount differs from the server snapshot, payment is confirming, the current state disallows the action, or an idempotent request is still processing/cannot be replayed (error code 3002, 3003, 3004, 3005, 1010, or 1011). */
+        /** @description Order cannot proceed because stock is insufficient, the order was cancelled or released, an amount differs from the server snapshot, payment is confirming, the current state disallows the action, the shipping quote expired, or an idempotent request is still processing/cannot be replayed (error code 3002, 3003, 3004, 3005, 3006, 1010, or 1011). */
         OrderConflict: {
             headers: {
                 "Retry-After": components["headers"]["RetryAfter"];

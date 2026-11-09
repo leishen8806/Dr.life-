@@ -58,12 +58,14 @@ type OrderLineInput struct {
 }
 type CatalogLine struct {
 	SKUPublicID          string
+	MerchantPublicID     string
 	MerchantID, Quantity int64
 	Tiers                []Tier
 	OnSale               bool
 }
 type OrderItem struct {
 	SKUPublicID                                    string
+	MerchantPublicID                               string
 	MerchantID, Quantity, UnitPriceE4, LineTotalE4 int64
 }
 
@@ -88,7 +90,7 @@ func BuildOrderItems(lines []CatalogLine) ([]OrderItem, int64, error) {
 		if amount > 0 && total > maxInt64-amount {
 			return nil, 0, ErrInvalidOrderLine
 		}
-		items = append(items, OrderItem{SKUPublicID: line.SKUPublicID, MerchantID: line.MerchantID, Quantity: line.Quantity, UnitPriceE4: price, LineTotalE4: amount})
+		items = append(items, OrderItem{SKUPublicID: line.SKUPublicID, MerchantPublicID: line.MerchantPublicID, MerchantID: line.MerchantID, Quantity: line.Quantity, UnitPriceE4: price, LineTotalE4: amount})
 		total += amount
 	}
 	return items, total, nil

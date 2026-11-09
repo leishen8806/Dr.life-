@@ -30,6 +30,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
+	"github.com/leishen8806/Dr.life-/backend/internal/trade"
 )
 
 type adminStepUpVerifier struct{ tokens iam.TokenManager }
@@ -278,6 +279,7 @@ func main() {
 	var accountLinkService *iam.AccountLinkService
 	var consentService *iam.ConsentService
 	var accountDirectory *iam.AccountDirectory
+	var orderAccounts trade.AccountDirectory
 	var adminPermissions *iam.AdminPermissionStore
 	var stepUpVerifier gateway.StepUpVerifier
 	var adminStepUpJTIStore gateway.JTIStore
@@ -303,6 +305,7 @@ func main() {
 		}
 		defer iamDatabase.Close()
 		accountDirectory = &iam.AccountDirectory{DB: iamDatabase}
+		orderAccounts = accountDirectory
 		adminPermissions = &iam.AdminPermissionStore{DB: iamDatabase}
 		checks = append(checks, iamDatabase.Ping)
 		jwtKeys, keyErr := iam.LoadJWTKeyringFromEnvironment()
@@ -386,6 +389,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	var orderService *trade.Service
+	if orderAccounts != nil {
+		orderService = trade.NewService(trade.NewPostgresStore(database), orderAccounts, unavailableOrderCatalog{})
+	}
 	handler := httpx.ETag(server.NewHandlerWithGateway(logger, server.GatewayOptions{
 		AppEnv: cfg.AppEnv,
 		OriginGroups: gateway.OriginGroups{
@@ -434,6 +441,7 @@ func main() {
 		AdminPermissions:    adminPermissions,
 		AdminManagement:     adminManagementService,
 		Files:               fileService,
+		Orders:              orderService,
 		Bulkhead:            bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)
