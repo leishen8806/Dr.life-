@@ -64,7 +64,7 @@ describe("buyer cart pricing and quantity guards", () => {
   });
 
   it("removes at quantity zero and rejects below MOQ or over available", () => {
-    const moqTwo = { ...product, tiers: [{ min_qty: "2", unit_price_e4: 95_000 }] };
+    const moqTwo = { ...product, tiers: [{ min_qty: 2, unit_price_e4: 95_000 }] };
     const added = addProduct([], moqTwo);
     const zero = updateQuantity(added.cart, product.public_id, "0");
     expect(zero.error).toBeUndefined();
