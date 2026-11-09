@@ -56,18 +56,18 @@ test("English entries for the localized content contain no Chinese characters", 
 });
 
 test("mobile English headings and supporting copy have a wrapping safeguard", () => {
-  assert.match(styles, /@media\(max-width:520px\).*\.eyebrow.*overflow-wrap:anywhere/s);
-  assert.match(styles, /@media\(max-width:520px\).*\.merchant-hero \.section-title.*overflow-wrap:anywhere/s);
+  assert.match(styles, /@media\s*\(max-width:520px\).*\.eyebrow.*overflow-wrap:anywhere/s);
+  assert.match(styles, /@media\s*\(max-width:520px\).*\.merchant-hero \.section-title.*overflow-wrap:anywhere/s);
 });
 
 test("confirmed mobile layout keeps hero stats and ecosystem nodes compact", () => {
-  assert.match(styles, /@media\(max-width:520px\).*\.stats\{grid-template-columns:repeat\(4,1fr\)/s);
-  assert.match(styles, /@media\(max-width:520px\).*\.ecosystem-orbit\{height:auto;display:grid;grid-template-columns:repeat\(2,1fr\)/s);
-  assert.match(styles, /@media\(max-width:520px\).*\.hero h1\{font-size:60px/s);
+  assert.match(styles, /@media\s*\(max-width:520px\).*\.stats\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/s);
+  assert.match(styles, /@media\s*\(max-width:520px\).*\.ecosystem-orbit\{height:auto;display:grid;grid-template-columns:repeat\(2,1fr\)/s);
+  assert.match(styles, /@media\s*\(max-width:520px\).*\.hero h1\{font-size:var\(--fs-display\)/s);
 });
 
 test("mobile language links stay on one line beside the menu", () => {
-  assert.match(styles, /@media\(max-width:520px\).*\.languages a\{padding:10px 6px;white-space:nowrap\}.*\.mobile-menu\{margin-left:0\}/s);
+  assert.match(styles, /@media\s*\(max-width:520px\).*\.languages a\{padding:10px 6px;white-space:nowrap\}.*\.mobile-menu\{margin-left:0\}/s);
 });
 
 test("320px header moves language selection into the accessible hamburger menu", () => {
@@ -77,8 +77,8 @@ test("320px header moves language selection into the accessible hamburger menu",
   assert.match(header, /data-language="zh"/);
   assert.match(header, /data-language="en"/);
   assert.match(header, /data-language="km"/);
-  assert.match(styles, /@media\(max-width:360px\)\{\.header-actions \.languages\{display:none\}\.mobile-menu-languages\{display:flex\}\}/);
-  assert.match(styles, /@media\(min-width:361px\)\{\.mobile-menu-languages\{display:none\}\}/);
+  assert.match(styles, /@media\s*\(max-width:360px\)\{\.header-actions \.languages\{display:none\}\.mobile-menu-languages\{display:flex\}\}/);
+  assert.match(styles, /@media\s*\(min-width:361px\)\{\.mobile-menu-languages\{display:none\}\}/);
   assert.match(styles, /\.mobile-menu summary:focus-visible\{outline:3px solid var\(--gold\);outline-offset:4px\}/);
 });
 
