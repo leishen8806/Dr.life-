@@ -1,10 +1,10 @@
 # 官网发布与回滚（VPS nginx）
 
-适用 `apps/website` 的 Astro 静态产物。页面仍按“草案上线”发布，方括号占位与草案横幅不得在本流程中替换。站点为独立 nginx 站点：`drlifeplus.com` 提供静态文件，`www` 以及备用域名 `settlecore.org` 保留路径和查询参数并 301 到新主域名。
+适用 `apps/website` 的 Astro 静态产物。页面仍按“草案上线”发布，方括号占位与草案横幅不得在本流程中替换。站点为独立 nginx 站点：`drlifeplus.com` 提供静态文件，`www` 由源站 301 到主域名；备用域名 `settlecore.org` 的保留路径、查询参数 301 跳转全部由 Cloudflare Redirect Rules 处理。
 
 ## 架构与安全
 
-- 配置：主站 `deploy/nginx/drlifeplus.com.conf`、备用域名跳转 `deploy/nginx/settlecore.org.conf` 及 `deploy/nginx/drlifeplus-security-headers.conf`。源站只启用 gzip；Cloudflare 在访客边缘按浏览器能力压缩（含 Brotli），无需 Brotli 模块或 `load_module`。
+- 配置：主站 `deploy/nginx/drlifeplus.com.conf` 及 `deploy/nginx/drlifeplus-security-headers.conf`。主站配置同时包含 80/443 的 `default_server`，未知主机名返回 444；443 兜底使用 `drlifeplus.com` 的 Origin CA 证书。源站只启用 gzip；Cloudflare 在访客边缘按浏览器能力压缩（含 Brotli），无需 Brotli 模块或 `load_module`。
 - TLS 使用 Cloudflare Origin CA，Cloudflare SSL/TLS 设为 **Full (strict)**。证书、私钥、部署密钥和主机指纹不得进仓库。
 - 可选的“仅 Cloudflare IP 段访问源站”防火墙规则是独立生产变更，须另行审批。
 - 仅 `/_astro/` 长缓存；HTML 与 `/fonts/` 下全部文件均为 `no-cache`。全部响应（包括缓存资源和 404）都带安全头与 CSP，`font-src 'self'`，不放行 Google Fonts。
@@ -17,7 +17,7 @@
 
 ### 步骤 2：安装 nginx 配置
 
-安装两个 nginx 站点配置和安全头 include；放置 `drlifeplus.com` 的 Origin CA 证书与私钥，并保留 `settlecore.org` 现有证书用于 HTTPS 跳转；先执行 `nginx -t`，再由获批变更执行 reload。不要改后端站点。裸 `/privacy` 预期为 301 到 `/privacy/`，配置已关闭绝对主机和端口重写。
+安装 `drlifeplus.com` 站点配置和安全头 include，并放置该域名的 Origin CA 证书与私钥；不在源站安装 `settlecore.org` 站点或证书。`default_server` 已包含在 `drlifeplus.com.conf`，无需安装第二份兜底配置。先执行 `nginx -t`，通过后才由获批变更执行 reload；若报告已有 `default_server` 冲突，立即停止并协调共用服务器的配置，不得删除或修改其他项目站点。不要改后端站点。裸 `/privacy` 预期为 301 到 `/privacy/`，配置已关闭绝对主机和端口重写。
 
 ### 步骤 3：安装发布脚本和 sudoers
 
@@ -58,7 +58,15 @@ GitHub Environment 创建 `website-production`，配置 required reviewers，禁
 
 ### 步骤 6：切换 Cloudflare
 
-保持新主域名及备用域名的官网 A 记录为 Cloudflare 代理状态。完成 nginx 校验、reload 和占位 `current` 后，才将 Cloudflare SSL/TLS 切到 Full (strict)；首次真实发布仍须等待合并及 Environment 人工批准。
+Cloudflare 已设置为 **Full (strict)**，不要切换模式。当前主站返回 521 的原因是源站尚未安装并监听本手册的 nginx 站点；完成 nginx 配置检查、reload 和占位 `current` 后再复测。保持新主域名及备用域名的官网 A 记录为 Cloudflare 代理状态，并在 `settlecore.org` 站点执行以下一次性配置：
+
+1. 进入 **Rules → Redirect Rules**，创建通配符重定向规则；
+2. 匹配表达式填写 `*settlecore.org/*`；
+3. 目标地址填写 `https://drlifeplus.com/${2}`；
+4. 状态码选择 **301**，并启用**保留查询参数**；
+5. 分别验证裸域名与 `www` 的路径、查询参数均被保留。
+
+首次真实发布仍须等待合并及 Environment 人工批准。
 
 ## 发布
 

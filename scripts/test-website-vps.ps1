@@ -2,18 +2,27 @@ $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
 $dist = Join-Path $root 'apps/website/dist'
 $siteConfig = Join-Path $root 'deploy/nginx/drlifeplus.com.conf'
-$legacySiteConfig = Join-Path $root 'deploy/nginx/settlecore.org.conf'
 $headers = Join-Path $root 'deploy/nginx/drlifeplus-security-headers.conf'
 $rollback = Join-Path $root 'deploy/website/rollback-current.sh'
 $publish = Join-Path $root 'deploy/website/publish-release.sh'
 $releaseGuide = Join-Path $root 'docs/ops/website-release.md'
 $dockerExe = 'C:\Program Files\Docker\Docker\resources\bin\docker.exe'
+$opensslExe = (Get-Command openssl -ErrorAction Stop).Source
 $temp = Join-Path ([IO.Path]::GetTempPath()) ("drlifeplus-nginx-" + [guid]::NewGuid())
 
 function Invoke-Docker { & $dockerExe @args; if ($LASTEXITCODE -ne 0) { throw 'docker command failed' } }
 function Invoke-Curl { param([string[]]$CurlArgs); $output = & curl.exe @CurlArgs; if ($LASTEXITCODE -ne 0) { throw 'curl command failed' }; $output }
 function Assert-Contains { param([string]$Output, [string]$Expected); if ($Output -notmatch [regex]::Escape($Expected)) { throw "missing expected output: $Expected`n$Output" } }
 function Assert-Equal { param([string]$Actual, [string]$Expected); if ($Actual -cne $Expected) { throw "expected: $Expected`nactual: $Actual" } }
+function Assert-ConnectionClosed {
+  param([string]$Url)
+  $priorErrorAction = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $status = & curl.exe -sk -o NUL -w '%{http_code}' -H 'Host: unconfigured.invalid' $Url 2>$null
+  $exitCode = $LASTEXITCODE
+  $ErrorActionPreference = $priorErrorAction
+  if ($exitCode -eq 0 -or $status -ne '000') { throw "expected nginx 444 connection close: exit=$exitCode status=$status url=$Url" }
+}
 function Get-StringSha256 { param([string]$Value); ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($Value)))).Replace('-', '').ToLowerInvariant() }
 function Test-GuideSudoersCase {
   param([string]$GuideScript, [string]$SudoList)
@@ -70,7 +79,7 @@ sudo -l -U drlifeplus-deploy | tr -d '\\' | tr ',' '\n' | grep -E '^[[:space:]]*
   Write-Host 'R1 legacy disabled/no-entry/sudo-rs mutations matched the 78c502b behavior.'
   Write-Host 'R1 guide-command real sudoers fixture verification passed.'
   $first = '20261104T000001Z-first'; $second = '20261104T000002Z-second'; $third = '20261104T000003Z-third'
-  New-Item -ItemType Directory -Path "$temp/site/releases/$first", "$temp/site/releases/$second", "$temp/site/releases/$third", "$temp/snippets" | Out-Null
+  New-Item -ItemType Directory -Path "$temp/site/releases/$first", "$temp/site/releases/$second", "$temp/site/releases/$third", "$temp/snippets", "$temp/tls" | Out-Null
   Copy-Item -Recurse "$dist/*" "$temp/site/releases/$first/"
   Copy-Item -Recurse "$dist/*" "$temp/site/releases/$second/"
   Copy-Item -Recurse "$dist/*" "$temp/site/releases/$third/"
@@ -81,51 +90,50 @@ sudo -l -U drlifeplus-deploy | tr -d '\\' | tr ',' '\n' | grep -E '^[[:space:]]*
   Invoke-Docker run --rm --network none -v "${temp}:/work" alpine:3.20 ln -s ../../escape.txt "/work/site/releases/$first/escape.txt"
   Invoke-Docker run --rm --network none -v "${temp}:/work" alpine:3.20 ln -s "releases/$first" /work/site/current
   Copy-Item $headers "$temp/snippets/drlifeplus-security-headers.conf"
-  (Get-Content -Raw $siteConfig).Replace('listen 443 ssl;', 'listen 8080;').Replace('listen [::]:443 ssl;', 'listen [::]:8080;').Replace('ssl_certificate     /etc/nginx/tls/drlifeplus-origin.crt;', '').Replace('ssl_certificate_key /etc/nginx/tls/drlifeplus-origin.key;', '').Replace('ssl_protocols TLSv1.2 TLSv1.3;', '').Replace('/srv/drlifeplus/current', '/work/site/current').Replace('/etc/nginx/snippets/', '/work/snippets/') | Set-Content -NoNewline -LiteralPath "$temp/drlifeplus.com.conf"
-  (Get-Content -Raw $legacySiteConfig).Replace('listen 443 ssl;', 'listen 8080;').Replace('listen [::]:443 ssl;', 'listen [::]:8080;').Replace('ssl_certificate     /etc/nginx/tls/settlecore-origin.crt;', '').Replace('ssl_certificate_key /etc/nginx/tls/settlecore-origin.key;', '') | Set-Content -NoNewline -LiteralPath "$temp/settlecore.org.conf"
+  & $opensslExe req -x509 -nodes -newkey rsa:2048 -days 1 -subj '/CN=drlifeplus.test' -keyout "$temp/tls/drlifeplus-origin.key" -out "$temp/tls/drlifeplus-origin.crt" 2>$null
+  if ($LASTEXITCODE -ne 0) { throw 'temporary certificate generation failed' }
+  (Get-Content -Raw $siteConfig).Replace('listen 80 default_server;', 'listen 8080 default_server;').Replace('listen [::]:80 default_server;', 'listen [::]:8080 default_server;').Replace('listen 443 ssl default_server;', 'listen 8443 ssl default_server;').Replace('listen [::]:443 ssl default_server;', 'listen [::]:8443 ssl default_server;').Replace('listen 80;', 'listen 8080;').Replace('listen [::]:80;', 'listen [::]:8080;').Replace('listen 443 ssl;', 'listen 8443 ssl;').Replace('listen [::]:443 ssl;', 'listen [::]:8443 ssl;').Replace('/etc/nginx/tls/', '/work/tls/').Replace('/srv/drlifeplus/current', '/work/site/current').Replace('/etc/nginx/snippets/', '/work/snippets/') | Set-Content -NoNewline -LiteralPath "$temp/drlifeplus.com.conf"
   @'
 events {}
-http { include /etc/nginx/mime.types; include /work/drlifeplus.com.conf; include /work/settlecore.org.conf; }
+http { include /etc/nginx/mime.types; include /work/drlifeplus.com.conf; }
 '@ | Set-Content -NoNewline -LiteralPath "$temp/nginx.conf"
   Invoke-Docker run --rm --network none -v "${temp}:/work:ro" nginx:1.27-alpine nginx -c /work/nginx.conf -t
-  Invoke-Docker run --rm -d --name drlifeplus-nginx-test -p 18080:80 -p 18081:8080 -v "${temp}:/work:ro" nginx:1.27-alpine nginx -c /work/nginx.conf -g 'daemon off;'
+  Write-Host 'nginx -t with a temporary self-signed certificate passed.'
+  Invoke-Docker run --rm -d --name drlifeplus-nginx-test -p 18080:8080 -p 18443:8443 -v "${temp}:/work:ro" nginx:1.27-alpine nginx -c /work/nginx.conf -g 'daemon off;'
   Start-Sleep -Seconds 1
-  $homeResponse = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: drlifeplus.com', 'http://127.0.0.1:18081/')
+  Assert-ConnectionClosed 'http://127.0.0.1:18080/'
+  Assert-ConnectionClosed 'https://127.0.0.1:18443/'
+  Write-Host 'HTTP and HTTPS default servers returned nginx 444 connection closes.'
+  $homeResponse = Invoke-Curl -CurlArgs @('-skI', '-H', 'Host: drlifeplus.com', 'https://127.0.0.1:18443/')
   Write-Host $homeResponse
   Assert-Contains $homeResponse 'HTTP/1.1 200 OK'; Assert-Contains $homeResponse 'Content-Security-Policy:'; Assert-Contains $homeResponse 'Cache-Control: no-cache'
-  $gzip = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: drlifeplus.com', '-H', 'Accept-Encoding: gzip', 'http://127.0.0.1:18081/')
+  $gzip = Invoke-Curl -CurlArgs @('-skI', '-H', 'Host: drlifeplus.com', '-H', 'Accept-Encoding: gzip', 'https://127.0.0.1:18443/')
   Write-Host $gzip
   Assert-Contains $gzip 'Content-Encoding: gzip'
   $asset = (Get-ChildItem "$temp/site/releases/$first/_astro" -File | Select-Object -First 1).Name
-  $assetHead = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: drlifeplus.com', "http://127.0.0.1:18081/_astro/$asset")
+  $assetHead = Invoke-Curl -CurlArgs @('-skI', '-H', 'Host: drlifeplus.com', "https://127.0.0.1:18443/_astro/$asset")
   Write-Host $assetHead
   Assert-Contains $assetHead 'Cache-Control: public, max-age=31536000, immutable'; Assert-Contains $assetHead 'Content-Security-Policy:'
   $font = (Get-ChildItem "$temp/site/releases/$first/fonts" -Filter '*.woff2' -File | Select-Object -First 1).Name
-  $fontHead = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: drlifeplus.com', "http://127.0.0.1:18081/fonts/$font")
+  $fontHead = Invoke-Curl -CurlArgs @('-skI', '-H', 'Host: drlifeplus.com', "https://127.0.0.1:18443/fonts/$font")
   Write-Host $fontHead
   Assert-Contains $fontHead 'Content-Security-Policy:'
-  $missing = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: drlifeplus.com', 'http://127.0.0.1:18081/_astro/missing.js')
+  $missing = Invoke-Curl -CurlArgs @('-skI', '-H', 'Host: drlifeplus.com', 'https://127.0.0.1:18443/_astro/missing.js')
   Write-Host $missing
   Assert-Contains $missing '404 Not Found'; Assert-Contains $missing 'Content-Security-Policy:'
   $redirect = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: www.drlifeplus.com', 'http://127.0.0.1:18080/terms?lang=km')
   Write-Host $redirect
   Assert-Contains $redirect '301 Moved Permanently'; Assert-Contains $redirect 'Location: https://drlifeplus.com/terms?lang=km'
-  $legacyRedirect = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: settlecore.org', 'http://127.0.0.1:18080/privacy?lang=en')
-  Write-Host $legacyRedirect
-  Assert-Contains $legacyRedirect '301 Moved Permanently'; Assert-Contains $legacyRedirect 'Location: https://drlifeplus.com/privacy?lang=en'
-  $legacyTLSRedirect = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: www.settlecore.org', 'http://127.0.0.1:18081/contact?lang=km')
-  Write-Host $legacyTLSRedirect
-  Assert-Contains $legacyTLSRedirect '301 Moved Permanently'; Assert-Contains $legacyTLSRedirect 'Location: https://drlifeplus.com/contact?lang=km'
-  $privacy = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: drlifeplus.com', 'http://127.0.0.1:18081/privacy')
+  $privacy = Invoke-Curl -CurlArgs @('-skI', '-H', 'Host: drlifeplus.com', 'https://127.0.0.1:18443/privacy')
   Write-Host $privacy
   Assert-Contains $privacy '301 Moved Permanently'; Assert-Contains $privacy 'Location: /privacy/'
-  $directory = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: drlifeplus.com', 'http://127.0.0.1:18081/fonts/')
+  $directory = Invoke-Curl -CurlArgs @('-skI', '-H', 'Host: drlifeplus.com', 'https://127.0.0.1:18443/fonts/')
   Write-Host $directory
   Assert-Contains $directory '404 Not Found'
-  $hidden = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: drlifeplus.com', 'http://127.0.0.1:18081/.env')
+  $hidden = Invoke-Curl -CurlArgs @('-skI', '-H', 'Host: drlifeplus.com', 'https://127.0.0.1:18443/.env')
   Write-Host $hidden
   Assert-Contains $hidden '403 Forbidden'
-  $symlink = Invoke-Curl -CurlArgs @('-sI', '-H', 'Host: drlifeplus.com', 'http://127.0.0.1:18081/escape.txt')
+  $symlink = Invoke-Curl -CurlArgs @('-skI', '-H', 'Host: drlifeplus.com', 'https://127.0.0.1:18443/escape.txt')
   Write-Host $symlink
   Assert-Contains $symlink '404 Not Found'
   $rollbackCommand = 'set -eu; mkdir -p /tmp/test-bin; printf ''#!/bin/sh\nexit 66\n'' >/tmp/test-bin/find; chmod 0755 /tmp/test-bin/find; rm -f /srv/drlifeplus/current; ln -s releases/' + $third + ' /srv/drlifeplus/current; ln -s releases/' + $first + ' /srv/drlifeplus/.current.next; PATH=/tmp/test-bin:$PATH sh /rollback-current.sh; test $(readlink /srv/drlifeplus/current) = releases/' + $second + '; sh /rollback-current.sh; test $(readlink /srv/drlifeplus/current) = releases/' + $first + '; if sh /rollback-current.sh; then exit 1; fi; test $(readlink /srv/drlifeplus/current) = releases/' + $first
