@@ -160,7 +160,7 @@ func (f *loginFixture) testSessionLifecycle(t *testing.T) {
 
 	sessions.Now = func() time.Time { return f.now.Add(11 * time.Second) }
 	f.cache.setEpochUnavailable(true)
-	sessions.EpochWriter = EpochCacheWriter{Cache: f.cache, Metrics: &epochWriterTestMetrics{}, Retry: func(_ context.Context, write func() error) {
+	sessions.EpochWriter = EpochCacheWriter{Cache: f.cache, Metrics: &epochWriterTestMetrics{}, Retry: func(_ context.Context, write func() error, _ func(string)) {
 		f.cache.setEpochUnavailable(false)
 		if err := write(); err != nil {
 			t.Errorf("reuse epoch retry: %v", err)
@@ -247,7 +247,7 @@ func (f *loginFixture) testSessionAccess(t *testing.T) {
 	f.cache.unavailable = true
 	f.cache.mu.Unlock()
 	retried := false
-	sessions.EpochWriter = EpochCacheWriter{Cache: f.cache, Retry: func(_ context.Context, write func() error) {
+	sessions.EpochWriter = EpochCacheWriter{Cache: f.cache, Retry: func(_ context.Context, write func() error, _ func(string)) {
 		retried = true
 		f.cache.mu.Lock()
 		f.cache.unavailable = false
@@ -262,6 +262,45 @@ func (f *loginFixture) testSessionAccess(t *testing.T) {
 	if !retried {
 		t.Fatal("single-session cache revoke was not retried")
 	}
+	queueFullLogin, err := f.service.Login(ctx, LoginInput{End: telegram.Buyer, InitData: signInit(f.now, 9403, "buyer-standby-token", ""), DeviceID: "device_revoke_queue_full", IP: "192.0.2.3"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queueFullSessions, err := sessions.ListSessions(ctx, queueFullLogin.Account.PublicID)
+	if err != nil || len(queueFullSessions) != 1 {
+		t.Fatalf("queue-full sessions=%+v err=%v", queueFullSessions, err)
+	}
+	f.cache.mu.Lock()
+	f.cache.unavailable = true
+	f.cache.mu.Unlock()
+	queue := make(chan epochRetryJob, 1)
+	queue <- epochRetryJob{}
+	queueMetrics := &epochWriterTestMetrics{}
+	sessions.EpochWriter = EpochCacheWriter{Cache: f.cache, Metrics: queueMetrics, Retry: func(retryCtx context.Context, write func() error, dropped func(string)) {
+		if reason := enqueueEpochRetry(retryCtx, queue, epochRetryJob{write: write}); reason != "" {
+			dropped(reason)
+		}
+	}}
+	revokeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- sessions.RevokeSession(revokeCtx, queueFullLogin.Account.PublicID, queueFullSessions[0].PublicID, "user_revoked")
+	}()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("queue-full revoke: %v", err)
+		}
+	case <-revokeCtx.Done():
+		t.Fatal("queue-full revoke blocked until its request timed out")
+	}
+	if queueMetrics.dropped["queue_full"] != 1 {
+		t.Fatalf("queue-full dropped metrics=%v", queueMetrics.dropped)
+	}
+	f.cache.mu.Lock()
+	f.cache.unavailable = false
+	f.cache.mu.Unlock()
 	sessions.EpochWriter = EpochCacheWriter{}
 
 	f.cache.mu.Lock()
@@ -286,7 +325,7 @@ func (f *loginFixture) testSessionAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.cache.setEpochUnavailable(true)
-	sessions.EpochWriter = EpochCacheWriter{Cache: f.cache, Metrics: &epochWriterTestMetrics{}, Retry: func(_ context.Context, write func() error) {
+	sessions.EpochWriter = EpochCacheWriter{Cache: f.cache, Metrics: &epochWriterTestMetrics{}, Retry: func(_ context.Context, write func() error, _ func(string)) {
 		f.cache.setEpochUnavailable(false)
 		if err := write(); err != nil {
 			t.Errorf("revoke-all epoch retry: %v", err)

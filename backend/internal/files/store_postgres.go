@@ -43,10 +43,14 @@ func (s PostgresStore) Cleanup(ctx context.Context, now time.Time, deleteObject 
 		deleteErr := deleteObject(deleteCtx, candidate.ObjectKey)
 		cancel()
 		if deleteErr != nil && !errors.Is(deleteErr, fs.ErrNotExist) {
-			_, _ = s.DB.Exec(ctx, `UPDATE ops.file SET cleanup_started_at=NULL WHERE public_id=$1 AND cleanup_started_at=$2`, candidate.PublicID, now)
-			return result, deleteErr
+			failures := candidate.CleanupFailures + 1
+			if _, err := s.DB.Exec(ctx, `UPDATE ops.file SET cleanup_started_at=NULL,cleanup_failures=$3,cleanup_next_attempt_at=$4,updated_at=$2
+				WHERE public_id=$1 AND cleanup_started_at=$2`, candidate.PublicID, now, failures, now.Add(cleanupRetryDelay(failures))); err != nil {
+				return result, err
+			}
+			continue
 		}
-		resultTag, err := s.DB.Exec(ctx, `UPDATE ops.file SET status=$2, cleanup_started_at=NULL, updated_at=$3
+		resultTag, err := s.DB.Exec(ctx, `UPDATE ops.file SET status=$2,cleanup_started_at=NULL,cleanup_failures=0,cleanup_next_attempt_at=NULL,updated_at=$3
 			WHERE public_id=$1 AND cleanup_started_at=$3`, candidate.PublicID, terminal, now)
 		if err != nil {
 			return result, err
@@ -62,6 +66,13 @@ func (s PostgresStore) Cleanup(ctx context.Context, now time.Time, deleteObject 
 	}
 }
 
+func cleanupRetryDelay(failures int) time.Duration {
+	if failures > 8 {
+		failures = 8
+	}
+	return time.Minute * time.Duration(1<<(failures-1))
+}
+
 func (s PostgresStore) claimCleanup(ctx context.Context, now time.Time) (cleanupCandidate, Status, error) {
 	var candidate cleanupCandidate
 	var terminal Status
@@ -70,18 +81,18 @@ func (s PostgresStore) claimCleanup(ctx context.Context, now time.Time) (cleanup
 		WHERE ((f.status IN ('pending','verifying') AND f.created_at < $1::timestamptz - interval '24 hours')
 		   OR (f.status IN ('ready','rejected') AND f.retention_until <= $1::timestamptz))
 		  AND (f.cleanup_started_at IS NULL OR f.cleanup_started_at < $1::timestamptz - interval '10 minutes')
+		  AND (f.cleanup_next_attempt_at IS NULL OR f.cleanup_next_attempt_at <= $1::timestamptz)
 		  AND NOT EXISTS (SELECT 1 FROM ops.file_reference r WHERE r.file_id=f.id AND r.released_at IS NULL)
 		ORDER BY CASE WHEN f.retention_until <= $1::timestamptz THEN 0 ELSE 1 END, f.created_at
 		FOR UPDATE SKIP LOCKED LIMIT 1
 	)
 	UPDATE ops.file f SET cleanup_started_at=$1 FROM candidate c WHERE f.id=c.id
-	RETURNING f.public_id, f.object_key, f.status, f.created_at, f.retention_until,
-		CASE WHEN f.status IN ('pending','verifying') THEN 'expired' ELSE 'deleted' END`, now).Scan(&candidate.PublicID, &candidate.ObjectKey, &candidate.Status, &candidate.CreatedAt, &candidate.RetentionUntil, &terminal)
+	RETURNING f.public_id, f.object_key, f.status, f.created_at, f.retention_until, f.cleanup_failures,
+		CASE WHEN f.status IN ('pending','verifying') THEN 'expired' ELSE 'deleted' END`, now).Scan(&candidate.PublicID, &candidate.ObjectKey, &candidate.Status, &candidate.CreatedAt, &candidate.RetentionUntil, &candidate.CleanupFailures, &terminal)
 	return candidate, terminal, err
 }
 
-// AttachReference protects a ready file from cleanup while a business record uses it.
-func (s PostgresStore) AttachReference(ctx context.Context, filePublicID, referencePublicID string) error {
+func (s PostgresStore) attachReference(ctx context.Context, filePublicID, referencePublicID string) error {
 	if s.DB == nil || filePublicID == "" || referencePublicID == "" {
 		return ErrNotConfigured
 	}
@@ -106,7 +117,7 @@ func (s PostgresStore) AttachReference(ctx context.Context, filePublicID, refere
 
 // ReleaseReference starts the purpose-specific retention period once the last
 // active business reference is released.
-func (s PostgresStore) ReleaseReference(ctx context.Context, filePublicID, referencePublicID string, releasedAt time.Time) error {
+func (s PostgresStore) releaseReference(ctx context.Context, filePublicID, referencePublicID string, releasedAt time.Time) error {
 	if s.DB == nil || filePublicID == "" || referencePublicID == "" || releasedAt.IsZero() {
 		return ErrNotConfigured
 	}

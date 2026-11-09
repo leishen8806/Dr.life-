@@ -19,7 +19,7 @@ func TestEpochCacheWriterReportsFailureAndRetries(t *testing.T) {
 		Cache:   cache,
 		Logger:  slog.New(slog.NewTextHandler(&logs, nil)),
 		Metrics: metrics,
-		Retry: func(_ context.Context, write func() error) {
+		Retry: func(_ context.Context, write func() error, _ func(string)) {
 			cache.setError(nil)
 			if err := write(); err != nil {
 				t.Errorf("retry write: %v", err)
@@ -37,6 +37,49 @@ func TestEpochCacheWriterReportsFailureAndRetries(t *testing.T) {
 	}
 	if got := cache.epoch("account-1"); got != 2 {
 		t.Fatalf("cached epoch=%d, want 2 after retry", got)
+	}
+}
+
+func TestEpochRetryQueueFullReturnsImmediately(t *testing.T) {
+	queue := make(chan epochRetryJob, 1)
+	queue <- epochRetryJob{}
+	start := time.Now()
+	if got := enqueueEpochRetry(context.Background(), queue, epochRetryJob{}); got != "queue_full" {
+		t.Fatalf("enqueue reason=%q, want queue_full", got)
+	}
+	if elapsed := time.Since(start); elapsed > 100*time.Millisecond {
+		t.Fatalf("full retry queue blocked for %v", elapsed)
+	}
+}
+
+func TestEpochRetryStopsAfterFiveAttempts(t *testing.T) {
+	attempts := 0
+	exhausted := retryEpochCacheWrite(func() error {
+		attempts++
+		return errors.New("redis unavailable")
+	}, func(time.Duration) {})
+	if !exhausted || attempts != maxEpochRetryAttempts {
+		t.Fatalf("exhausted=%v attempts=%d, want true and %d", exhausted, attempts, maxEpochRetryAttempts)
+	}
+}
+
+func TestEpochCacheWriterReportsDroppedRetry(t *testing.T) {
+	cache := &epochWriterTestCache{err: errors.New("redis unavailable")}
+	metrics := &epochWriterTestMetrics{}
+	var logs bytes.Buffer
+	writer := EpochCacheWriter{
+		Cache:   cache,
+		Logger:  slog.New(slog.NewTextHandler(&logs, nil)),
+		Metrics: metrics,
+		Retry: func(_ context.Context, _ func() error, dropped func(string)) {
+			dropped("queue_full")
+		},
+	}
+
+	writer.Write(context.Background(), "account-1", 2, time.Hour, "revoke_session")
+
+	if metrics.dropped["queue_full"] != 1 || !strings.Contains(logs.String(), "reason=queue_full") {
+		t.Fatalf("dropped metrics=%v log=%q", metrics.dropped, logs.String())
 	}
 }
 
@@ -58,9 +101,18 @@ func TestDBSessionCheckerFailsClosedWhenCacheUnavailable(t *testing.T) {
 	}
 }
 
-type epochWriterTestMetrics struct{ count int }
+type epochWriterTestMetrics struct {
+	count   int
+	dropped map[string]int
+}
 
 func (m *epochWriterTestMetrics) SessionEpochCacheWriteFailed(string) { m.count++ }
+func (m *epochWriterTestMetrics) SessionEpochCacheRetryDropped(_, reason string) {
+	if m.dropped == nil {
+		m.dropped = make(map[string]int)
+	}
+	m.dropped[reason]++
+}
 
 type epochWriterTestCache struct {
 	mu     sync.Mutex

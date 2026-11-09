@@ -34,7 +34,7 @@ func (f *loginFixture) testAccountStatus(t *testing.T) {
 	}
 
 	f.cache.setEpochUnavailable(true)
-	service.EpochWriter = EpochCacheWriter{Cache: f.cache, Metrics: &epochWriterTestMetrics{}, Retry: func(_ context.Context, write func() error) {
+	service.EpochWriter = EpochCacheWriter{Cache: f.cache, Metrics: &epochWriterTestMetrics{}, Retry: func(_ context.Context, write func() error, _ func(string)) {
 		f.cache.setEpochUnavailable(false)
 		if err := write(); err != nil {
 			t.Errorf("account-status epoch retry: %v", err)

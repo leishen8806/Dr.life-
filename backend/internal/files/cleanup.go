@@ -48,11 +48,12 @@ func (w *CleanupWorker) Handle(ctx context.Context, task *asynq.Task) error {
 }
 
 type cleanupCandidate struct {
-	PublicID       string
-	ObjectKey      string
-	Status         Status
-	CreatedAt      time.Time
-	RetentionUntil *time.Time
+	PublicID        string
+	ObjectKey       string
+	Status          Status
+	CreatedAt       time.Time
+	RetentionUntil  *time.Time
+	CleanupFailures int
 }
 
 // CleanupStore claims each row before deleting its object and never holds a

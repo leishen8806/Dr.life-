@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
@@ -189,13 +191,14 @@ func TestCleanupPostgresAndRustFS(t *testing.T) {
 	// released, each purpose receives its own retention window.
 	type retentionCase struct {
 		purpose string
+		module  ReferenceModule
 		want    time.Time
 	}
 	cases := []retentionCase{
-		{purpose: "product_image", want: now.AddDate(0, 0, 90)},
-		{purpose: "inbound_photo", want: now.AddDate(2, 0, 0)},
-		{purpose: "delivery_proof", want: now.AddDate(2, 0, 0)},
-		{purpose: "merchant_kyc", want: now.AddDate(5, 0, 0)},
+		{purpose: "product_image", module: ReferenceCatalog, want: now.AddDate(0, 0, 90)},
+		{purpose: "inbound_photo", module: ReferenceTrade, want: now.AddDate(2, 0, 0)},
+		{purpose: "delivery_proof", module: ReferenceTrade, want: now.AddDate(2, 0, 0)},
+		{purpose: "merchant_kyc", module: ReferenceIAM, want: now.AddDate(5, 0, 0)},
 	}
 	for i, test := range cases {
 		id := "retention-" + test.purpose
@@ -207,7 +210,9 @@ func TestCleanupPostgresAndRustFS(t *testing.T) {
 			t.Fatal(err)
 		}
 		store := PostgresStore{DB: pool}
-		if err := store.AttachReference(ctx, id, "business-record-1"); err != nil {
+		service := New(store, nil, Options{})
+		reference := Reference{Module: test.module, PublicID: "business-record-1"}
+		if err := service.AttachReference(ctx, id, reference); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := store.Cleanup(ctx, now.AddDate(10, 0, 0), verifier.Delete); err != nil {
@@ -217,13 +222,87 @@ func TestCleanupPostgresAndRustFS(t *testing.T) {
 		if err := pool.QueryRow(ctx, `SELECT status FROM ops.file WHERE public_id=$1`, id).Scan(&status); err != nil || status != "ready" {
 			t.Fatalf("active referenced %s status=%q err=%v", test.purpose, status, err)
 		}
-		if err := store.ReleaseReference(ctx, id, "business-record-1", now); err != nil {
+		if err := service.ReleaseReference(ctx, id, reference, now); err != nil {
 			t.Fatal(err)
 		}
 		var got time.Time
 		if err := pool.QueryRow(ctx, `SELECT retention_until FROM ops.file WHERE public_id=$1`, id).Scan(&got); err != nil || !got.Equal(test.want) {
 			t.Fatalf("%s retention=%s err=%v, want %s", test.purpose, got, err, test.want)
 		}
+	}
+
+	// The worker role cannot bypass an active business reference, even with a
+	// direct status update. Releasing that reference removes the guard.
+	if _, err := pool.Exec(ctx, `INSERT INTO ops.file(public_id,owner_account,purpose,object_key,content_type,size,sha256,status,retention_until,created_at,updated_at) VALUES('guarded-file',1,'product_image','objects/guarded','image/jpeg',1,decode(repeat('00',32),'hex'),'ready',$1,$2,$2)`, now.Add(-time.Hour), now.Add(-24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	guardService := New(PostgresStore{DB: pool}, nil, Options{})
+	guardReference := Reference{Module: ReferenceCatalog, PublicID: "product-guarded"}
+	if err := guardService.AttachReference(ctx, "guarded-file", guardReference); err != nil {
+		t.Fatal(err)
+	}
+	workerConn, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workerConn.Exec(ctx, `SET ROLE ops_file_worker`); err != nil {
+		workerConn.Release()
+		t.Fatal(err)
+	}
+	_, updateErr := workerConn.Exec(ctx, `UPDATE ops.file SET status='deleted',updated_at=now() WHERE public_id='guarded-file'`)
+	if _, err := workerConn.Exec(ctx, `RESET ROLE`); err != nil {
+		workerConn.Release()
+		t.Fatal(err)
+	}
+	workerConn.Release()
+	var pgErr *pgconn.PgError
+	if !errors.As(updateErr, &pgErr) || pgErr.Code != "23514" {
+		t.Fatalf("referenced worker update error=%v, want SQLSTATE 23514", updateErr)
+	}
+	if err := guardService.ReleaseReference(ctx, "guarded-file", guardReference, now); err != nil {
+		t.Fatal(err)
+	}
+	workerConn, err = pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := workerConn.Exec(ctx, `SET ROLE ops_file_worker`); err != nil {
+		workerConn.Release()
+		t.Fatal(err)
+	}
+	if _, err := workerConn.Exec(ctx, `UPDATE ops.file SET status='deleted',updated_at=now() WHERE public_id='guarded-file'`); err != nil {
+		workerConn.Release()
+		t.Fatalf("released worker update: %v", err)
+	}
+	if _, err := workerConn.Exec(ctx, `RESET ROLE`); err != nil {
+		workerConn.Release()
+		t.Fatal(err)
+	}
+	workerConn.Release()
+
+	// A permanently failing object is backed off without blocking later rows.
+	for i, id := range []string{"cleanup-fails", "cleanup-continues"} {
+		if _, err := pool.Exec(ctx, `INSERT INTO ops.file(public_id,owner_account,purpose,object_key,content_type,size,sha256,status,retention_until,created_at,updated_at) VALUES($1,1,'product_image',$2,'image/jpeg',1,decode(repeat('00',32),'hex'),'ready',$3,$4,$4)`, id, "objects/"+id, now.Add(-time.Hour), now.Add(-48*time.Hour+time.Duration(i)*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	continued, err := (PostgresStore{DB: pool}).Cleanup(ctx, now, func(_ context.Context, key string) error {
+		if key == "objects/cleanup-fails" {
+			return errors.New("object store unavailable")
+		}
+		return nil
+	})
+	if err != nil || continued.Deleted != 1 {
+		t.Fatalf("cleanup after isolated failure=%+v err=%v", continued, err)
+	}
+	var failures int
+	var nextAttempt time.Time
+	if err := pool.QueryRow(ctx, `SELECT cleanup_failures,cleanup_next_attempt_at FROM ops.file WHERE public_id='cleanup-fails'`).Scan(&failures, &nextAttempt); err != nil || failures != 1 || !nextAttempt.After(now) {
+		t.Fatalf("failed cleanup state failures=%d next=%s err=%v", failures, nextAttempt, err)
+	}
+	var continuedStatus string
+	if err := pool.QueryRow(ctx, `SELECT status FROM ops.file WHERE public_id='cleanup-continues'`).Scan(&continuedStatus); err != nil || continuedStatus != "deleted" {
+		t.Fatalf("continued cleanup status=%q err=%v", continuedStatus, err)
 	}
 	for _, test := range cases {
 		id := "retention-" + test.purpose
@@ -235,10 +314,16 @@ func TestCleanupPostgresAndRustFS(t *testing.T) {
 			t.Fatalf("released %s status=%q err=%v", test.purpose, status, err)
 		}
 	}
+	if err := goose.DownTo(sqlDB, filesMigrationDir(t), 59); err != nil {
+		t.Fatalf("rollback file cleanup guard migration: %v", err)
+	}
+	if err := goose.UpTo(sqlDB, filesMigrationDir(t), 60); err != nil {
+		t.Fatalf("reapply file cleanup guard migration: %v", err)
+	}
 	if err := goose.DownTo(sqlDB, filesMigrationDir(t), 57); err != nil {
 		t.Fatalf("rollback file retention migration: %v", err)
 	}
-	if err := goose.UpTo(sqlDB, filesMigrationDir(t), 59); err != nil {
+	if err := goose.UpTo(sqlDB, filesMigrationDir(t), 60); err != nil {
 		t.Fatalf("reapply file retention migration: %v", err)
 	}
 	t.Logf("cleanup database result expired=%d deleted=%d; second run expired=%d deleted=%d", result.Expired, result.Deleted, second.Expired, second.Deleted)

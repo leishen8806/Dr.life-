@@ -73,10 +73,10 @@
 ### `ops` 文件保留
 | 表 | 关键字段与约束 |
 |---|---|
-| `file` | public_id, owner_account, purpose, object_key, content_type, size, sha256, status, retention_until, cleanup_started_at, created_at, updated_at；未引用上传保留 24 小时；清理先认领、对象删除单独超时，网络调用期间不持有行锁 |
-| `file_reference` | file_id, reference_public_id, released_at, created_at, updated_at；未释放引用存在时禁止清理；最后一个引用释放后按用途设置 `retention_until` |
+| `file` | public_id, owner_account, purpose, object_key, content_type, size, sha256, status, retention_until, cleanup_started_at, cleanup_failures, cleanup_next_attempt_at, created_at, updated_at；未引用上传保留 24 小时；清理先认领、对象删除单独超时，单个对象失败后退避且不阻塞同批其他文件，网络调用期间不持有行锁；未释放引用存在时数据库触发器禁止转为 `deleted` / `expired` |
+| `file_reference` | file_id, reference_public_id, released_at, created_at, updated_at；`reference_public_id` 使用 `catalog:`、`trade:` 或 `iam:` 模块前缀；未释放引用存在时禁止清理；最后一个引用释放后按用途设置 `retention_until` |
 
-文件用途保留规则：商品图片自商品下架起 90 天；签收、入库照片自订单完成起 2 年；商户核验材料自商户注销起 5 年；上传后未被引用的临时文件 24 小时。业务模块必须在使用文件时登记引用、生命周期结束时释放引用。旧的 `ready` 文件迁移后不自动删除，需先补齐引用状态。图片只允许 JPEG/PNG，统一重新编码到新对象键并按 EXIF 方向纠正；WebP 在具备元数据清洗器前拒绝。S3 若启用版本控制，原始上传前缀必须配置永久删除非当前版本的生命周期策略，避免原始 EXIF 留在历史版本。
+文件用途保留规则：商品图片自商品下架起 90 天；签收、入库照片自订单完成起 2 年；商户核验材料自商户注销起 5 年；上传后未被引用的临时文件 24 小时。业务模块必须通过文件服务的强类型接口登记和释放引用，不得跨 schema 直接写表。旧的 `ready` 文件迁移后不自动删除，需先补齐引用状态。图片只允许 JPEG/PNG，统一重新编码到新对象键；JPEG 按 EXIF 方向纠正，PNG eXIf 方向处理尚待后续加固；WebP 在具备元数据清洗器前拒绝。S3 若启用版本控制，原始上传前缀必须配置永久删除非当前版本的生命周期策略，避免原始 EXIF 留在历史版本。
 
 ---
 

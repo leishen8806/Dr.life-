@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
@@ -19,6 +20,7 @@ var (
 	ErrNotFound           = errors.New("file not found")
 	ErrNotReady           = errors.New("file is not ready for download")
 	ErrQuotaExceeded      = errors.New("file upload quota exceeded")
+	ErrInvalidReference   = errors.New("invalid file reference")
 )
 
 type Status string
@@ -43,6 +45,29 @@ type File struct {
 type Usage struct {
 	Count int
 	Bytes int64
+}
+
+type ReferenceModule string
+
+const (
+	ReferenceCatalog ReferenceModule = "catalog"
+	ReferenceTrade   ReferenceModule = "trade"
+	ReferenceIAM     ReferenceModule = "iam"
+)
+
+type Reference struct {
+	Module   ReferenceModule
+	PublicID string
+}
+
+type ReferenceManager interface {
+	AttachReference(context.Context, string, Reference) error
+	ReleaseReference(context.Context, string, Reference, time.Time) error
+}
+
+type referenceStore interface {
+	attachReference(context.Context, string, string) error
+	releaseReference(context.Context, string, string, time.Time) error
 }
 type Store interface {
 	Create(context.Context, File) error
@@ -86,6 +111,41 @@ func New(store Store, objects storage.Storage, options Options) *Service {
 		options.Now = time.Now
 	}
 	return &Service{store: store, objects: objects, verifier: options.Verifier, options: options}
+}
+
+func (s *Service) AttachReference(ctx context.Context, filePublicID string, reference Reference) error {
+	if s == nil || s.store == nil {
+		return ErrNotConfigured
+	}
+	store, ok := s.referenceStore(filePublicID, reference)
+	if !ok {
+		return ErrInvalidReference
+	}
+	return store.attachReference(ctx, filePublicID, referenceKey(reference))
+}
+
+func (s *Service) ReleaseReference(ctx context.Context, filePublicID string, reference Reference, releasedAt time.Time) error {
+	if s == nil || s.store == nil {
+		return ErrNotConfigured
+	}
+	store, ok := s.referenceStore(filePublicID, reference)
+	if !ok || releasedAt.IsZero() {
+		return ErrInvalidReference
+	}
+	return store.releaseReference(ctx, filePublicID, referenceKey(reference), releasedAt)
+}
+
+func (s *Service) referenceStore(filePublicID string, reference Reference) (referenceStore, bool) {
+	store, ok := s.store.(referenceStore)
+	return store, ok && filePublicID != "" && reference.PublicID == strings.TrimSpace(reference.PublicID) && reference.PublicID != "" && !strings.Contains(reference.PublicID, ":") && validReferenceModule(reference.Module)
+}
+
+func validReferenceModule(module ReferenceModule) bool {
+	return module == ReferenceCatalog || module == ReferenceTrade || module == ReferenceIAM
+}
+
+func referenceKey(reference Reference) string {
+	return string(reference.Module) + ":" + reference.PublicID
 }
 
 func (s *Service) Presign(ctx context.Context, ownerAccount int64, in PresignInput) (PresignResult, error) {
