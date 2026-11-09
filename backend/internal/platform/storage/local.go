@@ -33,6 +33,7 @@ type localStorage struct {
 
 var _ Storage = (*localStorage)(nil)
 var _ ObjectVerifier = (*localStorage)(nil)
+var _ ImageSanitizer = (*localStorage)(nil)
 
 func NewLocal(config LocalConfig, policy Policy) (Storage, error) {
 	if len(config.Secret) == 0 {
@@ -86,6 +87,34 @@ func (s *localStorage) Delete(_ context.Context, key string) error {
 		return os.ErrNotExist
 	}
 	return os.Remove(filepath.Join(s.rootDir, filepath.FromSlash(key)))
+}
+
+func (s *localStorage) SanitizeImage(ctx context.Context, key, contentType string) (string, error) {
+	if !validRandomKey(key) || s.rootDir == "" {
+		return "", os.ErrNotExist
+	}
+	body, err := s.Open(ctx, key)
+	if err != nil {
+		return "", err
+	}
+	clean, err := StripImageMetadata(contentType, body)
+	closeErr := body.Close()
+	if err != nil {
+		return "", err
+	}
+	if closeErr != nil {
+		return "", closeErr
+	}
+	destination := randomKey()
+	path := filepath.Join(s.rootDir, filepath.FromSlash(destination))
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, clean, 0o600); err != nil {
+		return "", err
+	}
+	s.puts[destination] = s.puts[key]
+	return destination, nil
 }
 
 func (s *localStorage) Promote(_ context.Context, key, etag string) (string, error) {

@@ -33,6 +33,13 @@ func (f *loginFixture) testAccountStatus(t *testing.T) {
 		t.Fatalf("blank reason logs=%d err=%v", logs, err)
 	}
 
+	f.cache.setEpochUnavailable(true)
+	service.EpochWriter = EpochCacheWriter{Cache: f.cache, Metrics: &epochWriterTestMetrics{}, Retry: func(_ context.Context, write func() error, _ func(string)) {
+		f.cache.setEpochUnavailable(false)
+		if err := write(); err != nil {
+			t.Errorf("account-status epoch retry: %v", err)
+		}
+	}}
 	change, err := service.SetAccountStatus(ctx, login.Account.PublicID, "frozen", "review required", actor)
 	if err != nil || change.ToStatus != "frozen" {
 		t.Fatalf("freeze=%+v err=%v", change, err)

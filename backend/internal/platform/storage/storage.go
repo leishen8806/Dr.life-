@@ -68,6 +68,11 @@ type ObjectVerifier interface {
 	Delete(context.Context, string) error
 }
 
+// ImageSanitizer writes a clean private object at a new key.
+type ImageSanitizer interface {
+	SanitizeImage(context.Context, string, string) (string, error)
+}
+
 func (p Policy) validate(in PutRequest) error {
 	if len(p.AllowedContentTypes) == 0 || p.MaxContentLength <= 0 {
 		return ErrPolicyNotConfigured

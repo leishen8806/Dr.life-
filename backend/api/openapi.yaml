@@ -1965,7 +1965,7 @@ components:
         purpose: {$ref: "#/components/schemas/FilePurpose"}
         content_type:
           type: string
-          enum: [image/jpeg, image/png, image/webp, application/pdf]
+          enum: [image/jpeg, image/png, application/pdf]
         size:
           type: integer
           format: int64
