@@ -90,7 +90,8 @@ sudo -l -U drlifeplus-deploy | tr -d '\\' | tr ',' '\n' | grep -E '^[[:space:]]*
   Invoke-Docker run --rm --network none -v "${temp}:/work" alpine:3.20 ln -s ../../escape.txt "/work/site/releases/$first/escape.txt"
   Invoke-Docker run --rm --network none -v "${temp}:/work" alpine:3.20 ln -s "releases/$first" /work/site/current
   Copy-Item $headers "$temp/snippets/drlifeplus-security-headers.conf"
-  & $opensslExe req -x509 -nodes -newkey rsa:2048 -days 1 -subj '/CN=drlifeplus.test' -keyout "$temp/tls/drlifeplus-origin.key" -out "$temp/tls/drlifeplus-origin.crt" 2>$null
+  Push-Location "$temp/tls"
+  try { & $opensslExe req -x509 -nodes -newkey rsa:2048 -days 1 -subj '/CN=drlifeplus.test' -keyout drlifeplus-origin.key -out drlifeplus-origin.crt 2>$null } finally { Pop-Location }
   if ($LASTEXITCODE -ne 0) { throw 'temporary certificate generation failed' }
   (Get-Content -Raw $siteConfig).Replace('listen 80 default_server;', 'listen 8080 default_server;').Replace('listen [::]:80 default_server;', 'listen [::]:8080 default_server;').Replace('listen 443 ssl default_server;', 'listen 8443 ssl default_server;').Replace('listen [::]:443 ssl default_server;', 'listen [::]:8443 ssl default_server;').Replace('listen 80;', 'listen 8080;').Replace('listen [::]:80;', 'listen [::]:8080;').Replace('listen 443 ssl;', 'listen 8443 ssl;').Replace('listen [::]:443 ssl;', 'listen [::]:8443 ssl;').Replace('/etc/nginx/tls/', '/work/tls/').Replace('/srv/drlifeplus/current', '/work/site/current').Replace('/etc/nginx/snippets/', '/work/snippets/') | Set-Content -NoNewline -LiteralPath "$temp/drlifeplus.com.conf"
   @'
