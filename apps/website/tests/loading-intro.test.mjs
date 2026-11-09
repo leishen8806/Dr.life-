@@ -84,6 +84,11 @@ test("only html.intro makes the server-rendered overlay visible", () => {
   assert.match(componentSource, /:global\(html\.intro\) \.site-loader\s*\{\s*display:\s*grid;/);
 });
 
+test("CSS hides and disables the overlay after 1.5 seconds if JavaScript fails", () => {
+  assert.match(componentSource, /animation:\s*site-loader-failsafe 0s linear 1\.5s forwards;/);
+  assert.match(componentSource, /@keyframes site-loader-failsafe\s*\{[\s\S]*?visibility:\s*hidden;[\s\S]*?pointer-events:\s*none;/);
+});
+
 test("the gate is a synchronous classic script in the document head", () => {
   assert.match(layoutSource, /<head>[\s\S]*?<script is:inline src="\/scripts\/intro-gate\.js"><\/script>/);
   assert.doesNotMatch(layoutSource, /intro-gate\.js[^>]*(?:defer|type="module")/);
