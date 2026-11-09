@@ -70,7 +70,7 @@ Cloudflare 已设置为 **Full (strict)**，不要切换模式。当前主站返
 
 ## 发布
 
-`website.yml` 在 PR 与 main push 均构建 artifact；只有 main push 能通过 secrets 门禁。缺任一部署 secret 时部署作业跳过。门禁通过后仍必须等待 `website-production` 人工批准。
+`website.yml` 在 PR、main push 与手动触发时构建 artifact。生产部署只接受 main 的 push，或在 Actions 中选择 main 后手动触发；其他分支的手动运行只构建、不部署。`deploy-production` 绑定 `website-production`，因此每次发布只需一次 Environment 人工批准。批准后，作业的第一步检查四个环境级部署 secret；缺少任何一项都会失败并只报告缺失的 secret 名称，不输出值，也不会静默跳过部署。需要在不改代码的情况下重新发布时，在 Actions 的 Website 工作流选择 **Run workflow**，并确认分支为 `main`。
 
 批准后，专用账号仅可把 artifact 上传到 `/srv/drlifeplus/incoming/<release-id>/`。工作流随后通过受控 root 脚本发布：脚本验证 release-id，先清理固定路径上的 `.current.next` 文件、目录或悬空链接，再把 incoming 原子移动到仅 root 可进入的 `staging/`，拒绝符号链接、非常规文件和多硬链接文件；再在 staging 内创建 root 所有的新目录并复制内容，设为 `root:root`（目录 `0755`、文件 `0644`）后移动到 `releases/`，删除旧 staging 内容，原子替换 `current` 符号链接并只保留最新五个 release。复制使线上文件拥有新的 inode，即使上传账号在移动前已打开写句柄，之后的句柄写入也不会影响线上文件。发布后，部署账号不能修改或新增已有 release 的文件；发布核验应以该账号分别尝试追加 `index.html`、新增文件及保留的写句柄写入，三者都必须失败或不影响线上内容。
 
