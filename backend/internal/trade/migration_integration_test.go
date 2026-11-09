@@ -52,29 +52,353 @@ func TestTradeOrderMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	migrations := migrationDirectory(t)
-	orderMigration := findMigration(t, migrations, "_trade_orders.sql")
-	upgradeMigrations := t.TempDir()
-	copyMigrationsExcept(t, migrations, upgradeMigrations, filepath.Base(orderMigration))
-	if err := goose.Up(db, upgradeMigrations); err != nil {
+	const orderMigrationVersion int64 = 56
+	if err := goose.UpTo(db, migrations, orderMigrationVersion-1); err != nil {
 		t.Fatal(err)
 	}
 	baselineVersion, err := goose.GetDBVersion(db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	copyMigration(t, orderMigration, filepath.Join(upgradeMigrations, filepath.Base(orderMigration)))
-	if err := goose.Up(db, upgradeMigrations); err != nil {
+	if err := goose.UpTo(db, migrations, orderMigrationVersion); err != nil {
 		t.Fatal(err)
 	}
 	assertTradeTables(t, db, true)
-	if err := goose.DownTo(db, upgradeMigrations, baselineVersion); err != nil {
+	if err := goose.DownTo(db, migrations, baselineVersion); err != nil {
 		t.Fatal(err)
 	}
 	assertTradeTables(t, db, false)
-	if err := goose.Up(db, upgradeMigrations); err != nil {
+	if err := goose.Up(db, migrations); err != nil {
 		t.Fatal(err)
 	}
 	assertTradeTables(t, db, true)
+}
+
+func TestOrderHTTPMigrationUsesPayableAndPersistsReconciliation(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	dsn := os.Getenv("DRLIFE_ORDER_HTTP_TEST_DATABASE_URL")
+	if dsn == "" {
+		c, err := postgres.Run(ctx, "postgres:16-alpine", postgres.WithDatabase("trade_http"), postgres.WithUsername("test_admin"), postgres.WithPassword("test-only"), postgres.BasicWaitStrategies())
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = testcontainers.TerminateContainer(c) })
+		dsn, err = c.ConnectionString(ctx, "sslmode=disable")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatal(err)
+	}
+	migrations := migrationDirectory(t)
+	if err := goose.Up(db, migrations); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO trade.buyer_order(public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at,shipping_address_public_id,shipping_recipient_name,shipping_address_text,shipping_phone)
+		VALUES('01ARZ3NDEKTSV4RRFFQ69G5FC1',7,'http-order',repeat('a',64),100,100,100,200,now()+interval '1 hour','address-1','Buyer','Phnom Penh','012345678');
+		INSERT INTO trade.merchant_order(public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		VALUES('01ARZ3NDEKTSV4RRFFQ69G5FC2',1,9,'merchant-9',100,100,100,200,now()+interval '1 hour');
+		INSERT INTO trade.order_line(merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES(1,'01ARZ3NDEKTSV4RRFFQ69G5FC3',1,100,100)`); err != nil {
+		t.Fatal(err)
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	store := NewPostgresStore(pool)
+	buyerView, err := store.FindBuyerOrderDetail(ctx, 7, "01ARZ3NDEKTSV4RRFFQ69G5FC1")
+	if err != nil || buyerView.PayableAmountE4 != 200 || buyerView.PaymentStatus != "pending" || len(buyerView.Children) != 1 || buyerView.Children[0].MerchantPublicID != "merchant-9" || buyerView.ShippingAddress.Phone != "012345678" {
+		t.Fatalf("buyer detail=%+v err=%v", buyerView, err)
+	}
+	if _, err := store.FindBuyerOrderDetail(ctx, 8, "01ARZ3NDEKTSV4RRFFQ69G5FC1"); !errors.Is(err, ErrOrderNotVisible) {
+		t.Fatalf("other buyer error=%v", err)
+	}
+	merchantView, err := store.FindMerchantOrderDetail(ctx, 9, "01ARZ3NDEKTSV4RRFFQ69G5FC2")
+	if err != nil || merchantView.PayableAmountE4 != 200 || len(merchantView.Lines) != 1 {
+		t.Fatalf("merchant detail=%+v err=%v", merchantView, err)
+	}
+	if _, err := store.FindMerchantOrderDetail(ctx, 10, "01ARZ3NDEKTSV4RRFFQ69G5FC2"); !errors.Is(err, ErrOrderNotVisible) {
+		t.Fatalf("other merchant error=%v", err)
+	}
+	attempt, err := store.PaymentAttempt(ctx, 7, "01ARZ3NDEKTSV4RRFFQ69G5FC1")
+	if err != nil || attempt.AmountE4 != 200 || attempt.AttemptNo != 1 || attempt.Existing != nil {
+		t.Fatalf("payment attempt=%+v err=%v", attempt, err)
+	}
+	if _, err := db.Exec(`
+		BEGIN;
+		INSERT INTO trade.buyer_order(public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		VALUES('01ARZ3NDEKTSV4RRFFQ69G5FD1',8,'cancel-order',repeat('b',64),100,100,100,200,now()+interval '1 hour');
+		INSERT INTO trade.merchant_order(public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD2',id,10,'merchant-10',100,100,100,200,now()+interval '1 hour' FROM trade.buyer_order WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD1';
+		INSERT INTO trade.order_line(merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
+		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FD3',1,100,100 FROM trade.merchant_order WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD2';
+		INSERT INTO trade.kess_payment_intent(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status,expires_at)
+		VALUES('01ARZ3NDEKTSV4RRFFQ69G5FD4',1,'kess','DRL-01ARZ3NDEKTSV4RRFFQ69G5FD1-1','01ARZ3NDEKTSV4RRFFQ69G5FD1',1,200,'USD','seller','PENDING',now()+interval '1 hour');
+		UPDATE trade.kess_payment_intent SET status='WAITING' WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD4';
+		UPDATE trade.kess_payment_intent SET status='UNKNOWN' WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD4';
+		COMMIT`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.PaymentAttempt(ctx, 8, "01ARZ3NDEKTSV4RRFFQ69G5FD1"); !errors.Is(err, ErrPaymentConfirming) {
+		t.Fatalf("confirming payment attempt error=%v", err)
+	}
+	if _, _, err := store.ClaimBuyerReservationRelease(ctx, 8, "01ARZ3NDEKTSV4RRFFQ69G5FD1"); !errors.Is(err, ErrPaymentConfirming) {
+		t.Fatalf("confirming cancel error=%v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM trade.kess_payment_intent WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD4'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, claimed, err := store.ClaimBuyerReservationRelease(ctx, 8, "01ARZ3NDEKTSV4RRFFQ69G5FD1"); err != nil || !claimed {
+		t.Fatalf("cancel claimed=%v err=%v", claimed, err)
+	}
+	if _, claimed, err := store.ClaimBuyerReservationRelease(ctx, 8, "01ARZ3NDEKTSV4RRFFQ69G5FD1"); err != nil || !claimed {
+		t.Fatalf("cancel replay claimed=%v err=%v", claimed, err)
+	}
+	var cancelled bool
+	if err := db.QueryRow(`SELECT reservation_released_at IS NOT NULL AND bool_and(child.status='cancelled') AND count(outbox.*)=1
+		FROM trade.buyer_order buyer JOIN trade.merchant_order child ON child.buyer_order_id=buyer.id
+		JOIN trade.reservation_release_outbox outbox ON outbox.reservation_key=buyer.buyer_account_id || ':' || buyer.idempotency_key AND outbox.action='release'
+		WHERE buyer.public_id='01ARZ3NDEKTSV4RRFFQ69G5FD1' GROUP BY buyer.id`).Scan(&cancelled); err != nil || !cancelled {
+		t.Fatalf("cancelled=%v err=%v", cancelled, err)
+	}
+	var paymentErrorCode string
+	if err := db.QueryRow(`SELECT error_code FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-wrong',100)`).Scan(&paymentErrorCode); err != nil || paymentErrorCode != "TR002" {
+		t.Fatalf("wrong amount error_code=%q err=%v, want TR002", paymentErrorCode, err)
+	}
+	var wrongAmountTasks int
+	if err := db.QueryRow(`SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref='pay-wrong'`).Scan(&wrongAmountTasks); err != nil || wrongAmountTasks != 1 {
+		t.Fatalf("wrong amount reconciliation tasks=%d err=%v, want 1", wrongAmountTasks, err)
+	}
+	t.Run("cancel invalidates payment and late payment is reconciled", func(t *testing.T) {
+		order := seedHTTPMigrationOrder(t, db, 31, 100, 100, time.Now().Add(time.Hour))
+		insertPaymentIntent(t, db, order.publicID, 1, order.payableE4, "PENDING")
+		if _, claimed, err := store.ClaimBuyerReservationRelease(ctx, order.buyerID, order.publicID); err != nil || !claimed {
+			t.Fatalf("cancel claimed=%v err=%v", claimed, err)
+		}
+		var status string
+		if err := db.QueryRow(`SELECT status FROM trade.kess_payment_intent WHERE source_ref=$1`, order.publicID).Scan(&status); err != nil || status != "INVALIDATED" {
+			t.Fatalf("payment status=%q err=%v, want INVALIDATED", status, err)
+		}
+		for i := 0; i < 2; i++ {
+			if _, _, err := store.ConfirmPayment(ctx, order.publicID, order.payableE4, EventSource{Type: SourceKESSResult, Reference: "late-payment"}); !errors.Is(err, ErrReservationReleased) {
+				t.Fatalf("late payment attempt %d error=%v, want ErrReservationReleased", i, err)
+			}
+		}
+		var tasks int
+		if err := db.QueryRow(`SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref='late-payment'`).Scan(&tasks); err != nil || tasks != 1 {
+			t.Fatalf("late payment reconciliation tasks=%d err=%v, want 1", tasks, err)
+		}
+	})
+	t.Run("cancel and payment creation serialize on parent", func(t *testing.T) {
+		order := seedHTTPMigrationOrder(t, db, 32, 100, 0, time.Now().Add(time.Hour))
+		start := make(chan struct{})
+		paymentErr := make(chan error, 1)
+		cancelErr := make(chan error, 1)
+		go func() {
+			<-start
+			_, err := db.Exec(`INSERT INTO trade.kess_payment_intent
+				(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status,expires_at)
+				VALUES($1,1,'kess',$2,$3,1,$4,'USD','seller','PENDING',now()+interval '1 hour')`, newHTTPTestULID(t), "DRL-"+order.publicID+"-1", order.publicID, order.payableE4)
+			paymentErr <- err
+		}()
+		go func() {
+			<-start
+			_, _, err := store.ClaimBuyerReservationRelease(ctx, order.buyerID, order.publicID)
+			cancelErr <- err
+		}()
+		close(start)
+		if err := <-cancelErr; err != nil {
+			t.Fatalf("concurrent cancel error=%v", err)
+		}
+		if err := <-paymentErr; err != nil {
+			assertPGCode(t, err, "TR001")
+		}
+		var released bool
+		var active int
+		if err := db.QueryRow(`SELECT reservation_released_at IS NOT NULL FROM trade.buyer_order WHERE public_id=$1`, order.publicID).Scan(&released); err != nil || !released {
+			t.Fatalf("released=%v err=%v", released, err)
+		}
+		if err := db.QueryRow(`SELECT count(*) FROM trade.kess_payment_intent WHERE source_ref=$1 AND status IN ('PENDING','WAITING','UNKNOWN','REVIEW')`, order.publicID).Scan(&active); err != nil || active != 0 {
+			t.Fatalf("active payment intents=%d err=%v, want 0", active, err)
+		}
+	})
+	t.Run("new attempt requires channel terminal status and exact amount", func(t *testing.T) {
+		order := seedHTTPMigrationOrder(t, db, 33, 100, 100, time.Now().Add(time.Hour))
+		insertPaymentIntent(t, db, order.publicID, 1, order.payableE4, "PENDING")
+		if _, err := store.PaymentAttempt(ctx, order.buyerID, order.publicID); !errors.Is(err, ErrPaymentConfirming) {
+			t.Fatalf("locally expired or missing payment URL error=%v, want ErrPaymentConfirming", err)
+		}
+		_, err := db.Exec(`INSERT INTO trade.kess_payment_intent
+			(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status)
+			VALUES($1,1,'kess',$2,$3,2,$4,'USD','seller','PENDING')`, newHTTPTestULID(t), "DRL-"+order.publicID+"-2", order.publicID, order.payableE4)
+		assertPGConstraint(t, err, "23505", "ux_kess_payment_intent_one_active_order")
+		_, err = db.Exec(`INSERT INTO trade.kess_payment_intent
+			(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status)
+			VALUES($1,1,'kess',$2,$3,2,$4,'USD','seller','PENDING')`, newHTTPTestULID(t), "DRL-"+order.publicID+"-wrong", order.publicID, order.payableE4+100)
+		assertPGCode(t, err, "TR002")
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='WAITING' WHERE source_ref=$1`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='FAILED' WHERE source_ref=$1`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		attempt, err := store.PaymentAttempt(ctx, order.buyerID, order.publicID)
+		if err != nil || attempt.AttemptNo != 2 {
+			t.Fatalf("retry attempt=%+v err=%v, want attempt 2", attempt, err)
+		}
+	})
+	t.Run("expired quote blocks payment", func(t *testing.T) {
+		order := seedHTTPMigrationOrder(t, db, 34, 100, 100, time.Now().Add(-time.Minute))
+		if _, err := store.PaymentAttempt(ctx, order.buyerID, order.publicID); !errors.Is(err, ErrShippingQuoteExpired) {
+			t.Fatalf("expired quote error=%v, want ErrShippingQuoteExpired", err)
+		}
+	})
+	t.Run("any successful attempt wins payment projection", func(t *testing.T) {
+		order := seedHTTPMigrationOrder(t, db, 35, 100, 0, time.Now().Add(time.Hour))
+		insertPaymentIntent(t, db, order.publicID, 1, order.payableE4, "PENDING")
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='WAITING' WHERE source_ref=$1`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='SUCCESS' WHERE source_ref=$1`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		insertPaymentIntent(t, db, order.publicID, 2, order.payableE4, "PENDING")
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='WAITING' WHERE source_ref=$1 AND attempt_no=2`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='FAILED' WHERE source_ref=$1 AND attempt_no=2`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		view, err := store.FindBuyerOrderDetail(ctx, order.buyerID, order.publicID)
+		if err != nil || view.PaymentStatus != "succeeded" {
+			t.Fatalf("payment status=%q err=%v, want succeeded", view.PaymentStatus, err)
+		}
+	})
+	t.Run("report role cannot read address snapshot", func(t *testing.T) {
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		if _, err := conn.ExecContext(ctx, `SET ROLE report_ro`); err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _, _ = conn.ExecContext(ctx, `RESET ROLE`) }()
+		if err := conn.QueryRowContext(ctx, `SELECT public_id FROM trade.buyer_order LIMIT 1`).Scan(new(string)); err != nil {
+			t.Fatalf("report_ro allowed column: %v", err)
+		}
+		assertPGCode(t, queryRowError(conn.QueryRowContext(ctx, `SELECT shipping_recipient_name,shipping_address_text,shipping_phone FROM trade.buyer_order LIMIT 1`)), "42501")
+	})
+	var applied bool
+	if err := db.QueryRow(`SELECT applied FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-ok',200)`).Scan(&applied); err != nil || !applied {
+		t.Fatalf("payable confirmation applied=%v err=%v", applied, err)
+	}
+	if _, err := db.Exec(`UPDATE trade.buyer_order SET refund_required_at=clock_timestamp() WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FC1'`); err != nil {
+		t.Fatal(err)
+	}
+	var reconciliation bool
+	if err := db.QueryRow(`SELECT reconciliation_required FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-second',300)`).Scan(&reconciliation); err != nil || !reconciliation {
+		t.Fatalf("different-source reconciliation=%v err=%v", reconciliation, err)
+	}
+	var amount int64
+	if err := db.QueryRow(`SELECT paid_amount_e4 FROM trade.payment_reconciliation_task WHERE source_ref='pay-second'`).Scan(&amount); err != nil || amount != 300 {
+		t.Fatalf("reconciliation amount=%d err=%v", amount, err)
+	}
+	if err := goose.DownTo(db, migrations, 57); err != nil {
+		t.Fatal(err)
+	}
+	var columnExists bool
+	if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='trade' AND table_name='buyer_order' AND column_name='payable_amount_e4')`).Scan(&columnExists); err != nil || columnExists {
+		t.Fatalf("down payable column exists=%v err=%v", columnExists, err)
+	}
+	if err := goose.Up(db, migrations); err != nil {
+		t.Fatal(err)
+	}
+}
+
+type httpMigrationOrder struct {
+	publicID  string
+	buyerID   int64
+	payableE4 int64
+}
+
+func seedHTTPMigrationOrder(t *testing.T, db *sql.DB, buyerID, goodsE4, shippingE4 int64, quoteExpiry time.Time) httpMigrationOrder {
+	t.Helper()
+	order := httpMigrationOrder{publicID: newHTTPTestULID(t), buyerID: buyerID, payableE4: goodsE4 + shippingE4}
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var orderID int64
+	if err := tx.QueryRow(`INSERT INTO trade.buyer_order
+		(public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		VALUES($1,$2,$3,$4,$5,$5,$6,$7,$8) RETURNING id`, order.publicID, buyerID, "fixture-"+order.publicID, fmt.Sprintf("%064x", buyerID), goodsE4, shippingE4, order.payableE4, quoteExpiry).Scan(&orderID); err != nil {
+		t.Fatal(err)
+	}
+	var merchantOrderID int64
+	if err := tx.QueryRow(`INSERT INTO trade.merchant_order
+		(public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		VALUES($1,$2,$3,'merchant-fixture',$4,$4,$5,$6,$7) RETURNING id`, newHTTPTestULID(t), orderID, buyerID, goodsE4, shippingE4, order.payableE4, quoteExpiry).Scan(&merchantOrderID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`INSERT INTO trade.order_line
+		(merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES($1,$2,1,$3,$3)`, merchantOrderID, newHTTPTestULID(t), goodsE4); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	return order
+}
+
+func insertPaymentIntent(t *testing.T, db *sql.DB, orderPublicID string, attempt int, amountE4 int64, status string) {
+	t.Helper()
+	if status != "PENDING" {
+		t.Fatalf("fixture payment intent must begin PENDING, got %s", status)
+	}
+	if _, err := db.Exec(`INSERT INTO trade.kess_payment_intent
+		(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status,expires_at)
+		VALUES($1,1,'kess',$2,$3,$4,$5,'USD','seller',$6,now()+interval '1 hour')`, newHTTPTestULID(t), fmt.Sprintf("DRL-%s-%d", orderPublicID, attempt), orderPublicID, attempt, amountE4, status); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func queryRowError(row *sql.Row) error {
+	var recipient, address, phone string
+	return row.Scan(&recipient, &address, &phone)
+}
+
+func newHTTPTestULID(t *testing.T) string {
+	t.Helper()
+	value, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value
+}
+
+func assertDatabaseSQLState(t *testing.T, db *sql.DB, statement, want string) {
+	t.Helper()
+	_, err := db.Exec(statement)
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) || pgErr.Code != want {
+		t.Fatalf("SQLSTATE=%v error=%v, want %s", func() string {
+			if pgErr == nil {
+				return ""
+			}
+			return pgErr.Code
+		}(), err, want)
+	}
 }
 
 func migrationDirectory(t *testing.T) string {
@@ -84,40 +408,6 @@ func migrationDirectory(t *testing.T) string {
 		t.Fatal("cannot locate migrations")
 	}
 	return filepath.Join(filepath.Dir(file), "..", "..", "migrations")
-}
-
-func copyMigrationsExcept(t *testing.T, source, destination, excluded string) {
-	t.Helper()
-	entries, err := os.ReadDir(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, entry := range entries {
-		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" || entry.Name() == excluded {
-			continue
-		}
-		copyMigration(t, filepath.Join(source, entry.Name()), filepath.Join(destination, entry.Name()))
-	}
-}
-
-func copyMigration(t *testing.T, source, destination string) {
-	t.Helper()
-	content, err := os.ReadFile(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(destination, content, 0o600); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func findMigration(t *testing.T, directory, suffix string) string {
-	t.Helper()
-	matches, err := filepath.Glob(filepath.Join(directory, "*"+suffix))
-	if err != nil || len(matches) != 1 {
-		t.Fatalf("find migration %q: matches=%v err=%v", suffix, matches, err)
-	}
-	return matches[0]
 }
 
 func assertTradeTables(t *testing.T, db *sql.DB, want bool) {
@@ -158,7 +448,7 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	if err := goose.Up(db, migrations); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Exec(`INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAV', 1, 'idem-1', repeat('0',64), 100); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAW', 1, 9, 100); INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES (1,'01ARZ3NDEKTSV4RRFFQ69G5FAX',1,100,100)`); err != nil {
+	if _, err := db.Exec(`INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAV', 1, 'idem-1', repeat('0',64), 100,100,0,100); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAW', 1, 9, 100,100,0,100); INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES (1,'01ARZ3NDEKTSV4RRFFQ69G5FAX',1,100,100)`); err != nil {
 		t.Fatal(err)
 	}
 	pool, err := pgxpool.New(ctx, dsn)
@@ -264,7 +554,7 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 		t.Fatalf("trade_rw order_event REFERENCES=%v TRIGGER=%v, want false/false", canReferences, canTrigger)
 	}
 
-	if _, err := db.Exec(`INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAY', 2, 'idem-2', repeat('1',64), 100); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAZ', 2, 10, 100); INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES (2,'01ARZ3NDEKTSV4RRFFQ69G5FB0',1,100,100)`); err != nil {
+	if _, err := db.Exec(`INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAY', 2, 'idem-2', repeat('1',64), 100,100,0,100); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAZ', 2, 10, 100,100,0,100); INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES (2,'01ARZ3NDEKTSV4RRFFQ69G5FB0',1,100,100)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FAY", 100, source); !errors.Is(err, ErrInvalidTransition) || applied {
@@ -334,13 +624,13 @@ func assertTradeRWCreateIsIdempotent(t *testing.T, ctx context.Context, dsn stri
 		t.Fatalf("trade_rw parent payment key=%q applied=%v err=%v", key, applied, err)
 	}
 	assertPGCode(t, func() error {
-		_, err := pool.Exec(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,status,total_e4,version)
-			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF1',id,990,'shipped',1,7 FROM trade.buyer_order WHERE public_id=$1`, first.PublicID)
+		_, err := pool.Exec(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,status,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,version)
+			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF1',id,990,'shipped',100,100,0,100,7 FROM trade.buyer_order WHERE public_id=$1`, first.PublicID)
 		return err
 	}(), "TR006")
 	assertPGCode(t, func() error {
-		_, err := pool.Exec(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF2',id,991,1 FROM trade.buyer_order WHERE public_id=$1`, first.PublicID)
+		_, err := pool.Exec(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF2',id,991,100,100,0,100 FROM trade.buyer_order WHERE public_id=$1`, first.PublicID)
 		return err
 	}(), "TR006")
 
@@ -349,8 +639,8 @@ func assertTradeRWCreateIsIdempotent(t *testing.T, ctx context.Context, dsn stri
 		t.Fatal(err)
 	}
 	assertPGCode(t, func() error {
-		_, err := pool.Exec(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF3',id,992,0 FROM trade.buyer_order WHERE public_id=$1`, second.PublicID)
+		_, err := pool.Exec(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+			SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF3',id,992,0,0,0,0 FROM trade.buyer_order WHERE public_id=$1`, second.PublicID)
 		return err
 	}(), "TR006")
 	var secondMerchantID int64
@@ -413,11 +703,11 @@ func assertTradeRWConnectionReuse(t *testing.T, ctx context.Context, owner *pgxp
 		}
 		key := fmt.Sprintf("connection-reuse-%d", i)
 		if _, err := owner.Exec(ctx, `WITH buyer AS (
-			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-			VALUES ($1,$2,$3,repeat('6',64),100) RETURNING id
+			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+			VALUES ($1,$2,$3,repeat('6',64),100,100,0,100) RETURNING id
 		), child AS (
-			INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-			SELECT $4,id,$5,100 FROM buyer RETURNING id
+			INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+			SELECT $4,id,$5,100,100,0,100 FROM buyer RETURNING id
 		) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 		SELECT id,$6,1,100,100 FROM child`, parentID, 2000+i, key, childID, 3000+i, skuID); err != nil {
 			t.Fatal(err)
@@ -443,11 +733,11 @@ func assertReservationCommitRequiredBeforeSubmission(t *testing.T, ctx context.C
 	t.Helper()
 	var merchantOrderID int64
 	if err := pool.QueryRow(ctx, `WITH buyer AS (
-		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FF4',990,'commit-guard',repeat('9',64),100) RETURNING id
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FF4',990,'commit-guard',repeat('9',64),100,100,0,100) RETURNING id
 	), merchant AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF5',id,991,100 FROM buyer RETURNING id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FF5',id,991,100,100,0,100 FROM buyer RETURNING id
 	) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FF6',1,100,100 FROM merchant RETURNING merchant_order_id`).Scan(&merchantOrderID); err != nil {
 		t.Fatal(err)
@@ -478,7 +768,7 @@ func assertAmountConstraints(t *testing.T, ctx context.Context, pool *pgxpool.Po
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, `INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB1', 3, 'idem-3', repeat('2',64), 1); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB2', 3, 11, 0)`); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB1', 3, 'idem-3', repeat('2',64), 100,100,0,100); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB2', 3, 11, 0,0,0,0)`); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(ctx); err == nil {
@@ -490,7 +780,7 @@ func assertAmountConstraints(t *testing.T, ctx context.Context, pool *pgxpool.Po
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, `INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB6', 3, 'idem-4', repeat('3',64), 100); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB7', 4, 11, 100); INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES (4,'01ARZ3NDEKTSV4RRFFQ69G5FB8',1,0,0)`); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB6', 3, 'idem-4', repeat('3',64), 100,100,0,100); INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB7', 4, 11, 100,100,0,100); INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES (4,'01ARZ3NDEKTSV4RRFFQ69G5FB8',1,0,0)`); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(ctx); err == nil {
@@ -501,7 +791,7 @@ func assertAmountConstraints(t *testing.T, ctx context.Context, pool *pgxpool.Po
 func assertDifferentSourcesSerialize(t *testing.T, ctx context.Context, db *sql.DB, pool *pgxpool.Pool, store *PostgresStore) {
 	t.Helper()
 	var merchantOrderID int64
-	if err := db.QueryRow(`WITH buyer AS (INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB3', 4, 'idem-5', repeat('4',64), 100) RETURNING id), merchant AS (INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FB4', id, 12, 100 FROM buyer RETURNING id) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FB5',1,100,100 FROM merchant RETURNING merchant_order_id`).Scan(&merchantOrderID); err != nil {
+	if err := db.QueryRow(`WITH buyer AS (INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB3', 4, 'idem-5', repeat('4',64), 100,100,0,100) RETURNING id), merchant AS (INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FB4', id, 12, 100,100,0,100 FROM buyer RETURNING id) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FB5',1,100,100 FROM merchant RETURNING merchant_order_id`).Scan(&merchantOrderID); err != nil {
 		t.Fatal(err)
 	}
 	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FB3", 100, EventSource{Type: SourceKESSResult, Reference: "payment-before-serialize"}); err != nil || !applied {
@@ -575,14 +865,14 @@ func assertSiblingTransitionsSerialize(t *testing.T, ctx context.Context, pool *
 	t.Helper()
 	var firstID, secondID int64
 	if err := pool.QueryRow(ctx, `WITH buyer AS (
-		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FDP',46,'sibling-lock',repeat('c',64),200) RETURNING id
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FDP',46,'sibling-lock',repeat('c',64),200,200,0,200) RETURNING id
 	), first_child AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FDQ',id,546,100 FROM buyer RETURNING id,buyer_order_id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FDQ',id,546,100,100,0,100 FROM buyer RETURNING id,buyer_order_id
 	), second_child AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FDR',buyer_order_id,547,100 FROM first_child RETURNING id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FDR',buyer_order_id,547,100,100,0,100 FROM first_child RETURNING id
 	), first_line AS (
 		INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FDS',1,100,100 FROM first_child
@@ -628,13 +918,13 @@ func assertSharedSourceWithinBuyer(t *testing.T, ctx context.Context, pool *pgxp
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	var buyerOrderID, firstMerchantOrderID, secondMerchantOrderID int64
-	if err := tx.QueryRow(ctx, `INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB9', 5, 'idem-6', repeat('5',64), 200) RETURNING id`).Scan(&buyerOrderID); err != nil {
+	if err := tx.QueryRow(ctx, `INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FB9', 5, 'idem-6', repeat('5',64), 200,200,0,200) RETURNING id`).Scan(&buyerOrderID); err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.QueryRow(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FBA',$1,13,100) RETURNING id`, buyerOrderID).Scan(&firstMerchantOrderID); err != nil {
+	if err := tx.QueryRow(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FBA',$1,13,100,100,0,100) RETURNING id`, buyerOrderID).Scan(&firstMerchantOrderID); err != nil {
 		t.Fatal(err)
 	}
-	if err := tx.QueryRow(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FBB',$1,14,100) RETURNING id`, buyerOrderID).Scan(&secondMerchantOrderID); err != nil {
+	if err := tx.QueryRow(ctx, `INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FBB',$1,14,100,100,0,100) RETURNING id`, buyerOrderID).Scan(&secondMerchantOrderID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES ($1,'01ARZ3NDEKTSV4RRFFQ69G5FBC',1,100,100),($2,'01ARZ3NDEKTSV4RRFFQ69G5FBD',1,100,100)`, firstMerchantOrderID, secondMerchantOrderID); err != nil {
@@ -676,14 +966,14 @@ func assertPartialCancellationRejected(t *testing.T, ctx context.Context, pool *
 	t.Helper()
 	var buyerOrderID, firstChildID int64
 	if err := pool.QueryRow(ctx, `WITH buyer AS (
-		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FD0',40,'cancel-cascade',repeat('7',64),200) RETURNING id
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FD0',40,'cancel-cascade',repeat('7',64),200,200,0,200) RETURNING id
 	), first_child AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD1',id,401,100 FROM buyer RETURNING id,buyer_order_id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD1',id,401,100,100,0,100 FROM buyer RETURNING id,buyer_order_id
 	), second_child AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD2',buyer_order_id,402,100 FROM first_child RETURNING id,merchant_id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD2',buyer_order_id,402,100,100,0,100 FROM first_child RETURNING id,merchant_id
 	), first_line AS (
 		INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FD3',1,100,100 FROM first_child
@@ -729,12 +1019,12 @@ func assertReservationReleaseCancelsAndQueuesFailures(t *testing.T, ctx context.
 	t.Helper()
 	var buyerOrderID int64
 	if err := pool.QueryRow(ctx, `WITH buyer AS (
-		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FD5',41,'release-cascade',repeat('8',64),200) RETURNING id
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FD5',41,'release-cascade',repeat('8',64),200,200,0,200) RETURNING id
 	), children AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD6',id,411,100 FROM buyer UNION ALL
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD7',id,412,100 FROM buyer RETURNING id,buyer_order_id,merchant_id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD6',id,411,100,100,0,100 FROM buyer UNION ALL
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD7',id,412,100,100,0,100 FROM buyer RETURNING id,buyer_order_id,merchant_id
 	), lines AS (
 		INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 		SELECT id,CASE merchant_id WHEN 411 THEN '01ARZ3NDEKTSV4RRFFQ69G5FD8' ELSE '01ARZ3NDEKTSV4RRFFQ69G5FD9' END,1,100,100 FROM children
@@ -762,10 +1052,13 @@ func assertReservationReleaseCancelsAndQueuesFailures(t *testing.T, ctx context.
 	if cancelled != 2 || queued != 1 || !released {
 		t.Fatalf("cancelled=%d queued=%d released=%v, want 2/1/true", cancelled, queued, released)
 	}
-	assertPGCode(t, func() error {
-		_, err := pool.Exec(ctx, `SELECT * FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FD5','cancelled-payment',200)`)
-		return err
-	}(), "TR001")
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FD5", 200, EventSource{Type: SourceKESSResult, Reference: "cancelled-payment"}); !errors.Is(err, ErrReservationReleased) || applied {
+		t.Fatalf("cancelled payment applied=%v err=%v, want ErrReservationReleased", applied, err)
+	}
+	var reconciliationTasks int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref='cancelled-payment'`).Scan(&reconciliationTasks); err != nil || reconciliationTasks != 1 {
+		t.Fatalf("cancelled payment reconciliation tasks=%d err=%v, want 1", reconciliationTasks, err)
+	}
 	if _, err := pool.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE reservation_key='41:release-cascade'`); err != nil {
 		t.Fatal(err)
 	}
@@ -775,11 +1068,11 @@ func assertRefundRequiredBlocksSubmission(t *testing.T, ctx context.Context, poo
 	t.Helper()
 	var merchantOrderID int64
 	if err := pool.QueryRow(ctx, `WITH buyer AS (
-		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FDK',45,'refund-required',repeat('b',64),100) RETURNING id
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FDK',45,'refund-required',repeat('b',64),100,100,0,100) RETURNING id
 	), merchant AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FDM',id,545,100 FROM buyer RETURNING id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FDM',id,545,100,100,0,100 FROM buyer RETURNING id
 	) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 	SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FDN',1,100,100 FROM merchant RETURNING merchant_order_id`).Scan(&merchantOrderID); err != nil {
 		t.Fatal(err)
@@ -826,40 +1119,42 @@ func assertPaymentSQLStates(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 	create := func(parentID, childID, skuID, key string, buyerID int64) {
 		t.Helper()
 		if _, err := pool.Exec(ctx, `WITH buyer AS (
-			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-			VALUES ($1,$2,$3,repeat('9',64),100) RETURNING id
+			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+			VALUES ($1,$2,$3,repeat('9',64),100,100,0,100) RETURNING id
 		), child AS (
-			INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-			SELECT $4,id,$2+500,100 FROM buyer RETURNING id
+			INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+			SELECT $4,id,$2+500,100,100,0,100 FROM buyer RETURNING id
 		) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 		SELECT id,$5,1,100,100 FROM child`, parentID, buyerID, key, childID, skuID); err != nil {
 			t.Fatal(err)
 		}
 	}
 	create("01ARZ3NDEKTSV4RRFFQ69G5FDA", "01ARZ3NDEKTSV4RRFFQ69G5FDB", "01ARZ3NDEKTSV4RRFFQ69G5FDC", "sqlstate-amount", 42)
-	assertPGCode(t, func() error {
-		_, err := pool.Exec(ctx, `SELECT * FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FDA','wrong-amount',99)`)
-		return err
-	}(), "TR002")
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FDA", 99, EventSource{Type: SourceKESSResult, Reference: "wrong-amount"}); !errors.Is(err, ErrPaymentAmount) || applied {
+		t.Fatalf("wrong amount applied=%v err=%v, want ErrPaymentAmount", applied, err)
+	}
 	create("01ARZ3NDEKTSV4RRFFQ69G5FDD", "01ARZ3NDEKTSV4RRFFQ69G5FDE", "01ARZ3NDEKTSV4RRFFQ69G5FDF", "sqlstate-release", 43)
 	if _, claimed, err := store.ClaimReservationRelease(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FDD"); err != nil || !claimed {
 		t.Fatalf("release claim claimed=%v err=%v", claimed, err)
 	}
-	assertPGCode(t, func() error {
-		_, err := pool.Exec(ctx, `SELECT * FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FDD','released-payment',100)`)
-		return err
-	}(), "TR001")
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FDD", 100, EventSource{Type: SourceKESSResult, Reference: "released-payment"}); !errors.Is(err, ErrReservationReleased) || applied {
+		t.Fatalf("released payment applied=%v err=%v, want ErrReservationReleased", applied, err)
+	}
+	var tasks int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref IN ('wrong-amount','released-payment')`).Scan(&tasks); err != nil || tasks != 2 {
+		t.Fatalf("payment error reconciliation tasks=%d err=%v, want 2", tasks, err)
+	}
 }
 
 func assertCreatedTxidCannotBeForged(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	var eventTxid, currentTxid int64
 	if err := pool.QueryRow(ctx, `WITH buyer AS (
-		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FDG',44,'txid-guard',repeat('a',64),100) RETURNING id
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FDG',44,'txid-guard',repeat('a',64),100,100,0,100) RETURNING id
 	), child AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FDH',id,544,100 FROM buyer RETURNING id,buyer_order_id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FDH',id,544,100,100,0,100 FROM buyer RETURNING id,buyer_order_id
 	), line AS (
 		INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FDJ',1,100,100 FROM child
@@ -894,11 +1189,11 @@ func assertPaymentReleaseGuards(t *testing.T, ctx context.Context, pool *pgxpool
 	createOrder := func(parentID, childID, skuID, key string, buyerID int64) {
 		t.Helper()
 		if _, err := pool.Exec(ctx, `WITH buyer AS (
-			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-			VALUES ($1,$2,$3,repeat('6',64),100) RETURNING id
+			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+			VALUES ($1,$2,$3,repeat('6',64),100,100,0,100) RETURNING id
 		), merchant AS (
-			INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-			SELECT $4,id,$2+100,100 FROM buyer RETURNING id
+			INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+			SELECT $4,id,$2+100,100,100,0,100 FROM buyer RETURNING id
 		) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 		SELECT id,$5,1,100,100 FROM merchant`, parentID, buyerID, key, childID, skuID); err != nil {
 			t.Fatal(err)
@@ -1039,11 +1334,11 @@ func assertReservationReleaseOutbox(t *testing.T, ctx context.Context, pool *pgx
 func assertDuplicatePaymentSignal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
 	t.Helper()
 	if _, err := pool.Exec(ctx, `WITH buyer AS (
-		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FE0',60,'duplicate-payment',repeat('d',64),200) RETURNING id
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FE0',60,'duplicate-payment',repeat('d',64),200,200,0,200) RETURNING id
 	), children AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT child.public_id,buyer.id,child.merchant_id,100 FROM buyer CROSS JOIN (VALUES
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT child.public_id,buyer.id,child.merchant_id,100,100,0,100 FROM buyer CROSS JOIN (VALUES
 			('01ARZ3NDEKTSV4RRFFQ69G5FE1',660),
 			('01ARZ3NDEKTSV4RRFFQ69G5FE2',661)
 		) child(public_id,merchant_id) RETURNING id,merchant_id
@@ -1086,8 +1381,8 @@ func assertDuplicatePaymentSignal(t *testing.T, ctx context.Context, pool *pgxpo
 
 func assertNoChildOrderHandling(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FE3',61,'empty-order',repeat('e',64),0)`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FE3',61,'empty-order',repeat('e',64),0,0,0,0)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FE3", 0, EventSource{Type: SourceKESSResult, Reference: "empty-payment"}); !errors.Is(err, ErrInvalidTransition) || applied {
@@ -1162,9 +1457,9 @@ func assertTradeSecurityDefinerAndPrivileges(t *testing.T, ctx context.Context, 
 
 func assertBuyerIsolationAndForeignEvent(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	if _, err := pool.Exec(ctx, `INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4) VALUES
-		('01ARZ3NDEKTSV4RRFFQ69G5FE4',62,'shared-key',repeat('1',64),0),
-		('01ARZ3NDEKTSV4RRFFQ69G5FE5',63,'shared-key',repeat('2',64),0)`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4) VALUES
+		('01ARZ3NDEKTSV4RRFFQ69G5FE4',62,'shared-key',repeat('1',64),0,0,0,0),
+		('01ARZ3NDEKTSV4RRFFQ69G5FE5',63,'shared-key',repeat('2',64),0,0,0,0)`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref)
@@ -1198,14 +1493,14 @@ func assertLineAndParentTotalGuards(t *testing.T, ctx context.Context, pool *pgx
 	t.Helper()
 	var buyerID, firstID, emptyID int64
 	if err := pool.QueryRow(ctx, `WITH buyer AS (
-		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FE6',64,'total-guards',repeat('3',64),100) RETURNING id
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FE6',64,'total-guards',repeat('3',64),100,100,0,100) RETURNING id
 	), first_child AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FE7',id,664,100 FROM buyer RETURNING id,buyer_order_id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FE7',id,664,100,100,0,100 FROM buyer RETURNING id,buyer_order_id
 	), empty_child AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FE8',buyer_order_id,665,0 FROM first_child RETURNING id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FE8',buyer_order_id,665,0,0,0,0 FROM first_child RETURNING id
 	), line AS (
 		INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FE9',1,100,100 FROM first_child
@@ -1238,8 +1533,8 @@ func assertLineAndParentTotalGuards(t *testing.T, ctx context.Context, pool *pgx
 		t.Fatal(err)
 	}
 	if _, err := tx.Exec(ctx, `WITH child AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FEA',$1,666,100) RETURNING id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FEA',$1,666,100,100,0,100) RETURNING id
 	) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 	SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FEB',1,100,100 FROM child`, buyerID); err != nil {
 		t.Fatal(err)
@@ -1251,11 +1546,11 @@ func assertLineAndParentTotalGuards(t *testing.T, ctx context.Context, pool *pgx
 		t.Fatal(err)
 	}
 	_, err = tx.Exec(ctx, `WITH buyer AS (
-		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FEC',67,'whole-cent',repeat('4',64),101) RETURNING id
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FEC',67,'whole-cent',repeat('4',64),100,100,0,100) RETURNING id
 	), child AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FED',id,667,101 FROM buyer RETURNING id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FED',id,667,100,100,0,100 FROM buyer RETURNING id
 	) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 	SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FEE',1,101,101 FROM child`)
 	assertPGConstraint(t, err, "23514", "order_line_unit_price_e4_check")
@@ -1265,11 +1560,11 @@ func assertLineAndParentTotalGuards(t *testing.T, ctx context.Context, pool *pgx
 func assertDifferentPaymentSourcesSerialize(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
 	t.Helper()
 	if _, err := pool.Exec(ctx, `WITH buyer AS (
-		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FEF',68,'payment-lock',repeat('5',64),100) RETURNING id
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FEF',68,'payment-lock',repeat('5',64),100,100,0,100) RETURNING id
 	), child AS (
-		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FEG',id,668,100 FROM buyer RETURNING id
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FEG',id,668,100,100,0,100 FROM buyer RETURNING id
 	) INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 	SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FEH',1,100,100 FROM child`); err != nil {
 		t.Fatal(err)
@@ -1329,10 +1624,10 @@ func assertTransitionMatrix(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 					t.Fatal(err)
 				}
 				if err := pool.QueryRow(ctx, `WITH buyer AS (
-					INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4)
-					VALUES ($1,$2,$3,repeat('f',64),0) RETURNING id
-				) INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,status,total_e4)
-				SELECT $4,id,$2,$5,0 FROM buyer RETURNING id`, parentPublicID, 1000+nextID, fmt.Sprintf("matrix-%d", nextID), childPublicID, string(from)).Scan(&merchantID); err != nil {
+					INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+					VALUES ($1,$2,$3,repeat('f',64),0,0,0,0) RETURNING id
+				) INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,status,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+				SELECT $4,id,$2,$5,0,0,0,0 FROM buyer RETURNING id`, parentPublicID, 1000+nextID, fmt.Sprintf("matrix-%d", nextID), childPublicID, string(from)).Scan(&merchantID); err != nil {
 					t.Fatal(err)
 				}
 				if from == Paid && to == Submitted {

@@ -142,6 +142,7 @@
 ,"error.3003": "[TODO-KM-REVIEW] This order was cancelled or its stock reservation was released."
 ,"error.3004": "[TODO-KM-REVIEW] The payment amount does not match the order total."
 ,"error.3005": "[TODO-KM-REVIEW] This action is not allowed in the order's current state."
+,"error.3006": "តម្លៃដឹកជញ្ជូនបានផុតកំណត់។ សូមធ្វើបច្ចុប្បន្នភាពតម្លៃ ឬបញ្ជាទិញម្តងទៀត។"
 ,"consent.title": "[TODO-KM-REVIEW] Review and accept the agreements"
 ,"consent.description": "[TODO-KM-REVIEW] You must accept the current legal documents before continuing."
 ,"consent.privacy": "[TODO-KM-REVIEW] Privacy policy"

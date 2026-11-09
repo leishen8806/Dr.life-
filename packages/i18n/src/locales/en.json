@@ -60,6 +60,7 @@
   "error.3003": "This order was cancelled or its stock reservation was released.",
   "error.3004": "The payment amount does not match the order total.",
   "error.3005": "This action is not allowed in the order's current state.",
+  "error.3006": "The shipping quote expired. Refresh the quote or place the order again.",
   "consent.title": "Review and accept the agreements",
   "consent.description": "You must accept the current legal documents before continuing.",
   "consent.privacy": "Privacy policy",

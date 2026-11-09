@@ -21,7 +21,7 @@ type accountDirectoryDB interface {
 }
 
 // AccountDirectory resolves the opaque public account identifier carried in a
-// verified session. It is the IAM-owned adapter for ledger read authorization.
+// verified session. It is the IAM-owned adapter for cross-module authorization.
 type AccountDirectory struct{ DB accountDirectoryDB }
 
 func (d AccountDirectory) Resolve(ctx context.Context, publicID string) (AccountResolution, bool, error) {
@@ -38,4 +38,13 @@ func (d AccountDirectory) Resolve(ctx context.Context, publicID string) (Account
 		return AccountResolution{}, false, err
 	}
 	return result, true, nil
+}
+
+func (d AccountDirectory) Status(ctx context.Context, id int64) (string, error) {
+	if d.DB == nil || id <= 0 {
+		return "", pgx.ErrNoRows
+	}
+	var status string
+	err := d.DB.QueryRow(ctx, `SELECT status FROM iam.account WHERE id=$1`, id).Scan(&status)
+	return status, err
 }
