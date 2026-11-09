@@ -73,4 +73,4 @@ await store.login(); // 或 store.setTokens(pair)
 
 接口变更先修改 OpenAPI 规范，再从 `backend` 运行 `make generate-all`。不要手工修改 `src/schema.d.ts`。
 
-开发环境未设置 `VITE_API_BASE_URL` 时使用 `http://localhost:8080`。生产环境必须显式设置，例如部署配置中的 `https://adminapi.settlecore.org`；客户端代码不内置生产地址。
+开发环境未设置 `VITE_API_BASE_URL` 时使用 `http://localhost:8080`。生产环境必须显式设置，例如部署配置中的 `https://adminapi.drlifeplus.com`；客户端代码不内置生产地址。

@@ -42,7 +42,7 @@
 - **服务令牌**：RouteFit 给 Dr.life+ 签发一个平台通道令牌（通道 `PLATFORM`，`source_system=drlife`），scope 至少包括 `platform:owners:read`、`platform:fulfillments:create|read|cancel`、`platform:inventory:read`、`platform:owners:hold`、`platform:statements:read`、`platform:evidence:read`。令牌存放在 Dr.life+ 的集成配置（N-10），走密钥信封加密，不进日志。轮换期间新旧两枚同时有效。
 - **货主授权**：每个商户在 RouteFit 侧是一个货主（`party.customer`）。平台令牌能代哪些货主操作，由 RouteFit 侧的绑定表决定（4.1），Dr.life+ 在请求里带 `ownerRef`，RouteFit 校验它在绑定范围内，不在范围内返回 404。
 - **出站事件签名**（RouteFit → Dr.life+）：见 5.1。签名密钥与服务令牌分开，独立轮换。
-- **网络**：RouteFit 测试环境与生产环境地址由 RouteFit 提供（E-1）；Dr.life+ 回调地址为 `https://adminapi.settlecore.org/v1/integrations/routefit/events`（统一 API 网关，路径级限制）。
+- **网络**：RouteFit 测试环境与生产环境地址由 RouteFit 提供（E-1）；Dr.life+ 回调地址为 `https://adminapi.drlifeplus.com/v1/integrations/routefit/events`（统一 API 网关，路径级限制）。
 
 ## 4. Dr.life+ → RouteFit 接口
 
@@ -117,7 +117,7 @@
 
 ### 5.1 投递协议
 
-- `POST https://adminapi.settlecore.org/v1/integrations/routefit/events`，一次一个事件。正文沿用 RouteFit 内部信封：`eventId`、`eventType`、`schemaVersion`、`occurredAt`、`aggregate{type,id,version}`、`correlationId`、`payload`。
+- `POST https://adminapi.drlifeplus.com/v1/integrations/routefit/events`，一次一个事件。正文沿用 RouteFit 内部信封：`eventId`、`eventType`、`schemaVersion`、`occurredAt`、`aggregate{type,id,version}`、`correlationId`、`payload`。
 - 请求头：
   - `X-RouteFit-Event-Id`
   - `X-RouteFit-Timestamp`（Unix 秒）

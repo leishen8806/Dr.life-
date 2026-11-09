@@ -39,7 +39,7 @@ Telegram Mini App 电商平台，首版聚焦商家仓储与配送，并由平�
 | [packages/ui/](packages/ui/README.md) | 前端共享 UI 组件 |
 | [packages/api-client/](packages/api-client/README.md) | OpenAPI 生成的共享接口客户端 |
 | [packages/i18n/](packages/i18n/README.md) | 中文、英文与高棉语共享词条 |
-| [site/](site/README.md) | settlecore.org 静态官网 |
+| [site/](site/README.md) | drlifeplus.com 静态官网 |
 | [poc/](poc/README.md) | 不进入生产目录的技术验证 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 分支、提交、评审、迁移与合并规则 |
 | [PR 模板](.github/pull_request_template.md) | PR 信息、验收结果与安全检查清单 |

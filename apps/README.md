@@ -26,7 +26,7 @@ pnpm install --frozen-lockfile
 
 ## 配置
 
-开发环境未设置 `VITE_API_BASE_URL` 时，接口客户端连接 `http://localhost:8080`。生产部署必须设置 `VITE_API_BASE_URL`，当前约定值为 `https://adminapi.settlecore.org`；生产地址不写入客户端源代码。
+开发环境未设置 `VITE_API_BASE_URL` 时，接口客户端连接 `http://localhost:8080`。生产部署必须设置 `VITE_API_BASE_URL`，当前约定值为 `https://adminapi.drlifeplus.com`；生产地址不写入客户端源代码。
 
 ## 新增应用或包
 
