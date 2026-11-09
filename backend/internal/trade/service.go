@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -65,26 +66,28 @@ type OrderReader interface {
 	FindBuyerOrder(context.Context, int64, string) (BuyerOrderView, error)
 	FindMerchantOrder(context.Context, int64, string) (MerchantOrderView, error)
 }
-type BuyerOrderView struct {
-	PublicID, Status string
-	BuyerAccountID   int64
-	TotalE4          int64
-}
-type MerchantOrderView struct {
-	PublicID, Status string
-	MerchantID       int64
-	TotalE4          int64
-}
 type ChildOrder struct {
-	MerchantID, TotalE4 int64
-	Lines               []OrderItem
+	MerchantID             int64
+	MerchantPublicID       string
+	TotalE4                int64
+	GoodsAmountE4          int64
+	ShippingAmountE4       int64
+	PayableAmountE4        int64
+	ShippingQuoteExpiresAt time.Time
+	Lines                  []OrderItem
 }
 type CreateOrder struct {
-	BuyerAccountID, TotalE4 int64
-	PublicID                string
-	IdempotencyKey          string
-	RequestHash             string
-	Children                []ChildOrder
+	BuyerAccountID         int64
+	TotalE4                int64
+	GoodsAmountE4          int64
+	ShippingAmountE4       int64
+	PayableAmountE4        int64
+	ShippingQuoteExpiresAt time.Time
+	ShippingAddress        AddressSnapshot
+	PublicID               string
+	IdempotencyKey         string
+	RequestHash            string
+	Children               []ChildOrder
 }
 type Reservation struct {
 	Key      string
@@ -97,13 +100,16 @@ type ReservationAction struct {
 	Action string
 }
 type Service struct {
-	store    Store
-	accounts AccountDirectory
-	catalog  Catalog
+	store     Store
+	accounts  AccountDirectory
+	catalog   Catalog
+	addresses AddressBook
+	quotes    ShippingQuoter
+	payments  PaymentCreator
 }
 
 func NewService(store Store, accounts AccountDirectory, catalog Catalog) *Service {
-	return &Service{store, accounts, catalog}
+	return &Service{store: store, accounts: accounts, catalog: catalog}
 }
 
 // BuyerOrder returns a parent order only when it belongs to buyerID.
@@ -124,6 +130,10 @@ func (s *Service) MerchantOrder(ctx context.Context, merchantID int64, publicID 
 	return reader.FindMerchantOrder(ctx, merchantID, publicID)
 }
 func (s *Service) Place(ctx context.Context, buyer int64, idempotencyKey string, lines []OrderLineInput) (CreateOrder, error) {
+	return s.place(ctx, buyer, idempotencyKey, AddressSnapshot{}, lines)
+}
+
+func (s *Service) place(ctx context.Context, buyer int64, idempotencyKey string, address AddressSnapshot, lines []OrderLineInput) (CreateOrder, error) {
 	idempotencyKey = strings.TrimSpace(idempotencyKey)
 	if len(idempotencyKey) < 1 || len(idempotencyKey) > 200 {
 		return CreateOrder{}, ErrIdempotencyRequired
@@ -139,7 +149,7 @@ func (s *Service) Place(ctx context.Context, buyer int64, idempotencyKey string,
 	if err != nil {
 		return CreateOrder{}, err
 	}
-	hash := requestHash(buyer, normalized)
+	hash := requestHash(buyer, address.PublicID, normalized)
 	if existing, found, err := s.store.FindByIdempotency(ctx, buyer, idempotencyKey, hash); err != nil || found {
 		return existing, err
 	}
@@ -151,22 +161,60 @@ func (s *Service) Place(ctx context.Context, buyer int64, idempotencyKey string,
 	if err := validateCatalogSnapshot(normalized, snapshots); err != nil {
 		return CreateOrder{}, errors.Join(err, s.releaseOrQueue(ctx, reservationKey, "invalid_snapshot"))
 	}
-	items, total, err := BuildOrderItems(snapshots)
+	items, goodsTotal, err := BuildOrderItems(snapshots)
 	if err != nil {
 		return CreateOrder{}, errors.Join(err, s.releaseOrQueue(ctx, reservationKey, "invalid_order"))
 	}
 	children := map[int64]int{}
-	order := CreateOrder{BuyerAccountID: buyer, TotalE4: total}
+	order := CreateOrder{BuyerAccountID: buyer, TotalE4: goodsTotal, GoodsAmountE4: goodsTotal, PayableAmountE4: goodsTotal, ShippingAddress: address}
 	for _, item := range items {
 		index, ok := children[item.MerchantID]
 		if !ok {
 			index = len(order.Children)
 			children[item.MerchantID] = index
-			order.Children = append(order.Children, ChildOrder{MerchantID: item.MerchantID})
+			order.Children = append(order.Children, ChildOrder{MerchantID: item.MerchantID, MerchantPublicID: item.MerchantPublicID})
 		}
 		child := &order.Children[index]
 		child.Lines = append(child.Lines, item)
 		child.TotalE4 += item.LineTotalE4
+		child.GoodsAmountE4 += item.LineTotalE4
+		child.PayableAmountE4 += item.LineTotalE4
+	}
+	if address.PublicID != "" {
+		for _, child := range order.Children {
+			if child.MerchantPublicID == "" {
+				return CreateOrder{}, errors.Join(ErrInvalidOrderLine, s.releaseOrQueue(ctx, reservationKey, "missing_merchant_public_id"))
+			}
+		}
+		quotes, quoteErr := s.quotes.Quote(ctx, address, order.Children)
+		if quoteErr != nil {
+			return CreateOrder{}, errors.Join(quoteErr, s.releaseOrQueue(ctx, reservationKey, "shipping_quote_failed"))
+		}
+		if len(quotes) != len(order.Children) {
+			return CreateOrder{}, errors.Join(ErrInvalidOrderLine, s.releaseOrQueue(ctx, reservationKey, "invalid_shipping_quote"))
+		}
+		byMerchant := make(map[int64]ShippingQuote, len(quotes))
+		for _, quote := range quotes {
+			if quote.MerchantID <= 0 || quote.AmountE4 < 0 || quote.AmountE4%100 != 0 || !quote.ExpiresAt.After(time.Now()) {
+				return CreateOrder{}, errors.Join(ErrInvalidOrderLine, s.releaseOrQueue(ctx, reservationKey, "invalid_shipping_quote"))
+			}
+			byMerchant[quote.MerchantID] = quote
+		}
+		for index := range order.Children {
+			child := &order.Children[index]
+			quote, found := byMerchant[child.MerchantID]
+			if !found {
+				return CreateOrder{}, errors.Join(ErrInvalidOrderLine, s.releaseOrQueue(ctx, reservationKey, "missing_shipping_quote"))
+			}
+			child.ShippingAmountE4 = quote.AmountE4
+			child.PayableAmountE4 += quote.AmountE4
+			child.ShippingQuoteExpiresAt = quote.ExpiresAt
+			order.ShippingAmountE4 += quote.AmountE4
+			if order.ShippingQuoteExpiresAt.IsZero() || quote.ExpiresAt.Before(order.ShippingQuoteExpiresAt) {
+				order.ShippingQuoteExpiresAt = quote.ExpiresAt
+			}
+		}
+		order.PayableAmountE4 += order.ShippingAmountE4
 	}
 	order.IdempotencyKey = idempotencyKey
 	order.RequestHash = hash
@@ -301,9 +349,9 @@ func normalizeOrderLines(lines []OrderLineInput) ([]OrderLineInput, error) {
 	return normalized, nil
 }
 
-func requestHash(buyer int64, lines []OrderLineInput) string {
+func requestHash(buyer int64, addressPublicID string, lines []OrderLineInput) string {
 	hash := sha256.New()
-	_, _ = hash.Write([]byte(strconv.FormatInt(buyer, 10)))
+	_, _ = hash.Write([]byte(strconv.FormatInt(buyer, 10) + "\x00" + addressPublicID))
 	for _, line := range lines {
 		_, _ = hash.Write([]byte("\x00" + line.SKUPublicID + "\x00" + strconv.FormatInt(line.Quantity, 10)))
 	}

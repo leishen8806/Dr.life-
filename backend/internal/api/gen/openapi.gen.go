@@ -500,6 +500,7 @@ const (
 	ErrorCodeOrderCancelledOrReleased ErrorCode = 3003
 	ErrorCodeOrderInsufficientStock   ErrorCode = 3002
 	ErrorCodeOrderInvalidItem         ErrorCode = 3001
+	ErrorCodeOrderQuoteExpired        ErrorCode = 3006
 	ErrorCodeOrderStateConflict       ErrorCode = 3005
 	ErrorCodePermissionDenied         ErrorCode = 2002
 	ErrorCodeRequestTooLarge          ErrorCode = 1007
@@ -542,6 +543,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeOrderInsufficientStock:
 		return true
 	case ErrorCodeOrderInvalidItem:
+		return true
+	case ErrorCodeOrderQuoteExpired:
 		return true
 	case ErrorCodeOrderStateConflict:
 		return true
