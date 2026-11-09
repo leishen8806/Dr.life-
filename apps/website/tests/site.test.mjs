@@ -212,3 +212,10 @@ test("mobile Khmer display headings have an explicit no-clipping wrap guard", ()
   const css = source("styles/global.css");
   assert.match(css, /\[data-lang="km"\] \.hero h1,\[data-lang="km"\] \.subtitle,\[data-lang="km"\] \.merchant-hero \.section-title,\[data-lang="km"\] \.legal-page h1\{max-inline-size:100%;min-width:0;overflow-wrap:anywhere;word-break:break-word;letter-spacing:normal\}/);
 });
+
+test("homepage service chain keeps its alignment and light-section eyebrow contrast", () => {
+  const css = source("styles/global.css");
+  assert.match(css, /\.chain\{margin:64px auto 0\}/);
+  assert.match(css, /\.chain-note\{max-width:1280px;margin:32px auto 0\}/);
+  assert.match(css, /\.section--light \.eyebrow,\.section:not\(\.section--dark\) \.eyebrow\{color:var\(--deep-gold\)\}/);
+});
