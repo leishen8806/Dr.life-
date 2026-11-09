@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 	"github.com/leishen8806/Dr.life-/backend/internal/trade/kess"
 )
 
@@ -57,6 +59,19 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 	}
 	if err := goose.Up(database, migrations); err != nil {
 		t.Fatal(err)
+	}
+	for i, receivable := range []struct {
+		publicID string
+		amountE4 int64
+	}{
+		{"01ARZ3NDEKTSV4RRFFQ69G5FAT", 123400},
+		{"01ARZ3NDEKTSV4RRFFQ69G5FAV", 100},
+		{"01ARZ3NDEKTSV4RRFFQ69G5FAW", 100},
+		{"01ARZ3NDEKTSV4RRFFQ69G5FAX", 100},
+		{"01ARZ3NDEKTSV4RRFFQ69G5FAY", 10000},
+		{"01ARZ3NDEKTSV4RRFFQ69G5FAZ", 10000},
+	} {
+		seedKESSReceivableOrder(t, database, receivable.publicID, receivable.amountE4, int64(i+1))
 	}
 
 	pool, err := pgxpool.New(ctx, dsn)
@@ -250,12 +265,51 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 	})
 }
 
+func seedKESSReceivableOrder(t *testing.T, db *sql.DB, publicID string, amountE4, sequence int64) {
+	t.Helper()
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var buyerOrderID int64
+	if err := tx.QueryRow(`INSERT INTO trade.buyer_order
+		(public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		VALUES($1,$2,$3,$4,$5,$5,0,$5,now()+interval '1 hour') RETURNING id`,
+		publicID, sequence, "kess-fixture-"+publicID, fmt.Sprintf("%064x", sequence), amountE4).Scan(&buyerOrderID); err != nil {
+		t.Fatal(err)
+	}
+	var merchantOrderID int64
+	if err := tx.QueryRow(`INSERT INTO trade.merchant_order
+		(public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		VALUES($1,$2,$3,$4,$5,$5,0,$5,now()+interval '1 hour') RETURNING id`,
+		newKESSFixtureULID(t), buyerOrderID, sequence, "merchant-fixture", amountE4).Scan(&merchantOrderID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`INSERT INTO trade.order_line
+		(merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES($1,$2,1,$3,$3)`, merchantOrderID, newKESSFixtureULID(t), amountE4); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func assertPGError(t *testing.T, err error, code, message string) {
 	t.Helper()
 	var pgErr *pgconn.PgError
 	if !errors.As(err, &pgErr) || pgErr.Code != code || pgErr.Message != message {
 		t.Fatalf("error = %v, want PostgreSQL %s %q", err, code, message)
 	}
+}
+
+func newKESSFixtureULID(t *testing.T) string {
+	t.Helper()
+	value, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value
 }
 
 type persistedThenTimeout struct {
