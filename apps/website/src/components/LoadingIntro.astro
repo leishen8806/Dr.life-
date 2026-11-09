@@ -1,14 +1,12 @@
 ---
 import BrandWordmark from "./BrandWordmark.astro";
 ---
-<template id="site-loading-template">
-  <div class="site-loader" aria-hidden="true">
-    <div class="site-loader__mark">
-      <BrandWordmark class="site-loader__brand" />
-      <div class="site-loader__track"><span></span></div>
-    </div>
+<div class="site-loader" id="site-loading-intro" aria-hidden="true">
+  <div class="site-loader__mark">
+    <BrandWordmark class="site-loader__brand" />
+    <div class="site-loader__track"><span></span></div>
   </div>
-</template>
+</div>
 
 <script>
   import { initLoadingIntro } from "../scripts/loading-intro.mjs";
@@ -21,17 +19,16 @@ import BrandWordmark from "./BrandWordmark.astro";
     position: fixed;
     inset: 0;
     z-index: 9999;
-    display: grid;
+    display: none;
     place-items: center;
     background: radial-gradient(circle at 50% 42%, var(--graphite), var(--deep) 68%);
-    opacity: 0;
-    pointer-events: none;
+    opacity: 1;
+    pointer-events: auto;
     transition: opacity 180ms ease;
   }
 
-  .site-loader.is-visible {
-    opacity: 1;
-    pointer-events: auto;
+  :global(html.intro) .site-loader {
+    display: grid;
   }
 
   .site-loader.is-leaving {

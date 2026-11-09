@@ -1,42 +1,46 @@
-const SESSION_KEY = "drlife-loading-intro-seen";
-const SHOW_DELAY_MS = 300;
+const FONT_WAIT_MS = 600;
 const MAX_VISIBLE_MS = 1200;
 const FADE_MS = 180;
 
 export function initLoadingIntro(windowObject, documentObject) {
-  if (windowObject.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const overlay = documentObject.getElementById("site-loading-intro");
+  if (!overlay) return;
 
-  try {
-    if (windowObject.sessionStorage.getItem(SESSION_KEY)) return;
-  } catch {
-    // Storage can be unavailable in privacy modes; loading feedback still works.
+  let removed = false;
+  let hardTimer;
+  const remove = () => {
+    if (removed) return;
+    removed = true;
+    windowObject.clearTimeout(hardTimer);
+    overlay.remove();
+    documentObject.documentElement.classList.remove("intro");
+  };
+  if (!documentObject.documentElement.classList.contains("intro")) {
+    remove();
+    return;
   }
 
-  const template = documentObject.getElementById("site-loading-template");
-  if (!template?.content.firstElementChild) return;
-
-  let overlay;
-  const remove = () => overlay?.remove();
   const hide = () => {
-    if (!overlay || overlay.classList.contains("is-leaving")) return;
+    if (removed || overlay.classList.contains("is-leaving")) return;
     overlay.classList.add("is-leaving");
-    windowObject.setTimeout(remove, FADE_MS);
+    const remaining = Math.max(0, MAX_VISIBLE_MS - windowObject.performance.now());
+    windowObject.setTimeout(remove, Math.min(FADE_MS, remaining));
   };
-  const showTimer = windowObject.setTimeout(() => {
-    if (documentObject.readyState === "complete") return;
-    overlay = template.content.firstElementChild.cloneNode(true);
-    documentObject.body.append(overlay);
-    try {
-      windowObject.sessionStorage.setItem(SESSION_KEY, "1");
-    } catch {
-      // The overlay must never block the page when storage is unavailable.
-    }
-    windowObject.requestAnimationFrame(() => overlay?.classList.add("is-visible"));
-    windowObject.setTimeout(hide, MAX_VISIBLE_MS - FADE_MS);
-  }, SHOW_DELAY_MS);
 
-  windowObject.addEventListener("load", () => {
-    windowObject.clearTimeout(showTimer);
+  const finishAfterFonts = async () => {
+    const fontsReady = documentObject.fonts?.ready ?? Promise.resolve();
+    await Promise.race([
+      Promise.resolve(fontsReady).catch(() => undefined),
+      new Promise((resolve) => windowObject.setTimeout(resolve, FONT_WAIT_MS))
+    ]);
     hide();
-  }, { once: true });
+  };
+
+  const remaining = Math.max(0, MAX_VISIBLE_MS - windowObject.performance.now());
+  hardTimer = windowObject.setTimeout(remove, remaining);
+  if (documentObject.readyState === "loading") {
+    windowObject.addEventListener("DOMContentLoaded", finishAfterFonts, { once: true });
+  } else {
+    finishAfterFonts();
+  }
 }
