@@ -57,18 +57,18 @@ type OriginGroups struct {
 
 func DefaultOriginGroups(appEnv string) OriginGroups {
 	groups := OriginGroups{
-		Buyer:    []string{"https://miniapp.settlecore.org"},
-		Merchant: []string{"https://shop.settlecore.org"},
-		Driver:   []string{"https://driver.settlecore.org"},
-		WMS:      []string{"https://wms.settlecore.org"},
-		Admin:    []string{"https://admin.settlecore.org"},
+		Buyer:    []string{"https://miniapp.drlifeplus.com"},
+		Merchant: []string{"https://shop.drlifeplus.com"},
+		Driver:   []string{"https://driver.drlifeplus.com"},
+		WMS:      []string{"https://wms.drlifeplus.com"},
+		Admin:    []string{"https://admin.drlifeplus.com"},
 	}
 	groups.Public = append(groups.Public, groups.Buyer...)
 	groups.Public = append(groups.Public, groups.Merchant...)
 	groups.Public = append(groups.Public, groups.Driver...)
 	groups.Public = append(groups.Public, groups.WMS...)
 	groups.Public = append(groups.Public, groups.Admin...)
-	groups.Public = append(groups.Public, "https://settlecore.org")
+	groups.Public = append(groups.Public, "https://drlifeplus.com")
 	if appEnv == "dev" {
 		for _, origins := range []*[]string{&groups.Buyer, &groups.Merchant, &groups.Driver, &groups.WMS, &groups.Admin, &groups.Public} {
 			*origins = append(*origins, "http://localhost:5173")

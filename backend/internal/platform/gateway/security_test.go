@@ -29,10 +29,11 @@ func TestGroupedCORSSeparatesClients(t *testing.T) {
 		path, origin string
 		want         int
 	}{
-		{"/v1/buyer/x", "https://miniapp.settlecore.org", http.StatusNoContent},
-		{"/v1/merchant/x", "https://miniapp.settlecore.org", http.StatusForbidden},
-		{"/v1/public/ping", "https://settlecore.org", http.StatusNoContent},
-		{"/v1/admin/x", "https://settlecore.org", http.StatusForbidden},
+		{"/v1/buyer/x", "https://miniapp.drlifeplus.com", http.StatusNoContent},
+		{"/v1/merchant/x", "https://miniapp.drlifeplus.com", http.StatusForbidden},
+		{"/v1/public/ping", "https://drlifeplus.com", http.StatusNoContent},
+		{"/v1/admin/x", "https://drlifeplus.com", http.StatusForbidden},
+		{"/v1/buyer/x", "https://miniapp.settlecore.org", http.StatusForbidden},
 	}
 	for _, test := range tests {
 		request := httptest.NewRequest(http.MethodGet, test.path, nil)
@@ -44,7 +45,7 @@ func TestGroupedCORSSeparatesClients(t *testing.T) {
 		}
 	}
 	request := httptest.NewRequest(http.MethodOptions, "/v1/buyer/x", nil)
-	request.Header.Set("Origin", "https://miniapp.settlecore.org")
+	request.Header.Set("Origin", "https://miniapp.drlifeplus.com")
 	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -54,7 +55,7 @@ func TestGroupedCORSSeparatesClients(t *testing.T) {
 	groups.CredentialPaths = []string{"/v1/admin/auth/refresh"}
 	handler = GroupedCORS(groups)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
 	request = httptest.NewRequest(http.MethodPost, "/v1/admin/auth/refresh", nil)
-	request.Header.Set("Origin", "https://admin.settlecore.org")
+	request.Header.Set("Origin", "https://admin.drlifeplus.com")
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Header().Get("Access-Control-Allow-Credentials") != "true" {
@@ -63,16 +64,16 @@ func TestGroupedCORSSeparatesClients(t *testing.T) {
 }
 
 func TestAdminRefreshCSRFRequiresTrustedOriginAndRequestedWithHeader(t *testing.T) {
-	groups := OriginGroups{Admin: []string{"https://admin.settlecore.org"}}
+	groups := OriginGroups{Admin: []string{"https://admin.drlifeplus.com"}}
 	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	handler := RequireAdminRefreshCSRF(groups)(next)
 
 	for name, mutate := range map[string]func(*http.Request){
 		"missing origin":         func(_ *http.Request) {},
 		"untrusted origin":       func(r *http.Request) { r.Header.Set("Origin", "https://evil.example") },
-		"missing requested with": func(r *http.Request) { r.Header.Set("Origin", "https://admin.settlecore.org") },
+		"missing requested with": func(r *http.Request) { r.Header.Set("Origin", "https://admin.drlifeplus.com") },
 		"wrong requested with": func(r *http.Request) {
-			r.Header.Set("Origin", "https://admin.settlecore.org")
+			r.Header.Set("Origin", "https://admin.drlifeplus.com")
 			r.Header.Set("X-Requested-With", "other")
 		},
 	} {
@@ -88,7 +89,7 @@ func TestAdminRefreshCSRFRequiresTrustedOriginAndRequestedWithHeader(t *testing.
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/admin/auth/refresh", nil)
-	req.Header.Set("Origin", "https://admin.settlecore.org")
+	req.Header.Set("Origin", "https://admin.drlifeplus.com")
 	req.Header.Set("X-Requested-With", "drlife")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)

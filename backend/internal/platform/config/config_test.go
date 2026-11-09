@@ -53,7 +53,7 @@ func TestLoadDefaultsAndOptionalURLs(t *testing.T) {
 	if cfg.DatabaseURL != "" || cfg.IAMDatabaseURL != "" || cfg.ReportDatabaseURL != "" || cfg.RedisURL != "" || cfg.CacheRedisURL != "" || cfg.QueueRedisURL != "" {
 		t.Fatalf("optional URLs should be empty: %+v", cfg)
 	}
-	if len(cfg.CORSBuyerOrigins) != 2 || cfg.CORSBuyerOrigins[1] != "http://localhost:5173" || len(cfg.CORSPublicOrigins) != 7 || cfg.WebhookPrefix != "" || cfg.TrustedProxyHeader != "" || len(cfg.TrustedProxyCIDRs) != 0 {
+	if len(cfg.CORSBuyerOrigins) != 2 || cfg.CORSBuyerOrigins[0] != "https://miniapp.drlifeplus.com" || cfg.CORSBuyerOrigins[1] != "http://localhost:5173" || len(cfg.CORSPublicOrigins) != 7 || cfg.CORSPublicOrigins[5] != "https://drlifeplus.com" || cfg.WebhookPrefix != "" || cfg.TrustedProxyHeader != "" || len(cfg.TrustedProxyCIDRs) != 0 {
 		t.Fatalf("gateway trust defaults should be empty: %+v", cfg)
 	}
 	if cfg.RequestBodyMaxBytes != 64<<10 || cfg.WebhookMaxBodyBytes != 64<<10 || cfg.IdempotencyTTL != 24*time.Hour || cfg.IdempotencyMaxBytes != 64<<10 || len(cfg.FinancialPrefixes) != 4 {

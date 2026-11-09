@@ -109,7 +109,7 @@ jobs:
           chmod 600 "$key" "$known_hosts"
           remote="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$known_hosts"
           target="$WEBSITE_DEPLOY_USER@$WEBSITE_DEPLOY_HOST"
-          $remote "$target" "mkdir -p /srv/settlecore/incoming/$release_id"
+          $remote "$target" "mkdir -p /srv/drlifeplus/incoming/$release_id"
           rsync -a --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
-            -e "$remote" website-dist/ "$target:/srv/settlecore/incoming/$release_id/"
-          $remote "$target" "sudo /usr/local/sbin/settlecore-website-publish $release_id"
+            -e "$remote" website-dist/ "$target:/srv/drlifeplus/incoming/$release_id/"
+          $remote "$target" "sudo /usr/local/sbin/drlifeplus-website-publish $release_id"

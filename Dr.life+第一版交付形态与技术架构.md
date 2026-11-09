@@ -171,7 +171,7 @@
 | 实时推送 | **SSE（服务端事件流）**为主 | 比 WebSocket 简单，穿过 CDN 容易；只需服务端 → 页面单向推送 | 需要双向时再上 WebSocket |
 | Mini App 前端 | **React + Vite + TypeScript**，Telegram 官方 SDK；pnpm monorepo，三个应用（买家/商家/司机）共用 UI 组件、接口客户端、多语言词条 | 对接 Telegram 的返回键、主按钮、主题最成熟；共用代码最多 | 构建产物是静态文件，放 CDN |
 | 管理后台（`admin`、`wms`） | **React + Ant Design（Pro Table）** | 表格、筛选、抽屉、权限路由现成，贴合原型的 PC 布局 | 与 Mini App 共用接口客户端与词条 |
-| 官网（`settlecore.org`） | **静态站点生成（Astro）**，内容来自后台已发布的协议与政策，发布时自动重新生成并推 CDN | 纯静态、快、安全；符合"同一份已发布版本" | 官网不处理登录与交易 |
+| 官网（`drlifeplus.com`） | **静态站点生成（Astro）**，内容来自后台已发布的协议与政策，发布时自动重新生成并推 CDN | 纯静态、快、安全；符合"同一份已发布版本" | 官网不处理登录与交易 |
 | 接口规范 | **OpenAPI 3，先写规范再生成**：`oapi-codegen` 生成 Go 服务端接口，`openapi-typescript` 生成前端客户端和类型 | 前后端分离不会对不上；换接口时编译期报错；也方便 Codex 等开发助手按规范实现 | 接口带版本 `/v1/` |
 | Telegram Bot | **Go 的 Bot API 库（`gotgbot` 或 `go-telegram/bot`，PoC 时二选一）** + **Webhook 模式**；Bot 池的令牌加密存库 | 与后端同一进程内的模块，不另起服务；Webhook 不占长连接 | 每个端一个 Bot 池，按第二章流程校验 initData |
 | AI 网关 | **Go 自研薄适配层，统一用"OpenAI 兼容协议"调用**（DeepSeek、ChatGPT、Ollama 都支持该协议），Claude 等不兼容的写专用适配器 | 三个已开通的接口用同一个客户端，只换地址、密钥、模型名；容易做优先级、超时、回退 | 优先级、预算、开关存数据库，后台可调 |
@@ -220,33 +220,37 @@
 
 ## 七、域名规划（已确认）
 
-主域名：`settlecore.org`
+主域名：`drlifeplus.com`
+
+备用域名：`settlecore.org`，只保留为入口并将原路径和查询参数 301 跳转到 `https://drlifeplus.com`，不再承载官网或业务子域名。
 
 | 域名 | 用途 | 说明 |
 |---|---|---|
-| `settlecore.org` | **公开官网** | 介绍、隐私政策、用户协议、联系方式；所有 Bot 的隐私政策链接指向这里 |
-| `miniapp.settlecore.org` | **买家端** Mini App | 买家 Bot 的 Mini App 地址 |
-| `shop.settlecore.org` | **商家端** Mini App | 商家 Bot 的 Mini App 地址 |
-| `driver.settlecore.org` | **司机端** Mini App | 司机 Bot 的 Mini App 地址 |
-| `wms.settlecore.org` | **物流仓储** Web（PC） | 仓库、物流人员登录 |
-| `admin.settlecore.org` | **平台端** Web（PC） | 运营、财务、审计、客服 |
-| `adminapi.settlecore.org` | **统一 API 网关（所有端共用）** | 三个 Mini App、物流仓储 Web、平台 Web 全部通过它读写数据；按路径和权限区分。名字里带 admin，但**不是只给后台用**；不再另设 `api` 域名 |
+| `drlifeplus.com` | **公开官网** | 介绍、隐私政策、用户协议、联系方式；所有 Bot 的隐私政策链接指向这里 |
+| `miniapp.drlifeplus.com` | **买家端** Mini App | 买家 Bot 的 Mini App 地址 |
+| `shop.drlifeplus.com` | **商家端** Mini App | 商家 Bot 的 Mini App 地址 |
+| `driver.drlifeplus.com` | **司机端** Mini App | 司机 Bot 的 Mini App 地址 |
+| `wms.drlifeplus.com` | **物流仓储** Web（PC） | 仓库、物流人员登录 |
+| `admin.drlifeplus.com` | **平台端** Web（PC） | 运营、财务、审计、客服 |
+| `adminapi.drlifeplus.com` | **统一 API 网关（所有端共用）** | 三个 Mini App、物流仓储 Web、平台 Web 全部通过它读写数据；按路径和权限区分。名字里带 admin，但**不是只给后台用**；不再另设 `api` 域名 |
+| `test.drlifeplus.com` | **测试环境预留** | 使用独立 Bot、密钥和数据，不进入生产 CORS 白名单 |
+| `staging.drlifeplus.com` | **预发布环境预留** | 使用独立 Bot、密钥和数据，不进入生产 CORS 白名单 |
 
-**API 路径与权限（示例，域名统一为 `adminapi.settlecore.org`）：** `/v1/buyer/*`、`/v1/merchant/*`、`/v1/driver/*`、`/v1/wms/*`、`/v1/admin/*`、公共的 `/v1/public/*`（分类、搜索热词等）。网关按登录凭证判断角色，**路径与角色不匹配一律拒绝**（买家令牌访问 `/v1/admin/*` 直接 403）；后台路径（`/v1/admin/*`、`/v1/wms/*`）只接受来自 `admin`、`wms` 前端的请求并校验来源；因为所有端共用一个域名，**后台的更严规则（IP 白名单、双因素、更严限流）按路径加在网关上，而不是按域名**。
+**API 路径与权限（示例，域名统一为 `adminapi.drlifeplus.com`）：** `/v1/buyer/*`、`/v1/merchant/*`、`/v1/driver/*`、`/v1/wms/*`、`/v1/admin/*`、公共的 `/v1/public/*`（分类、搜索热词等）。网关按登录凭证判断角色，**路径与角色不匹配一律拒绝**（买家令牌访问 `/v1/admin/*` 直接 403）；后台路径（`/v1/admin/*`、`/v1/wms/*`）只接受来自 `admin`、`wms` 前端的请求并校验来源；因为所有端共用一个域名，**后台的更严规则（IP 白名单、双因素、更严限流）按路径加在网关上，而不是按域名**。
 
 **技术约定：**
 1. **全部 HTTPS**（Telegram Mini App 强制要求），证书自动续期；三个 Mini App 地址分别配置到对应 Bot 池的每个 Bot（主 Bot 和备用 Bot 都指向同一个域名，换 Bot 不换地址）。
 2. **前端与接口分域：** 各前端域名只放静态页面，数据一律走 `adminapi`；接口开启跨域白名单，只允许上表的前端域名访问。
-3. **Cookie 与会话互相隔离：** 平台端、物流仓储 Web 的登录凭证只在各自域名下有效，**不要把 Cookie 设成整个 `.settlecore.org`**；Mini App 用令牌而不是 Cookie。
+3. **Cookie 与会话互相隔离：** 平台端、物流仓储 Web 的登录凭证只在各自域名下有效，**不要把 Cookie 设成整个 `.drlifeplus.com`**；Mini App 用令牌而不是 Cookie。
 4. **平台端 `admin` 加固：** 双因素、IP 白名单（或经办公网络/VPN）、登录失败限流；`/v1/admin/*` 在网关上单独限制来源 IP，不对公网开放全部路径。
 5. **防护：** 前面放 CDN/WAF，开启限流和机器人防护；预留 `test`/`staging` 子域名做测试环境，测试环境使用独立的 Bot 和密钥，不与正式混用。
-6. **域名安全：** 开启域名锁和注册商双因素；子域名不用时及时删除解析（防止被接管）；建议提前注册一个备用域名（主域名被封时，Mini App 可切到备用域名，Bot 池和账号数据不受影响）。
-7. **品牌与信任：** 域名 `settlecore` 与 DR.LIFE+ 不直接相关，用户在 Telegram 里点开时会看到这个域名，所以官网首页、Bot 欢迎语、页面标题都要明确写 DR.LIFE+。
+6. **域名安全：** 开启域名锁和注册商双因素；子域名不用时及时删除解析（防止被接管）；`settlecore.org` 作为备用域名保留，只做 301 跳转，不配置业务子域名。
+7. **品牌与信任：** `drlifeplus.com` 与 DR.LIFE+ 品牌一致；官网首页、Bot 欢迎语和页面标题仍需明确写 DR.LIFE+。
 
-**公开官网 `settlecore.org`（必须有）：**
+**公开官网 `drlifeplus.com`（必须有）：**
 - **固定公开网址（供 Bot 和 Mini App 引用）：**
-  - 隐私政策：`https://settlecore.org/privacy`（中文 / English / ខ្មែរ 三语，可用 `?lang=` 切换）
-  - 用户协议：`https://settlecore.org/terms`（三语）
+  - 隐私政策：`https://drlifeplus.com/privacy`（中文 / English / ខ្មែរ 三语，可用 `?lang=` 切换）
+  - 用户协议：`https://drlifeplus.com/terms`（三语）
   - 另建议：`/delete-account`（账号与数据删除说明）、`/contact`（联系与投诉）、商户入驻指引、费用说明（仓储费、0% 佣金）。
 - **每个 Bot 都要填隐私政策链接**（在 BotFather 里设置），指向同一个网址；Mini App 首次进入时展示协议并让用户同意，**同意记录要带协议版本号和时间**（对应 PRD 的合规文件与同意记录）。
 - **文件要有版本号和生效日期**，更新时保留历史版本；金融授权、数据共享等单独同意项不放进通用协议里。
@@ -262,7 +266,7 @@
 
 ## 八、需要确认的事项
 
-已确认（本章不再列）：目标用户都在用 Telegram；每个端至少一个主 Bot、令牌由平台保管；开通 DeepSeek、ChatGPT，密钥由平台保管，Ollama 在局域网另一台服务器；域名清单（统一 API 网关为 adminapi.settlecore.org）、官网。
+已确认（本章不再列）：目标用户都在用 Telegram；每个端至少一个主 Bot、令牌由平台保管；开通 DeepSeek、ChatGPT，密钥由平台保管，Ollama 在局域网另一台服务器；域名清单（统一 API 网关为 adminapi.drlifeplus.com）、官网。
 
 仍待确认：
 1. ~~备用 Bot~~ **已定：正式上线后每个端主 Bot + 备用 Bot 各一个。**

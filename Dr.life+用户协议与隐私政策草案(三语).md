@@ -2,7 +2,7 @@
 
 **版本：** 1.0　**生效日期：** 2026-10-09（示例）
 
-> **这是草案，不是法律文件。** 方括号 `[ ]` 里的内容必须由公司填写或由律师确认（运营主体、服务器所在地、聊天原文保存期限、未成年人年龄、管辖法院、费用口径等）。**高棉语和英文由我据中文草拟，必须请母语人士和律师审校。** 定稿后在平台后台「运营 → 协议与政策」里编辑发布，官网 settlecore.org/terms、/privacy 读取同一份已发布版本。
+> **这是草案，不是法律文件。** 方括号 `[ ]` 里的内容必须由公司填写或由律师确认（运营主体、服务器所在地、聊天原文保存期限、未成年人年龄、管辖法院、费用口径等）。**高棉语和英文由我据中文草拟，必须请母语人士和律师审校。** 定稿后在平台后台「运营 → 协议与政策」里编辑发布，官网 drlifeplus.com/terms、/privacy 读取同一份已发布版本。
 
 ## 与产品事实一致的关键点（审校时重点核对）
 
@@ -61,7 +61,7 @@ AI 的回答仅供参考，不构成金融或法律建议。每月有免费使�
 本协议适用柬埔寨王国法律。争议先协商解决，协商不成的，提交 [有管辖权的法院，须律师确认]。
 
 14. 联系我们
-https://settlecore.org/contact
+https://drlifeplus.com/contact
 ```
 
 ### 用户协议 · English
@@ -110,7 +110,7 @@ This agreement carries a version number and an effective date. After a new versi
 This agreement is governed by the laws of the Kingdom of Cambodia. Disputes are first resolved by negotiation, failing which they go to [competent court, to be confirmed by a lawyer].
 
 14. Contact us
-https://settlecore.org/contact
+https://drlifeplus.com/contact
 ```
 
 ### 用户协议 · ខ្មែរ
@@ -159,7 +159,7 @@ DR.LIFE+ (ហៅថា «វេទិកា») ផ្តល់សេវាតា
 កិច្ចព្រមព្រៀងនេះអនុវត្តតាមច្បាប់នៃព្រះរាជាណាចក្រកម្ពុជា។ វិវាទត្រូវដោះស្រាយដោយការចរចាជាមុន បើមិនបានទេ ត្រូវបញ្ជូនទៅ [តុលាការមានសមត្ថកិច្ច ត្រូវបញ្ជាក់ដោយអ្នកច្បាប់]។
 
 ១៤. ទំនាក់ទំនងយើង
-https://settlecore.org/contact
+https://drlifeplus.com/contact
 ```
 
 ## 隐私政策
@@ -171,7 +171,7 @@ DR.LIFE+ 隐私政策
 版本 1.0 · 生效日期 2026-10-09
 
 1. 我们是谁
-本政策适用于 DR.LIFE+（以下简称“我们”）的买家、商家、司机 Mini App 及相关服务。运营主体：[公司名称，须填写]；联系方式：https://settlecore.org/contact。
+本政策适用于 DR.LIFE+（以下简称“我们”）的买家、商家、司机 Mini App 及相关服务。运营主体：[公司名称，须填写]；联系方式：https://drlifeplus.com/contact。
 
 2. 我们收集哪些信息
 ① Telegram 用户编号、昵称、界面语言；② 你提供的资料：姓名、手机号、地址、企业资料；③ 交易与资金记录：订单、KESS 支付意向与查单结果、托管记录、钱包流水、提现账户；历史 `payment_proof` 仅为旧数据，不再新增；④ 使用信息：设备、页面访问、点击等（用匿名编号记录）；⑤ AI 聊天内容，以及由此总结的基础信息和兴趣标签；⑥ 你上传的照片和凭证；⑦ 司机端在执行任务期间的位置。
@@ -207,7 +207,7 @@ AI 聊天会记录你的基础信息（如城市、房屋类型、面积、预�
 本政策带有版本号和生效日期。发布新版本后，你会被要求重新阅读并同意。
 
 13. 联系与投诉
-https://settlecore.org/contact
+https://drlifeplus.com/contact
 ```
 
 ### 隐私政策 · English
@@ -217,7 +217,7 @@ DR.LIFE+ Privacy Policy
 Version 1.0 · Effective 2026-10-09
 
 1. Who we are
-This policy applies to the buyer, merchant and driver Mini Apps and related services of DR.LIFE+ (“we”). Operator: [company name, to be filled in]. Contact: https://settlecore.org/contact.
+This policy applies to the buyer, merchant and driver Mini Apps and related services of DR.LIFE+ (“we”). Operator: [company name, to be filled in]. Contact: https://drlifeplus.com/contact.
 
 2. What we collect
 (1) Telegram user ID, name and interface language; (2) information you provide: name, phone number, address, business details; (3) transaction and funds records: orders, KESS payment intents and query results, holds, wallet entries and withdrawal accounts; historical `payment_proof` records are retained but no longer created; (4) usage information: device, page views and clicks (recorded under a pseudonymous ID); (5) AI chat content and the basic information and interest tags summarised from it; (6) photos and proofs you upload; (7) drivers’ location while performing tasks.
@@ -253,7 +253,7 @@ We send order and funds notifications through Telegram bots; marketing notificat
 This policy carries a version number and an effective date. After a new version is published you will be asked to read and agree again.
 
 13. Contact and complaints
-https://settlecore.org/contact
+https://drlifeplus.com/contact
 ```
 
 ### 隐私政策 · ខ្មែរ
@@ -263,7 +263,7 @@ https://settlecore.org/contact
 កំណែ 1.0 · មានប្រសិទ្ធភាព 2026-10-09
 
 ១. យើងជានរណា
-គោលការណ៍នេះអនុវត្តចំពោះ Mini App អ្នកទិញ អ្នកលក់ អ្នកបើកបរ និងសេវាពាក់ព័ន្ធរបស់ DR.LIFE+ (ហៅថា «យើង»)។ ប្រតិបត្តិករ៖ [ឈ្មោះក្រុមហ៊ុន ត្រូវបំពេញ]។ ទំនាក់ទំនង៖ https://settlecore.org/contact។
+គោលការណ៍នេះអនុវត្តចំពោះ Mini App អ្នកទិញ អ្នកលក់ អ្នកបើកបរ និងសេវាពាក់ព័ន្ធរបស់ DR.LIFE+ (ហៅថា «យើង»)។ ប្រតិបត្តិករ៖ [ឈ្មោះក្រុមហ៊ុន ត្រូវបំពេញ]។ ទំនាក់ទំនង៖ https://drlifeplus.com/contact។
 
 ២. ព័ត៌មានដែលយើងប្រមូល
 ១) លេខអ្នកប្រើ Telegram ឈ្មោះ និងភាសា ២) ព័ត៌មានដែលអ្នកផ្តល់៖ ឈ្មោះ លេខទូរស័ព្ទ អាសយដ្ឋាន ព័ត៌មានអាជីវកម្ម ៣) កំណត់ត្រាប្រតិបត្តិការ និងប្រាក់៖ ការបញ្ជាទិញ បំណងបង់ប្រាក់ KESS និងលទ្ធផលសាកសួរ កំណត់ត្រាប្រាក់ធានា ចលនាកាបូប និងគណនីដកប្រាក់; កំណត់ត្រា `payment_proof` ចាស់ត្រូវបានរក្សាទុក ប៉ុន្តែមិនបង្កើតថ្មីទៀតទេ ៤) ព័ត៌មានប្រើប្រាស់៖ ឧបករណ៍ ទំព័រដែលបានមើល ការចុច (កត់ត្រាដោយលេខអនាមិក) ៥) ខ្លឹមសារជជែកជាមួយ AI និងព័ត៌មានមូលដ្ឋាន និងស្លាកចំណូលចិត្តដែលសង្ខេបពីវា ៦) រូបថត និងភស្តុតាងដែលអ្នកផ្ទុកឡើង ៧) ទីតាំងរបស់អ្នកបើកបរក្នុងអំឡុងពេលអនុវត្តភារកិច្ច។
@@ -299,5 +299,5 @@ https://settlecore.org/contact
 គោលការណ៍នេះមានលេខកំណែ និងកាលបរិច្ឆេទមានប្រសិទ្ធភាព។ ពេលមានកំណែថ្មី អ្នកនឹងត្រូវបានស្នើឱ្យអាន និងយល់ព្រមម្តងទៀត។
 
 ១៣. ទំនាក់ទំនង និងបណ្តឹង
-https://settlecore.org/contact
+https://drlifeplus.com/contact
 ```
