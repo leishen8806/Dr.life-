@@ -217,5 +217,6 @@ test("homepage service chain keeps its alignment and light-section eyebrow contr
   const css = source("styles/global.css");
   assert.match(css, /\.chain\{margin:64px auto 0\}/);
   assert.match(css, /\.chain-note\{max-width:1280px;margin:32px auto 0\}/);
-  assert.match(css, /\.section--light \.eyebrow,\.section:not\(\.section--dark\) \.eyebrow\{color:var\(--deep-gold\)\}/);
+  assert.match(css, /:root\{--gold-text:#6f5a35\}/);
+  assert.match(css, /\.section--light \.eyebrow,\.section:not\(\.section--dark\) \.eyebrow\{color:var\(--gold-text\)\}/);
 });

@@ -24,6 +24,7 @@
  @media(max-width:360px){.header-actions .languages{display:none}.mobile-menu-languages{display:flex}}
  @media(min-width:361px){.mobile-menu-languages{display:none}}
 /* Keep the homepage service chain and its note in the same readable container. */
-.section--light .eyebrow,.section:not(.section--dark) .eyebrow{color:var(--deep-gold)}
+.section--light .eyebrow,.section:not(.section--dark) .eyebrow{color:var(--gold-text)}
+:root{--gold-text:#6f5a35}
 .chain{margin:64px auto 0}
 .chain-note{max-width:1280px;margin:32px auto 0}
