@@ -42,6 +42,7 @@ const (
 	CodeOrderCancelledOrReleased ErrorCode = 3003
 	CodeOrderAmountMismatch      ErrorCode = 3004
 	CodeOrderStateConflict       ErrorCode = 3005
+	CodeOrderQuoteExpired        ErrorCode = 3006
 	CodeWebhookInvalid           ErrorCode = 7001
 )
 
@@ -86,6 +87,7 @@ var appErrors = map[ErrorCode]AppError{
 	CodeOrderCancelledOrReleased: {Code: CodeOrderCancelledOrReleased, StatusCode: http.StatusConflict, Message: Messages{ZH: "订单已取消或库存已释放", EN: "Order was cancelled or its stock was released", KM: "Order was cancelled or its stock was released"}},
 	CodeOrderAmountMismatch:      {Code: CodeOrderAmountMismatch, StatusCode: http.StatusConflict, Message: Messages{ZH: "付款金额与订单不符", EN: "Payment amount does not match the order", KM: "Payment amount does not match the order"}},
 	CodeOrderStateConflict:       {Code: CodeOrderStateConflict, StatusCode: http.StatusConflict, Message: Messages{ZH: "订单状态不允许此操作；付款确认中请稍后", EN: "The order state does not allow this action; payment confirmation may be in progress", KM: "The order state does not allow this action; payment confirmation may be in progress"}},
+	CodeOrderQuoteExpired:        {Code: CodeOrderQuoteExpired, StatusCode: http.StatusConflict, Message: Messages{ZH: "运费报价已过期，请重新下单或刷新报价", EN: "The shipping quote expired; refresh the quote or place the order again", KM: "តម្លៃដឹកជញ្ជូនបានផុតកំណត់។ សូមធ្វើបច្ចុប្បន្នភាពតម្លៃ ឬបញ្ជាទិញម្តងទៀត។"}},
 	CodeWebhookInvalid:           {Code: CodeWebhookInvalid, StatusCode: http.StatusUnauthorized, Message: Messages{ZH: "回调验证失败", EN: "Webhook verification failed", KM: "Webhook verification failed"}},
 }
 

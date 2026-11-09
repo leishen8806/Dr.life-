@@ -36,6 +36,7 @@ const serverMessageKeys = {
   3003: "error.3003",
   3004: "error.3004",
   3005: "error.3005",
+  3006: "error.3006",
   7001: "error.7001"
 } satisfies Record<components["schemas"]["ErrorCode"], TranslationKey>;
 

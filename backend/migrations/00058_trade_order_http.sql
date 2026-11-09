@@ -33,6 +33,12 @@ ALTER TABLE trade.merchant_order ADD CONSTRAINT ck_trade_merchant_order_amounts 
     payable_amount_e4 = goods_amount_e4 + shipping_amount_e4);
 
 ALTER TABLE trade.kess_payment_intent ADD COLUMN expires_at timestamptz;
+ALTER TABLE trade.kess_payment_intent DROP CONSTRAINT kess_payment_intent_status_check;
+ALTER TABLE trade.kess_payment_intent ADD CONSTRAINT kess_payment_intent_status_check CHECK (
+    status IN ('PENDING','WAITING','SUCCESS','FAILED','CLOSED','UNKNOWN','REVIEW','REFUND','INVALIDATED'));
+CREATE UNIQUE INDEX ux_kess_payment_intent_one_active_order
+    ON trade.kess_payment_intent (source_ref)
+    WHERE status IN ('PENDING','WAITING','UNKNOWN','REVIEW');
 SET CONSTRAINTS ALL DEFERRED;
 
 -- +goose StatementBegin
@@ -168,6 +174,10 @@ $$;
 
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION trade.guard_kess_payment_intent() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+    order_payable_e4 bigint;
+    order_released boolean;
+    order_payable boolean;
 BEGIN
     IF TG_OP = 'INSERT' THEN
         IF NEW.status <> 'PENDING' OR NEW.create_attempts <> 0 OR NEW.channel_status IS NOT NULL
@@ -175,6 +185,15 @@ BEGIN
            OR NEW.create_sent_at IS NOT NULL OR NEW.last_checked_at IS NOT NULL THEN
             RAISE EXCEPTION 'invalid initial kess payment intent state' USING ERRCODE = 'P0001';
         END IF;
+        SELECT payable_amount_e4,reservation_released_at IS NOT NULL OR refund_required_at IS NOT NULL
+          INTO order_payable_e4,order_released
+          FROM trade.buyer_order WHERE public_id=NEW.source_ref FOR UPDATE;
+        IF NOT FOUND THEN RAISE EXCEPTION 'payment intent parent order not found' USING ERRCODE='23503'; END IF;
+        SELECT EXISTS(SELECT 1 FROM trade.merchant_order WHERE buyer_order_id=(SELECT id FROM trade.buyer_order WHERE public_id=NEW.source_ref))
+           AND NOT EXISTS(SELECT 1 FROM trade.merchant_order WHERE buyer_order_id=(SELECT id FROM trade.buyer_order WHERE public_id=NEW.source_ref) AND status<>'awaiting_payment')
+          INTO order_payable;
+        IF order_released OR NOT order_payable THEN RAISE EXCEPTION 'order reservation already released' USING ERRCODE='TR001'; END IF;
+        IF NEW.amount_e4 IS DISTINCT FROM order_payable_e4 THEN RAISE EXCEPTION 'payment intent amount does not match order payable total' USING ERRCODE='TR002'; END IF;
         RETURN NEW;
     END IF;
     IF NEW.public_id <> OLD.public_id OR NEW.company_id <> OLD.company_id OR NEW.channel <> OLD.channel
@@ -188,7 +207,9 @@ BEGIN
         OR (OLD.status='UNKNOWN' AND NEW.status IN ('WAITING','SUCCESS','FAILED','CLOSED','UNKNOWN','REFUND'))
         OR (OLD.status='REVIEW' AND NEW.status IN ('REVIEW','SUCCESS','REFUND'))
         OR (OLD.status='SUCCESS' AND NEW.status IN ('SUCCESS','REFUND'))
-        OR (OLD.status IN ('FAILED','CLOSED','REFUND') AND NEW.status=OLD.status)) THEN
+        OR (OLD.status='INVALIDATED' AND NEW.status IN ('INVALIDATED','SUCCESS','CLOSED','REFUND'))
+        OR (OLD.status IN ('FAILED','CLOSED','REFUND') AND NEW.status=OLD.status)
+        OR (OLD.status IN ('PENDING','WAITING') AND NEW.status='INVALIDATED')) THEN
         RAISE EXCEPTION 'invalid kess payment intent status transition' USING ERRCODE = 'P0001';
     END IF;
     NEW.updated_at := now();
@@ -198,27 +219,33 @@ $$;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+DROP FUNCTION trade.confirm_order_payment(text,text,bigint);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION trade.confirm_order_payment(p_public_id text, p_source_ref text, p_paid_amount_e4 bigint)
-RETURNS TABLE (reservation_key text, applied boolean, reconciliation_required boolean)
+RETURNS TABLE (reservation_key text, applied boolean, reconciliation_required boolean, error_code text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, trade AS $$
 DECLARE
     target_id bigint; target_buyer_id bigint; target_idempotency_key text; target_payable_e4 bigint;
     target_released_at timestamptz; target_committed_at timestamptz; target_refund_required_at timestamptz;
     target_reservation_key text; source_owner_id bigint; source_was_known boolean; source_was_applied boolean;
-    source_requires_reconciliation boolean; different_source boolean; child_count integer; awaiting_count integer; cancelled_count integer;
+    source_requires_reconciliation boolean; child_count integer; awaiting_count integer; cancelled_count integer;
 BEGIN
     IF p_source_ref IS NULL OR length(btrim(p_source_ref))=0 THEN RAISE EXCEPTION 'payment source is required' USING ERRCODE='23514'; END IF;
     SELECT id,buyer_account_id,idempotency_key,payable_amount_e4,reservation_released_at,reservation_committed_at,refund_required_at
       INTO target_id,target_buyer_id,target_idempotency_key,target_payable_e4,target_released_at,target_committed_at,target_refund_required_at
       FROM trade.buyer_order WHERE public_id=p_public_id FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION 'buyer order not found' USING ERRCODE='23514'; END IF;
-    SELECT EXISTS(SELECT 1 FROM trade.order_event_source WHERE buyer_order_id=target_id AND source_type='kess_result' AND source_ref<>p_source_ref) INTO different_source;
-    IF different_source AND (p_paid_amount_e4 IS DISTINCT FROM target_payable_e4 OR target_released_at IS NOT NULL OR target_refund_required_at IS NOT NULL) THEN
+    target_reservation_key := target_buyer_id || ':' || target_idempotency_key; reservation_key := target_reservation_key;
+    IF target_released_at IS NOT NULL OR target_refund_required_at IS NOT NULL THEN
         INSERT INTO trade.payment_reconciliation_task (buyer_order_id,source_ref,paid_amount_e4) VALUES (target_id,p_source_ref,p_paid_amount_e4) ON CONFLICT (source_ref) DO NOTHING;
-        reservation_key := target_buyer_id || ':' || target_idempotency_key; applied := false; reconciliation_required := true; RETURN NEXT; RETURN;
+        applied := false; reconciliation_required := true; error_code := 'TR001'; RETURN NEXT; RETURN;
     END IF;
-    IF target_released_at IS NOT NULL OR target_refund_required_at IS NOT NULL THEN RAISE EXCEPTION 'order reservation already released' USING ERRCODE='TR001'; END IF;
-    IF p_paid_amount_e4 IS DISTINCT FROM target_payable_e4 THEN RAISE EXCEPTION 'paid amount does not match order total' USING ERRCODE='TR002'; END IF;
+    IF p_paid_amount_e4 IS DISTINCT FROM target_payable_e4 THEN
+        INSERT INTO trade.payment_reconciliation_task (buyer_order_id,source_ref,paid_amount_e4) VALUES (target_id,p_source_ref,p_paid_amount_e4) ON CONFLICT (source_ref) DO NOTHING;
+        applied := false; reconciliation_required := true; error_code := 'TR002'; RETURN NEXT; RETURN;
+    END IF;
     SELECT buyer_order_id INTO source_owner_id FROM trade.order_event_source WHERE source_type='kess_result' AND source_ref=p_source_ref;
     source_was_known := FOUND;
     IF source_was_known AND source_owner_id IS DISTINCT FROM target_id THEN RAISE EXCEPTION 'payment source belongs to another order' USING ERRCODE='23514'; END IF;
@@ -230,16 +257,18 @@ BEGIN
     SELECT EXISTS(SELECT 1 FROM trade.order_event WHERE buyer_order_id=target_id AND source_type='kess_result' AND source_ref=p_source_ref AND from_status='awaiting_payment' AND to_status='paid') INTO source_was_applied;
     SELECT EXISTS(SELECT 1 FROM trade.payment_reconciliation_task WHERE buyer_order_id=target_id AND source_ref=p_source_ref) INTO source_requires_reconciliation;
     SELECT count(*),count(*) FILTER (WHERE status='awaiting_payment'),count(*) FILTER (WHERE status='cancelled') INTO child_count,awaiting_count,cancelled_count FROM trade.merchant_order WHERE buyer_order_id=target_id;
-    IF cancelled_count>0 THEN RAISE EXCEPTION 'order reservation already released' USING ERRCODE='TR001'; END IF;
+    IF cancelled_count>0 THEN
+        INSERT INTO trade.payment_reconciliation_task (buyer_order_id,source_ref,paid_amount_e4) VALUES (target_id,p_source_ref,p_paid_amount_e4) ON CONFLICT (source_ref) DO NOTHING;
+        applied := false; reconciliation_required := true; error_code := 'TR001'; RETURN NEXT; RETURN;
+    END IF;
     IF child_count=0 THEN RAISE EXCEPTION 'parent payment requires one consistent child batch' USING ERRCODE='23514'; END IF;
-    target_reservation_key := target_buyer_id || ':' || target_idempotency_key; reservation_key := target_reservation_key;
     IF source_was_applied THEN
         IF target_committed_at IS NULL THEN INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason) VALUES (target_reservation_key,'commit','payment_confirmed') ON CONFLICT DO NOTHING; END IF;
-        applied:=false; reconciliation_required:=false; RETURN NEXT; RETURN;
+        applied:=false; reconciliation_required:=false; error_code:=''; RETURN NEXT; RETURN;
     END IF;
     IF source_requires_reconciliation OR awaiting_count<>child_count THEN
         INSERT INTO trade.payment_reconciliation_task (buyer_order_id,source_ref,paid_amount_e4) VALUES (target_id,p_source_ref,p_paid_amount_e4) ON CONFLICT (source_ref) DO NOTHING;
-        applied:=false; reconciliation_required:=true; RETURN NEXT; RETURN;
+        applied:=false; reconciliation_required:=true; error_code:=''; RETURN NEXT; RETURN;
     END IF;
     INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason) VALUES (target_reservation_key,'commit','payment_confirmed') ON CONFLICT DO NOTHING;
     INSERT INTO trade.payment_transition_guard (txid,buyer_order_id) VALUES (txid_current(),target_id);
@@ -247,17 +276,28 @@ BEGIN
       SELECT id,target_id,'awaiting_payment','paid','kess_result',p_source_ref FROM trade.merchant_order WHERE buyer_order_id=target_id ORDER BY id;
     UPDATE trade.merchant_order SET status='paid',version=version+1,updated_at=clock_timestamp() WHERE buyer_order_id=target_id;
     DELETE FROM trade.payment_transition_guard WHERE txid=txid_current() AND buyer_order_id=target_id;
-    applied:=true; reconciliation_required:=false; RETURN NEXT;
+    applied:=true; reconciliation_required:=false; error_code:=''; RETURN NEXT;
 END;
 $$;
 -- +goose StatementEnd
 
 -- New order facts are immutable, but runtime roles need to insert and read them.
 GRANT SELECT, INSERT ON trade.buyer_order, trade.merchant_order TO trade_rw;
-GRANT SELECT ON trade.buyer_order, trade.merchant_order TO report_ro;
+REVOKE ALL ON trade.buyer_order, trade.merchant_order FROM report_ro;
+GRANT SELECT (id,public_id,buyer_account_id,total_e4,reservation_released_at,reservation_committed_at,refund_required_at,created_at,updated_at,
+    goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at) ON trade.buyer_order TO report_ro;
+GRANT SELECT (id,public_id,buyer_order_id,merchant_id,external_order_id,status,total_e4,version,created_at,updated_at,
+    merchant_public_id,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at) ON trade.merchant_order TO report_ro;
 GRANT SELECT (expires_at) ON trade.kess_payment_intent TO report_ro;
+REVOKE EXECUTE ON FUNCTION trade.confirm_order_payment(text,text,bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION trade.confirm_order_payment(text,text,bigint) TO trade_rw;
 
 -- +goose Down
+DROP INDEX trade.ux_kess_payment_intent_one_active_order;
+UPDATE trade.kess_payment_intent SET status='CLOSED' WHERE status='INVALIDATED';
+ALTER TABLE trade.kess_payment_intent DROP CONSTRAINT kess_payment_intent_status_check;
+ALTER TABLE trade.kess_payment_intent ADD CONSTRAINT kess_payment_intent_status_check CHECK (
+    status IN ('PENDING','WAITING','SUCCESS','FAILED','CLOSED','UNKNOWN','REVIEW','REFUND'));
 -- +goose StatementBegin
 CREATE OR REPLACE FUNCTION trade.assert_buyer_order_total() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
@@ -402,6 +442,10 @@ $$;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+DROP FUNCTION trade.confirm_order_payment(text,text,bigint);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION trade.confirm_order_payment(p_public_id text,p_source_ref text,p_paid_amount_e4 bigint)
 RETURNS TABLE(reservation_key text,applied boolean,reconciliation_required boolean)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,trade AS $$
@@ -436,3 +480,7 @@ ALTER TABLE trade.merchant_order DROP CONSTRAINT ck_trade_merchant_order_amounts
 ALTER TABLE trade.buyer_order DROP CONSTRAINT ck_trade_buyer_order_address_snapshot,DROP CONSTRAINT ck_trade_buyer_order_amounts,
     DROP COLUMN shipping_phone,DROP COLUMN shipping_address_text,DROP COLUMN shipping_recipient_name,DROP COLUMN shipping_address_public_id,
     DROP COLUMN shipping_quote_expires_at,DROP COLUMN payable_amount_e4,DROP COLUMN shipping_amount_e4,DROP COLUMN goods_amount_e4;
+REVOKE ALL ON trade.buyer_order, trade.merchant_order FROM report_ro;
+GRANT SELECT ON trade.buyer_order, trade.merchant_order TO report_ro;
+REVOKE EXECUTE ON FUNCTION trade.confirm_order_payment(text,text,bigint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION trade.confirm_order_payment(text,text,bigint) TO trade_rw;

@@ -441,10 +441,16 @@ func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID s
 	if source.Type != SourceKESSResult || source.Reference == "" {
 		return "", false, ErrEventSourceRequired
 	}
-	var key string
+	var key, errorCode string
 	var applied, reconciliationRequired bool
-	err := s.db.QueryRow(ctx, `SELECT reservation_key,applied,reconciliation_required FROM trade.confirm_order_payment($1,$2,$3)`, buyerOrderPublicID, source.Reference, paidAmountE4).Scan(&key, &applied, &reconciliationRequired)
+	err := s.db.QueryRow(ctx, `SELECT reservation_key,applied,reconciliation_required,error_code FROM trade.confirm_order_payment($1,$2,$3)`, buyerOrderPublicID, source.Reference, paidAmountE4).Scan(&key, &applied, &reconciliationRequired, &errorCode)
 	if err == nil {
+		switch errorCode {
+		case "TR001":
+			return key, false, ErrReservationReleased
+		case "TR002":
+			return key, false, ErrPaymentAmount
+		}
 		if reconciliationRequired {
 			return key, false, ErrPaymentReconciliation
 		}
@@ -517,7 +523,7 @@ func (s *PostgresStore) FindBuyerOrderDetail(ctx context.Context, buyerID int64,
 		       COALESCE(latest.status,'')
 		FROM trade.buyer_order buyer
 		JOIN trade.merchant_order child ON child.buyer_order_id=buyer.id
-		LEFT JOIN LATERAL (SELECT status FROM trade.kess_payment_intent WHERE source_ref=buyer.public_id ORDER BY attempt_no DESC LIMIT 1) latest ON true
+		LEFT JOIN LATERAL (SELECT status FROM trade.kess_payment_intent WHERE source_ref=buyer.public_id ORDER BY (status='SUCCESS') DESC,attempt_no DESC LIMIT 1) latest ON true
 		WHERE buyer.public_id=$1 AND buyer.buyer_account_id=$2
 		GROUP BY buyer.id,latest.status`, publicID, buyerID).Scan(
 		new(int64), &order.PublicID, &order.BuyerAccountID, &order.GoodsAmountE4, &order.ShippingAmountE4, &order.PayableAmountE4,
@@ -644,7 +650,7 @@ func (s *PostgresStore) ClaimBuyerReservationRelease(ctx context.Context, buyerI
 	defer func() { _ = tx.Rollback(ctx) }()
 	var reservation Reservation
 	var orderID int64
-	var confirming, allowed, allCancelled bool
+	var confirming, paid, allowed, allCancelled bool
 	err = tx.QueryRow(ctx, `SELECT id,buyer_account_id || ':' || idempotency_key,reservation_released_at IS NOT NULL FROM trade.buyer_order WHERE public_id=$1 AND buyer_account_id=$2 FOR UPDATE`, publicID, buyerID).Scan(&orderID, &reservation.Key, &reservation.Released)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Reservation{}, false, ErrOrderNotVisible
@@ -658,6 +664,12 @@ func (s *PostgresStore) ClaimBuyerReservationRelease(ctx context.Context, buyerI
 	if confirming {
 		return Reservation{}, false, ErrPaymentConfirming
 	}
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM trade.kess_payment_intent WHERE source_ref=$1 AND status IN ('SUCCESS','REFUND'))`, publicID).Scan(&paid); err != nil {
+		return Reservation{}, false, err
+	}
+	if paid {
+		return Reservation{}, false, ErrInvalidTransition
+	}
 	if err := tx.QueryRow(ctx, `SELECT COALESCE(bool_and(status IN ('awaiting_payment','cancelled')),false),COALESCE(bool_and(status='cancelled'),false) FROM trade.merchant_order WHERE buyer_order_id=$1`, orderID).Scan(&allowed, &allCancelled); err != nil {
 		return Reservation{}, false, err
 	}
@@ -666,6 +678,9 @@ func (s *PostgresStore) ClaimBuyerReservationRelease(ctx context.Context, buyerI
 	}
 	if !allowed {
 		return Reservation{}, false, ErrInvalidTransition
+	}
+	if _, err := tx.Exec(ctx, `UPDATE trade.kess_payment_intent SET status='INVALIDATED' WHERE source_ref=$1 AND status IN ('PENDING','WAITING')`, publicID); err != nil {
+		return Reservation{}, false, err
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO trade.reservation_release_outbox (reservation_key,action,reason) VALUES ($1,'release','order_cancelled') ON CONFLICT (reservation_key,action) WHERE completed_at IS NULL DO NOTHING`, reservation.Key); err != nil {
 		return Reservation{}, false, err
@@ -690,19 +705,20 @@ func (s *PostgresStore) ClaimBuyerReservationRelease(ctx context.Context, buyerI
 }
 
 func (s *PostgresStore) PaymentAttempt(ctx context.Context, buyerID int64, publicID string) (PaymentAttempt, error) {
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return PaymentAttempt{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
 	var attempt PaymentAttempt
+	var orderID int64
 	var released bool
+	var quoteExpiry *time.Time
 	var latestStatus, latestNo, latestURL *string
 	var latestExpiry *time.Time
 	var latestAttempt *int
-	err := s.db.QueryRow(ctx, `
-		SELECT buyer.payable_amount_e4,buyer.reservation_released_at IS NOT NULL OR buyer.refund_required_at IS NOT NULL,
-		       latest.status,latest.trade_no,latest.payment_url,latest.expires_at,latest.attempt_no
-		FROM trade.buyer_order buyer
-		LEFT JOIN LATERAL (SELECT status,trade_no,payment_url,expires_at,attempt_no FROM trade.kess_payment_intent WHERE source_ref=buyer.public_id ORDER BY attempt_no DESC LIMIT 1) latest ON true
-		WHERE buyer.public_id=$1 AND buyer.buyer_account_id=$2
-		  AND EXISTS(SELECT 1 FROM trade.merchant_order child WHERE child.buyer_order_id=buyer.id)
-		  AND NOT EXISTS(SELECT 1 FROM trade.merchant_order child WHERE child.buyer_order_id=buyer.id AND child.status<>'awaiting_payment')`, publicID, buyerID).Scan(&attempt.AmountE4, &released, &latestStatus, &latestNo, &latestURL, &latestExpiry, &latestAttempt)
+	err = tx.QueryRow(ctx, `SELECT id,payable_amount_e4,reservation_released_at IS NOT NULL OR refund_required_at IS NOT NULL,shipping_quote_expires_at
+		FROM trade.buyer_order WHERE public_id=$1 AND buyer_account_id=$2 FOR UPDATE`, publicID, buyerID).Scan(&orderID, &attempt.AmountE4, &released, &quoteExpiry)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return PaymentAttempt{}, ErrOrderNotVisible
 	}
@@ -712,26 +728,47 @@ func (s *PostgresStore) PaymentAttempt(ctx context.Context, buyerID int64, publi
 	if released {
 		return PaymentAttempt{}, ErrReservationReleased
 	}
+	var childCount, unavailableCount int
+	if err := tx.QueryRow(ctx, `SELECT count(*),count(*) FILTER (WHERE status<>'awaiting_payment') FROM trade.merchant_order WHERE buyer_order_id=$1`, orderID).Scan(&childCount, &unavailableCount); err != nil {
+		return PaymentAttempt{}, err
+	}
+	if childCount == 0 {
+		return PaymentAttempt{}, ErrOrderNotVisible
+	}
+	if unavailableCount != 0 {
+		return PaymentAttempt{}, ErrInvalidTransition
+	}
+	if quoteExpiry == nil || !quoteExpiry.After(time.Now()) {
+		return PaymentAttempt{}, ErrShippingQuoteExpired
+	}
+	if err := tx.QueryRow(ctx, `SELECT status,trade_no,payment_url,expires_at,attempt_no FROM trade.kess_payment_intent WHERE source_ref=$1 ORDER BY attempt_no DESC LIMIT 1`, publicID).Scan(&latestStatus, &latestNo, &latestURL, &latestExpiry, &latestAttempt); errors.Is(err, pgx.ErrNoRows) {
+		latestStatus = nil
+	} else if err != nil {
+		return PaymentAttempt{}, err
+	}
 	if latestStatus != nil {
 		switch *latestStatus {
 		case "UNKNOWN", "REVIEW":
 			return PaymentAttempt{}, ErrPaymentConfirming
 		case "SUCCESS", "REFUND":
 			return PaymentAttempt{}, ErrInvalidTransition
+		case "INVALIDATED":
+			return PaymentAttempt{}, ErrReservationReleased
 		case "PENDING", "WAITING":
 			if latestNo != nil && latestURL != nil && *latestURL != "" && latestExpiry != nil && latestExpiry.After(time.Now()) {
 				attempt.Existing = &PaymentResult{PaymentNo: *latestNo, PaymentLink: *latestURL, ExpiresAt: *latestExpiry}
-				return attempt, nil
+				return attempt, tx.Commit(ctx)
 			}
+			return PaymentAttempt{}, ErrPaymentConfirming
 		}
-		attempt.AttemptNo = *latestAttempt
-		if *latestStatus == "FAILED" || *latestStatus == "CLOSED" || latestExpiry != nil && !latestExpiry.After(time.Now()) {
-			attempt.AttemptNo++
+		if *latestStatus != "FAILED" && *latestStatus != "CLOSED" {
+			return PaymentAttempt{}, ErrInvalidTransition
 		}
+		attempt.AttemptNo = *latestAttempt + 1
 	} else {
 		attempt.AttemptNo = 1
 	}
-	return attempt, nil
+	return attempt, tx.Commit(ctx)
 }
 
 func pageLimit(limit int) int {
@@ -773,7 +810,7 @@ func projectPaymentStatus(status string) string {
 		return "confirming"
 	case "SUCCESS":
 		return "succeeded"
-	case "FAILED", "CLOSED":
+	case "FAILED", "CLOSED", "INVALIDATED":
 		return "failed"
 	case "REFUND":
 		return "refunded"

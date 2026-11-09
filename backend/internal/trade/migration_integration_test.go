@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -134,10 +135,10 @@ func TestOrderHTTPMigrationUsesPayableAndPersistsReconciliation(t *testing.T) {
 	}
 	if _, err := db.Exec(`
 		BEGIN;
-		INSERT INTO trade.buyer_order(public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
-		VALUES('01ARZ3NDEKTSV4RRFFQ69G5FD1',8,'cancel-order',repeat('b',64),100,100,100,200);
-		INSERT INTO trade.merchant_order(public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
-		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD2',id,10,'merchant-10',100,100,100,200 FROM trade.buyer_order WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD1';
+		INSERT INTO trade.buyer_order(public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		VALUES('01ARZ3NDEKTSV4RRFFQ69G5FD1',8,'cancel-order',repeat('b',64),100,100,100,200,now()+interval '1 hour');
+		INSERT INTO trade.merchant_order(public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		SELECT '01ARZ3NDEKTSV4RRFFQ69G5FD2',id,10,'merchant-10',100,100,100,200,now()+interval '1 hour' FROM trade.buyer_order WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD1';
 		INSERT INTO trade.order_line(merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
 		SELECT id,'01ARZ3NDEKTSV4RRFFQ69G5FD3',1,100,100 FROM trade.merchant_order WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FD2';
 		INSERT INTO trade.kess_payment_intent(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status,expires_at)
@@ -169,7 +170,134 @@ func TestOrderHTTPMigrationUsesPayableAndPersistsReconciliation(t *testing.T) {
 		WHERE buyer.public_id='01ARZ3NDEKTSV4RRFFQ69G5FD1' GROUP BY buyer.id`).Scan(&cancelled); err != nil || !cancelled {
 		t.Fatalf("cancelled=%v err=%v", cancelled, err)
 	}
-	assertDatabaseSQLState(t, db, `SELECT * FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-wrong',100)`, `TR002`)
+	var paymentErrorCode string
+	if err := db.QueryRow(`SELECT error_code FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-wrong',100)`).Scan(&paymentErrorCode); err != nil || paymentErrorCode != "TR002" {
+		t.Fatalf("wrong amount error_code=%q err=%v, want TR002", paymentErrorCode, err)
+	}
+	var wrongAmountTasks int
+	if err := db.QueryRow(`SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref='pay-wrong'`).Scan(&wrongAmountTasks); err != nil || wrongAmountTasks != 1 {
+		t.Fatalf("wrong amount reconciliation tasks=%d err=%v, want 1", wrongAmountTasks, err)
+	}
+	t.Run("cancel invalidates payment and late payment is reconciled", func(t *testing.T) {
+		order := seedHTTPMigrationOrder(t, db, 31, 100, 100, time.Now().Add(time.Hour))
+		insertPaymentIntent(t, db, order.publicID, 1, order.payableE4, "PENDING")
+		if _, claimed, err := store.ClaimBuyerReservationRelease(ctx, order.buyerID, order.publicID); err != nil || !claimed {
+			t.Fatalf("cancel claimed=%v err=%v", claimed, err)
+		}
+		var status string
+		if err := db.QueryRow(`SELECT status FROM trade.kess_payment_intent WHERE source_ref=$1`, order.publicID).Scan(&status); err != nil || status != "INVALIDATED" {
+			t.Fatalf("payment status=%q err=%v, want INVALIDATED", status, err)
+		}
+		for i := 0; i < 2; i++ {
+			if _, _, err := store.ConfirmPayment(ctx, order.publicID, order.payableE4, EventSource{Type: SourceKESSResult, Reference: "late-payment"}); !errors.Is(err, ErrReservationReleased) {
+				t.Fatalf("late payment attempt %d error=%v, want ErrReservationReleased", i, err)
+			}
+		}
+		var tasks int
+		if err := db.QueryRow(`SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref='late-payment'`).Scan(&tasks); err != nil || tasks != 1 {
+			t.Fatalf("late payment reconciliation tasks=%d err=%v, want 1", tasks, err)
+		}
+	})
+	t.Run("cancel and payment creation serialize on parent", func(t *testing.T) {
+		order := seedHTTPMigrationOrder(t, db, 32, 100, 0, time.Now().Add(time.Hour))
+		start := make(chan struct{})
+		paymentErr := make(chan error, 1)
+		cancelErr := make(chan error, 1)
+		go func() {
+			<-start
+			_, err := db.Exec(`INSERT INTO trade.kess_payment_intent
+				(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status,expires_at)
+				VALUES($1,1,'kess',$2,$3,1,$4,'USD','seller','PENDING',now()+interval '1 hour')`, newHTTPTestULID(t), "DRL-"+order.publicID+"-1", order.publicID, order.payableE4)
+			paymentErr <- err
+		}()
+		go func() {
+			<-start
+			_, _, err := store.ClaimBuyerReservationRelease(ctx, order.buyerID, order.publicID)
+			cancelErr <- err
+		}()
+		close(start)
+		if err := <-cancelErr; err != nil {
+			t.Fatalf("concurrent cancel error=%v", err)
+		}
+		if err := <-paymentErr; err != nil {
+			assertPGCode(t, err, "TR001")
+		}
+		var released bool
+		var active int
+		if err := db.QueryRow(`SELECT reservation_released_at IS NOT NULL FROM trade.buyer_order WHERE public_id=$1`, order.publicID).Scan(&released); err != nil || !released {
+			t.Fatalf("released=%v err=%v", released, err)
+		}
+		if err := db.QueryRow(`SELECT count(*) FROM trade.kess_payment_intent WHERE source_ref=$1 AND status IN ('PENDING','WAITING','UNKNOWN','REVIEW')`, order.publicID).Scan(&active); err != nil || active != 0 {
+			t.Fatalf("active payment intents=%d err=%v, want 0", active, err)
+		}
+	})
+	t.Run("new attempt requires channel terminal status and exact amount", func(t *testing.T) {
+		order := seedHTTPMigrationOrder(t, db, 33, 100, 100, time.Now().Add(time.Hour))
+		insertPaymentIntent(t, db, order.publicID, 1, order.payableE4, "PENDING")
+		if _, err := store.PaymentAttempt(ctx, order.buyerID, order.publicID); !errors.Is(err, ErrPaymentConfirming) {
+			t.Fatalf("locally expired or missing payment URL error=%v, want ErrPaymentConfirming", err)
+		}
+		_, err := db.Exec(`INSERT INTO trade.kess_payment_intent
+			(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status)
+			VALUES($1,1,'kess',$2,$3,2,$4,'USD','seller','PENDING')`, newHTTPTestULID(t), "DRL-"+order.publicID+"-2", order.publicID, order.payableE4)
+		assertPGConstraint(t, err, "23505", "ux_kess_payment_intent_one_active_order")
+		_, err = db.Exec(`INSERT INTO trade.kess_payment_intent
+			(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status)
+			VALUES($1,1,'kess',$2,$3,2,$4,'USD','seller','PENDING')`, newHTTPTestULID(t), "DRL-"+order.publicID+"-wrong", order.publicID, order.payableE4+100)
+		assertPGCode(t, err, "TR002")
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='WAITING' WHERE source_ref=$1`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='FAILED' WHERE source_ref=$1`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		attempt, err := store.PaymentAttempt(ctx, order.buyerID, order.publicID)
+		if err != nil || attempt.AttemptNo != 2 {
+			t.Fatalf("retry attempt=%+v err=%v, want attempt 2", attempt, err)
+		}
+	})
+	t.Run("expired quote blocks payment", func(t *testing.T) {
+		order := seedHTTPMigrationOrder(t, db, 34, 100, 100, time.Now().Add(-time.Minute))
+		if _, err := store.PaymentAttempt(ctx, order.buyerID, order.publicID); !errors.Is(err, ErrShippingQuoteExpired) {
+			t.Fatalf("expired quote error=%v, want ErrShippingQuoteExpired", err)
+		}
+	})
+	t.Run("any successful attempt wins payment projection", func(t *testing.T) {
+		order := seedHTTPMigrationOrder(t, db, 35, 100, 0, time.Now().Add(time.Hour))
+		insertPaymentIntent(t, db, order.publicID, 1, order.payableE4, "PENDING")
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='WAITING' WHERE source_ref=$1`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='SUCCESS' WHERE source_ref=$1`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		insertPaymentIntent(t, db, order.publicID, 2, order.payableE4, "PENDING")
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='WAITING' WHERE source_ref=$1 AND attempt_no=2`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`UPDATE trade.kess_payment_intent SET status='FAILED' WHERE source_ref=$1 AND attempt_no=2`, order.publicID); err != nil {
+			t.Fatal(err)
+		}
+		view, err := store.FindBuyerOrderDetail(ctx, order.buyerID, order.publicID)
+		if err != nil || view.PaymentStatus != "succeeded" {
+			t.Fatalf("payment status=%q err=%v, want succeeded", view.PaymentStatus, err)
+		}
+	})
+	t.Run("report role cannot read address snapshot", func(t *testing.T) {
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		if _, err := conn.ExecContext(ctx, `SET ROLE report_ro`); err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _, _ = conn.ExecContext(ctx, `RESET ROLE`) }()
+		if err := conn.QueryRowContext(ctx, `SELECT public_id FROM trade.buyer_order LIMIT 1`).Scan(new(string)); err != nil {
+			t.Fatalf("report_ro allowed column: %v", err)
+		}
+		assertPGCode(t, queryRowError(conn.QueryRowContext(ctx, `SELECT shipping_recipient_name,shipping_address_text,shipping_phone FROM trade.buyer_order LIMIT 1`)), "42501")
+	})
 	var applied bool
 	if err := db.QueryRow(`SELECT applied FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-ok',200)`).Scan(&applied); err != nil || !applied {
 		t.Fatalf("payable confirmation applied=%v err=%v", applied, err)
@@ -195,6 +323,68 @@ func TestOrderHTTPMigrationUsesPayableAndPersistsReconciliation(t *testing.T) {
 	if err := goose.Up(db, migrations); err != nil {
 		t.Fatal(err)
 	}
+}
+
+type httpMigrationOrder struct {
+	publicID  string
+	buyerID   int64
+	payableE4 int64
+}
+
+func seedHTTPMigrationOrder(t *testing.T, db *sql.DB, buyerID, goodsE4, shippingE4 int64, quoteExpiry time.Time) httpMigrationOrder {
+	t.Helper()
+	order := httpMigrationOrder{publicID: newHTTPTestULID(t), buyerID: buyerID, payableE4: goodsE4 + shippingE4}
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var orderID int64
+	if err := tx.QueryRow(`INSERT INTO trade.buyer_order
+		(public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		VALUES($1,$2,$3,$4,$5,$5,$6,$7,$8) RETURNING id`, order.publicID, buyerID, "fixture-"+order.publicID, fmt.Sprintf("%064x", buyerID), goodsE4, shippingE4, order.payableE4, quoteExpiry).Scan(&orderID); err != nil {
+		t.Fatal(err)
+	}
+	var merchantOrderID int64
+	if err := tx.QueryRow(`INSERT INTO trade.merchant_order
+		(public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4,shipping_quote_expires_at)
+		VALUES($1,$2,$3,'merchant-fixture',$4,$4,$5,$6,$7) RETURNING id`, newHTTPTestULID(t), orderID, buyerID, goodsE4, shippingE4, order.payableE4, quoteExpiry).Scan(&merchantOrderID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(`INSERT INTO trade.order_line
+		(merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES($1,$2,1,$3,$3)`, merchantOrderID, newHTTPTestULID(t), goodsE4); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	return order
+}
+
+func insertPaymentIntent(t *testing.T, db *sql.DB, orderPublicID string, attempt int, amountE4 int64, status string) {
+	t.Helper()
+	if status != "PENDING" {
+		t.Fatalf("fixture payment intent must begin PENDING, got %s", status)
+	}
+	if _, err := db.Exec(`INSERT INTO trade.kess_payment_intent
+		(public_id,company_id,channel,trade_no,source_ref,attempt_no,amount_e4,currency,seller_code,status,expires_at)
+		VALUES($1,1,'kess',$2,$3,$4,$5,'USD','seller',$6,now()+interval '1 hour')`, newHTTPTestULID(t), fmt.Sprintf("DRL-%s-%d", orderPublicID, attempt), orderPublicID, attempt, amountE4, status); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func queryRowError(row *sql.Row) error {
+	var recipient, address, phone string
+	return row.Scan(&recipient, &address, &phone)
+}
+
+func newHTTPTestULID(t *testing.T) string {
+	t.Helper()
+	value, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value
 }
 
 func assertDatabaseSQLState(t *testing.T, db *sql.DB, statement, want string) {
@@ -862,10 +1052,13 @@ func assertReservationReleaseCancelsAndQueuesFailures(t *testing.T, ctx context.
 	if cancelled != 2 || queued != 1 || !released {
 		t.Fatalf("cancelled=%d queued=%d released=%v, want 2/1/true", cancelled, queued, released)
 	}
-	assertPGCode(t, func() error {
-		_, err := pool.Exec(ctx, `SELECT * FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FD5','cancelled-payment',200)`)
-		return err
-	}(), "TR001")
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FD5", 200, EventSource{Type: SourceKESSResult, Reference: "cancelled-payment"}); !errors.Is(err, ErrReservationReleased) || applied {
+		t.Fatalf("cancelled payment applied=%v err=%v, want ErrReservationReleased", applied, err)
+	}
+	var reconciliationTasks int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref='cancelled-payment'`).Scan(&reconciliationTasks); err != nil || reconciliationTasks != 1 {
+		t.Fatalf("cancelled payment reconciliation tasks=%d err=%v, want 1", reconciliationTasks, err)
+	}
 	if _, err := pool.Exec(ctx, `DELETE FROM trade.reservation_release_outbox WHERE reservation_key='41:release-cascade'`); err != nil {
 		t.Fatal(err)
 	}
@@ -937,18 +1130,20 @@ func assertPaymentSQLStates(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 		}
 	}
 	create("01ARZ3NDEKTSV4RRFFQ69G5FDA", "01ARZ3NDEKTSV4RRFFQ69G5FDB", "01ARZ3NDEKTSV4RRFFQ69G5FDC", "sqlstate-amount", 42)
-	assertPGCode(t, func() error {
-		_, err := pool.Exec(ctx, `SELECT * FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FDA','wrong-amount',99)`)
-		return err
-	}(), "TR002")
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FDA", 99, EventSource{Type: SourceKESSResult, Reference: "wrong-amount"}); !errors.Is(err, ErrPaymentAmount) || applied {
+		t.Fatalf("wrong amount applied=%v err=%v, want ErrPaymentAmount", applied, err)
+	}
 	create("01ARZ3NDEKTSV4RRFFQ69G5FDD", "01ARZ3NDEKTSV4RRFFQ69G5FDE", "01ARZ3NDEKTSV4RRFFQ69G5FDF", "sqlstate-release", 43)
 	if _, claimed, err := store.ClaimReservationRelease(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FDD"); err != nil || !claimed {
 		t.Fatalf("release claim claimed=%v err=%v", claimed, err)
 	}
-	assertPGCode(t, func() error {
-		_, err := pool.Exec(ctx, `SELECT * FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FDD','released-payment',100)`)
-		return err
-	}(), "TR001")
+	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FDD", 100, EventSource{Type: SourceKESSResult, Reference: "released-payment"}); !errors.Is(err, ErrReservationReleased) || applied {
+		t.Fatalf("released payment applied=%v err=%v, want ErrReservationReleased", applied, err)
+	}
+	var tasks int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref IN ('wrong-amount','released-payment')`).Scan(&tasks); err != nil || tasks != 2 {
+		t.Fatalf("payment error reconciliation tasks=%d err=%v, want 2", tasks, err)
+	}
 }
 
 func assertCreatedTxidCannotBeForged(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {

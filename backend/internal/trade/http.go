@@ -9,6 +9,8 @@ import (
 var (
 	ErrOrderAdaptersUnavailable = errors.New("trade: order adapters are unavailable")
 	ErrPaymentConfirming        = errors.New("trade: payment confirmation is in progress")
+	ErrShippingQuoteExpired     = errors.New("trade: shipping quote expired")
+	ErrAddressNotFound          = errors.New("trade: shipping address not found")
 )
 
 type AddressSnapshot struct {
@@ -98,7 +100,10 @@ func (s *Service) PlaceForDelivery(ctx context.Context, buyer int64, idempotency
 	if err != nil {
 		return CreateOrder{}, err
 	}
-	if address.PublicID != addressPublicID || address.RecipientName == "" || address.AddressText == "" || address.Phone == "" {
+	if address.PublicID == "" || address.PublicID != addressPublicID {
+		return CreateOrder{}, ErrAddressNotFound
+	}
+	if address.RecipientName == "" || address.AddressText == "" || address.Phone == "" {
 		return CreateOrder{}, ErrInvalidOrderLine
 	}
 	return s.place(ctx, buyer, idempotencyKey, address, lines)

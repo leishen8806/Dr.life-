@@ -74,6 +74,14 @@ func TestPlaceForDeliveryRejectsIncompleteCatalogAndExpiredQuote(t *testing.T) {
 	}
 }
 
+func TestPlaceForDeliveryRejectsMissingAddress(t *testing.T) {
+	service := NewService(&stubOrders{}, stubAccounts{"active"}, &stubCatalog{})
+	service.ConfigureHTTP(stubAddresses{}, stubQuotes{}, nil)
+	if _, err := service.PlaceForDelivery(context.Background(), 7, "delivery-1", "missing-address", []OrderLineInput{{SKUPublicID: "A", Quantity: 1}}); !errors.Is(err, ErrAddressNotFound) {
+		t.Fatalf("missing address error=%v, want ErrAddressNotFound", err)
+	}
+}
+
 func (s *stubCatalog) ResolveAndReserve(_ context.Context, key string, input []OrderLineInput) ([]CatalogLine, error) {
 	s.resolveCalls++
 	s.lastInput = append([]OrderLineInput(nil), input...)

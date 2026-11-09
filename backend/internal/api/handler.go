@@ -1652,6 +1652,8 @@ func (h Handler) orderError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, trade.ErrOrderNotVisible):
 		code = httpx.CodeResourceNotFound
+	case errors.Is(err, trade.ErrAddressNotFound):
+		code = httpx.CodeResourceNotFound
 	case errors.Is(err, trade.ErrIdempotencyConflict):
 		code = httpx.CodeIdempotencyConflict
 	case errors.Is(err, trade.ErrInvalidOrderLine), errors.Is(err, trade.ErrNoMatchingTier), errors.Is(err, trade.ErrPriceNotWholeCent):
@@ -1664,6 +1666,8 @@ func (h Handler) orderError(w http.ResponseWriter, r *http.Request, err error) {
 		code = httpx.CodeOrderAmountMismatch
 	case errors.Is(err, trade.ErrInvalidTransition), errors.Is(err, trade.ErrPaymentConfirming), errors.Is(err, trade.ErrPaymentReconciliation):
 		code = httpx.CodeOrderStateConflict
+	case errors.Is(err, trade.ErrShippingQuoteExpired):
+		code = httpx.CodeOrderQuoteExpired
 	case errors.Is(err, trade.ErrBuyerInactive):
 		code = httpx.CodeAccountBlocked
 	case errors.Is(err, trade.ErrOrderAdaptersUnavailable):
@@ -1705,10 +1709,10 @@ func orderLines(lines []trade.OrderLineView) []gen.OrderLineSnapshot {
 }
 func maskPhone(phone string) string {
 	runes := []rune(phone)
-	if len(runes) > 4 {
-		runes = runes[len(runes)-4:]
+	if len(runes) < 4 {
+		return "****"
 	}
-	return "****" + string(runes)
+	return "****" + string(runes[len(runes)-4:])
 }
 func stringValue(value *string) string {
 	if value == nil {

@@ -10,7 +10,7 @@ func TestPostgresStoreImplementsStore(t *testing.T) {
 func TestPaymentStatusProjectionCoversEveryIntentState(t *testing.T) {
 	for input, want := range map[string]string{
 		"PENDING": "pending", "WAITING": "pending", "UNKNOWN": "confirming", "REVIEW": "confirming",
-		"SUCCESS": "succeeded", "FAILED": "failed", "CLOSED": "failed", "REFUND": "refunded", "": "pending",
+		"SUCCESS": "succeeded", "FAILED": "failed", "CLOSED": "failed", "INVALIDATED": "failed", "REFUND": "refunded", "": "pending",
 	} {
 		if got := projectPaymentStatus(input); got != want {
 			t.Errorf("%s => %s, want %s", input, got, want)

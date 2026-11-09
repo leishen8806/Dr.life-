@@ -30,7 +30,7 @@ func (d orderTestDirectory) Resolve(context.Context, string) (iam.AccountResolut
 type orderTestService struct {
 	createCalls, paymentCalls, cancelCalls int
 	merchantID                             int64
-	cancelErr                              error
+	createErr, paymentErr, cancelErr       error
 	buyer                                  trade.BuyerOrderView
 	merchant                               trade.MerchantOrderView
 }
@@ -40,6 +40,9 @@ func (s *orderTestService) BuyerOrders(context.Context, int64, string, int) ([]t
 }
 func (s *orderTestService) PlaceForDelivery(_ context.Context, _ int64, _ string, _ string, _ []trade.OrderLineInput) (trade.CreateOrder, error) {
 	s.createCalls++
+	if s.createErr != nil {
+		return trade.CreateOrder{}, s.createErr
+	}
 	return trade.CreateOrder{PublicID: s.buyer.PublicID}, nil
 }
 func (s *orderTestService) BuyerOrderDetail(context.Context, int64, string) (trade.BuyerOrderView, error) {
@@ -51,6 +54,9 @@ func (s *orderTestService) Cancel(context.Context, int64, string) error {
 }
 func (s *orderTestService) CreatePayment(context.Context, int64, string) (trade.PaymentResult, error) {
 	s.paymentCalls++
+	if s.paymentErr != nil {
+		return trade.PaymentResult{}, s.paymentErr
+	}
 	return trade.PaymentResult{PaymentNo: "DRL-ORDER-1", PaymentLink: "https://pay.example.test/1", ExpiresAt: time.Unix(1_800_000_000, 0)}, nil
 }
 func (s *orderTestService) MerchantOrders(_ context.Context, merchantID int64, _ string, _ int) ([]trade.MerchantOrderView, string, error) {
@@ -105,6 +111,20 @@ func TestMerchantSuborderMasksPhoneAndUsesMerchantScope(t *testing.T) {
 	}
 }
 
+func TestMerchantSuborderMasksShortPhoneCompletely(t *testing.T) {
+	merchantID := int64(19)
+	service := &orderTestService{merchant: trade.MerchantOrderView{PublicID: "child", ParentPublicID: "parent", Status: string(trade.AwaitingPayment), GoodsAmountE4: 100, PayableAmountE4: 100, ShippingAddress: trade.AddressSnapshot{Phone: "123"}}}
+	h := Handler{Orders: service, Directory: orderTestDirectory{merchantID: &merchantID}}
+	req := httptest.NewRequest(http.MethodGet, "/v1/merchant/suborders", nil)
+	w := httptest.NewRecorder()
+	orderEndpoint(gateway.RoleMerchant, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.ListMerchantSuborders(w, r, gen.ListMerchantSubordersParams{})
+	})).ServeHTTP(w, req)
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"phone":"****"`) || strings.Contains(w.Body.String(), `"phone":"123"`) {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestConfirmingPaymentBlocksCancellation(t *testing.T) {
 	service := &orderTestService{cancelErr: trade.ErrPaymentConfirming}
 	h := Handler{Orders: service, Directory: orderTestDirectory{}}
@@ -114,6 +134,32 @@ func TestConfirmingPaymentBlocksCancellation(t *testing.T) {
 		h.CancelBuyerOrder(w, r, "order", gen.CancelBuyerOrderParams{IdempotencyKey: "cancel-1"})
 	})).ServeHTTP(w, req)
 	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), `"code":3005`) {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestExpiredShippingQuoteBlocksPayment(t *testing.T) {
+	service := &orderTestService{paymentErr: trade.ErrShippingQuoteExpired}
+	h := Handler{Orders: service, Directory: orderTestDirectory{}}
+	req := httptest.NewRequest(http.MethodPost, "/v1/buyer/orders/order/payments", nil)
+	w := httptest.NewRecorder()
+	orderEndpoint(gateway.RoleBuyer, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.CreateBuyerOrderPayment(w, r, "order", gen.CreateBuyerOrderPaymentParams{IdempotencyKey: "payment-quote-expired"})
+	})).ServeHTTP(w, req)
+	if w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), `"code":3006`) {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestMissingShippingAddressIsNotInternalError(t *testing.T) {
+	service := &orderTestService{createErr: trade.ErrAddressNotFound}
+	h := Handler{Orders: service, Directory: orderTestDirectory{}}
+	req := httptest.NewRequest(http.MethodPost, "/v1/buyer/orders", strings.NewReader(`{"items":[{"sku_public_id":"01ARZ3NDEKTSV4RRFFQ69G5FA2","quantity":1}],"shipping_address_public_id":"missing"}`))
+	w := httptest.NewRecorder()
+	orderEndpoint(gateway.RoleBuyer, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.CreateBuyerOrder(w, r, gen.CreateBuyerOrderParams{IdempotencyKey: "missing-address"})
+	})).ServeHTTP(w, req)
+	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), `"code":1003`) {
 		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
 	}
 }
