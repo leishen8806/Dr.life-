@@ -396,7 +396,9 @@ create trigger trg_posting_no_truncate before truncate on ledger.posting for eac
 
 `trade.kess_payment_intent` 只保存服务端应收快照和 KESS 渠道事实，不记余额、不产生分录。一个父订单的每次付款尝试只有一条意向，唯一键为 `(company_id, source_ref, attempt_no)`；同一父订单同时最多一条 `PENDING/WAITING/UNKNOWN/REVIEW` 意向，只有 KESS 查单确认前一条为 `FAILED/CLOSED` 后才能新建尝试，本地付款链接到期不代表渠道失败。`trade_no` 由父订单编号与尝试号确定，重试不得换号。意向金额必须等于父订单 `payable_amount_e4`，使用 USD e4，跨 KESS 边界时必须整分（`amount_e4 % 100 = 0`）。
 
-初始状态只能是 `PENDING`，且渠道状态、交易号、付款链接、领取时间与 `create_sent_at` 均为空。worker 以 `FOR UPDATE SKIP LOCKED` 加有期限的领取标记，避免两个进程同时调用 createOrder；只有确定请求尚未发出时才释放领取标记并保留 `PENDING`。已经领取过的租约即使过期也不得再次调用 createOrder，而是转 `UNKNOWN` 后按原 `trade_no` 查单；`create_sent_at` 记录首次可能发出 createOrder 的时间，进程在请求后失联时以领取时间作保守代理。请求可能已经发出后的超时、断线、5xx、解码或验签失败一律转 `UNKNOWN`。createOrder 即使返回终态也只转 `UNKNOWN`；`WAITING` 与 `UNKNOWN` 都必须周期性主动查单，付款成功仅认服务端 queryorder 返回的 `SUCCESS`，且支付号、商户、金额、币种必须与意向一致。超过以 `create_sent_at` 起算的可配置窗口仍查无此单才转 `CLOSED`，并由订单域释放对应预占。
+初始状态只能是 `PENDING`，且渠道状态、交易号、付款链接、领取时间与 `create_sent_at` 均为空。worker 以 `FOR UPDATE SKIP LOCKED` 加有期限的领取标记，避免两个进程同时调用 createOrder；只有确定请求尚未发出时才释放领取标记并保留 `PENDING`。已经领取过的租约即使过期也不得再次调用 createOrder，而是转 `UNKNOWN` 后按原 `trade_no` 查单；`create_sent_at` 记录首次可能发出 createOrder 的时间，进程在请求后失联时以领取时间作保守代理。没有付款链接的 `PENDING` 由每分钟维护任务重新领取；过期领取转 `UNKNOWN`，查无此单且付款意向已过期或超过恢复窗口时才转 `CLOSED`，使订单能够重新付款或取消。请求可能已经发出后的超时、断线、5xx、解码或验签失败一律转 `UNKNOWN`。createOrder 即使返回终态也只转 `UNKNOWN`；`WAITING` 与 `UNKNOWN` 都必须周期性主动查单，付款成功仅认服务端 queryorder 返回的 `SUCCESS`，且支付号、商户、金额、币种必须与意向一致。
+
+`WAITING` 查无此单转 `REVIEW`，`REVIEW` 按较长间隔继续查单，但只允许 queryorder 确认的 `SUCCESS` 自动离开，不得自动关闭。订单取消时进行中的意向转 `INVALIDATED`；维护任务仍继续查单，迟到的 `SUCCESS` 必须通过 `trade.confirm_order_payment` 写入 `payment_reconciliation_task`，交由人工退款，不得把已取消订单推进为已付款。维护扫描以 `last_checked_at` 作为跨 worker 租约，同一批并发扫描只能领取一次；已经入账的同来源重放先按 `order_event_source` 判断幂等，再判断退款、释放或金额异常，避免产生误报对账待办。
 
 状态更新必须带旧状态条件，影响 0 行视为冲突；没有新付款链接时保留旧链接。收款响应未带 `sign` 时依赖 TLS，带 `sign` 时必须校验；响应签名与回调签名的最终规则仍列为 KESS 外部待确认项。
 

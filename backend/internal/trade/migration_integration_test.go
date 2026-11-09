@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -72,6 +73,12 @@ func TestTradeOrderMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertTradeTables(t, db, true)
+	if err := goose.DownTo(db, migrations, 60); err != nil {
+		t.Fatalf("down 00061: %v", err)
+	}
+	if err := goose.UpTo(db, migrations, 61); err != nil {
+		t.Fatalf("reapply 00061: %v", err)
+	}
 }
 
 func TestOrderHTTPMigrationUsesPayableAndPersistsReconciliation(t *testing.T) {
@@ -304,6 +311,13 @@ func TestOrderHTTPMigrationUsesPayableAndPersistsReconciliation(t *testing.T) {
 	}
 	if _, err := db.Exec(`UPDATE trade.buyer_order SET refund_required_at=clock_timestamp() WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FC1'`); err != nil {
 		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT applied FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-ok',200)`).Scan(&applied); err != nil || applied {
+		t.Fatalf("refunded same-source replay applied=%v err=%v, want idempotent success", applied, err)
+	}
+	var originalTasks int
+	if err := db.QueryRow(`SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref='pay-ok'`).Scan(&originalTasks); err != nil || originalTasks != 0 {
+		t.Fatalf("same-source reconciliation tasks=%d err=%v, want 0", originalTasks, err)
 	}
 	var reconciliation bool
 	if err := db.QueryRow(`SELECT reconciliation_required FROM trade.confirm_order_payment('01ARZ3NDEKTSV4RRFFQ69G5FC1','pay-second',300)`).Scan(&reconciliation); err != nil || !reconciliation {
@@ -582,6 +596,31 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	assertSiblingTransitionsSerialize(t, ctx, pool, store)
 	assertTradeRWCreateIsIdempotent(t, ctx, dsn)
 	assertTradeRWConnectionReuse(t, ctx, pool, dsn)
+	assertReservationScheduledHandler(t, ctx, pool, store)
+}
+
+func assertReservationScheduledHandler(t *testing.T, ctx context.Context, pool *pgxpool.Pool, store *PostgresStore) {
+	t.Helper()
+	const key = "81:scheduled-review"
+	if err := store.QueueReservationReview(ctx, key, "scheduled_test"); err != nil {
+		t.Fatal(err)
+	}
+	catalog := catalogFixture()
+	catalog.reservations = map[string]bool{key: true}
+	service := NewService(store, stubAccounts{"active"}, catalog)
+	task := asynq.NewTask(TaskReservationActions, ReservationScheduledTask().Payload(time.Now()))
+	for range 2 {
+		if err := NewReservationHandler(service)(ctx, task); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var completed int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.reservation_release_outbox WHERE reservation_key=$1 AND action='review_release' AND completed_at IS NOT NULL`, key).Scan(&completed); err != nil {
+		t.Fatal(err)
+	}
+	if completed != 1 || catalog.releases != 1 {
+		t.Fatalf("scheduled reservation maintenance completed=%d releases=%d, want 1/1", completed, catalog.releases)
+	}
 }
 
 func assertTradeRWCreateIsIdempotent(t *testing.T, ctx context.Context, dsn string) {
@@ -1376,6 +1415,9 @@ func assertDuplicatePaymentSignal(t *testing.T, ctx context.Context, pool *pgxpo
 	}
 	if err := pool.QueryRow(ctx, `SELECT count(*),COALESCE(max(paid_amount_e4),0) FROM trade.payment_reconciliation_task WHERE source_ref='duplicate-payment-b'`).Scan(&tasks, &taskAmount); err != nil || tasks != 1 || taskAmount != 200 {
 		t.Fatalf("reconciliation tasks=%d amount=%d err=%v, want 1/200", tasks, taskAmount, err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref='duplicate-payment-a'`).Scan(&tasks); err != nil || tasks != 0 {
+		t.Fatalf("same-source reconciliation tasks=%d err=%v, want 0", tasks, err)
 	}
 }
 
