@@ -1483,7 +1483,7 @@ export interface components {
         FilePresignRequest: {
             purpose: components["schemas"]["FilePurpose"];
             /** @enum {string} */
-            content_type: "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
+            content_type: "image/jpeg" | "image/png" | "application/pdf";
             /** Format: int64 */
             size: number;
             /** @description Base64-encoded SHA-256 of the bytes sent directly to object storage. */

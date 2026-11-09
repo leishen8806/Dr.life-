@@ -40,6 +40,16 @@ func TestEpochCacheWriterReportsFailureAndRetries(t *testing.T) {
 	}
 }
 
+func TestEpochCacheWriterDoesNotLowerEpoch(t *testing.T) {
+	cache := &epochWriterTestCache{}
+	writer := EpochCacheWriter{Cache: cache}
+	writer.Write(context.Background(), "account-1", 2, time.Hour, "test")
+	writer.Write(context.Background(), "account-1", 1, time.Hour, "test")
+	if got := cache.epoch("account-1"); got != 2 {
+		t.Fatalf("cached epoch=%d, want 2", got)
+	}
+}
+
 func TestDBSessionCheckerFailsClosedWhenCacheUnavailable(t *testing.T) {
 	cache := &epochWriterTestCache{getErr: ErrSessionStoreUnavailable}
 	active, err := (DBSessionChecker{Cache: cache}).Active(context.Background(), "account-1", "session-1")
@@ -75,7 +85,9 @@ func (c *epochWriterTestCache) SetAccountEpoch(_ context.Context, accountID stri
 	if c.epochs == nil {
 		c.epochs = make(map[string]int64)
 	}
-	c.epochs[accountID] = epoch
+	if c.epochs[accountID] <= epoch {
+		c.epochs[accountID] = epoch
+	}
 	return nil
 }
 func (c *epochWriterTestCache) setError(err error) { c.mu.Lock(); c.err = err; c.mu.Unlock() }

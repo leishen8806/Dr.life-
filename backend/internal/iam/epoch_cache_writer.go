@@ -3,6 +3,8 @@ package iam
 import (
 	"context"
 	"log/slog"
+	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -25,14 +27,20 @@ func (w EpochCacheWriter) Write(ctx context.Context, accountID string, epoch int
 	if err := write(); err == nil {
 		return
 	}
+	w.retry(ctx, accountID, source, write)
+}
+
+func (w EpochCacheWriter) retry(ctx context.Context, accountID, source string, write func() error) {
 	w.failed(ctx, accountID, source)
-	if w.Retry != nil {
-		retryCtx := w.Context
-		if retryCtx == nil {
-			retryCtx = context.Background()
-		}
-		w.Retry(retryCtx, write)
+	retry := w.Retry
+	if retry == nil {
+		retry = RetryEpochCacheWrite
 	}
+	retryCtx := w.Context
+	if retryCtx == nil {
+		retryCtx = context.Background()
+	}
+	retry(retryCtx, write)
 }
 
 func (w EpochCacheWriter) failed(ctx context.Context, accountID, source string) {
@@ -44,21 +52,46 @@ func (w EpochCacheWriter) failed(ctx context.Context, accountID, source string) 
 	}
 }
 
-// RetryEpochCacheWrite retries a failed cache invalidation without holding the
-// request or database transaction open. It stops only after Redis accepts it.
+const epochRetryQueueSize = 256
+
+type epochRetryJob struct {
+	ctx   context.Context
+	write func() error
+}
+
+var (
+	epochRetryQueue = make(chan epochRetryJob, epochRetryQueueSize)
+	epochRetryOnce  sync.Once
+)
+
+// RetryEpochCacheWrite queues cache invalidation on a fixed worker pool, so a
+// Redis outage cannot create an unbounded goroutine per failed request.
 func RetryEpochCacheWrite(ctx context.Context, write func() error) {
-	go func() {
+	epochRetryOnce.Do(func() {
+		for range 2 {
+			go epochRetryWorker()
+		}
+	})
+	select {
+	case epochRetryQueue <- epochRetryJob{ctx: ctx, write: write}:
+	case <-ctx.Done():
+	}
+}
+
+func epochRetryWorker() {
+	for job := range epochRetryQueue {
 		delay := time.Second
 		for {
-			timer := time.NewTimer(delay)
+			jitter := time.Duration(rand.Int63n(int64(delay/4) + 1))
+			timer := time.NewTimer(delay + jitter)
 			select {
-			case <-ctx.Done():
+			case <-job.ctx.Done():
 				timer.Stop()
-				return
+				goto next
 			case <-timer.C:
 			}
-			if write() == nil {
-				return
+			if job.write() == nil {
+				break
 			}
 			if delay < time.Minute {
 				delay *= 2
@@ -67,5 +100,6 @@ func RetryEpochCacheWrite(ctx context.Context, write func() error) {
 				}
 			}
 		}
-	}()
+	next:
+	}
 }

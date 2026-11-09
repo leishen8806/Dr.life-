@@ -11,6 +11,7 @@ func TestCleanupWorkerDeletesObjectBeforeWritingTerminalStatus(t *testing.T) {
 	now := time.Date(2026, 10, 31, 2, 0, 0, 0, time.UTC)
 	store := &cleanupMemoryStore{candidates: []cleanupCandidate{
 		{ObjectKey: "objects/pending", Status: StatusPending, CreatedAt: now.Add(-25 * time.Hour)},
+		{ObjectKey: "objects/verifying", Status: StatusVerifying, CreatedAt: now.Add(-25 * time.Hour)},
 		{ObjectKey: "objects/retained", Status: StatusReady, RetentionUntil: ptrTime(now.Add(-time.Second))},
 		{ObjectKey: "objects/unexpired", Status: StatusReady, RetentionUntil: ptrTime(now.Add(time.Second))},
 	}}
@@ -21,11 +22,14 @@ func TestCleanupWorkerDeletesObjectBeforeWritingTerminalStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Expired != 1 || result.Deleted != 1 || len(objects.deleted) != 2 {
+	if result.Expired != 2 || result.Deleted != 1 || len(objects.deleted) != 3 {
 		t.Fatalf("result=%+v deleted=%v", result, objects.deleted)
 	}
 	if got := store.terminal["objects/pending"]; got != StatusExpired {
 		t.Fatalf("pending terminal status=%q, want expired", got)
+	}
+	if got := store.terminal["objects/verifying"]; got != StatusExpired {
+		t.Fatalf("verifying terminal status=%q, want expired", got)
 	}
 	if got := store.terminal["objects/retained"]; got != StatusDeleted {
 		t.Fatalf("retained terminal status=%q, want deleted", got)
@@ -48,15 +52,11 @@ func TestCleanupWorkerLeavesRecordRetryableWhenObjectDeletionFails(t *testing.T)
 	}
 }
 
-func TestRetentionDefaultIsTwoYearsAndConfigurable(t *testing.T) {
+func TestUnreferencedUploadRetentionIsTwentyFourHours(t *testing.T) {
 	now := time.Date(2026, 10, 31, 2, 0, 0, 0, time.UTC)
 	service := New(&memoryStore{}, &fakeObjects{}, Options{Now: func() time.Time { return now }})
-	if got := service.retentionUntil(); !got.Equal(now.AddDate(2, 0, 0)) {
-		t.Fatalf("default retention=%s, want %s", got, now.AddDate(2, 0, 0))
-	}
-	service = New(&memoryStore{}, &fakeObjects{}, Options{Now: func() time.Time { return now }, RetentionPeriod: 24 * time.Hour})
 	if got := service.retentionUntil(); !got.Equal(now.Add(24 * time.Hour)) {
-		t.Fatalf("configured retention=%s", got)
+		t.Fatalf("retention=%s, want %s", got, now.Add(24*time.Hour))
 	}
 }
 

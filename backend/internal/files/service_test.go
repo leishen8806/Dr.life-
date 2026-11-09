@@ -17,6 +17,12 @@ func TestPresignRejectsUnsupportedPurpose(t *testing.T) {
 	}
 }
 
+func TestUploadPolicyRejectsWebP(t *testing.T) {
+	if purposeAllows("product_image", "image/webp") {
+		t.Fatal("webp upload was allowed without a metadata sanitizer")
+	}
+}
+
 func TestPresignCreatesPendingFileAndSignsExactMetadata(t *testing.T) {
 	store := &memoryStore{}
 	objects := &fakeObjects{}

@@ -12,6 +12,7 @@ import (
 
 const (
 	pendingUploadTTL = 24 * time.Hour
+	deleteTimeout    = 30 * time.Second
 )
 
 // CleanupResult counts terminal transitions completed only after the backing
@@ -54,8 +55,8 @@ type cleanupCandidate struct {
 	RetentionUntil *time.Time
 }
 
-// CleanupStore owns the database transaction that holds each file row stable
-// while its object is deleted, then writes the terminal status.
+// CleanupStore claims each row before deleting its object and never holds a
+// database row lock across object-storage I/O.
 type CleanupStore interface {
 	Cleanup(context.Context, time.Time, func(context.Context, string) error) (CleanupResult, error)
 }
@@ -99,11 +100,11 @@ func (w *CleanupWorker) Run(ctx context.Context) (CleanupResult, error) {
 }
 
 func cleanupTerminal(file cleanupCandidate, now time.Time) Status {
-	if file.RetentionUntil != nil && !file.RetentionUntil.After(now) && (file.Status == StatusPending || file.Status == StatusReady || file.Status == StatusRejected) {
-		return StatusDeleted
-	}
-	if file.Status == StatusPending && file.CreatedAt.Before(now.Add(-pendingUploadTTL)) {
+	if (file.Status == StatusPending || file.Status == StatusVerifying) && file.CreatedAt.Before(now.Add(-pendingUploadTTL)) {
 		return StatusExpired
+	}
+	if file.RetentionUntil != nil && !file.RetentionUntil.After(now) && (file.Status == StatusReady || file.Status == StatusRejected) {
+		return StatusDeleted
 	}
 	return ""
 }

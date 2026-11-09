@@ -104,26 +104,27 @@ func (s *s3Storage) Delete(ctx context.Context, key string) error {
 	return err
 }
 
-func (s *s3Storage) SanitizeImage(ctx context.Context, key, contentType string) error {
+func (s *s3Storage) SanitizeImage(ctx context.Context, key, contentType string) (string, error) {
 	body, err := s.Open(ctx, key)
 	if err != nil {
-		return err
+		return "", err
 	}
 	clean, err := StripImageMetadata(contentType, body)
 	closeErr := body.Close()
 	if err != nil {
-		return err
+		return "", err
 	}
 	if closeErr != nil {
-		return closeErr
+		return "", closeErr
 	}
+	destination := randomKey()
 	_, err = s.objects.PutObject(ctx, &awss3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
-		Key:         aws.String(key),
+		Key:         aws.String(destination),
 		ContentType: aws.String(contentType),
 		Body:        bytes.NewReader(clean),
 	})
-	return err
+	return destination, err
 }
 
 func (s *s3Storage) Promote(ctx context.Context, key, etag string) (string, error) {

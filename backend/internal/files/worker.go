@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 
 	"github.com/hibiken/asynq"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
@@ -102,12 +103,22 @@ func (w *VerificationWorker) Handle(ctx context.Context, task *asynq.Task) error
 		_ = w.objects.Delete(ctx, readyKey)
 		return w.reject(ctx, file)
 	}
-	if file.ContentType == "image/jpeg" || file.ContentType == "image/png" {
+	if strings.HasPrefix(file.ContentType, "image/") {
 		sanitizer, ok := w.objects.(storage.ImageSanitizer)
-		if !ok || sanitizer.SanitizeImage(ctx, readyKey, file.ContentType) != nil {
+		if !ok {
 			_ = w.objects.Delete(ctx, readyKey)
 			return w.reject(ctx, file)
 		}
+		cleanKey, sanitizeErr := sanitizer.SanitizeImage(ctx, readyKey, file.ContentType)
+		if sanitizeErr != nil || cleanKey == "" {
+			_ = w.objects.Delete(ctx, readyKey)
+			return w.reject(ctx, file)
+		}
+		if err := w.objects.Delete(ctx, readyKey); err != nil {
+			_ = w.objects.Delete(ctx, cleanKey)
+			return w.reject(ctx, file)
+		}
+		readyKey = cleanKey
 	}
 	readySize, readySHA256, err := w.objectMetadata(ctx, readyKey)
 	if err != nil {

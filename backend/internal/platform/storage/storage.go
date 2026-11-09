@@ -68,9 +68,9 @@ type ObjectVerifier interface {
 	Delete(context.Context, string) error
 }
 
-// ImageSanitizer rewrites a private object without retaining metadata.
+// ImageSanitizer writes a clean private object at a new key.
 type ImageSanitizer interface {
-	SanitizeImage(context.Context, string, string) error
+	SanitizeImage(context.Context, string, string) (string, error)
 }
 
 func (p Policy) validate(in PutRequest) error {

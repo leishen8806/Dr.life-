@@ -53,7 +53,6 @@ type Config struct {
 	StorageMaxContentLength            int64
 	FileMaxDailyUploads                int
 	FileMaxDailyBytes                  int64
-	FileRetentionPeriod                time.Duration
 	CORSBuyerOrigins                   []string
 	CORSMerchantOrigins                []string
 	CORSDriverOrigins                  []string
@@ -528,10 +527,6 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 	if err != nil {
 		return Config{}, fmt.Errorf("FILE_MAX_DAILY_BYTES must be a positive integer")
 	}
-	fileRetentionPeriod, err := optionalPositiveDuration(getenv("FILE_RETENTION_PERIOD"))
-	if err != nil {
-		return Config{}, fmt.Errorf("FILE_RETENTION_PERIOD must be a positive Go duration")
-	}
 	cacheRedisURL := strings.TrimSpace(getenv("CACHE_REDIS_URL"))
 	redisURL := strings.TrimSpace(getenv("REDIS_URL"))
 	queueRedisURL := strings.TrimSpace(getenv("QUEUE_REDIS_URL"))
@@ -574,7 +569,7 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		StorageRegion: strings.TrimSpace(getenv("STORAGE_REGION")), StorageEndpoint: strings.TrimSpace(getenv("STORAGE_ENDPOINT")),
 		StorageAccessKey: strings.TrimSpace(getenv("STORAGE_ACCESS_KEY")), StorageSecretKey: strings.TrimSpace(getenv("STORAGE_SECRET_KEY")),
 		StorageAllowedContentTypes: storageTypes, StorageMaxContentLength: storageMaxLength,
-		FileMaxDailyUploads: fileMaxUploads, FileMaxDailyBytes: fileMaxBytes, FileRetentionPeriod: fileRetentionPeriod,
+		FileMaxDailyUploads: fileMaxUploads, FileMaxDailyBytes: fileMaxBytes,
 		CORSBuyerOrigins:       cors["CORS_BUYER_ORIGINS"],
 		CORSMerchantOrigins:    cors["CORS_MERCHANT_ORIGINS"],
 		CORSDriverOrigins:      cors["CORS_DRIVER_ORIGINS"],
@@ -663,18 +658,6 @@ func optionalPositiveInt64(raw string) (int64, error) {
 	value, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil || value <= 0 {
 		return 0, errors.New("invalid positive integer")
-	}
-	return value, nil
-}
-
-func optionalPositiveDuration(raw string) (time.Duration, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0, nil
-	}
-	value, err := time.ParseDuration(raw)
-	if err != nil || value <= 0 {
-		return 0, errors.New("invalid positive duration")
 	}
 	return value, nil
 }

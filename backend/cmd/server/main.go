@@ -226,7 +226,7 @@ func main() {
 			os.Exit(1)
 		}
 		fileService = files.New(files.PostgresStore{DB: database}, objects, files.Options{
-			Verifier: files.NewQueueVerifier(fileEnqueuer), MaxDailyUploads: cfg.FileMaxDailyUploads, MaxDailyBytes: cfg.FileMaxDailyBytes, RetentionPeriod: cfg.FileRetentionPeriod,
+			Verifier: files.NewQueueVerifier(fileEnqueuer), MaxDailyUploads: cfg.FileMaxDailyUploads, MaxDailyBytes: cfg.FileMaxDailyBytes,
 		})
 	}
 

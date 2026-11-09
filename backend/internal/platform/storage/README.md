@@ -37,15 +37,23 @@ No presigned URL, access key, or secret key may be written to logs. ScanHook is 
 
 ## File retention and cleanup
 
-Every file upload receives a retention deadline. The default is two calendar
-years; set `FILE_RETENTION_PERIOD` to a positive Go duration (for example,
-`17520h`) to override it. An hourly worker removes object-store bytes before
-changing the metadata row, so a failed object deletion leaves the key and row
-available for retry.
+Every unreferenced upload receives a 24-hour deadline. A business module must
+attach a reference before that deadline and release it only when the business
+lifecycle ends. The final release starts the purpose-specific retention period:
+product images 90 days after delisting, inbound and delivery photos two years
+after order completion, and merchant KYC material five years after merchant
+cancellation.
 
-- Pending uploads older than 24 hours become `expired` after deletion.
-- Pending, ready, and rejected files whose `retention_until` has passed become
-  `deleted` after deletion.
-- Verification uploads are not included in the 24-hour recovery sweep.
+- Pending or stuck verifying uploads older than 24 hours become `expired`.
+- Active `ops.file_reference` rows prevent deletion regardless of age.
+- Ready and rejected files become `deleted` only after the last reference is
+  released and `retention_until` has passed.
+- Cleanup claims a row first, then performs object deletion with a 30-second
+  timeout without holding a database row lock. Failures clear the claim so the
+  next run can retry.
 
 The cleanup worker preserves `ops.file` rows for audit and is safe to rerun.
+Image uploads use a clean object key after re-encoding. WebP is not accepted
+until a metadata sanitizer is available. With S3 versioning enabled, the raw
+upload prefix must have a lifecycle rule that permanently removes noncurrent
+versions; otherwise deleted uploads can retain metadata in old versions.

@@ -96,10 +96,10 @@ func TestCleanupPostgresAndRustFS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Expired != 1 || result.Deleted != 1 {
+	if result.Expired != 2 || result.Deleted != 1 {
 		t.Fatalf("cleanup=%+v", result)
 	}
-	for _, want := range []struct{ id, status string }{{"pending-old", "expired"}, {"ready-expired", "deleted"}, {"verifying-old", "verifying"}} {
+	for _, want := range []struct{ id, status string }{{"pending-old", "expired"}, {"ready-expired", "deleted"}, {"verifying-old", "expired"}} {
 		var got string
 		if err := pool.QueryRow(ctx, `SELECT status FROM ops.file WHERE public_id=$1`, want.id).Scan(&got); err != nil || got != want.status {
 			t.Fatalf("%s status=%q err=%v", want.id, got, err)
@@ -111,7 +111,7 @@ func TestCleanupPostgresAndRustFS(t *testing.T) {
 	}
 
 	// Two workers racing the same ready object must claim it only once. The
-	// PostgreSQL row lock makes the second worker observe no candidate rather
+	// atomic claim makes the second worker observe no candidate rather
 	// than deleting an already-promoted object or overwriting the terminal state.
 	raceKey := "objects/00000000000000000000000000000099"
 	if _, err := client.PutObject(ctx, &awss3.PutObjectInput{Bucket: aws.String("files"), Key: aws.String(raceKey), Body: nil}); err != nil {
@@ -183,6 +183,63 @@ func TestCleanupPostgresAndRustFS(t *testing.T) {
 	}
 	if persistedStatus != "ready" || persistedSize != int64(len(actual)) || !bytes.Equal(persistedSHA256, sha256Sum(actual)) {
 		t.Fatalf("published metadata status=%q size=%d sha256=%x object size=%d sha256=%x", persistedStatus, persistedSize, persistedSHA256, len(actual), sha256Sum(actual))
+	}
+
+	// Active references always win over age. Once the final reference is
+	// released, each purpose receives its own retention window.
+	type retentionCase struct {
+		purpose string
+		want    time.Time
+	}
+	cases := []retentionCase{
+		{purpose: "product_image", want: now.AddDate(0, 0, 90)},
+		{purpose: "inbound_photo", want: now.AddDate(2, 0, 0)},
+		{purpose: "delivery_proof", want: now.AddDate(2, 0, 0)},
+		{purpose: "merchant_kyc", want: now.AddDate(5, 0, 0)},
+	}
+	for i, test := range cases {
+		id := "retention-" + test.purpose
+		key := fmt.Sprintf("objects/%032x", i+200)
+		if _, err := client.PutObject(ctx, &awss3.PutObjectInput{Bucket: aws.String("files"), Key: aws.String(key), Body: nil}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO ops.file(public_id,owner_account,purpose,object_key,content_type,size,sha256,status,retention_until,created_at,updated_at) VALUES($1,1,$2,$3,'image/jpeg',1,decode(repeat('00',32),'hex'),'ready',$4,$5,$5)`, id, test.purpose, key, now.Add(-time.Hour), now.Add(-24*time.Hour)); err != nil {
+			t.Fatal(err)
+		}
+		store := PostgresStore{DB: pool}
+		if err := store.AttachReference(ctx, id, "business-record-1"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.Cleanup(ctx, now.AddDate(10, 0, 0), verifier.Delete); err != nil {
+			t.Fatal(err)
+		}
+		var status string
+		if err := pool.QueryRow(ctx, `SELECT status FROM ops.file WHERE public_id=$1`, id).Scan(&status); err != nil || status != "ready" {
+			t.Fatalf("active referenced %s status=%q err=%v", test.purpose, status, err)
+		}
+		if err := store.ReleaseReference(ctx, id, "business-record-1", now); err != nil {
+			t.Fatal(err)
+		}
+		var got time.Time
+		if err := pool.QueryRow(ctx, `SELECT retention_until FROM ops.file WHERE public_id=$1`, id).Scan(&got); err != nil || !got.Equal(test.want) {
+			t.Fatalf("%s retention=%s err=%v, want %s", test.purpose, got, err, test.want)
+		}
+	}
+	for _, test := range cases {
+		id := "retention-" + test.purpose
+		if _, err := (PostgresStore{DB: pool}).Cleanup(ctx, test.want.Add(time.Second), verifier.Delete); err != nil {
+			t.Fatal(err)
+		}
+		var status string
+		if err := pool.QueryRow(ctx, `SELECT status FROM ops.file WHERE public_id=$1`, id).Scan(&status); err != nil || status != "deleted" {
+			t.Fatalf("released %s status=%q err=%v", test.purpose, status, err)
+		}
+	}
+	if err := goose.DownTo(sqlDB, filesMigrationDir(t), 57); err != nil {
+		t.Fatalf("rollback file retention migration: %v", err)
+	}
+	if err := goose.UpTo(sqlDB, filesMigrationDir(t), 59); err != nil {
+		t.Fatalf("reapply file retention migration: %v", err)
 	}
 	t.Logf("cleanup database result expired=%d deleted=%d; second run expired=%d deleted=%d", result.Expired, result.Deleted, second.Expired, second.Deleted)
 }

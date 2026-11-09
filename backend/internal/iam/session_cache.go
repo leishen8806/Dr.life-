@@ -65,6 +65,15 @@ redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[3])
 return 1
 `)
 
+var setEpochScript = redis.NewScript(`
+local current = redis.call('GET', KEYS[1])
+if not current or tonumber(current) <= tonumber(ARGV[1]) then
+  redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
+  return 1
+end
+return 0
+`)
+
 func (c *RedisSessionCache) Put(ctx context.Context, accountID, sessionID string, epoch int64, ttl time.Duration) error {
 	value, _ := json.Marshal(redisSessionValue{AccountID: accountID, Epoch: epoch})
 	if err := putSessionScript.Run(ctx, c.client, []string{sessionCacheKey(sessionID), epochCacheKey(accountID)}, value, epoch, ttl.Milliseconds()).Err(); err != nil {
@@ -81,7 +90,7 @@ func (c *RedisSessionCache) Revoke(ctx context.Context, sessionID string, ttl ti
 }
 
 func (c *RedisSessionCache) SetAccountEpoch(ctx context.Context, accountID string, epoch int64, ttl time.Duration) error {
-	if err := c.client.Set(ctx, epochCacheKey(accountID), epoch, ttl).Err(); err != nil {
+	if err := setEpochScript.Run(ctx, c.client, []string{epochCacheKey(accountID)}, epoch, ttl.Milliseconds()).Err(); err != nil {
 		return ErrSessionStoreUnavailable
 	}
 	return nil

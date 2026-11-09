@@ -332,7 +332,12 @@ func (s *SessionService) RevokeSession(ctx context.Context, accountID, sessionID
 		return err
 	}
 	if s.Cache != nil {
-		_ = s.Cache.Revoke(ctx, sessionID, positiveTTL(now, expiresAt))
+		ttl := positiveTTL(now, expiresAt)
+		if err := s.Cache.Revoke(ctx, sessionID, ttl); err != nil {
+			s.epochWriter().retry(ctx, accountID, "revoke_session", func() error {
+				return s.Cache.Revoke(context.Background(), sessionID, ttl)
+			})
+		}
 	}
 	return nil
 }

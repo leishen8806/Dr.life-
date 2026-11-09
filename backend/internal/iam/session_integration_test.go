@@ -78,7 +78,9 @@ func (c *testSessionCache) SetAccountEpoch(_ context.Context, accountID string, 
 	if c.unavailable || c.epochUnavailable {
 		return ErrSessionStoreUnavailable
 	}
-	c.epochs[accountID] = epoch
+	if c.epochs[accountID] <= epoch {
+		c.epochs[accountID] = epoch
+	}
 	c.epochTTL = ttl
 	return nil
 }
@@ -233,6 +235,34 @@ func (f *loginFixture) testSessionAccess(t *testing.T) {
 	if err := sessions.RevokeSession(ctx, other.Account.PublicID, items[0].PublicID, "user_revoked"); err == nil {
 		t.Fatal("another account revoked a session")
 	}
+	retryLogin, err := f.service.Login(ctx, LoginInput{End: telegram.Buyer, InitData: signInit(f.now, 9402, "buyer-standby-token", ""), DeviceID: "device_revoke_retry", IP: "192.0.2.2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	retrySessions, err := sessions.ListSessions(ctx, retryLogin.Account.PublicID)
+	if err != nil || len(retrySessions) != 1 {
+		t.Fatalf("retry sessions=%+v err=%v", retrySessions, err)
+	}
+	f.cache.mu.Lock()
+	f.cache.unavailable = true
+	f.cache.mu.Unlock()
+	retried := false
+	sessions.EpochWriter = EpochCacheWriter{Cache: f.cache, Retry: func(_ context.Context, write func() error) {
+		retried = true
+		f.cache.mu.Lock()
+		f.cache.unavailable = false
+		f.cache.mu.Unlock()
+		if err := write(); err != nil {
+			t.Errorf("single-session revoke retry: %v", err)
+		}
+	}}
+	if err := sessions.RevokeSession(ctx, retryLogin.Account.PublicID, retrySessions[0].PublicID, "user_revoked"); err != nil {
+		t.Fatal(err)
+	}
+	if !retried {
+		t.Fatal("single-session cache revoke was not retried")
+	}
+	sessions.EpochWriter = EpochCacheWriter{}
 
 	f.cache.mu.Lock()
 	f.cache.sessions = make(map[string]cachedTestSession)

@@ -57,7 +57,6 @@ type Options struct {
 	Verifier        Verifier
 	MaxDailyUploads int
 	MaxDailyBytes   int64
-	RetentionPeriod time.Duration
 }
 
 // Verifier is the queue-facing port. The worker alone reads object bytes.
@@ -123,10 +122,7 @@ func (s *Service) Presign(ctx context.Context, ownerAccount int64, in PresignInp
 }
 
 func (s *Service) retentionUntil() time.Time {
-	if s.options.RetentionPeriod <= 0 {
-		return s.options.Now().UTC().AddDate(2, 0, 0)
-	}
-	return s.options.Now().UTC().Add(s.options.RetentionPeriod)
+	return s.options.Now().UTC().Add(pendingUploadTTL)
 }
 
 // Complete makes a pending upload visible to the verification worker. It does
@@ -167,7 +163,7 @@ func purposeAllows(purpose, contentType string) bool {
 	case "merchant_kyc":
 		return contentType == "image/jpeg" || contentType == "image/png" || contentType == "application/pdf"
 	case "product_image", "inbound_photo", "delivery_proof":
-		return contentType == "image/jpeg" || contentType == "image/png" || contentType == "image/webp"
+		return contentType == "image/jpeg" || contentType == "image/png"
 	default:
 		return false
 	}
