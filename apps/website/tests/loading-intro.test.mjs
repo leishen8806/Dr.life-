@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { initLoadingIntro } from "../src/scripts/loading-intro.mjs";
 
@@ -50,6 +51,12 @@ function createEnvironment({ reduced = false, seen = false, storageThrows = fals
 
   return { advanceTo, documentObject, fireLoad: () => listeners.get("load")?.(), overlay, storage, windowObject };
 }
+
+test("loading intro uses the shared text wordmark without office branding or raster logos", () => {
+  const source = readFileSync(new URL("../src/components/LoadingIntro.astro", import.meta.url), "utf8");
+  assert.match(source, /<BrandWordmark class="site-loader__brand"/);
+  assert.doesNotMatch(source, /logo\.png|智序工场|NiuMa/);
+});
 
 test("fast pages never show the loading intro", () => {
   const env = createEnvironment();
