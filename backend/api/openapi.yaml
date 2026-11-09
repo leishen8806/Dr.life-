@@ -8,7 +8,7 @@ info:
     4xxx warehousing and logistics, 5xxx ledger and funds, 6xxx AI, and
     7xxx external services.
 servers:
-  - url: https://adminapi.settlecore.org
+  - url: https://adminapi.drlifeplus.com
     description: Production API gateway placeholder
   - url: http://localhost:8080
     description: Local development server

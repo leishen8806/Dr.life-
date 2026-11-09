@@ -1,4 +1,4 @@
-export const SITE_URL = "https://settlecore.org";
+export const SITE_URL = "https://drlifeplus.com";
 export const BOT_USERNAMES = {
   buyer: "DrLifePlusBot",
   merchant: "DrLifeMerchantBot"

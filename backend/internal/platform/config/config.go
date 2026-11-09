@@ -228,10 +228,10 @@ func loadWithLookup(getenv func(string) string, lookupEnv func(string) (string, 
 		return Config{}, err
 	}
 	defaultOrigins := map[string]string{
-		"CORS_BUYER_ORIGINS": "https://miniapp.settlecore.org", "CORS_MERCHANT_ORIGINS": "https://shop.settlecore.org",
-		"CORS_DRIVER_ORIGINS": "https://driver.settlecore.org", "CORS_WMS_ORIGINS": "https://wms.settlecore.org",
-		"CORS_ADMIN_ORIGINS":  "https://admin.settlecore.org",
-		"CORS_PUBLIC_ORIGINS": "https://miniapp.settlecore.org,https://shop.settlecore.org,https://driver.settlecore.org,https://wms.settlecore.org,https://admin.settlecore.org,https://settlecore.org",
+		"CORS_BUYER_ORIGINS": "https://miniapp.drlifeplus.com", "CORS_MERCHANT_ORIGINS": "https://shop.drlifeplus.com",
+		"CORS_DRIVER_ORIGINS": "https://driver.drlifeplus.com", "CORS_WMS_ORIGINS": "https://wms.drlifeplus.com",
+		"CORS_ADMIN_ORIGINS":  "https://admin.drlifeplus.com",
+		"CORS_PUBLIC_ORIGINS": "https://miniapp.drlifeplus.com,https://shop.drlifeplus.com,https://driver.drlifeplus.com,https://wms.drlifeplus.com,https://admin.drlifeplus.com,https://drlifeplus.com",
 	}
 	cors := make(map[string][]string, len(defaultOrigins))
 	for name, fallback := range defaultOrigins {
