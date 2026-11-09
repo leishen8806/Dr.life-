@@ -20,6 +20,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
+	"github.com/leishen8806/Dr.life-/backend/internal/trade"
 	"github.com/leishen8806/Dr.life-/backend/internal/trade/kess"
 )
 
@@ -70,6 +71,8 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 		{"01ARZ3NDEKTSV4RRFFQ69G5FAX", 100},
 		{"01ARZ3NDEKTSV4RRFFQ69G5FAY", 10000},
 		{"01ARZ3NDEKTSV4RRFFQ69G5FAZ", 10000},
+		{"01ARZ3NDEKTSV4RRFFQ69G5FB0", 10000},
+		{"01ARZ3NDEKTSV4RRFFQ69G5FB1", 10000},
 	} {
 		seedKESSReceivableOrder(t, database, receivable.publicID, receivable.amountE4, int64(i+1))
 	}
@@ -159,6 +162,102 @@ func TestKESSPaymentIntentMigrationAndPersistence(t *testing.T) {
 		}
 		if success != 1 || duplicate != 1 {
 			t.Fatalf("success=%d duplicate=%d, want 1/1", success, duplicate)
+		}
+	})
+
+	t.Run("due scan leases one intent across concurrent trade workers", func(t *testing.T) {
+		due, err := store.CreateIntent(ctx, kess.ReceivableSnapshot{CompanyID: 9, SourceRef: "01ARZ3NDEKTSV4RRFFQ69G5FB1", AttemptNo: 1, AmountE4: 10000, Currency: "USD", SellerCode: "seller-test"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `UPDATE trade.kess_payment_intent SET last_checked_at=now()-interval '2 minutes' WHERE id=$1`, due.ID); err != nil {
+			t.Fatal(err)
+		}
+		start := make(chan struct{})
+		results := make(chan []kess.Intent, 2)
+		errs := make(chan error, 2)
+		scanAt := time.Now()
+		for range 2 {
+			go func() {
+				conn, err := pool.Acquire(ctx)
+				if err != nil {
+					errs <- err
+					return
+				}
+				defer conn.Release()
+				if _, err := conn.Exec(ctx, `SET ROLE trade_rw`); err != nil {
+					errs <- err
+					return
+				}
+				defer func() { _, _ = conn.Exec(ctx, `RESET ROLE`) }()
+				<-start
+				items, err := kess.NewPgStore(conn).ListDue(ctx, scanAt, 100)
+				results <- items
+				errs <- err
+			}()
+		}
+		close(start)
+		matches := 0
+		for range 2 {
+			for _, item := range <-results {
+				if item.ID == due.ID {
+					matches++
+				}
+			}
+			if err := <-errs; err != nil {
+				t.Fatal(err)
+			}
+		}
+		if matches != 1 {
+			t.Fatalf("due intent claimed %d times, want 1", matches)
+		}
+	})
+
+	t.Run("invalidated late success creates one manual reconciliation task", func(t *testing.T) {
+		const orderID = "01ARZ3NDEKTSV4RRFFQ69G5FB0"
+		intent, err := store.CreateIntent(ctx, kess.ReceivableSnapshot{CompanyID: 9, SourceRef: orderID, AttemptNo: 1, AmountE4: 10000, Currency: "USD", SellerCode: "seller-test"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		tradeStore := trade.NewPostgresStore(pool)
+		if _, claimed, err := tradeStore.ClaimBuyerReservationRelease(ctx, 7, orderID); err != nil || !claimed {
+			t.Fatalf("cancel claimed=%v err=%v", claimed, err)
+		}
+		if _, err := pool.Exec(ctx, `UPDATE trade.kess_payment_intent SET last_checked_at=now()+interval '1 hour'`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `UPDATE trade.kess_payment_intent SET last_checked_at=now()-interval '2 minutes' WHERE id=$1`, intent.ID); err != nil {
+			t.Fatal(err)
+		}
+		client := &lateSuccessClient{transactionID: "late-kess-transaction"}
+		worker, err := kess.NewWorker(kess.NewPgStore(pool), client, 24*time.Hour, "devwebpayment.kesspay.io")
+		if err != nil {
+			t.Fatal(err)
+		}
+		service := trade.NewService(tradeStore, kessAccounts{}, kessCatalog{})
+		maintenance, err := kess.NewMaintenance(kess.NewPgStore(pool), worker, service)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := maintenance.ProcessDue(ctx, 100); err != nil {
+			t.Fatal(err)
+		}
+		if err := maintenance.ProcessDue(ctx, 100); err != nil {
+			t.Fatal(err)
+		}
+		var status string
+		var tasks, paid int
+		if err := pool.QueryRow(ctx, `SELECT status FROM trade.kess_payment_intent WHERE id=$1`, intent.ID).Scan(&status); err != nil {
+			t.Fatal(err)
+		}
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.payment_reconciliation_task WHERE source_ref=$1`, client.transactionID).Scan(&tasks); err != nil {
+			t.Fatal(err)
+		}
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM trade.merchant_order child JOIN trade.buyer_order buyer ON buyer.id=child.buyer_order_id WHERE buyer.public_id=$1 AND child.status='paid'`, orderID).Scan(&paid); err != nil {
+			t.Fatal(err)
+		}
+		if status != "SUCCESS" || tasks != 1 || paid != 0 || client.queries != 1 {
+			t.Fatalf("status=%s tasks=%d paid=%d queries=%d, want SUCCESS/1/0/1", status, tasks, paid, client.queries)
 		}
 	})
 
@@ -317,6 +416,32 @@ type persistedThenTimeout struct {
 	intentID int64
 	seen     bool
 }
+
+type lateSuccessClient struct {
+	transactionID string
+	queries       int
+}
+
+func (*lateSuccessClient) Create(context.Context, kess.Intent) (kess.ChannelOrder, error) {
+	return kess.ChannelOrder{}, errors.New("unexpected KESS create")
+}
+
+func (c *lateSuccessClient) Query(_ context.Context, intent kess.Intent) (kess.ChannelOrder, error) {
+	c.queries++
+	return kess.ChannelOrder{TradeNo: intent.TradeNo, SellerCode: intent.ExpectedSellerCode, AmountE4: intent.AmountE4, Currency: intent.Currency, Status: "SUCCESS", TransactionID: c.transactionID}, nil
+}
+
+type kessAccounts struct{}
+
+func (kessAccounts) Status(context.Context, int64) (string, error) { return "active", nil }
+
+type kessCatalog struct{}
+
+func (kessCatalog) ResolveAndReserve(context.Context, string, []trade.OrderLineInput) ([]trade.CatalogLine, error) {
+	return nil, errors.New("unexpected catalog reservation")
+}
+func (kessCatalog) Release(context.Context, string) error { return nil }
+func (kessCatalog) Commit(context.Context, string) error  { return nil }
 
 func (c *persistedThenTimeout) Create(ctx context.Context, _ kess.Intent) (kess.ChannelOrder, error) {
 	var count int
