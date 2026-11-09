@@ -23,3 +23,11 @@
  @media(max-width:520px){.hero h1{font-size:60px;line-height:1.1}.site-header{gap:12px}.header-actions{margin-left:auto}.languages{gap:2px}.languages a{padding:10px 6px;white-space:nowrap}.mobile-menu{margin-left:0}}
  @media(max-width:360px){.header-actions .languages{display:none}.mobile-menu-languages{display:flex}}
  @media(min-width:361px){.mobile-menu-languages{display:none}}
+/* Homepage category imagery: keep text readable while the source remains replaceable. */
+.category-card{overflow:hidden;isolation:isolate}
+.category-card picture,.category-card picture::after,.category-card img{position:absolute;inset:0;width:100%;height:100%}
+.category-card picture{display:block;z-index:-1}
+.category-card picture::after{content:"";background:linear-gradient(180deg,rgb(19 21 23/.08) 20%,rgb(19 21 23/.78) 100%);z-index:1}
+.category-card img{display:block;object-fit:cover;z-index:0}
+.category-card>span,.category-card>h3,.category-card>small{position:relative;z-index:1;text-shadow:0 1px 2px rgb(0 0 0/.45)}
+.category-card>small:empty{display:none}
