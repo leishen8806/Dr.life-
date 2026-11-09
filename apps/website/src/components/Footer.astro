@@ -1,9 +1,10 @@
 ---
 import { locales, read } from "../i18n";
+import BrandWordmark from "./BrandWordmark.astro";
 const copy = locales.zh;
 ---
 <footer class="site-footer">
-  <div><a class="brand" href="/">DR.LIFE<span>+</span></a><p data-i18n="brand.tagline">{read(copy, "brand.tagline")}</p><p class="khmer" data-i18n="brand.welcome">{read(copy, "brand.welcome")}</p></div>
+  <div><BrandWordmark class="brand" href="/" /><p data-i18n="brand.tagline">{read(copy, "brand.tagline")}</p><p class="khmer" data-i18n="brand.welcome">{read(copy, "brand.welcome")}</p></div>
   <div class="footer-links"><a href="/privacy" data-i18n="legal.privacy">{read(copy, "legal.privacy")}</a><a href="/terms" data-i18n="legal.terms">{read(copy, "legal.terms")}</a><a href="/delete-account" data-i18n="legal.delete">{read(copy, "legal.delete")}</a><a href="/contact" data-i18n="legal.contact">{read(copy, "legal.contact")}</a></div>
   <p class="official" data-i18n="brand.official">{read(copy, "brand.official")}</p>
   <p data-i18n="footer.copyright">{read(copy, "footer.copyright")}</p>

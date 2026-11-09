@@ -1,6 +1,7 @@
 ---
 import { SITE_URL } from "../constants";
 import { getLocale, locales, read } from "../i18n";
+import LoadingIntro from "./LoadingIntro.astro";
 import "../styles/global.css";
 
 const { titleKey, descriptionKey, robots } = Astro.props;
@@ -35,6 +36,7 @@ const canonical = new URL(Astro.url.pathname, SITE_URL).href;
     <link rel="stylesheet" href="/fonts/fonts.css" />
   </head>
   <body data-lang={lang}>
+    <LoadingIntro />
     <slot />
   </body>
 </html>
