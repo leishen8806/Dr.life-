@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const dist = fileURLToPath(new URL("../dist/", import.meta.url));
 const source = (name) => readFileSync(fileURLToPath(new URL(`../src/${name}`, import.meta.url)), "utf8");
+const publicSource = (name) => readFileSync(fileURLToPath(new URL(`../public/${name}`, import.meta.url)), "utf8");
 
 test("confirmed-design sections remain present in the source", () => {
   const home = source("pages/index.astro");
@@ -15,6 +16,16 @@ test("confirmed-design sections remain present in the source", () => {
   for (const marker of ["hero-arc", "category-grid", "ecosystem-node", "chain-step"]) {
     assert.match(home, new RegExp(marker), `homepage is missing ${marker}`);
   }
+  assert.match(home, /<picture>/, "category cards must use responsive picture markup");
+  assert.match(home, /type="image\/avif"/, "category cards must expose AVIF");
+  assert.match(home, /type="image\/webp"/, "category cards must expose WebP");
+  assert.match(home, /data-i18n-alt={`home\.categoryAlts\.\$\{index\}`}/, "category cards must use localized alt keys");
+
+  const imageCredits = publicSource("images/CREDITS.md");
+  for (const photographer of ["Aspect 11", "R ARCHITECTURE", "Spacejoy", "Theme Photos"]) {
+    assert.match(imageCredits, new RegExp(photographer.replace(" ", "\\s+")), `image credits missing ${photographer}`);
+  }
+  assert.equal((imageCredits.match(/https:\/\/unsplash\.com\/photos\//g) || []).length, 5, "each local image needs its original source page");
   for (const marker of ["merchant-fee-table", "merchant-cta"]) {
     assert.match(merchant, new RegExp(marker), `merchant page is missing ${marker}`);
   }
