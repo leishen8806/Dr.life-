@@ -1,6 +1,7 @@
 ---
 import { EXTERNAL_LINKS } from "../constants";
 import { locales, read } from "../i18n";
+import BrandWordmark from "./BrandWordmark.astro";
 const { dark = false } = Astro.props;
 const copy = locales.zh;
 const isMerchant = Astro.url.pathname.startsWith("/merchant");
@@ -10,7 +11,7 @@ const links = isMerchant
 const action = isMerchant ? { href: EXTERNAL_LINKS.merchantBot, label: "merchant.headerAction" } : { href: EXTERNAL_LINKS.buyerBot, label: "nav.shop" };
 ---
 <header class:list={["site-header", { "site-header--dark": dark }]}>
-  <a class="brand" href="/" aria-label="DR.LIFE+">DR.LIFE<span>+</span></a>
+  <BrandWordmark class="brand" href="/" />
   <nav aria-label={read(copy, "nav.about")} class="main-nav">
     {links.map(([href, label]) => <a href={href} data-i18n={label}>{read(copy, label)}</a>)}
   </nav>
