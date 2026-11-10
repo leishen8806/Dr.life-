@@ -2,9 +2,9 @@
 
 > 与 Dr.RouteFit 的 `ops/codex/DISPATCH.md` 保持一致。周计划与任务在 GitHub Issues / Milestones，本文件不登记具体任务。
 
-适用：`zhangdaowang3-code`（大旺 + Codex：前端、官网、文档、部署模板）和 `suchenyang0910-glitch`（苏晨 + Codex，后端/接口/运维）。本仓库是**公开仓库**，写在这里的一切都是公开的。时间一律按 UTC+7。
+适用：`zhangdaowang3-code`（大旺 + Codex：前端、官网、文档、部署模板）和 `suchenyang0910-glitch`（owner 的 Codex 账号：后端/接口/运维，这条线归 owner；提示词由大旺起草、owner 过目后发出）。本仓库是**公开仓库**，写在这里的一切都是公开的。时间一律按 UTC+7。
 
-自 2026-11-09 起，大旺（`zhangdaowang3-code`）为 Dr.life+ 主力负责人，负责日常推进、拆任务、派单和每周进度；项目负责人（owner）仍是 `leishen8806`，最终批准合并与发布、亲审资金/登录权限/迁移改动，权限边界不因交接而改变。
+自 2026-11-09 起，大旺（`zhangdaowang3-code`）为 Dr.life+ 主力负责人，负责日常推进、拆任务、派单和每周进度；项目负责人（owner）仍是 `leishen8806`，最终批准合并与发布、亲审资金/登录权限/迁移改动，权限边界不因交接而改变。大旺可以审核 Codex（`suchenyang0910-glitch`）和智序工场的 PR；大旺自己的 PR 不能自审，由 Claude 审核、owner 批准（#185）。
 
 ### 一、去哪里领任务
 ```bash
