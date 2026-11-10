@@ -11,10 +11,6 @@ on:
   pull_request_review_comment:
     types: [created]
 
-concurrency:
-  group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
-  cancel-in-progress: true
-
 jobs:
   review:
     # 公开仓库：只响应仓库成员或协作者的 @claude，防止外人消耗额度；草稿 PR 不自动审核；fork 来的 PR 拿不到密钥，不运行。
@@ -31,6 +27,11 @@ jobs:
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # 并发控制放在 job 上：不满足 if 的评论（Codex 回复、claude[bot] 自己发的审核）不会占用并发组，
+    # 也就不会取消正在进行的审核；同一 PR 的审核排队执行，不互相取消。
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: write
