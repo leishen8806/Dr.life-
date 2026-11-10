@@ -258,6 +258,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartError, setCartError] = useState<ReturnType<typeof addProduct>["error"]>();
   const route = stack[stack.length - 1] ?? { name: "home" };
+  const detailRequest = useRef<AbortController | undefined>(undefined);
   const push = useCallback(
     (next: Route) => setStack((current) => [...current, next]),
     []
@@ -267,7 +268,10 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     []
   );
   const back = useCallback(
-    () => setStack((current) => (current.length > 1 ? current.slice(0, -1) : current)),
+    () => {
+      detailRequest.current?.abort();
+      setStack((current) => (current.length > 1 ? current.slice(0, -1) : current));
+    },
     []
   );
   useBackButton(back, isTelegram && stack.length > 1);
@@ -300,7 +304,6 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const { resource: orders, retry: retryOrders, loadMore: loadMoreOrders, loadingMore, moreMessageKey: moreOrdersMessageKey, nextCursor: nextOrderCursor } =
     useOrderFeed(client, language);
   const orderList = orders;
-  const detailRequest = useRef<AbortController | undefined>(undefined);
   useEffect(() => () => {
     detailRequest.current?.abort();
   }, []);

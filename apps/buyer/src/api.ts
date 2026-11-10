@@ -103,7 +103,10 @@ function mapOrderForList(order: ApiOrder): BuyerOrder | null {
   try {
     return mapOrder(order);
   } catch (error) {
-    if (error instanceof ApiError && error.code === 1001) return null;
+    if (error instanceof ApiError && error.code === 1001) {
+      console.warn("[buyer] skipped malformed order", order.public_id);
+      return null;
+    }
     throw error;
   }
 }

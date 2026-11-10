@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@drlife/api-client";
 import { createBuyerApiClient, loadCategories, loadProducts, loadBuyerOrders, loadBuyerOrder } from "./api";
 import type { Category, Product } from "./types";
+
+afterEach(() => vi.restoreAllMocks());
 
 const category: Category = {
   public_id: "cat_tile",
@@ -249,6 +251,7 @@ describe("loadBuyerOrders", () => {
   });
 
   it("skips a malformed list row without hiding valid orders", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const malformed = { ...apiOrder, public_id: "01JBAD", payable_amount_e4: 101 };
     const { transport } = recordingFetch(() =>
       success({ items: [malformed, apiOrder], next_cursor: null })
@@ -258,6 +261,7 @@ describe("loadBuyerOrders", () => {
       items: [{ publicId: "01JORDER" }],
       nextCursor: null
     });
+    expect(warning).toHaveBeenCalledWith("[buyer] skipped malformed order", "01JBAD");
   });
 
   it("maps unknown server statuses to the localized processing fallback", async () => {
