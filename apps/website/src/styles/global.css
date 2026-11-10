@@ -822,18 +822,9 @@ a:focus-visible {
   .chain {
     grid-template-columns: repeat(2, 1fr);
   }
-  .stats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
   .button {
     width: 100%;
     min-height: 52px;
-  }
-  .ecosystem-orbit {
-    height: 460px;
-    transform: scale(0.82);
-    transform-origin: top center;
-    margin-bottom: -80px;
   }
   .category-grid {
     grid-auto-rows: 170px;
@@ -851,14 +842,10 @@ a:focus-visible {
     padding: 38px 20px;
     grid-template-columns: 1fr;
   }
-}
-@media (max-width: 520px) {
   .eyebrow,
   .merchant-hero .section-title {
     overflow-wrap: anywhere;
   }
-}
-@media (max-width: 520px) {
   .stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
@@ -953,8 +940,6 @@ a:focus-visible {
   .partner p {
     font-size: var(--fs-small);
   }
-}
-@media (max-width: 520px) {
   [data-lang="km"] .hero h1,
   [data-lang="km"] .legal-page h1,
   [data-lang="km"] .merchant-hero .section-title,
