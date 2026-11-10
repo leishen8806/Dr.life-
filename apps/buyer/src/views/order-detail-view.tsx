@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { AppHeader, Card } from "@drlife/ui";
 import { localized } from "../localized";
 import { formatPriceE4 } from "../money";
@@ -24,6 +25,19 @@ export function OrderDetailView({
   onRetry,
   onBack
 }: { order: Resource<BuyerOrder>; actions?: ReactNode; onRetry?: () => void; onBack: () => void } & LocaleProps) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (order.status !== "ready") return;
+    const expiry = order.value.subOrders
+      .map((subOrder) => Date.parse(subOrder.shippingQuoteExpiresAt))
+      .filter((value) => Number.isFinite(value) && value > now)
+      .sort((a, b) => a - b)[0];
+    if (expiry === undefined) return;
+    const timer = window.setTimeout(() => setNow(Date.now()), expiry - now);
+    return () => window.clearTimeout(timer);
+  }, [now, order]);
+
   return (
     <div className="buyer-page">
       <AppHeader slogan={t("order.detailTitle")} actions={actions} />
@@ -66,10 +80,9 @@ export function OrderDetailView({
             {subOrder.shippingQuoteExpiresAt && subOrder.status === "awaiting_payment" && (
               <p className="buyer-order-detail__meta">
                 {/* Payment follow-up owns server-authoritative 409/3006 handling; this is display-only. */}
-                {new Date(subOrder.shippingQuoteExpiresAt).getTime() <
-                // The expiry is a server timestamp; this render-time comparison is intentionally best-effort.
-                // eslint-disable-next-line react-hooks/purity
-                Date.now() ? t("order.quoteExpired") : t("order.quoteExpires")}: {formatQuoteExpiry(subOrder.shippingQuoteExpiresAt, language)}
+                {new Date(subOrder.shippingQuoteExpiresAt).getTime() < now
+                  ? t("order.quoteExpired")
+                  : t("order.quoteExpires")}: {formatQuoteExpiry(subOrder.shippingQuoteExpiresAt, language)}
               </p>
             )}
             {subOrder.events.length > 0 && <>

@@ -89,6 +89,7 @@ function mapSuborder(suborder: ApiSuborder): BuyerSubOrder {
 }
 
 function mapOrder(order: ApiOrder): BuyerOrder {
+  // Follow-up data-integrity task: validate parent totals against suborder sums once the owner assigns it.
   return {
     publicId: order.public_id,
     createdAt: order.created_at,
