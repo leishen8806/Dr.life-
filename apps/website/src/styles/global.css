@@ -170,14 +170,12 @@ a:focus-visible {
   font-size: var(--fs-display);
   letter-spacing: 0.02em;
   margin: 0;
-  white-space: nowrap;
 }
 .subtitle {
   font-size: var(--fs-tagline);
   font-weight: 200;
   letter-spacing: 0.32em;
   color: var(--silver);
-  white-space: nowrap;
 }
 .hero-copy {
   max-width: 640px;
