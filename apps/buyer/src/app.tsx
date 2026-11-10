@@ -167,6 +167,13 @@ export function useOrderFeed(client: BuyerApiClient, language: string, enabled =
   const [moreOrders, setMoreOrders] = useState<MoreOrders>();
   const moreOrdersRequest = useRef<AbortController | undefined>(undefined);
 
+  useEffect(() => {
+    if (enabled) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMoreOrders(undefined);
+    }
+  }, [enabled]);
+
   // This reset intentionally synchronizes the continuation cache with the
   // language-keyed first-page loader.
   useEffect(() => {

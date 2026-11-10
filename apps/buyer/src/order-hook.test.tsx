@@ -69,6 +69,28 @@ describe("useOrderFeed", () => {
     expect(requests).toBe(1);
   });
 
+  it("drops appended rows before reloading after leaving and returning", async () => {
+    let firstPage = 0;
+    const transport: typeof globalThis.fetch = async (input) => {
+      const url = new URL(new Request(input).url);
+      if (url.searchParams.has("cursor")) return page([order("old_2")], null);
+      firstPage += 1;
+      return page([order(firstPage === 1 ? "old_1" : "new_1")], firstPage === 1 ? "next" : null);
+    };
+    const buyerClient = client(transport, "zh");
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useOrderFeed(buyerClient, "zh", enabled),
+      { initialProps: { enabled: true } }
+    );
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.resource.status === "ready" && result.current.resource.value.length).toBe(2));
+    rerender({ enabled: false });
+    rerender({ enabled: true });
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    expect(result.current.resource.status === "ready" ? result.current.resource.value.map((item) => item.publicId) : []).toEqual(["new_1"]);
+  });
+
   it("deduplicates appended orders and keeps the cursor for retry", async () => {
     const requests: string[] = [];
     const transport: typeof globalThis.fetch = async (input, init) => {
