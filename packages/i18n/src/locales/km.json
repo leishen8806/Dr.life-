@@ -111,6 +111,8 @@
   "order.itemFallback": "[TODO-KM-REVIEW] ទំនិញ {count}",
   "order.merchantFallback": "[TODO-KM-REVIEW] អ្នកលក់",
   "order.quoteExpires": "[TODO-KM-REVIEW] សុពលភាពតម្លៃដឹកជញ្ជូនដល់",
+  "order.quoteExpired": "[TODO-KM-REVIEW] តម្លៃដឹកជញ្ជូនបានផុតកំណត់",
+  "order.unit.item": "[TODO-KM-REVIEW] ឯកតាទំនិញ",
   "shell.currentLanguage": "ភាសាបច្ចុប្បន្ន៖ {language}",
   "shell.developmentMode": "[TODO-KM-REVIEW] Development mode: browser mock data is active",
   "shell.telegramMode": "[TODO-KM-REVIEW] Telegram Mini App mode",

@@ -111,6 +111,8 @@
   "order.itemFallback": "商品 {count}",
   "order.merchantFallback": "商家",
   "order.quoteExpires": "运费报价有效期至",
+  "order.quoteExpired": "运费报价已过期",
+  "order.unit.item": "件",
   "shell.currentLanguage": "当前语言：{language}",
   "shell.developmentMode": "开发模式：正在使用浏览器模拟数据",
   "shell.telegramMode": "Telegram Mini App 模式",

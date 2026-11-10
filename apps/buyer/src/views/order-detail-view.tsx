@@ -6,6 +6,16 @@ import type { BuyerOrder } from "../orders";
 import type { Resource } from "../resource";
 import type { LocaleProps } from "./common";
 
+function formatQuoteExpiry(value: string, language: LocaleProps["language"]): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(language, {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Phnom_Penh"
+  }).format(date);
+}
+
 export function OrderDetailView({
   t,
   language,
@@ -43,16 +53,20 @@ export function OrderDetailView({
                 <div className="buyer-order-line" key={line.publicId}>
                   <div>
                     <strong lang={language}>{localized(line.name, language) || t("order.itemFallback", { count: lineIndex + 1 })}</strong>
-                    <small>{line.quantity} {line.unit} × {formatPriceE4(line.unitPriceE4)}</small>
+                    <small>{line.quantity} {line.unit === "item" ? t("order.unit.item") : line.unit} × {formatPriceE4(line.unitPriceE4)}</small>
                   </div>
                   <strong>{formatPriceE4(line.totalE4)}</strong>
                 </div>
               ))}
             </div>
             <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(subOrder.goodsAmountE4)}</strong></p>
-            <p className="buyer-order-detail__meta">{t("order.shipping")}: {subOrder.shippingAmountE4 === 0n ? t("order.free") : formatPriceE4(subOrder.shippingAmountE4)}</p>
+            <p className="buyer-order-detail__meta">{t("order.shipping")}: {formatPriceE4(subOrder.shippingAmountE4)}</p>
             <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(subOrder.totalE4)}</strong></p>
-            {subOrder.shippingQuoteExpiresAt && <p className="buyer-order-detail__meta">{t("order.quoteExpires")}: {subOrder.shippingQuoteExpiresAt.slice(0, 10)}</p>}
+            {subOrder.shippingQuoteExpiresAt && subOrder.status === "awaiting_payment" && (
+              <p className="buyer-order-detail__meta">
+                {new Date(subOrder.shippingQuoteExpiresAt).getTime() < Date.now() ? t("order.quoteExpired") : t("order.quoteExpires")}: {formatQuoteExpiry(subOrder.shippingQuoteExpiresAt, language)}
+              </p>
+            )}
             <h3 className="buyer-section__title">{t("order.delivery")}</h3>
             <ol className="buyer-order-events">
               {subOrder.events.map((event) => (
@@ -66,7 +80,7 @@ export function OrderDetailView({
         ))}
         <Card>
           <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(order.value.goodsAmountE4)}</strong></p>
-          <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{order.value.shippingAmountE4 === 0n ? t("order.free") : formatPriceE4(order.value.shippingAmountE4)}</strong></p>
+          <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{formatPriceE4(order.value.shippingAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(order.value.totalE4)}</strong></p>
         </Card>
         </>}

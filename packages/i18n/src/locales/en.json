@@ -141,6 +141,8 @@
   "order.itemFallback": "Item {count}",
   "order.merchantFallback": "Merchant",
   "order.quoteExpires": "Shipping quote expires",
+  "order.quoteExpired": "Shipping quote expired",
+  "order.unit.item": "item",
   "shell.currentLanguage": "Current language: {language}",
   "shell.developmentMode": "Development mode: browser mock data is active",
   "shell.telegramMode": "Telegram Mini App mode",
