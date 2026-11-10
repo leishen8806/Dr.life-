@@ -99,14 +99,14 @@ function mapOrder(order: ApiOrder): BuyerOrder {
   };
 }
 
-function mapOrderForList(order: ApiOrder): BuyerOrder {
+function mapOrderForList(order: ApiOrder, index: number): BuyerOrder {
   try {
     return mapOrder(order);
   } catch (error) {
     if (error instanceof ApiError && error.code === 1001) {
       console.warn("[buyer] malformed order", order.public_id);
       return {
-        publicId: "",
+        publicId: `data-error:${order.public_id}:${index}`,
         createdAt: "",
         totalE4: 0n,
         goodsAmountE4: 0n,
@@ -136,7 +136,7 @@ export async function loadBuyerOrders(
   });
   if (!data) throw new ApiError(1001, "buyer-orders", 502);
   return {
-    items: data.data.items.map(mapOrderForList),
+    items: data.data.items.map((order, index) => mapOrderForList(order, index)),
     nextCursor: data.data.next_cursor ?? null
   };
 }

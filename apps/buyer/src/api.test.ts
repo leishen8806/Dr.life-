@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readLanguagePreference, storeLanguagePreference } from "@drlife/i18n";
 import { ApiError } from "@drlife/api-client";
 import { createBuyerApiClient, loadCategories, loadProducts, loadBuyerOrders, loadBuyerOrder } from "./api";
 import type { Category, Product } from "./types";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const category: Category = {
   public_id: "cat_tile",
@@ -206,6 +209,32 @@ const apiOrder = {
 };
 
 describe("loadBuyerOrders", () => {
+  it("uses the newly stored language on the next request of one client", async () => {
+    const languages: string[] = [];
+    const preferences = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => preferences.get(key) ?? null,
+      setItem: (key: string, value: string) => preferences.set(key, value)
+    };
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      languages.push(new Request(input, init).headers.get("Accept-Language") ?? "");
+      return success({ items: [], next_cursor: null });
+    };
+    const buyerClient = createBuyerApiClient({
+      baseUrl: "http://api.test",
+      getLanguage: () => readLanguagePreference(storage) ?? "zh",
+      fetch: transport,
+      resilience: { retry: { maxAttempts: 1 } }
+    });
+
+    storeLanguagePreference("zh", storage);
+    await loadBuyerOrders(buyerClient);
+    storeLanguagePreference("km", storage);
+    await loadBuyerOrders(buyerClient);
+
+    expect(languages).toEqual(["zh", "km"]);
+  });
+
   it("reads the current language for every request", async () => {
     let language: "zh" | "en" | "km" = "zh";
     const languages: string[] = [];
@@ -258,7 +287,7 @@ describe("loadBuyerOrders", () => {
     );
 
     await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
-      items: [{ dataError: true }, { publicId: "01JORDER" }],
+      items: [{ dataError: true, publicId: "data-error:01JBAD:0" }, { publicId: "01JORDER" }],
       nextCursor: null
     });
     expect(warning).toHaveBeenCalledWith("[buyer] malformed order", "01JBAD");

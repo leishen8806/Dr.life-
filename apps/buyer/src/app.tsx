@@ -174,7 +174,12 @@ export function useOrderFeed(client: BuyerApiClient, language: string) {
         if (controller.signal.aborted) return;
         setMoreOrders({
           language,
-          items: [...currentItems, ...page.items.filter((item) => !currentItems.some((existing) => existing.publicId === item.publicId))],
+          items: [
+            ...currentItems,
+            ...page.items.filter((item) =>
+              item.dataError || !currentItems.some((existing) => existing.publicId === item.publicId)
+            )
+          ],
           nextCursor: page.nextCursor,
           loading: false
         });
