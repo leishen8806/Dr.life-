@@ -155,4 +155,21 @@ describe("useOrderDetail", () => {
     rerender({ lang: "km" });
     await waitFor(() => expect(languages).toEqual(["zh", "km"]));
   });
+
+  it("does not render the previous order while switching detail ids", async () => {
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      const request = new Request(input, init);
+      return detail(order(new URL(request.url).pathname.endsWith("ord_b") ? "ord_b" : "ord_a"));
+    };
+    const buyerClient = client(transport, "zh");
+    const { result, rerender } = renderHook(
+      ({ publicId }) => useOrderDetail(buyerClient, publicId, "zh"),
+      { initialProps: { publicId: "ord_a" } }
+    );
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    rerender({ publicId: "ord_b" });
+    expect(result.current.resource.status).toBe("loading");
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    expect(result.current.resource.status === "ready" ? result.current.resource.value.publicId : "").toBe("ord_b");
+  });
 });

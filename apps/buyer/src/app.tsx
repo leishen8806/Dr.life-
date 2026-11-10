@@ -145,7 +145,7 @@ export function useOrderFeed(client: BuyerApiClient, language: string) {
   const loadOrders = useCallback(
     (signal: AbortSignal) =>
       loadBuyerOrders(client, undefined, signal).then((page) => {
-        setReadyLanguage(language);
+        if (!signal.aborted) setReadyLanguage(language);
         return page;
       }),
     [client, language]
@@ -224,23 +224,27 @@ export function useOrderFeed(client: BuyerApiClient, language: string) {
 
 /** Loads one order detail and reloads it whenever the active language changes. */
 export function useOrderDetail(client: BuyerApiClient, publicId: string, language: string) {
-  const [resource, setResource] = useState<Resource<BuyerOrder>>({ status: "loading" });
+  const [loaded, setLoaded] = useState<{ key: string; resource: Resource<BuyerOrder> }>({
+    key: "",
+    resource: { status: "loading" }
+  });
   const request = useRef<AbortController | undefined>(undefined);
+  const key = `${publicId}:${language}`;
 
   const load = useCallback(() => {
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
-    setResource({ status: "loading" });
+    setLoaded({ key, resource: { status: "loading" } });
     loadBuyerOrder(client, publicId, controller.signal).then(
       (value) => {
-        if (!controller.signal.aborted) setResource({ status: "ready", value });
+        if (!controller.signal.aborted) setLoaded({ key, resource: { status: "ready", value } });
       },
       (error: unknown) => {
-        if (!controller.signal.aborted) setResource({ status: "error", messageKey: errorMessageKey(error) });
+        if (!controller.signal.aborted) setLoaded({ key, resource: { status: "error", messageKey: errorMessageKey(error) } });
       }
     );
-  }, [client, publicId]);
+  }, [client, key, publicId]);
 
   useEffect(() => {
     if (!publicId) {
@@ -252,7 +256,7 @@ export function useOrderDetail(client: BuyerApiClient, publicId: string, languag
     return () => request.current?.abort();
   }, [load, language, publicId]);
 
-  return { resource, retry: load };
+  return { resource: loaded.key === key ? loaded.resource : { status: "loading" as const }, retry: load };
 }
 
 function CategoryPage({
