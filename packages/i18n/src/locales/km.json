@@ -68,7 +68,6 @@
   "order.merchantStatus.exception": "[TODO-KM-REVIEW] ការបញ្ជាទិញមានបញ្ហា",
   "order.pageTitle": "[TODO-KM-REVIEW] ការបញ្ជាទិញ",
   "order.detailTitle": "[TODO-KM-REVIEW] ព័ត៌មានការបញ្ជាទិញ",
-  "order.orderFallback": "[TODO-KM-REVIEW] ការបញ្ជាទិញ {count}",
   "order.listEmpty": "[TODO-KM-REVIEW] មិនទាន់មានការបញ្ជាទិញ",
   "order.listError": "[TODO-KM-REVIEW] ផ្ទុកការបញ្ជាទិញមិនបាន",
   "order.viewDetails": "[TODO-KM-REVIEW] មើលព័ត៌មាន",

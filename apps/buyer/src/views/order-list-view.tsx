@@ -62,7 +62,7 @@ export function OrderListView({
             ) : (
               <button type="button" className="buyer-order-card" key={item.publicId} onClick={() => onOpen(item)}>
                 <span className="buyer-order-card__header">
-                  <strong>{t("order.orderFallback", { count: index + 1 })}</strong>
+                  <strong>{t("order.detailTitle")}</strong>
                   <span className="buyer-order-status">{statusSummary(item.subOrders, t)}</span>
                 </span>
                 <span className="buyer-order-card__merchant">

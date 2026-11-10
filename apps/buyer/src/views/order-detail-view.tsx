@@ -49,7 +49,7 @@ export function OrderDetailView({
         {order.status === "ready" && <>
         <Card>
           <div className="buyer-order-detail__heading">
-            <h1 className="buyer-section__title">{t("order.orderFallback", { count: 1 })}</h1>
+            <h1 className="buyer-section__title">{t("order.detailTitle")}</h1>
             <span className="buyer-order-status">{t("order.parentSummary")}</span>
           </div>
           <p className="buyer-order-detail__meta">{t("order.createdAt")}: {order.value.createdAt.slice(0, 10)}</p>
