@@ -395,6 +395,13 @@ test("mobile Khmer display headings have an explicit no-clipping wrap guard", ()
     css,
     /\[data-lang=\s*["']?km["']?\s*\][^}]*max-inline-size:\s*100%;[^}]*overflow-wrap:\s*anywhere;[^}]*word-break:\s*break-word;[^}]*letter-spacing:\s*normal/
   );
+  assert.match(
+    css,
+    /\[data-lang="km"\] \.hero h1,[\s\S]*?white-space:\s*normal/,
+    "Khmer hero headings must override the global nowrap rule"
+  );
+  assert.match(css, /\.stat span\s*\{[^}]*overflow-wrap:\s*anywhere;/);
+  assert.doesNotMatch(css, /\.stat span\s*\{[^}]*white-space:\s*nowrap/);
 });
 
 test("not-found draft copy uses selector specificity instead of !important", () => {

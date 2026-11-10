@@ -692,7 +692,8 @@ a:focus-visible {
     gap: 16px;
   }
   .stat span {
-    white-space: nowrap;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .chain {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -839,7 +840,8 @@ a:focus-visible {
   .stat span {
     font-size: var(--fs-small);
     line-height: 1.35;
-    white-space: nowrap;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .stages {
     margin-top: 28px;
