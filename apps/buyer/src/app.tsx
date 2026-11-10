@@ -333,8 +333,8 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   useEffect(() => {
     // Language changes must refetch the open detail with the current Accept-Language.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (route.name === "order" && route.order.status === "ready") loadOrderDetail(route.publicId);
-  }, [language]);
+    if (route.name === "order") loadOrderDetail(route.publicId);
+  }, [language, loadOrderDetail]);
 
   const addToCart = useCallback((product: Product) => {
     const result = addProduct(cart, product);

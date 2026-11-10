@@ -99,6 +99,15 @@ function mapOrder(order: ApiOrder): BuyerOrder {
   };
 }
 
+function mapOrderForList(order: ApiOrder): BuyerOrder | null {
+  try {
+    return mapOrder(order);
+  } catch (error) {
+    if (error instanceof ApiError && error.code === 1001) return null;
+    throw error;
+  }
+}
+
 export interface BuyerOrderPage {
   items: BuyerOrder[];
   nextCursor: string | null;
@@ -115,7 +124,9 @@ export async function loadBuyerOrders(
   });
   if (!data) throw new ApiError(1001, "buyer-orders", 502);
   return {
-    items: data.data.items.map(mapOrder),
+    items: data.data.items
+      .map(mapOrderForList)
+      .filter((order): order is BuyerOrder => order !== null),
     nextCursor: data.data.next_cursor ?? null
   };
 }

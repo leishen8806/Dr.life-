@@ -248,6 +248,18 @@ describe("loadBuyerOrders", () => {
     expect(urls).toEqual(["http://api.test/v1/buyer/orders?page_size=20"]);
   });
 
+  it("skips a malformed list row without hiding valid orders", async () => {
+    const malformed = { ...apiOrder, public_id: "01JBAD", payable_amount_e4: 101 };
+    const { transport } = recordingFetch(() =>
+      success({ items: [malformed, apiOrder], next_cursor: null })
+    );
+
+    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
+      items: [{ publicId: "01JORDER" }],
+      nextCursor: null
+    });
+  });
+
   it("maps unknown server statuses to the localized processing fallback", async () => {
     const unknown = {
       ...apiOrder,

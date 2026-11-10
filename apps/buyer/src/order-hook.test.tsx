@@ -53,7 +53,8 @@ describe("useOrderFeed", () => {
         ? page([order("ord_1"), order("ord_2")], null)
         : page([order("ord_1")], "next");
     };
-    const { result } = renderHook(() => useOrderFeed(client(transport, "zh"), "zh"));
+    const buyerClient = client(transport, "zh");
+    const { result } = renderHook(() => useOrderFeed(buyerClient, "zh"));
     await waitFor(() => expect(result.current.resource.status).toBe("ready"));
     act(() => result.current.loadMore());
     await waitFor(() => expect(result.current.loadingMore).toBe(false));
@@ -82,5 +83,27 @@ describe("useOrderFeed", () => {
     resolveMore(page([order("stale")], null));
     await new Promise((resume) => setTimeout(resume, 0));
     expect(result.current.resource.status === "ready" ? result.current.resource.value.map((item) => item.publicId) : []).toEqual(["en_1"]);
+  });
+
+  it("retries a failed load-more request with the same cursor", async () => {
+    let attempts = 0;
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      const request = new Request(input, init);
+      if (!request.url.includes("cursor=next")) return page([order("ord_1")], "next");
+      attempts += 1;
+      return attempts === 1
+        ? new Response(JSON.stringify({ ok: false, error: { code: 1005, message: { zh: "错误", en: "Error", km: "កំហុស" } }, request_id: "req_test" }), { status: 503, headers: { "content-type": "application/json" } })
+        : page([order("ord_2")], null);
+    };
+    const buyerClient = client(transport, "zh");
+    const { result } = renderHook(() => useOrderFeed(buyerClient, "zh"));
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.moreMessageKey).toBe("error.1005"));
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.loadingMore).toBe(false));
+    expect(attempts).toBe(2);
+    expect(result.current.resource.status === "ready" ? result.current.resource.value.map((item) => item.publicId) : []).toEqual(["ord_1", "ord_2"]);
   });
 });
