@@ -1,0 +1,51 @@
+# Claude 独立审核（#185）：以 Claude GitHub App 身份发出审核，与实现者账号分开。
+# 只审核、只评论：不推代码、不批准、不合并。批准与合并只认 leishen8806（docs/ops/DISPATCH.md 第七节）。
+# 需要 owner 先安装 Claude GitHub App，并在 Settings → Secrets and variables → Actions 添加 CLAUDE_CODE_OAUTH_TOKEN。
+name: Claude Review
+
+on:
+  pull_request:
+    types: [ready_for_review, synchronize]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # 公开仓库：只响应仓库成员或协作者的 @claude，防止外人消耗额度；草稿 PR 不自动审核；fork 来的 PR 拿不到密钥，不运行。
+    if: >-
+      (github.event_name == 'pull_request'
+        && github.event.pull_request.draft == false
+        && github.event.pull_request.head.repo.full_name == github.repository)
+      || (github.event_name != 'pull_request'
+        && contains(github.event.comment.body, '@claude')
+        && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            你是 Dr.life+ 仓库的独立审核员。用中文审核当前 PR 的最新 head。
+            先读仓库根 AGENTS.md、docs/ops/DISPATCH.md，以及 PR 关联的 Issue。
+            对照：Issue 验收项；AGENTS.md 第 4 节不可违反的规则；已定决定（金额 e4 整分、
+            确认中订单不可取消返回 409、报价过期 409/3006、商家端电话脱敏、买家端不出现 RouteFit、
+            三语齐全、官网 CSP 不放宽、不写入服务器地址/密钥/令牌）。
+            输出一条审核，开头写“## Claude 独立审核 · PR #<编号>（head <短哈希>）”，
+            按“必须修 / 应修 / 低”分级，每条写清位置、原因、怎么改。
+            只评论：不要推送代码、不要批准、不要合并、不要请求修改状态以外的任何操作。
+            涉及资金、登录权限、数据库迁移的改动，在结论里注明“需 owner 亲审”。
