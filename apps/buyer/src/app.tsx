@@ -182,9 +182,11 @@ export function useOrderFeed(client: BuyerApiClient, language: string) {
           language,
           items: [
             ...currentItems,
-            ...page.items.filter((item) =>
-              item.dataError || !currentItems.some((existing) => existing.publicId === item.publicId)
-            )
+            ...page.items.filter((item) => !currentItems.some((existing) =>
+              item.dataError
+                ? existing.dataErrorPublicId === item.dataErrorPublicId
+                : existing.publicId === item.publicId
+            ))
           ],
           nextCursor: page.nextCursor,
           loading: false
@@ -209,9 +211,9 @@ export function useOrderFeed(client: BuyerApiClient, language: string) {
     retryOrders();
   }, [retryOrders]);
   const current = moreOrders?.language === language ? moreOrders : undefined;
-  const resource = orders.status === "ready"
+  const resource = orders.status === "ready" && readyLanguage === language
     ? { status: "ready" as const, value: current?.items ?? orders.value.items }
-    : orders;
+    : orders.status === "ready" ? { status: "loading" as const } : orders;
   return {
     resource,
     retry,

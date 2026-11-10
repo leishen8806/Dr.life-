@@ -107,6 +107,7 @@ function mapOrderForList(order: ApiOrder, index: number): BuyerOrder {
       console.warn("[buyer] malformed order", order.public_id);
       return {
         publicId: `data-error:${order.public_id}:${index}`,
+        dataErrorPublicId: order.public_id,
         createdAt: "",
         totalE4: 0n,
         goodsAmountE4: 0n,
