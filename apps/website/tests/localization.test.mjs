@@ -99,7 +99,7 @@ test("mobile stats keep the displayed number and unit together", () => {
 test("confirmed mobile layout keeps hero stats and ecosystem nodes compact", () => {
   assert.match(
     styles,
-    /@media\s*\(\s*max-width:\s*520px\s*\)[\s\S]*?\.stats\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/
+    /@media\s*\(\s*max-width:\s*520px\s*\)[\s\S]*?\.stats\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/
   );
   assert.match(
     styles,
