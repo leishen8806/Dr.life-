@@ -75,29 +75,47 @@ function mapSuborder(suborder: ApiSuborder): BuyerSubOrder {
     unitPriceE4: money(item.unit_price_e4),
     totalE4: money(item.line_total_e4)
   }));
+  const goodsAmountE4 = money(suborder.goods_amount_e4);
+  const shippingAmountE4 = money(suborder.shipping_amount_e4);
+  const totalE4 = money(suborder.payable_amount_e4);
+  const lineGoodsE4 = lines.reduce((sum, item) => sum + item.totalE4, 0n);
+  if (goodsAmountE4 !== lineGoodsE4 || totalE4 !== goodsAmountE4 + shippingAmountE4)
+    throw new ApiError(1001, "order-money", 502);
   return {
     publicId: suborder.public_id,
     merchantName: emptyLocalizedText,
     status: mapOrderStatus(suborder.status),
     lines,
-    goodsAmountE4: money(suborder.goods_amount_e4),
-    totalE4: money(suborder.payable_amount_e4),
-    shippingAmountE4: money(suborder.shipping_amount_e4),
+    goodsAmountE4,
+    totalE4,
+    shippingAmountE4,
     shippingQuoteExpiresAt: suborder.shipping_quote_expires_at,
     events: []
   };
 }
 
 function mapOrder(order: ApiOrder): BuyerOrder {
-  // Follow-up data-integrity task: validate parent totals against suborder sums once the owner assigns it.
+  const subOrders = order.suborders.map(mapSuborder);
+  const goodsAmountE4 = money(order.goods_amount_e4);
+  const shippingAmountE4 = money(order.shipping_amount_e4);
+  const totalE4 = money(order.payable_amount_e4);
+  const suborderGoodsE4 = subOrders.reduce((sum, subOrder) => sum + subOrder.goodsAmountE4, 0n);
+  const suborderShippingE4 = subOrders.reduce((sum, subOrder) => sum + subOrder.shippingAmountE4, 0n);
+  const suborderTotalE4 = subOrders.reduce((sum, subOrder) => sum + subOrder.totalE4, 0n);
+  if (
+    goodsAmountE4 !== suborderGoodsE4 ||
+    shippingAmountE4 !== suborderShippingE4 ||
+    totalE4 !== goodsAmountE4 + shippingAmountE4 ||
+    totalE4 !== suborderTotalE4
+  ) throw new ApiError(1001, "order-money", 502);
   return {
     publicId: order.public_id,
     createdAt: order.created_at,
-    totalE4: money(order.payable_amount_e4),
-    goodsAmountE4: money(order.goods_amount_e4),
-    shippingAmountE4: money(order.shipping_amount_e4),
+    totalE4,
+    goodsAmountE4,
+    shippingAmountE4,
     paymentStatus: mapPaymentStatus(order.payment_status),
-    subOrders: order.suborders.map(mapSuborder)
+    subOrders
   };
 }
 

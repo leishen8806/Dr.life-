@@ -390,8 +390,6 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     setStack((items) => items.map((item, index) =>
       index === items.length - 1 && item.name === "payment"
         ? { ...item, attempt, order: { ...item.order, paymentStatus: "succeeded" } }
-        : item.name === "order" && item.order?.publicId === order.publicId && item.order
-          ? { ...item, order: { ...item.order, paymentStatus: "succeeded" } }
           : item
     ));
   }, [paymentAttempts]);
