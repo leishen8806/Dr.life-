@@ -34,7 +34,8 @@ export function OrderDetailView({
       .filter((value) => Number.isFinite(value) && value > now)
       .sort((a, b) => a - b)[0];
     if (expiry === undefined) return;
-    const timer = window.setTimeout(() => setNow(Date.now()), expiry - now);
+    const delay = Math.min(expiry - now, 2_147_483_647);
+    const timer = window.setTimeout(() => setNow(Date.now()), delay);
     return () => window.clearTimeout(timer);
   }, [now, order]);
 
