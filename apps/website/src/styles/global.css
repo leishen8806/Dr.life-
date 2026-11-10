@@ -35,6 +35,18 @@ h3,
 .eyebrow {
   text-wrap: balance;
 }
+[data-lang="km"] {
+  line-height: 1.85;
+}
+[data-lang="km"] .hero h1,
+[data-lang="km"] .legal-content h2,
+[data-lang="km"] .legal-page h1,
+[data-lang="km"] .merchant-cta h2,
+[data-lang="km"] .merchant-faq h3,
+[data-lang="km"] .not-found-page h1,
+[data-lang="km"] .section-title {
+  line-height: 1.35;
+}
 a {
   color: inherit;
 }
@@ -676,14 +688,26 @@ a:focus-visible {
     position: static;
   }
 }
-@media (max-width: 600px) {
-  [data-lang="km"] {
-    line-height: 1.85;
+@media (min-width: 521px) and (max-width: 900px) {
+  .hero-content,
+  .legal-page,
+  .merchant-cta,
+  .merchant-hero__inner,
+  .merchant-section,
+  .section,
+  .site-header,
+  .stats {
+    padding-inline: 32px;
   }
+}
+@media (max-width: 600px) {
   .hero h1 {
     letter-spacing: 0;
   }
   .subtitle {
+    letter-spacing: 0.12em;
+  }
+  .eyebrow {
     letter-spacing: 0.12em;
   }
   .stats {
@@ -697,6 +721,7 @@ a:focus-visible {
   .stat strong {
     min-width: 0;
     overflow-wrap: anywhere;
+    word-break: keep-all;
   }
   .chain {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -937,12 +962,6 @@ a:focus-visible {
     overflow-wrap: anywhere;
     word-break: break-word;
     letter-spacing: normal;
-    white-space: normal;
-  }
-}
-@media (max-width: 600px) {
-  [data-lang="km"] .hero h1,
-  [data-lang="km"] .subtitle {
     white-space: normal;
   }
 }

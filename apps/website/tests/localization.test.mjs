@@ -81,6 +81,16 @@ test("base typography uses the shared body-size variable", () => {
   assert.match(styles, /:root\s*\{[\s\S]*?--fs-body:[^;]+;[\s\S]*?font-size:\s*var\(--fs-body\);/);
 });
 
+test("Khmer typography keeps readable line heights at every width", () => {
+  assert.match(styles, /\[data-lang="km"\]\s*\{\s*line-height:\s*1\.85;/);
+  assert.match(styles, /\[data-lang="km"\] \.hero h1,[\s\S]*?line-height:\s*1\.35;/);
+  assert.match(styles, /@media\s*\(min-width:\s*521px\) and \(max-width:\s*900px\)/);
+});
+
+test("mobile stats keep the displayed number and unit together", () => {
+  assert.match(styles, /\.stat strong\s*\{[\s\S]*?word-break:\s*keep-all;/);
+});
+
 test("confirmed mobile layout keeps hero stats and ecosystem nodes compact", () => {
   assert.match(
     styles,
