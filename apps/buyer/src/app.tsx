@@ -438,6 +438,10 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     </>
   );
   const knownCategories = categories.status === "ready" ? categories.value : [];
+  const detailOrder = orderDetail.resource.status === "ready" ? orderDetail.resource.value : undefined;
+  const openPaymentFromDetail = detailOrder
+    ? () => openPayment(detailOrder)
+    : undefined;
 
   if (route.name === "order")
     return (
@@ -448,7 +452,9 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
         actions={actions}
         onRetry={orderDetail.retry}
         onBack={back}
-        onPay={() => orderDetail.resource.status === "ready" && openPayment(orderDetail.resource.value)}
+        // The current payment flow is an interface stub; never expose it in production
+        // until the real KESS endpoint and server-authoritative 409/3006 handling exist.
+        onPay={import.meta.env.DEV ? openPaymentFromDetail : undefined}
       />
     );
 

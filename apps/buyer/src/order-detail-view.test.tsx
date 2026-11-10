@@ -32,7 +32,7 @@ function order(status: BuyerOrder["subOrders"][number]["status"], expiresAt: str
   };
 }
 
-function renderDetail(value: BuyerOrder) {
+function renderDetail(value: BuyerOrder, onPay?: () => void) {
   const language: Language = "en";
   return render(
     <OrderDetailView
@@ -40,6 +40,7 @@ function renderDetail(value: BuyerOrder) {
       language={language}
       order={{ status: "ready", value }}
       onBack={() => undefined}
+      onPay={onPay}
     />
   );
 }
@@ -68,5 +69,16 @@ describe("OrderDetailView quote expiry", () => {
   it("does not show a quote for a non-payment order", () => {
     renderDetail(order("paid", "2026-11-11T00:00:01Z"));
     expect(screen.queryByText(/Shipping quote/)).toBeNull();
+  });
+
+  it("does not offer payment while a quote is expired or pending", () => {
+    const onPay = vi.fn();
+    renderDetail(order("awaiting_payment", "2026-11-10T23:59:00Z"), onPay);
+    expect(screen.queryByText("Pay now")).toBeNull();
+
+    cleanup();
+    renderDetail(order("awaiting_payment", ""), onPay);
+    expect(screen.getByText("Quote pending")).toBeTruthy();
+    expect(screen.queryByText("Pay now")).toBeNull();
   });
 });

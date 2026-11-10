@@ -105,6 +105,7 @@
   "order.goods": "Goods",
   "order.shipping": "Shipping",
   "order.free": "Free",
+  "order.shippingPending": "Quote pending",
   "order.items": "{count} item(s)",
   "order.itemsTitle": "Items",
   "order.merchant": "Merchant",

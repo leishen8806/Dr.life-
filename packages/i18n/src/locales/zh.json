@@ -75,6 +75,7 @@
   "order.goods": "商品金额",
   "order.shipping": "运费",
   "order.free": "免运费",
+  "order.shippingPending": "待报价",
   "order.items": "{count} 项商品",
   "order.itemsTitle": "商品明细",
   "order.merchant": "商家",

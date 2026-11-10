@@ -18,6 +18,11 @@ function formatQuoteExpiry(value: string, language: LocaleProps["language"]): st
   }).format(date);
 }
 
+function isExpiredQuote(value: string, now: number): boolean {
+  const expiry = Date.parse(value);
+  return Number.isFinite(expiry) && expiry <= now;
+}
+
 export function OrderDetailView({
   t,
   language,
@@ -40,6 +45,10 @@ export function OrderDetailView({
     const timer = window.setTimeout(() => setNow(Date.now()), delay);
     return () => window.clearTimeout(timer);
   }, [now, order]);
+
+  const paymentQuoteUnavailable = order.status === "ready" && order.value.subOrders.some((subOrder) =>
+    subOrder.status === "awaiting_payment" && (!subOrder.shippingQuoteExpiresAt || isExpiredQuote(subOrder.shippingQuoteExpiresAt, now))
+  );
 
   return (
     <div className="buyer-page">
@@ -78,12 +87,14 @@ export function OrderDetailView({
               ))}
             </div>
             <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(subOrder.goodsAmountE4)}</strong></p>
-            <p className="buyer-order-detail__meta">{t("order.shipping")}: {subOrder.shippingAmountE4 === 0n ? t("order.free") : formatPriceE4(subOrder.shippingAmountE4)}</p>
+            <p className="buyer-order-detail__meta">{t("order.shipping")}: {subOrder.shippingAmountE4 === 0n
+              ? subOrder.shippingQuoteExpiresAt ? t("order.free") : t("order.shippingPending")
+              : formatPriceE4(subOrder.shippingAmountE4)}</p>
             <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(subOrder.totalE4)}</strong></p>
             {subOrder.shippingQuoteExpiresAt && subOrder.status === "awaiting_payment" && (
               <p className="buyer-order-detail__meta">
                 {/* Payment follow-up owns server-authoritative 409/3006 handling; this is display-only. */}
-                {new Date(subOrder.shippingQuoteExpiresAt).getTime() < now
+                {isExpiredQuote(subOrder.shippingQuoteExpiresAt, now)
                   ? t("order.quoteExpired")
                   : t("order.quoteExpires")}: {formatQuoteExpiry(subOrder.shippingQuoteExpiresAt, language)}
               </p>
@@ -103,9 +114,11 @@ export function OrderDetailView({
         ))}
         <Card>
           <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(order.value.goodsAmountE4)}</strong></p>
-          <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{order.value.shippingAmountE4 === 0n ? t("order.free") : formatPriceE4(order.value.shippingAmountE4)}</strong></p>
+          <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{order.value.shippingAmountE4 === 0n
+            ? order.value.subOrders.some((subOrder) => !subOrder.shippingQuoteExpiresAt) ? t("order.shippingPending") : t("order.free")
+            : formatPriceE4(order.value.shippingAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(order.value.totalE4)}</strong></p>
-          {canPay(order.value) && onPay && <button type="button" className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</button>}
+          {canPay(order.value) && !paymentQuoteUnavailable && onPay && <button type="button" className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</button>}
         </Card>
         </>}
       </main>
