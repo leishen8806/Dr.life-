@@ -3,6 +3,7 @@ import { AppHeader, Card } from "@drlife/ui";
 import { localized } from "../localized";
 import { formatPriceE4 } from "../money";
 import type { BuyerOrder } from "../orders";
+import { canPay } from "../payment";
 import type { LocaleProps } from "./common";
 
 export function OrderDetailView({
@@ -10,8 +11,9 @@ export function OrderDetailView({
   language,
   order,
   actions,
-  onBack
-}: { order: BuyerOrder; actions?: ReactNode; onBack: () => void } & LocaleProps) {
+  onBack,
+  onPay
+}: { order: BuyerOrder; actions?: ReactNode; onBack: () => void; onPay?: () => void } & LocaleProps) {
   return (
     <div className="buyer-page">
       <AppHeader slogan={t("order.detailTitle")} actions={actions} />
@@ -59,6 +61,7 @@ export function OrderDetailView({
         ))}
         <Card>
           <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(order.totalE4)}</strong></p>
+          {canPay(order) && onPay && <button type="button" className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</button>}
         </Card>
         <p className="buyer-order-note">{t("order.mockNote")}</p>
       </main>
