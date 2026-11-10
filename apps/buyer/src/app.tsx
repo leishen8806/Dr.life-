@@ -42,9 +42,17 @@ function useLoaded<T>(
 ): [Resource<T>, () => void] {
   const [resource, setResource] = useState<Resource<T>>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
+  const wasEnabled = useRef(enabled);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      wasEnabled.current = false;
+      return;
+    }
+    if (!wasEnabled.current) {
+      setResource({ status: "loading" });
+      wasEnabled.current = true;
+    }
     const controller = new AbortController();
     load(controller.signal).then(
       (value) => {
