@@ -55,7 +55,11 @@ export function OrderListView({
         )}
         {orders.status === "ready" && orders.value.length > 0 && (
           <section className="buyer-order-list" aria-label={t("order.pageTitle")}>
-            {orders.value.map((item) => (
+            {orders.value.map((item, index) => item.dataError ? (
+              <div className="buyer-order-card buyer-order-card--error" key={`data-error-${index}`} role="alert">
+                <strong>{t("error.1001")}</strong>
+              </div>
+            ) : (
               <button type="button" className="buyer-order-card" key={item.publicId} onClick={() => onOpen(item)}>
                 <span className="buyer-order-card__header">
                   <strong>{item.publicId}</strong>

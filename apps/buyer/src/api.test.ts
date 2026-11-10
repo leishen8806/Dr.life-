@@ -250,7 +250,7 @@ describe("loadBuyerOrders", () => {
     expect(urls).toEqual(["http://api.test/v1/buyer/orders?page_size=20"]);
   });
 
-  it("skips a malformed list row without hiding valid orders", async () => {
+  it("keeps a malformed list row visible without hiding valid orders", async () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const malformed = { ...apiOrder, public_id: "01JBAD", payable_amount_e4: 101 };
     const { transport } = recordingFetch(() =>
@@ -258,10 +258,10 @@ describe("loadBuyerOrders", () => {
     );
 
     await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
-      items: [{ publicId: "01JORDER" }],
+      items: [{ dataError: true }, { publicId: "01JORDER" }],
       nextCursor: null
     });
-    expect(warning).toHaveBeenCalledWith("[buyer] skipped malformed order", "01JBAD");
+    expect(warning).toHaveBeenCalledWith("[buyer] malformed order", "01JBAD");
   });
 
   it("maps unknown server statuses to the localized processing fallback", async () => {

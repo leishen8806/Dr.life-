@@ -99,13 +99,22 @@ function mapOrder(order: ApiOrder): BuyerOrder {
   };
 }
 
-function mapOrderForList(order: ApiOrder): BuyerOrder | null {
+function mapOrderForList(order: ApiOrder): BuyerOrder {
   try {
     return mapOrder(order);
   } catch (error) {
     if (error instanceof ApiError && error.code === 1001) {
-      console.warn("[buyer] skipped malformed order", order.public_id);
-      return null;
+      console.warn("[buyer] malformed order", order.public_id);
+      return {
+        publicId: "",
+        createdAt: "",
+        totalE4: 0n,
+        goodsAmountE4: 0n,
+        shippingAmountE4: 0n,
+        paymentStatus: "unknown",
+        subOrders: [],
+        dataError: true
+      };
     }
     throw error;
   }
@@ -127,9 +136,7 @@ export async function loadBuyerOrders(
   });
   if (!data) throw new ApiError(1001, "buyer-orders", 502);
   return {
-    items: data.data.items
-      .map(mapOrderForList)
-      .filter((order): order is BuyerOrder => order !== null),
+    items: data.data.items.map(mapOrderForList),
     nextCursor: data.data.next_cursor ?? null
   };
 }

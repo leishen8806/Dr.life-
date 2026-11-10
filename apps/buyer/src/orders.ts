@@ -48,6 +48,7 @@ export interface BuyerSubOrder {
 
 export interface BuyerOrder {
   publicId: string;
+  dataError?: boolean;
   createdAt: string;
   totalE4: bigint;
   goodsAmountE4: bigint;
