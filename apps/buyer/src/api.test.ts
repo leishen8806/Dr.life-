@@ -342,6 +342,26 @@ describe("loadBuyerOrders", () => {
     expect(warning).toHaveBeenCalledWith("[buyer] malformed order", "01JORDER");
   });
 
+  it("rejects inconsistent line and suborder totals as malformed data", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const malformed = {
+      ...apiOrder,
+      suborders: [{
+        ...apiOrder.suborders[0],
+        goods_amount_e4: 180_000,
+        payable_amount_e4: 180_000
+      }]
+    };
+    const { transport } = recordingFetch(() =>
+      success({ items: [malformed], next_cursor: null })
+    );
+
+    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
+      items: [{ dataError: true, publicId: "data-error:01JORDER:0" }]
+    });
+    expect(warning).toHaveBeenCalledWith("[buyer] malformed order", "01JORDER");
+  });
+
   it("maps unknown server statuses to the localized processing fallback", async () => {
     const unknown = {
       ...apiOrder,

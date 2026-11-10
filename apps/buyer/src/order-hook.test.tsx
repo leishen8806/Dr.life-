@@ -51,6 +51,24 @@ function client(transport: typeof globalThis.fetch, language: Language): BuyerAp
 }
 
 describe("useOrderFeed", () => {
+  it("does not request orders until enabled", async () => {
+    let requests = 0;
+    const transport: typeof globalThis.fetch = async () => {
+      requests += 1;
+      return page([order("ord_1")], null);
+    };
+    const buyerClient = client(transport, "zh");
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useOrderFeed(buyerClient, "zh", enabled),
+      { initialProps: { enabled: false } }
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(requests).toBe(0);
+    rerender({ enabled: true });
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    expect(requests).toBe(1);
+  });
+
   it("deduplicates appended orders and keeps the cursor for retry", async () => {
     const requests: string[] = [];
     const transport: typeof globalThis.fetch = async (input, init) => {

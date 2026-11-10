@@ -37,12 +37,14 @@ const featuredPageSize = 6;
 
 /** Loads one list and exposes the retry the error state offers. */
 function useLoaded<T>(
-  load: (signal: AbortSignal) => Promise<T>
+  load: (signal: AbortSignal) => Promise<T>,
+  enabled = true
 ): [Resource<T>, () => void] {
   const [resource, setResource] = useState<Resource<T>>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     load(controller.signal).then(
       (value) => {
@@ -54,7 +56,7 @@ function useLoaded<T>(
       }
     );
     return () => controller.abort();
-  }, [load, attempt]);
+  }, [enabled, load, attempt]);
 
   const retry = useCallback(() => {
     setResource({ status: "loading" });
@@ -143,7 +145,7 @@ interface MoreOrders {
 }
 
 /** Orders are paged independently from the first response and reset on language changes. */
-export function useOrderFeed(client: BuyerApiClient, language: string) {
+export function useOrderFeed(client: BuyerApiClient, language: string, enabled = true) {
   const [readyLanguage, setReadyLanguage] = useState<string>();
   const loadOrders = useCallback(
     (signal: AbortSignal) =>
@@ -153,7 +155,7 @@ export function useOrderFeed(client: BuyerApiClient, language: string) {
       }),
     [client, language]
   );
-  const [orders, retryOrders] = useLoaded(loadOrders);
+  const [orders, retryOrders] = useLoaded(loadOrders, enabled);
   const [moreOrders, setMoreOrders] = useState<MoreOrders>();
   const moreOrdersRequest = useRef<AbortController | undefined>(undefined);
 
@@ -355,7 +357,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   );
   const openOrders = useCallback(() => push({ name: "orders" }), [push]);
   const { resource: orders, retry: retryOrders, loadMore: loadMoreOrders, loadingMore, moreMessageKey: moreOrdersMessageKey, nextCursor: nextOrderCursor } =
-    useOrderFeed(client, language);
+    useOrderFeed(client, language, route.name === "orders");
   const orderList = orders;
   const openOrder = useCallback((order: BuyerOrder) => {
     push({ name: "order", publicId: order.publicId, order });
