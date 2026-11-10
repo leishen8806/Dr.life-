@@ -4,6 +4,7 @@ import { type TranslationKey, useI18n } from "@drlife/i18n";
 import { LanguageSwitcher, useBackButton } from "@drlife/ui";
 import {
   type BuyerApiClient,
+  type BuyerOrderPage,
   loadCategories,
   loadProducts,
   loadBuyerOrders,
@@ -130,6 +131,86 @@ export function useProductFeed(client: BuyerApiClient, code?: string, language?:
   };
 }
 
+interface MoreOrders {
+  language: string;
+  items: BuyerOrder[];
+  nextCursor: string | null;
+  loading: boolean;
+  messageKey?: ReturnType<typeof errorMessageKey>;
+}
+
+/** Orders are paged independently from the first response and reset on language changes. */
+export function useOrderFeed(client: BuyerApiClient, language: string) {
+  const loadOrders = useCallback(
+    (signal: AbortSignal) => loadBuyerOrders(client, undefined, signal),
+    [client, language]
+  );
+  const [orders, retryOrders] = useLoaded(loadOrders);
+  const [moreOrders, setMoreOrders] = useState<MoreOrders>();
+  const moreOrdersRequest = useRef<AbortController | undefined>(undefined);
+
+  // This reset intentionally synchronizes the continuation cache with the
+  // language-keyed first-page loader.
+  useEffect(() => {
+    moreOrdersRequest.current?.abort();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMoreOrders(undefined);
+    // The first page is reloaded by useLoaded when the language-keyed loader changes.
+  }, [language]);
+  useEffect(() => () => moreOrdersRequest.current?.abort(), []);
+
+  const loadMore = useCallback(() => {
+    const current = moreOrders?.language === language ? moreOrders : undefined;
+    if (orders.status !== "ready" || current?.loading) return;
+    const currentItems = current?.items ?? orders.value.items;
+    const cursor = current?.nextCursor ?? orders.value.nextCursor;
+    if (!cursor) return;
+    moreOrdersRequest.current?.abort();
+    const controller = new AbortController();
+    moreOrdersRequest.current = controller;
+    setMoreOrders({ language, items: currentItems, nextCursor: cursor, loading: true });
+    loadBuyerOrders(client, cursor, controller.signal).then(
+      (page: BuyerOrderPage) => {
+        if (controller.signal.aborted) return;
+        setMoreOrders({
+          language,
+          items: [...currentItems, ...page.items.filter((item) => !currentItems.some((existing) => existing.publicId === item.publicId))],
+          nextCursor: page.nextCursor,
+          loading: false
+        });
+      },
+      (error: unknown) => {
+        if (controller.signal.aborted) return;
+        setMoreOrders({
+          language,
+          items: currentItems,
+          nextCursor: cursor,
+          loading: false,
+          messageKey: errorMessageKey(error)
+        });
+      }
+    );
+  }, [client, language, moreOrders, orders]);
+
+  const retry = useCallback(() => {
+    moreOrdersRequest.current?.abort();
+    setMoreOrders(undefined);
+    retryOrders();
+  }, [retryOrders]);
+  const current = moreOrders?.language === language ? moreOrders : undefined;
+  const resource = orders.status === "ready"
+    ? { status: "ready" as const, value: current?.items ?? orders.value.items }
+    : orders;
+  return {
+    resource,
+    retry,
+    loadMore,
+    loadingMore: current?.loading ?? false,
+    moreMessageKey: current?.messageKey,
+    nextCursor: current?.nextCursor ?? (orders.status === "ready" ? orders.value.nextCursor : null)
+  };
+}
+
 function CategoryPage({
   client,
   categories,
@@ -216,70 +297,13 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     [push]
   );
   const openOrders = useCallback(() => push({ name: "orders" }), [push]);
-  const loadOrders = useCallback(
-    (signal: AbortSignal) => loadBuyerOrders(client, undefined, signal),
-    [client, language]
-  );
-  const [orders, retryOrders] = useLoaded(loadOrders);
-  const [moreOrders, setMoreOrders] = useState<{
-    language: string;
-    items: BuyerOrder[];
-    nextCursor: string | null;
-    loading: boolean;
-    messageKey?: ReturnType<typeof errorMessageKey>;
-  }>();
-  const moreOrdersRequest = useRef<AbortController | undefined>(undefined);
+  const { resource: orders, retry: retryOrders, loadMore: loadMoreOrders, loadingMore, moreMessageKey: moreOrdersMessageKey, nextCursor: nextOrderCursor } =
+    useOrderFeed(client, language);
+  const orderList = orders;
   const detailRequest = useRef<AbortController | undefined>(undefined);
   useEffect(() => () => {
-    moreOrdersRequest.current?.abort();
     detailRequest.current?.abort();
   }, []);
-  const loadMoreOrders = useCallback(() => {
-    const currentMoreOrders = moreOrders?.language === language ? moreOrders : undefined;
-    if (orders.status !== "ready" || currentMoreOrders?.loading) return;
-    const currentItems = currentMoreOrders?.items ?? orders.value.items;
-    const cursor = currentMoreOrders?.nextCursor ?? orders.value.nextCursor;
-    if (!cursor) return;
-    moreOrdersRequest.current?.abort();
-    const controller = new AbortController();
-    moreOrdersRequest.current = controller;
-    setMoreOrders({ language, items: currentItems, nextCursor: cursor, loading: true });
-    loadBuyerOrders(client, cursor, controller.signal).then(
-      (page) => {
-        if (controller.signal.aborted) return;
-        setMoreOrders({
-          language,
-          items: [...currentItems, ...page.items.filter((item) => !currentItems.some((existing) => existing.publicId === item.publicId))],
-          nextCursor: page.nextCursor,
-          loading: false
-        });
-      },
-      (error: unknown) =>
-        controller.signal.aborted ? undefined :
-        setMoreOrders({
-          language,
-          items: currentItems,
-          nextCursor: cursor,
-          loading: false,
-          messageKey: errorMessageKey(error)
-        })
-    );
-  }, [client, language, moreOrders, orders]);
-  const retryOrderList = useCallback(() => {
-    setMoreOrders(undefined);
-    moreOrdersRequest.current?.abort();
-    retryOrders();
-  }, [retryOrders]);
-  const currentMoreOrders = moreOrders?.language === language ? moreOrders : undefined;
-  const orderList =
-    orders.status === "ready"
-      ? {
-          status: "ready" as const,
-          value: currentMoreOrders?.items ?? orders.value.items
-        }
-      : orders;
-  const nextOrderCursor =
-    currentMoreOrders?.nextCursor ?? (orders.status === "ready" ? orders.value.nextCursor : null);
   const setOrderResource = useCallback((publicId: string, resource: Resource<BuyerOrder>) => {
     setStack((current) => {
       const route = current.at(-1);
@@ -307,9 +331,9 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     if (route.name === "order") loadOrderDetail(route.publicId);
   }, [loadOrderDetail, route]);
   useEffect(() => {
-    if (route.name === "order" && route.order.status === "ready") loadOrderDetail(route.publicId);
     // Language changes must refetch the open detail with the current Accept-Language.
     // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (route.name === "order" && route.order.status === "ready") loadOrderDetail(route.publicId);
   }, [language]);
 
   const addToCart = useCallback((product: Product) => {
@@ -366,11 +390,11 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
         orders={orderList}
         actions={actions}
         onBack={back}
-        onRetry={retryOrderList}
+        onRetry={retryOrders}
         onOpen={openOrder}
         onLoadMore={nextOrderCursor ? loadMoreOrders : undefined}
-        loadingMore={currentMoreOrders?.loading ?? false}
-        moreMessageKey={currentMoreOrders?.messageKey}
+        loadingMore={loadingMore}
+        moreMessageKey={moreOrdersMessageKey}
       />
     );
 

@@ -1,0 +1,86 @@
+// @vitest-environment jsdom
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import type { Language } from "@drlife/i18n";
+import { type BuyerApiClient, createBuyerApiClient } from "./api";
+import { useOrderFeed } from "./app";
+
+afterEach(cleanup);
+
+function order(id: string) {
+  return {
+    public_id: id,
+    created_at: "2026-11-10T00:00:00Z",
+    payable_amount_e4: 10_000,
+    goods_amount_e4: 10_000,
+    shipping_amount_e4: 0,
+    payment_status: "succeeded",
+    suborders: [{
+      public_id: `${id}-sub`,
+      status: "paid",
+      goods_amount_e4: 10_000,
+      payable_amount_e4: 10_000,
+      shipping_amount_e4: 0,
+      shipping_quote_expires_at: "2026-11-11T00:00:00Z",
+      items: [{ sku_public_id: `${id}-sku`, quantity: 1, unit_price_e4: 10_000, line_total_e4: 10_000 }]
+    }]
+  };
+}
+
+function page(items: ReturnType<typeof order>[], next_cursor: string | null): Response {
+  return new Response(JSON.stringify({ ok: true, data: { items, next_cursor }, request_id: "req_test" }), {
+    status: 200,
+    headers: { "content-type": "application/json" }
+  });
+}
+
+function client(transport: typeof globalThis.fetch, language: Language): BuyerApiClient {
+  return createBuyerApiClient({
+    baseUrl: "http://api.test",
+    getLanguage: () => language,
+    fetch: transport,
+    resilience: { retry: { maxAttempts: 1 } }
+  });
+}
+
+describe("useOrderFeed", () => {
+  it("deduplicates appended orders and keeps the cursor for retry", async () => {
+    const requests: string[] = [];
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      const request = new Request(input, init);
+      requests.push(request.url);
+      return request.url.includes("cursor=next")
+        ? page([order("ord_1"), order("ord_2")], null)
+        : page([order("ord_1")], "next");
+    };
+    const { result } = renderHook(() => useOrderFeed(client(transport, "zh"), "zh"));
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.loadingMore).toBe(false));
+    expect(result.current.resource.status === "ready" ? result.current.resource.value.map((item) => item.publicId) : []).toEqual(["ord_1", "ord_2"]);
+    expect(requests.some((url) => url.includes("cursor=next"))).toBe(true);
+  });
+
+  it("clears an in-flight continuation when language changes", async () => {
+    let language: Language = "zh";
+    let resolveMore!: (response: Response) => void;
+    const more = new Promise<Response>((resolve) => { resolveMore = resolve; });
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      const request = new Request(input, init);
+      if (request.url.includes("cursor=next")) return more;
+      return page([order(language === "zh" ? "zh_1" : "en_1")], "next");
+    };
+    const { result, rerender } = renderHook(
+      ({ lang }) => useOrderFeed(client(transport, lang), lang),
+      { initialProps: { lang: "zh" as Language } }
+    );
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    act(() => result.current.loadMore());
+    language = "en";
+    rerender({ lang: "en" });
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    resolveMore(page([order("stale")], null));
+    await new Promise((resume) => setTimeout(resume, 0));
+    expect(result.current.resource.status === "ready" ? result.current.resource.value.map((item) => item.publicId) : []).toEqual(["en_1"]);
+  });
+});

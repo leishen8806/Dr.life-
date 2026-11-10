@@ -81,4 +81,17 @@ describe("buyer order views", () => {
     expect(text(markup)).toContain("Payment result is being confirmed. Please do not pay again.");
     expect(text(markup)).not.toContain("Pay now");
   });
+
+  it("does not show an empty delivery section", () => {
+    const order = { ...mockOrders[2]!, subOrders: mockOrders[2]!.subOrders.map((subOrder) => ({ ...subOrder, events: [] })) };
+    const markup = renderToStaticMarkup(
+      <OrderDetailView
+        t={translator("en")}
+        language="en"
+        order={{ status: "ready", value: order }}
+        onBack={() => undefined}
+      />
+    );
+    expect(text(markup)).not.toContain("Delivery progress");
+  });
 });

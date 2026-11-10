@@ -65,18 +65,23 @@ export function OrderDetailView({
             <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(subOrder.totalE4)}</strong></p>
             {subOrder.shippingQuoteExpiresAt && subOrder.status === "awaiting_payment" && (
               <p className="buyer-order-detail__meta">
-                {new Date(subOrder.shippingQuoteExpiresAt).getTime() < Date.now() ? t("order.quoteExpired") : t("order.quoteExpires")}: {formatQuoteExpiry(subOrder.shippingQuoteExpiresAt, language)}
+                {new Date(subOrder.shippingQuoteExpiresAt).getTime() <
+                // The expiry is a server timestamp; this render-time comparison is intentionally best-effort.
+                // eslint-disable-next-line react-hooks/purity
+                Date.now() ? t("order.quoteExpired") : t("order.quoteExpires")}: {formatQuoteExpiry(subOrder.shippingQuoteExpiresAt, language)}
               </p>
             )}
-            <h3 className="buyer-section__title">{t("order.delivery")}</h3>
-            <ol className="buyer-order-events">
-              {subOrder.events.map((event) => (
-                <li key={`${event.label}-${event.at}`}>
-                  <strong>{t(`order.buyerStatus.${event.label}` as const)}</strong>
-                  <small>{event.at.slice(0, 10)}</small>
-                </li>
-              ))}
-            </ol>
+            {subOrder.events.length > 0 && <>
+              <h3 className="buyer-section__title">{t("order.delivery")}</h3>
+              <ol className="buyer-order-events">
+                {subOrder.events.map((event) => (
+                  <li key={`${event.label}-${event.at}`}>
+                    <strong>{t(`order.buyerStatus.${event.label}` as const)}</strong>
+                    <small>{event.at.slice(0, 10)}</small>
+                  </li>
+                ))}
+              </ol>
+            </>}
           </Card>
         ))}
         <Card>
