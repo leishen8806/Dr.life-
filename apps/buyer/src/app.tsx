@@ -12,6 +12,7 @@ import {
 } from "./api";
 import { appendFeed, firstFeed, nextPage, type ProductFeed } from "./feed";
 import type { BuyerOrder } from "./orders";
+import { createMockPaymentAttempt, createPaymentIdempotencyKey, pendingPaymentAttempt, type PaymentAttempt } from "./payment";
 import { addProduct, cartCount, stepQuantity, updateQuantity, type CartItem } from "./cart";
 import { errorMessageKey, type Resource } from "./resource";
 import type { Category, Product } from "./types";
@@ -21,13 +22,15 @@ import { HomeView } from "./views/home-view";
 import { ProductDetailView } from "./views/product-detail-view";
 import { OrderDetailView } from "./views/order-detail-view";
 import { OrderListView } from "./views/order-list-view";
+import { PaymentView } from "./views/payment-view";
 
 type Route =
   | { name: "home" }
   | { name: "category"; code?: string }
   | { name: "product"; product: Product }
   | { name: "orders" }
-  | { name: "order"; publicId: string }
+  | { name: "order"; publicId: string; order?: BuyerOrder }
+  | { name: "payment"; order: BuyerOrder; attempt: PaymentAttempt }
   | { name: "cart" };
 
 const featuredPageSize = 6;
@@ -307,6 +310,8 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const [stack, setStack] = useState<Route[]>([{ name: "home" }]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartError, setCartError] = useState<ReturnType<typeof addProduct>["error"]>();
+  const [paymentAttempts, setPaymentAttempts] = useState<Record<string, PaymentAttempt>>({});
+  const [paymentSequences, setPaymentSequences] = useState<Record<string, number>>({});
   const route = stack[stack.length - 1] ?? { name: "home" };
   const push = useCallback(
     (next: Route) => setStack((current) => [...current, next]),
@@ -353,8 +358,51 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     useOrderFeed(client, language);
   const orderList = orders;
   const openOrder = useCallback((order: BuyerOrder) => {
-    push({ name: "order", publicId: order.publicId });
+    push({ name: "order", publicId: order.publicId, order });
   }, [push]);
+  const openPayment = useCallback((order: BuyerOrder) => {
+    const idempotencyKey = paymentAttempts[order.publicId]?.idempotencyKey ?? createPaymentIdempotencyKey();
+    push({
+      name: "payment",
+      order,
+      attempt: paymentAttempts[order.publicId] ?? pendingPaymentAttempt(order, idempotencyKey)
+    });
+  }, [paymentAttempts, push]);
+  const payOrder = useCallback((order: BuyerOrder) => {
+    const idempotencyKey = paymentAttempts[order.publicId]?.idempotencyKey ?? createPaymentIdempotencyKey();
+    const attemptNumber = (paymentSequences[order.publicId] ?? 0) + 1;
+    const attempt = createMockPaymentAttempt(order, idempotencyKey, attemptNumber);
+    setPaymentAttempts((current) => ({ ...current, [order.publicId]: attempt }));
+    setPaymentSequences((current) => ({ ...current, [order.publicId]: attemptNumber }));
+    setStack((current) => current.map((item, index) =>
+      index === current.length - 1 && item.name === "payment" ? { ...item, attempt } : item
+    ));
+    if (isTelegram && typeof window !== "undefined") {
+      const openLink = (window as unknown as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } }).Telegram?.WebApp?.openLink;
+      openLink?.(attempt.paymentLink!);
+    }
+  }, [isTelegram, paymentAttempts, paymentSequences]);
+  const refreshPayment = useCallback((order: BuyerOrder) => {
+    const current = paymentAttempts[order.publicId];
+    if (!current || current.status !== "confirming") return;
+    const attempt = { ...current, status: "succeeded" as const };
+    setPaymentAttempts((items) => ({ ...items, [order.publicId]: attempt }));
+    setStack((items) => items.map((item, index) =>
+      index === items.length - 1 && item.name === "payment"
+        ? { ...item, attempt, order: { ...item.order, paymentStatus: "succeeded" } }
+        : item.name === "order" && item.order?.publicId === order.publicId && item.order
+          ? { ...item, order: { ...item.order, paymentStatus: "succeeded" } }
+          : item
+    ));
+  }, [paymentAttempts]);
+  const retryPayment = useCallback((order: BuyerOrder) => {
+    const idempotencyKey = createPaymentIdempotencyKey();
+    const attempt = pendingPaymentAttempt(order, idempotencyKey);
+    setPaymentAttempts((current) => ({ ...current, [order.publicId]: attempt }));
+    setStack((current) => current.map((item, index) =>
+      index === current.length - 1 && item.name === "payment" ? { ...item, attempt } : item
+    ));
+  }, []);
   const orderDetail = useOrderDetail(client, route.name === "order" ? route.publicId : "", language);
 
   const addToCart = useCallback((product: Product) => {
@@ -400,6 +448,22 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
         actions={actions}
         onRetry={orderDetail.retry}
         onBack={back}
+        onPay={() => orderDetail.resource.status === "ready" && openPayment(orderDetail.resource.value)}
+      />
+    );
+
+  if (route.name === "payment")
+    return (
+      <PaymentView
+        t={t}
+        language={language}
+        order={route.order}
+        attempt={route.attempt}
+        actions={actions}
+        onBack={back}
+        onPay={() => payOrder(route.order)}
+        onRetry={() => retryPayment(route.order)}
+        onRefresh={() => refreshPayment(route.order)}
       />
     );
 

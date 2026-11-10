@@ -148,7 +148,7 @@ func TestPathBypassesAreRejected(t *testing.T) {
 }
 
 func TestCORSAllowlistAndPreflight(t *testing.T) {
-	allowed := "https://miniapp.settlecore.org"
+	allowed := "https://miniapp.drlifeplus.com"
 	handler := GroupedCORS(OriginGroups{Public: []string{allowed}})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
 	for _, test := range []struct {
 		name   string

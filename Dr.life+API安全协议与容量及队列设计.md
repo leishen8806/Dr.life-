@@ -24,7 +24,7 @@
 
 ## 二、传输与边界（所有端共用）
 
-1. **全程 HTTPS**：Cloudflare 终结 TLS（最低 TLS 1.2，开启 TLS 1.3），源站只通过 **Cloudflare Tunnel** 接入，不开放入站端口；`adminapi.settlecore.org` 开启 HSTS（`max-age=31536000; includeSubDomains`，稳定后再申请 preload）。
+1. **全程 HTTPS**：Cloudflare 终结 TLS（最低 TLS 1.2，开启 TLS 1.3），源站只通过 **Cloudflare Tunnel** 接入，不开放入站端口；`adminapi.drlifeplus.com` 开启 HSTS（`max-age=31536000; includeSubDomains`，稳定后再申请 preload）。
 2. **真实客户端 IP**：只信任来自 Tunnel/反向代理网段的 `CF-Connecting-IP`（F-05 已有 `TRUSTED_PROXY_*`），其余来源一律用连接地址。
 3. **API 响应安全头（网关统一加）：**
    - `Cache-Control: no-store`（已登录接口）；公开且可缓存的 GET 才允许 `public, max-age`（见第五章缓存）；
@@ -58,7 +58,7 @@
 |---|---|
 | 登录 | 账号 + argon2 密码 + **TOTP 双因素**；失败限流与临时锁定；密码策略与泄露检查（A-06） |
 | 访问令牌 | JWT，**10 分钟**，`aud` 为 `drlife:admin` 或 `drlife:wms`，放在内存，通过 `Authorization: Bearer` 发送 |
-| 刷新令牌 | 放在 **HttpOnly + Secure + SameSite=Strict、仅 `adminapi.settlecore.org`（host-only，不设 Domain）的 Cookie** 里，**只在刷新端点携带**（Path 限定到 `/v1/admin/auth` 或 `/v1/wms/auth`）；刷新请求必须带自定义头（如 `X-Requested-With: drlife`）并通过严格的 Origin 检查，防 CSRF；轮换 + 复用检测同上 |
+| 刷新令牌 | 放在 **HttpOnly + Secure + SameSite=Strict、仅 `adminapi.drlifeplus.com`（host-only，不设 Domain）的 Cookie** 里，**只在刷新端点携带**（Path 限定到 `/v1/admin/auth` 或 `/v1/wms/auth`）；刷新请求必须带自定义头（如 `X-Requested-With: drlife`）并通过严格的 Origin 检查，防 CSRF；轮换 + 复用检测同上 |
 | 会话限制 | 空闲 15 分钟、绝对 8 小时；同一账号并发会话数上限；**可被管理员远程作废** |
 | 来源 | `/v1/admin/*`：**IP 白名单（或经公司网络/VPN）+ 双因素 + 更严限流**，按路径配置在网关，**不对公网开放全部路径**；CORS 只放行 `admin.` / `wms.` |
 | 高风险动作 | 见 3.4"二次验证" |
@@ -67,11 +67,11 @@
 
 | 路径前缀 | 允许的 Origin |
 |---|---|
-| `/v1/buyer/*` | `https://miniapp.settlecore.org` |
-| `/v1/merchant/*` | `https://shop.settlecore.org` |
-| `/v1/driver/*` | `https://driver.settlecore.org` |
-| `/v1/wms/*` | `https://wms.settlecore.org` |
-| `/v1/admin/*` | `https://admin.settlecore.org` |
+| `/v1/buyer/*` | `https://miniapp.drlifeplus.com` |
+| `/v1/merchant/*` | `https://shop.drlifeplus.com` |
+| `/v1/driver/*` | `https://driver.drlifeplus.com` |
+| `/v1/wms/*` | `https://wms.drlifeplus.com` |
+| `/v1/admin/*` | `https://admin.drlifeplus.com` |
 | `/v1/public/*` | 以上全部 + 官网（只读公开接口） |
 
 开发环境另加 `http://localhost:5173`（仅 `APP_ENV=dev`）。规则：无 `Origin` 的非浏览器请求不受 CORS 影响（靠令牌鉴权）；预检结果缓存 10 分钟；响应带 `Vary: Origin`；`Access-Control-Allow-Credentials: true` **只**在带 Cookie 的刷新端点出现；不返回通配符。

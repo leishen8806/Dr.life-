@@ -34,7 +34,7 @@ describe("buyer order views", () => {
         onLoadMore={() => undefined}
       />
     );
-    expect(mockOrders).toHaveLength(16);
+    expect(mockOrders).toHaveLength(17);
     expect(text(markup)).toContain("Awaiting payment confirmation");
     expect(text(markup)).toContain("Warehouse processing, awaiting acceptance");
     expect(text(markup)).toContain("$114.00");

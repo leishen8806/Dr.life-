@@ -5,6 +5,7 @@ import { localized } from "../localized";
 import { formatPriceE4 } from "../money";
 import type { BuyerOrder } from "../orders";
 import type { Resource } from "../resource";
+import { canPay } from "../payment";
 import type { LocaleProps } from "./common";
 
 function formatQuoteExpiry(value: string, language: LocaleProps["language"]): string {
@@ -23,8 +24,9 @@ export function OrderDetailView({
   order,
   actions,
   onRetry,
-  onBack
-}: { order: Resource<BuyerOrder>; actions?: ReactNode; onRetry?: () => void; onBack: () => void } & LocaleProps) {
+  onBack,
+  onPay
+}: { order: Resource<BuyerOrder>; actions?: ReactNode; onRetry?: () => void; onBack: () => void; onPay?: () => void } & LocaleProps) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -103,6 +105,7 @@ export function OrderDetailView({
           <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(order.value.goodsAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{order.value.shippingAmountE4 === 0n ? t("order.free") : formatPriceE4(order.value.shippingAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(order.value.totalE4)}</strong></p>
+          {canPay(order.value) && onPay && <button type="button" className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</button>}
         </Card>
         </>}
       </main>

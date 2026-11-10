@@ -1,6 +1,6 @@
 # DR.LIFE+ 官网
 
-这是 `settlecore.org` 的 Astro 静态站。
+这是 `drlifeplus.com` 的 Astro 静态站。
 
 ## 本地运行
 

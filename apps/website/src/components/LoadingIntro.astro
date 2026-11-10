@@ -1,0 +1,84 @@
+---
+import BrandWordmark from "./BrandWordmark.astro";
+---
+<div class="site-loader" id="site-loading-intro" aria-hidden="true">
+  <div class="site-loader__mark">
+    <BrandWordmark class="site-loader__brand" />
+    <div class="site-loader__track"><span></span></div>
+  </div>
+</div>
+
+<script>
+  import { initLoadingIntro } from "../scripts/loading-intro.mjs";
+
+  initLoadingIntro(window, document);
+</script>
+
+<style>
+  .site-loader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    place-items: center;
+    background: radial-gradient(circle at 50% 42%, var(--graphite), var(--deep) 68%);
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 180ms ease;
+  }
+
+  :global(html.intro) .site-loader {
+    display: grid;
+    animation: site-loader-failsafe 0s linear 1.5s forwards;
+  }
+
+  .site-loader.is-leaving {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .site-loader__mark {
+    display: grid;
+    justify-items: center;
+    gap: 22px;
+    transform: translateY(-2vh);
+  }
+
+  :global(.site-loader__brand) {
+    color: var(--ivory);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1;
+  }
+
+  .site-loader__track {
+    width: min(220px, 58vw);
+    height: 2px;
+    overflow: hidden;
+    background: rgb(199 203 207 / 22%);
+  }
+
+  .site-loader__track span {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: var(--gold);
+    transform: scaleX(0);
+    transform-origin: left;
+    animation: site-loader-progress 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes site-loader-progress {
+    to { transform: scaleX(1); }
+  }
+
+  @keyframes site-loader-failsafe {
+    to {
+      visibility: hidden;
+      pointer-events: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .site-loader { display: none; }
+  }
+</style>

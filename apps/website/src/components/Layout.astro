@@ -1,6 +1,7 @@
 ---
 import { SITE_URL } from "../constants";
 import { getLocale, locales, read } from "../i18n";
+import LoadingIntro from "./LoadingIntro.astro";
 import "../styles/global.css";
 
 const { titleKey, descriptionKey, robots } = Astro.props;
@@ -15,6 +16,7 @@ const canonical = new URL(Astro.url.pathname, SITE_URL).href;
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script is:inline src="/scripts/intro-gate.js"></script>
     <title>{title}</title>
     <meta name="description" content={description} />
     {robots && <meta name="robots" content={robots} />}
@@ -35,6 +37,7 @@ const canonical = new URL(Astro.url.pathname, SITE_URL).href;
     <link rel="stylesheet" href="/fonts/fonts.css" />
   </head>
   <body data-lang={lang}>
+    <LoadingIntro />
     <slot />
   </body>
 </html>

@@ -2,7 +2,7 @@
 set -eu
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export PATH
 
-site_root=/srv/settlecore
+site_root=/srv/drlifeplus
 current="$site_root/current"
 releases="$site_root/releases"
 

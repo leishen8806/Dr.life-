@@ -23,6 +23,16 @@ func TestVerificationQueueRegistersAndEnqueuesFileID(t *testing.T) {
 	}
 }
 
+func TestCleanupTaskRegisters(t *testing.T) {
+	registry := queue.NewRegistry()
+	if err := RegisterTasks(registry); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := registry.Lookup(TaskCleanup); !ok {
+		t.Fatalf("cleanup task %q was not registered", TaskCleanup)
+	}
+}
+
 type recordingQueueClient struct {
 	taskType string
 	payload  []byte

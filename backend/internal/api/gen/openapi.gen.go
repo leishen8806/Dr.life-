@@ -610,7 +610,6 @@ const (
 	Applicationpdf FilePresignRequestContentType = "application/pdf"
 	Imagejpeg      FilePresignRequestContentType = "image/jpeg"
 	Imagepng       FilePresignRequestContentType = "image/png"
-	Imagewebp      FilePresignRequestContentType = "image/webp"
 )
 
 // Valid indicates whether the value is a known member of the FilePresignRequestContentType enum.
@@ -621,8 +620,6 @@ func (e FilePresignRequestContentType) Valid() bool {
 	case Imagejpeg:
 		return true
 	case Imagepng:
-		return true
-	case Imagewebp:
 		return true
 	default:
 		return false

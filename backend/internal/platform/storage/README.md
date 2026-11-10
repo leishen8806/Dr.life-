@@ -34,3 +34,26 @@ This package uses `github.com/aws/aws-sdk-go-v2/service/s3`. The AWS SDK's SigV4
 No presigned URL, access key, or secret key may be written to logs. ScanHook is intentionally only documented here: wiring and a provider decision are outside this package's scope.
 
 `VerifyLocalURL` validates the signature and expiry only. Its caller must separately verify that the actual HTTP request method matches the signed URL's `method` query parameter.
+
+## File retention and cleanup
+
+Every unreferenced upload receives a 24-hour deadline. A business module must
+attach a reference before that deadline and release it only when the business
+lifecycle ends. The final release starts the purpose-specific retention period:
+product images 90 days after delisting, inbound and delivery photos two years
+after order completion, and merchant KYC material five years after merchant
+cancellation.
+
+- Pending or stuck verifying uploads older than 24 hours become `expired`.
+- Active `ops.file_reference` rows prevent deletion regardless of age.
+- Ready and rejected files become `deleted` only after the last reference is
+  released and `retention_until` has passed.
+- Cleanup claims a row first, then performs object deletion with a 30-second
+  timeout without holding a database row lock. Failures clear the claim so the
+  next run can retry.
+
+The cleanup worker preserves `ops.file` rows for audit and is safe to rerun.
+Image uploads use a clean object key after re-encoding. WebP is not accepted
+until a metadata sanitizer is available. With S3 versioning enabled, the raw
+upload prefix must have a lifecycle rule that permanently removes noncurrent
+versions; otherwise deleted uploads can retain metadata in old versions.

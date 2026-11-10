@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 
 	"github.com/hibiken/asynq"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
@@ -17,7 +18,7 @@ import (
 // VerificationStore is the worker-only state transition port.
 type VerificationStore interface {
 	GetVerifying(context.Context, string) (File, error)
-	MarkReady(context.Context, string, string) error
+	MarkReady(context.Context, string, string, int64, []byte) error
 	MarkRejected(context.Context, string) error
 }
 
@@ -102,11 +103,57 @@ func (w *VerificationWorker) Handle(ctx context.Context, task *asynq.Task) error
 		_ = w.objects.Delete(ctx, readyKey)
 		return w.reject(ctx, file)
 	}
-	if err := w.store.MarkReady(ctx, file.PublicID, readyKey); err != nil {
+	if strings.HasPrefix(file.ContentType, "image/") {
+		sanitizer, ok := w.objects.(storage.ImageSanitizer)
+		if !ok {
+			_ = w.objects.Delete(ctx, readyKey)
+			return w.reject(ctx, file)
+		}
+		cleanKey, sanitizeErr := sanitizer.SanitizeImage(ctx, readyKey, file.ContentType)
+		if sanitizeErr != nil || cleanKey == "" {
+			_ = w.objects.Delete(ctx, readyKey)
+			return w.reject(ctx, file)
+		}
+		if err := w.objects.Delete(ctx, readyKey); err != nil {
+			_ = w.objects.Delete(ctx, cleanKey)
+			return w.reject(ctx, file)
+		}
+		readyKey = cleanKey
+	}
+	readySize, readySHA256, err := w.objectMetadata(ctx, readyKey)
+	if err != nil {
+		_ = w.objects.Delete(ctx, readyKey)
+		return w.reject(ctx, file)
+	}
+	if err := w.store.MarkReady(ctx, file.PublicID, readyKey, readySize, readySHA256); err != nil {
 		_ = w.objects.Delete(ctx, readyKey)
 		return err
 	}
 	return w.objects.Delete(ctx, file.ObjectKey)
+}
+
+func (w *VerificationWorker) objectMetadata(ctx context.Context, key string) (int64, []byte, error) {
+	stat, err := w.objects.Stat(ctx, key)
+	if err != nil {
+		return 0, nil, err
+	}
+	body, err := w.objects.Open(ctx, key)
+	if err != nil {
+		return 0, nil, err
+	}
+	hash := sha256.New()
+	_, copyErr := io.Copy(hash, body)
+	closeErr := body.Close()
+	if copyErr != nil {
+		return 0, nil, copyErr
+	}
+	if closeErr != nil {
+		return 0, nil, closeErr
+	}
+	if stat.Size < 1 {
+		return 0, nil, errors.New("ready object has invalid size")
+	}
+	return stat.Size, hash.Sum(nil), nil
 }
 
 func matchesMetadata(file File, stat storage.ObjectStat) bool {

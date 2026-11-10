@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"io"
 	"testing"
 
@@ -16,8 +17,8 @@ import (
 func TestVerificationWorkerMarksMatchingObjectReady(t *testing.T) {
 	body := []byte("verified file")
 	sum := sha256.Sum256(body)
-	store := &verificationMemoryStore{file: File{PublicID: "file-1", ObjectKey: "objects/file-1", ContentType: "image/jpeg", Size: int64(len(body)), SHA256: sum[:], Status: StatusVerifying}}
-	objects := &verificationObjects{body: body, stat: storage.ObjectStat{Size: int64(len(body)), ContentType: "image/jpeg", ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:]), ETag: "etag"}}
+	store := &verificationMemoryStore{file: File{PublicID: "file-1", ObjectKey: "objects/file-1", ContentType: "application/pdf", Size: int64(len(body)), SHA256: sum[:], Status: StatusVerifying}}
+	objects := &verificationObjects{body: body, stat: storage.ObjectStat{Size: int64(len(body)), ContentType: "application/pdf", ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:]), ETag: "etag"}}
 
 	if err := NewVerificationWorker(store, objects).Handle(context.Background(), asynq.NewTask(TaskVerify, []byte(`{"public_id":"file-1"}`))); err != nil {
 		t.Fatal(err)
@@ -28,15 +29,18 @@ func TestVerificationWorkerMarksMatchingObjectReady(t *testing.T) {
 	if store.file.ObjectKey == "objects/file-1" {
 		t.Fatal("ready file retained the key exposed by the upload URL")
 	}
+	if store.file.Size != int64(len(body)) || !bytes.Equal(store.file.SHA256, sum[:]) {
+		t.Fatal("ready metadata did not match the published object")
+	}
 }
 
 func TestVerificationWorkerAcceptsMissingProviderChecksum(t *testing.T) {
 	body := []byte("verified file")
 	sum := sha256.Sum256(body)
-	store := &verificationMemoryStore{file: File{PublicID: "file-1", ObjectKey: "objects/file-1", ContentType: "image/jpeg", Size: int64(len(body)), SHA256: sum[:], Status: StatusVerifying}}
+	store := &verificationMemoryStore{file: File{PublicID: "file-1", ObjectKey: "objects/file-1", ContentType: "application/pdf", Size: int64(len(body)), SHA256: sum[:], Status: StatusVerifying}}
 	// RustFS does not return x-amz-checksum-sha256 from HeadObject. The worker
 	// must still stream and verify the declared digest before marking ready.
-	objects := &verificationObjects{body: body, stat: storage.ObjectStat{Size: int64(len(body)), ContentType: "image/jpeg", ETag: "etag"}}
+	objects := &verificationObjects{body: body, stat: storage.ObjectStat{Size: int64(len(body)), ContentType: "application/pdf", ETag: "etag"}}
 
 	if err := NewVerificationWorker(store, objects).Handle(context.Background(), asynq.NewTask(TaskVerify, []byte(`{"public_id":"file-1"}`))); err != nil {
 		t.Fatal(err)
@@ -60,6 +64,39 @@ func TestVerificationWorkerRejectsAndDeletesChecksumMismatch(t *testing.T) {
 	}
 }
 
+func TestVerificationWorkerRejectsLegacyWebPWithGPSMetadata(t *testing.T) {
+	body := webpWithGPS(t)
+	sum := sha256.Sum256(body)
+	store := &verificationMemoryStore{file: File{PublicID: "file-webp", ObjectKey: "objects/file-webp", ContentType: "image/webp", Size: int64(len(body)), SHA256: sum[:], Status: StatusVerifying}}
+	objects := &verificationObjects{body: body, stat: storage.ObjectStat{Size: int64(len(body)), ContentType: "image/webp", ChecksumSHA256: base64.StdEncoding.EncodeToString(sum[:]), ETag: "etag"}}
+
+	if err := NewVerificationWorker(store, objects).Handle(context.Background(), asynq.NewTask(TaskVerify, []byte(`{"public_id":"file-webp"}`))); err != nil {
+		t.Fatal(err)
+	}
+	if store.file.Status != StatusRejected || !objects.deleted {
+		t.Fatalf("status=%q deleted=%t, want rejected and deleted", store.file.Status, objects.deleted)
+	}
+}
+
+func webpWithGPS(t *testing.T) []byte {
+	t.Helper()
+	// A valid 1x1 WebP image followed by a well-formed EXIF chunk. The upload
+	// policy rejects WebP, and this protects legacy rows created before it did.
+	body, err := base64.StdEncoding.DecodeString("UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA")
+	if err != nil {
+		t.Fatal(err)
+	}
+	exif := []byte("Exif\x00\x00GPSLatitudeLongitude")
+	chunk := append([]byte("EXIF\x00\x00\x00\x00"), exif...)
+	binary.LittleEndian.PutUint32(chunk[4:8], uint32(len(exif)))
+	if len(exif)%2 != 0 {
+		chunk = append(chunk, 0)
+	}
+	body = append(body, chunk...)
+	binary.LittleEndian.PutUint32(body[4:8], uint32(len(body)-8))
+	return body
+}
+
 func TestRegisterVerificationHandler(t *testing.T) {
 	worker := &recordingWorker{}
 	if err := RegisterVerificationHandler(worker, &verificationMemoryStore{}, &verificationObjects{}); err != nil {
@@ -78,12 +115,14 @@ func (s *verificationMemoryStore) GetVerifying(_ context.Context, publicID strin
 	}
 	return s.file, nil
 }
-func (s *verificationMemoryStore) MarkReady(_ context.Context, publicID, objectKey string) error {
+func (s *verificationMemoryStore) MarkReady(_ context.Context, publicID, objectKey string, size int64, sha256 []byte) error {
 	if s.file.PublicID != publicID || s.file.Status != StatusVerifying {
 		return ErrNotFound
 	}
 	s.file.Status = StatusReady
 	s.file.ObjectKey = objectKey
+	s.file.Size = size
+	s.file.SHA256 = append([]byte(nil), sha256...)
 	return nil
 }
 func (s *verificationMemoryStore) MarkRejected(_ context.Context, publicID string) error {

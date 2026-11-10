@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/url"
@@ -32,6 +33,7 @@ type s3Storage struct {
 
 var _ Storage = (*s3Storage)(nil)
 var _ ObjectVerifier = (*s3Storage)(nil)
+var _ ImageSanitizer = (*s3Storage)(nil)
 
 func NewS3(config S3Config, policy Policy) Storage {
 	return newS3(config, policy, putTTL, getTTL)
@@ -100,6 +102,29 @@ func (s *s3Storage) Delete(ctx context.Context, key string) error {
 	}
 	_, err := s.objects.DeleteObject(ctx, &awss3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
 	return err
+}
+
+func (s *s3Storage) SanitizeImage(ctx context.Context, key, contentType string) (string, error) {
+	body, err := s.Open(ctx, key)
+	if err != nil {
+		return "", err
+	}
+	clean, err := StripImageMetadata(contentType, body)
+	closeErr := body.Close()
+	if err != nil {
+		return "", err
+	}
+	if closeErr != nil {
+		return "", closeErr
+	}
+	destination := randomKey()
+	_, err = s.objects.PutObject(ctx, &awss3.PutObjectInput{
+		Bucket:      aws.String(s.bucket),
+		Key:         aws.String(destination),
+		ContentType: aws.String(contentType),
+		Body:        bytes.NewReader(clean),
+	})
+	return destination, err
 }
 
 func (s *s3Storage) Promote(ctx context.Context, key, etag string) (string, error) {
