@@ -29,7 +29,7 @@ type Route =
   | { name: "category"; code?: string }
   | { name: "product"; product: Product }
   | { name: "orders" }
-  | { name: "order"; publicId: string; order?: BuyerOrder }
+  | { name: "order"; publicId: string }
   | { name: "payment"; order: BuyerOrder; attempt: PaymentAttempt }
   | { name: "cart" };
 
@@ -375,7 +375,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     useOrderFeed(client, language, route.name === "orders");
   const orderList = orders;
   const openOrder = useCallback((order: BuyerOrder) => {
-    push({ name: "order", publicId: order.publicId, order });
+    push({ name: "order", publicId: order.publicId });
   }, [push]);
   const openPayment = useCallback((order: BuyerOrder) => {
     const idempotencyKey = paymentAttempts[order.publicId]?.idempotencyKey ?? createPaymentIdempotencyKey();
