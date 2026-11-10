@@ -402,6 +402,8 @@ test("mobile Khmer display headings have an explicit no-clipping wrap guard", ()
   );
   assert.match(css, /\.stat span\s*\{[^}]*overflow-wrap:\s*anywhere;/);
   assert.doesNotMatch(css, /\.stat span\s*\{[^}]*white-space:\s*nowrap/);
+  assert.match(css, /\.stat strong\s*\{[^}]*overflow-wrap:\s*anywhere;/);
+  assert.doesNotMatch(css, /\.stat strong\s*\{[^}]*white-space:\s*nowrap/);
 });
 
 test("not-found draft copy uses selector specificity instead of !important", () => {
