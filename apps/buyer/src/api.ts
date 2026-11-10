@@ -18,11 +18,13 @@ export function createBuyerApiClient(options: BuyerApiOptions): BuyerApiClient {
   return createApiClient(options);
 }
 
-const maxOrderPages = 20;
+export const buyerOrderPageSize = 20;
 
-function idText(value: string) {
-  return { zh: value, en: value, km: value };
+function itemPlaceholder(index: number) {
+  return { zh: `商品 ${index}`, en: `Item ${index}`, km: `ទំនិញ ${index}` };
 }
+
+const merchantPlaceholder = { zh: "商家", en: "Merchant", km: "អ្នកលក់" };
 
 function money(value: number): bigint {
   return BigInt(value);
@@ -31,10 +33,44 @@ function money(value: number): bigint {
 type ApiSuborder = components["schemas"]["BuyerSuborder"];
 type ApiOrder = components["schemas"]["BuyerOrder"] | components["schemas"]["BuyerOrderSummary"];
 
+const orderStatuses = new Set<OrderStatus>([
+  "awaiting_payment",
+  "paid",
+  "submitted",
+  "accepted",
+  "in_fulfillment",
+  "shipped",
+  "delivered_verified",
+  "settled",
+  "rejected",
+  "cancelled",
+  "delivery_failed",
+  "returning",
+  "returned",
+  "exception",
+  "mixed"
+]);
+
+const paymentStatuses = new Set<PaymentStatus>([
+  "pending",
+  "confirming",
+  "succeeded",
+  "failed",
+  "refunded"
+]);
+
+function mapOrderStatus(value: string): OrderStatus {
+  return orderStatuses.has(value as OrderStatus) ? (value as OrderStatus) : "unknown";
+}
+
+function mapPaymentStatus(value: string): PaymentStatus {
+  return paymentStatuses.has(value as PaymentStatus) ? (value as PaymentStatus) : "unknown";
+}
+
 function mapSuborder(suborder: ApiSuborder): BuyerSubOrder {
   const lines: OrderLine[] = suborder.items.map((item, index) => ({
     publicId: `${suborder.public_id}-${item.sku_public_id}-${index}`,
-    name: idText(item.sku_public_id),
+    name: itemPlaceholder(index + 1),
     quantity: String(item.quantity),
     unit: "item",
     unitPriceE4: money(item.unit_price_e4),
@@ -42,8 +78,8 @@ function mapSuborder(suborder: ApiSuborder): BuyerSubOrder {
   }));
   return {
     publicId: suborder.public_id,
-    merchantName: idText(suborder.merchant_public_id),
-    status: suborder.status as OrderStatus,
+    merchantName: merchantPlaceholder,
+    status: mapOrderStatus(suborder.status),
     lines,
     totalE4: money(suborder.payable_amount_e4),
     shippingAmountE4: money(suborder.shipping_amount_e4),
@@ -59,28 +95,30 @@ function mapOrder(order: ApiOrder): BuyerOrder {
     totalE4: money(order.payable_amount_e4),
     goodsAmountE4: money(order.goods_amount_e4),
     shippingAmountE4: money(order.shipping_amount_e4),
-    paymentStatus: order.payment_status as PaymentStatus,
+    paymentStatus: mapPaymentStatus(order.payment_status),
     subOrders: order.suborders.map(mapSuborder)
   };
 }
 
+export interface BuyerOrderPage {
+  items: BuyerOrder[];
+  nextCursor: string | null;
+}
+
 export async function loadBuyerOrders(
   client: BuyerApiClient,
+  cursor?: string,
   signal?: AbortSignal
-): Promise<BuyerOrder[]> {
-  const orders: BuyerOrder[] = [];
-  let cursor: string | undefined;
-  for (let page = 0; page < maxOrderPages; page += 1) {
-    const { data } = await client.GET("/v1/buyer/orders", {
-      params: { query: { cursor, page_size: 100 } },
-      signal
-    });
-    if (!data) throw new Error("The order response was malformed");
-    orders.push(...data.data.items.map(mapOrder));
-    cursor = data.data.next_cursor ?? undefined;
-    if (!cursor) break;
-  }
-  return orders;
+): Promise<BuyerOrderPage> {
+  const { data } = await client.GET("/v1/buyer/orders", {
+    params: { query: { cursor, page_size: buyerOrderPageSize } },
+    signal
+  });
+  if (!data) throw new Error("The order response was malformed");
+  return {
+    items: data.data.items.map(mapOrder),
+    nextCursor: data.data.next_cursor ?? null
+  };
 }
 
 export async function loadBuyerOrder(

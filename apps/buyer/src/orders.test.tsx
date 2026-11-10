@@ -31,6 +31,7 @@ describe("buyer order views", () => {
         onBack={() => undefined}
         onRetry={() => undefined}
         onOpen={() => undefined}
+        onLoadMore={() => undefined}
       />
     );
     expect(mockOrders).toHaveLength(16);

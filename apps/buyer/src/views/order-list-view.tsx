@@ -5,6 +5,7 @@ import { formatPriceE4 } from "../money";
 import type { Resource } from "../resource";
 import type { BuyerOrder, BuyerSubOrder, OrderStatus } from "../orders";
 import type { LocaleProps } from "./common";
+import type { TranslationKey } from "@drlife/i18n";
 
 function statusKey(status: OrderStatus) {
   return `order.buyerStatus.${status}` as const;
@@ -21,13 +22,19 @@ export function OrderListView({
   actions,
   onBack,
   onRetry,
-  onOpen
+  onOpen,
+  onLoadMore,
+  loadingMore,
+  moreMessageKey,
 }: {
   orders: Resource<readonly BuyerOrder[]>;
   actions?: ReactNode;
   onBack: () => void;
   onRetry: () => void;
   onOpen: (order: BuyerOrder) => void;
+  onLoadMore?: () => void;
+  loadingMore?: boolean;
+  moreMessageKey?: TranslationKey;
 } & LocaleProps) {
   return (
     <div className="buyer-page">
@@ -69,6 +76,14 @@ export function OrderListView({
               </button>
             ))}
           </section>
+        )}
+        {orders.status === "ready" && orders.value.length > 0 && onLoadMore && (
+          <div className="buyer-order-list__more">
+            {moreMessageKey && <p className="buyer-order-warning">{t(moreMessageKey)}</p>}
+            <button type="button" onClick={onLoadMore} disabled={loadingMore}>
+              {loadingMore ? t("common.loading") : t("order.loadMore")}
+            </button>
+          </div>
         )}
       </main>
     </div>

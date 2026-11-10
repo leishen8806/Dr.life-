@@ -204,7 +204,7 @@ const apiOrder = {
 };
 
 describe("loadBuyerOrders", () => {
-  it("follows cursor pages and maps server money to bigint without mock data", async () => {
+  it("loads one page and maps server money without exposing internal IDs", async () => {
     const second = { ...apiOrder, public_id: "01JORDER2" };
     const { urls, transport } = recordingFetch((call) =>
       call === 0
@@ -212,14 +212,32 @@ describe("loadBuyerOrders", () => {
         : success({ items: [second], next_cursor: null })
     );
 
-    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject([
-      { publicId: "01JORDER", totalE4: 190_000n, subOrders: [{ totalE4: 190_000n }] },
-      { publicId: "01JORDER2" }
-    ]);
-    expect(urls).toEqual([
-      "http://api.test/v1/buyer/orders?page_size=100",
-      "http://api.test/v1/buyer/orders?cursor=next-page&page_size=100"
-    ]);
+    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
+      items: [{
+        publicId: "01JORDER",
+        totalE4: 190_000n,
+        subOrders: [{
+          totalE4: 190_000n,
+          merchantName: { zh: "商家", en: "Merchant", km: "អ្នកលក់" },
+          lines: [{ name: { zh: "商品 1", en: "Item 1", km: "ទំនិញ 1" } }]
+        }]
+      }],
+      nextCursor: "next-page"
+    });
+    expect(urls).toEqual(["http://api.test/v1/buyer/orders?page_size=20"]);
+  });
+
+  it("maps unknown server statuses to the localized processing fallback", async () => {
+    const unknown = {
+      ...apiOrder,
+      payment_status: "awaiting_review",
+      suborders: [{ ...apiOrder.suborders[0], status: "queued" }]
+    };
+    const { transport } = recordingFetch(() => success({ items: [unknown], next_cursor: null }));
+
+    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
+      items: [{ paymentStatus: "unknown", subOrders: [{ status: "unknown" }] }]
+    });
   });
 
   it("loads one detail and preserves a server error code", async () => {

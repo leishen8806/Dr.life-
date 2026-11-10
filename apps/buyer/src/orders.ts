@@ -15,9 +15,10 @@ export type OrderStatus =
   | "returning"
   | "returned"
   | "exception"
+  | "unknown"
   | "mixed";
 
-export type PaymentStatus = "pending" | "confirming" | "succeeded" | "failed" | "refunded";
+export type PaymentStatus = "pending" | "confirming" | "succeeded" | "failed" | "refunded" | "unknown";
 
 export interface OrderLine {
   publicId: string;

@@ -221,10 +221,52 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   );
   const openOrders = useCallback(() => push({ name: "orders" }), [push]);
   const loadOrders = useCallback(
-    (signal: AbortSignal) => loadBuyerOrders(client, signal),
+    (signal: AbortSignal) => loadBuyerOrders(client, undefined, signal),
     [client]
   );
   const [orders, retryOrders] = useLoaded(loadOrders);
+  const [moreOrders, setMoreOrders] = useState<{
+    items: BuyerOrder[];
+    nextCursor: string | null;
+    loading: boolean;
+    messageKey?: ReturnType<typeof errorMessageKey>;
+  }>();
+  const loadMoreOrders = useCallback(() => {
+    if (orders.status !== "ready" || moreOrders?.loading) return;
+    const currentItems = moreOrders?.items ?? orders.value.items;
+    const cursor = moreOrders?.nextCursor ?? orders.value.nextCursor;
+    if (!cursor) return;
+    setMoreOrders({ items: currentItems, nextCursor: cursor, loading: true });
+    loadBuyerOrders(client, cursor).then(
+      (page) => {
+        setMoreOrders({
+          items: [...currentItems, ...page.items],
+          nextCursor: page.nextCursor,
+          loading: false
+        });
+      },
+      (error: unknown) =>
+        setMoreOrders({
+          items: currentItems,
+          nextCursor: cursor,
+          loading: false,
+          messageKey: errorMessageKey(error)
+        })
+    );
+  }, [client, moreOrders, orders]);
+  const retryOrderList = useCallback(() => {
+    setMoreOrders(undefined);
+    retryOrders();
+  }, [retryOrders]);
+  const orderList =
+    orders.status === "ready"
+      ? {
+          status: "ready" as const,
+          value: moreOrders?.items ?? orders.value.items
+        }
+      : orders;
+  const nextOrderCursor =
+    moreOrders?.nextCursor ?? (orders.status === "ready" ? orders.value.nextCursor : null);
   const openOrder = useCallback((order: BuyerOrder) => {
     push({ name: "order", order });
     loadBuyerOrder(client, order.publicId).then((detail) =>
@@ -287,11 +329,14 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       <OrderListView
         t={t}
         language={language}
-        orders={orders}
+        orders={orderList}
         actions={actions}
         onBack={back}
-        onRetry={retryOrders}
+        onRetry={retryOrderList}
         onOpen={openOrder}
+        onLoadMore={nextOrderCursor ? loadMoreOrders : undefined}
+        loadingMore={moreOrders?.loading ?? false}
+        moreMessageKey={moreOrders?.messageKey}
       />
     );
 
