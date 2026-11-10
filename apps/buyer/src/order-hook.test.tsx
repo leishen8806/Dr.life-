@@ -3,7 +3,7 @@ import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Language } from "@drlife/i18n";
 import { type BuyerApiClient, createBuyerApiClient } from "./api";
-import { useOrderFeed } from "./app";
+import { useOrderDetail, useOrderFeed } from "./app";
 
 afterEach(cleanup);
 
@@ -29,6 +29,13 @@ function order(id: string) {
 
 function page(items: ReturnType<typeof order>[], next_cursor: string | null): Response {
   return new Response(JSON.stringify({ ok: true, data: { items, next_cursor }, request_id: "req_test" }), {
+    status: 200,
+    headers: { "content-type": "application/json" }
+  });
+}
+
+function detail(value: ReturnType<typeof order>): Response {
+  return new Response(JSON.stringify({ ok: true, data: value, request_id: "req_detail" }), {
     status: 200,
     headers: { "content-type": "application/json" }
   });
@@ -105,5 +112,47 @@ describe("useOrderFeed", () => {
     await waitFor(() => expect(result.current.loadingMore).toBe(false));
     expect(attempts).toBe(2);
     expect(result.current.resource.status === "ready" ? result.current.resource.value.map((item) => item.publicId) : []).toEqual(["ord_1", "ord_2"]);
+  });
+});
+
+describe("useOrderDetail", () => {
+  it("retries a failed detail request", async () => {
+    let attempts = 0;
+    const transport: typeof globalThis.fetch = async () => {
+      attempts += 1;
+      return attempts === 1
+        ? new Response(JSON.stringify({ ok: false, error: { code: 1005, message: { zh: "错误", en: "Error", km: "កំហុស" } }, request_id: "req_detail" }), { status: 503, headers: { "content-type": "application/json" } })
+        : detail(order("ord_detail"));
+    };
+    const buyerClient = client(transport, "zh");
+    const { result } = renderHook(() => useOrderDetail(buyerClient, "ord_detail", "zh"));
+    await waitFor(() => expect(result.current.resource.status).toBe("error"));
+    act(() => result.current.retry());
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    expect(attempts).toBe(2);
+  });
+
+  it("reloads the open detail when the language changes", async () => {
+    let language: Language = "zh";
+    const languages: string[] = [];
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      const request = new Request(input, init);
+      languages.push(request.headers.get("Accept-Language") ?? "");
+      return detail(order("ord_detail"));
+    };
+    const buyerClient = createBuyerApiClient({
+      baseUrl: "http://api.test",
+      getLanguage: () => language,
+      fetch: transport,
+      resilience: { retry: { maxAttempts: 1 } }
+    });
+    const { result, rerender } = renderHook(
+      ({ lang }) => useOrderDetail(buyerClient, "ord_detail", lang),
+      { initialProps: { lang: "zh" as Language } }
+    );
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    language = "km";
+    rerender({ lang: "km" });
+    await waitFor(() => expect(languages).toEqual(["zh", "km"]));
   });
 });

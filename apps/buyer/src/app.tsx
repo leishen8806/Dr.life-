@@ -27,7 +27,7 @@ type Route =
   | { name: "category"; code?: string }
   | { name: "product"; product: Product }
   | { name: "orders" }
-  | { name: "order"; publicId: string; order: Resource<BuyerOrder> }
+  | { name: "order"; publicId: string }
   | { name: "cart" };
 
 const featuredPageSize = 6;
@@ -216,6 +216,39 @@ export function useOrderFeed(client: BuyerApiClient, language: string) {
   };
 }
 
+/** Loads one order detail and reloads it whenever the active language changes. */
+export function useOrderDetail(client: BuyerApiClient, publicId: string, language: string) {
+  const [resource, setResource] = useState<Resource<BuyerOrder>>({ status: "loading" });
+  const request = useRef<AbortController | undefined>(undefined);
+
+  const load = useCallback(() => {
+    request.current?.abort();
+    const controller = new AbortController();
+    request.current = controller;
+    setResource({ status: "loading" });
+    loadBuyerOrder(client, publicId, controller.signal).then(
+      (value) => {
+        if (!controller.signal.aborted) setResource({ status: "ready", value });
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted) setResource({ status: "error", messageKey: errorMessageKey(error) });
+      }
+    );
+  }, [client, publicId]);
+
+  useEffect(() => {
+    if (!publicId) {
+      request.current?.abort();
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+    return () => request.current?.abort();
+  }, [load, language, publicId]);
+
+  return { resource, retry: load };
+}
+
 function CategoryPage({
   client,
   categories,
@@ -263,7 +296,6 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartError, setCartError] = useState<ReturnType<typeof addProduct>["error"]>();
   const route = stack[stack.length - 1] ?? { name: "home" };
-  const detailRequest = useRef<AbortController | undefined>(undefined);
   const push = useCallback(
     (next: Route) => setStack((current) => [...current, next]),
     []
@@ -274,7 +306,6 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   );
   const back = useCallback(
     () => {
-      detailRequest.current?.abort();
       setStack((current) => (current.length > 1 ? current.slice(0, -1) : current));
     },
     []
@@ -309,40 +340,10 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const { resource: orders, retry: retryOrders, loadMore: loadMoreOrders, loadingMore, moreMessageKey: moreOrdersMessageKey, nextCursor: nextOrderCursor } =
     useOrderFeed(client, language);
   const orderList = orders;
-  useEffect(() => () => {
-    detailRequest.current?.abort();
-  }, []);
-  const setOrderResource = useCallback((publicId: string, resource: Resource<BuyerOrder>) => {
-    setStack((current) => {
-      const route = current.at(-1);
-      return route?.name === "order" && route.publicId === publicId
-        ? [...current.slice(0, -1), { ...route, order: resource }]
-        : current;
-    });
-  }, []);
-  const loadOrderDetail = useCallback((publicId: string) => {
-    detailRequest.current?.abort();
-    const controller = new AbortController();
-    detailRequest.current = controller;
-    setOrderResource(publicId, { status: "loading" });
-    loadBuyerOrder(client, publicId, controller.signal).then((detail) => {
-      if (!controller.signal.aborted) setOrderResource(publicId, { status: "ready", value: detail });
-    }, (error: unknown) => {
-      if (!controller.signal.aborted) setOrderResource(publicId, { status: "error", messageKey: errorMessageKey(error) });
-    });
-  }, [client, language, setOrderResource]);
   const openOrder = useCallback((order: BuyerOrder) => {
-    push({ name: "order", publicId: order.publicId, order: { status: "loading" } });
-    loadOrderDetail(order.publicId);
-  }, [loadOrderDetail, push]);
-  const retryOrder = useCallback(() => {
-    if (route.name === "order") loadOrderDetail(route.publicId);
-  }, [loadOrderDetail, route]);
-  useEffect(() => {
-    // Language changes must refetch the open detail with the current Accept-Language.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (route.name === "order") loadOrderDetail(route.publicId);
-  }, [language, loadOrderDetail]);
+    push({ name: "order", publicId: order.publicId });
+  }, [push]);
+  const orderDetail = useOrderDetail(client, route.name === "order" ? route.publicId : "", language);
 
   const addToCart = useCallback((product: Product) => {
     const result = addProduct(cart, product);
@@ -383,9 +384,9 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       <OrderDetailView
         t={t}
         language={language}
-        order={route.order}
+        order={orderDetail.resource}
         actions={actions}
-        onRetry={retryOrder}
+        onRetry={orderDetail.retry}
         onBack={back}
       />
     );
