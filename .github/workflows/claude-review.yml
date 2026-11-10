@@ -45,7 +45,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Grep,Glob"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Write,Grep,Glob"
           prompt: |
             REPO: ${{ github.repository }}
             PR: ${{ github.event.pull_request.number || github.event.issue.number }}
@@ -56,7 +56,11 @@ jobs:
             对照：Issue 验收项；AGENTS.md 第 4 节不可违反的规则；已定决定（金额 e4 整分、
             确认中订单不可取消返回 409、报价过期 409/3006、商家端电话脱敏、买家端不出现 RouteFit、
             三语齐全、官网 CSP 不放宽、不写入服务器地址/密钥/令牌）。
-            用 `gh pr comment` 发出一条审核，需要逐行指出的用行内评论；审核开头写“## Claude 独立审核 · PR #<编号>（head <短哈希>）”，
+            发审核的方法固定为两步，不要用管道、heredoc、cat 或 echo：
+            第一步用 Write 工具把审核全文写到 /tmp/claude-review.md；
+            第二步运行一条命令：gh pr comment <PR 编号> --body-file /tmp/claude-review.md
+            需要逐行指出的再用行内评论工具。审核开头写“## Claude 独立审核 · PR #<编号>（head <短哈希>）”，
             按“必须修 / 应修 / 低”分级，每条写清位置、原因、怎么改。
             只评论：不要推送代码、不要批准、不要合并、不要请求修改状态以外的任何操作。
+            结束前确认审核已经发出；没发出就重试上面第二步一次。
             涉及资金、登录权限、数据库迁移的改动，在结论里注明“需 owner 亲审”。
