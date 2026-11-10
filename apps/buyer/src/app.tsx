@@ -26,7 +26,7 @@ type Route =
   | { name: "category"; code?: string }
   | { name: "product"; product: Product }
   | { name: "orders" }
-  | { name: "order"; order: Resource<BuyerOrder> }
+  | { name: "order"; publicId: string; order: Resource<BuyerOrder> }
   | { name: "cart" };
 
 const featuredPageSize = 6;
@@ -280,25 +280,37 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       : orders;
   const nextOrderCursor =
     currentMoreOrders?.nextCursor ?? (orders.status === "ready" ? orders.value.nextCursor : null);
-  const openOrder = useCallback((order: BuyerOrder) => {
+  const setOrderResource = useCallback((publicId: string, resource: Resource<BuyerOrder>) => {
+    setStack((current) => {
+      const route = current.at(-1);
+      return route?.name === "order" && route.publicId === publicId
+        ? [...current.slice(0, -1), { ...route, order: resource }]
+        : current;
+    });
+  }, []);
+  const loadOrderDetail = useCallback((publicId: string) => {
     detailRequest.current?.abort();
     const controller = new AbortController();
     detailRequest.current = controller;
-    push({ name: "order", order: { status: "loading" } });
-    loadBuyerOrder(client, order.publicId, controller.signal).then((detail) =>
-      setStack((current) => {
-        const route = current.at(-1);
-        return !controller.signal.aborted && route?.name === "order"
-          ? [...current.slice(0, -1), { name: "order", order: { status: "ready", value: detail } }]
-          : current;
-      })
-    ).catch((error: unknown) => {
-      if (!controller.signal.aborted)
-        setStack((current) => current.at(-1)?.name === "order"
-          ? [...current.slice(0, -1), { name: "order", order: { status: "error", messageKey: errorMessageKey(error) } }]
-          : current);
+    setOrderResource(publicId, { status: "loading" });
+    loadBuyerOrder(client, publicId, controller.signal).then((detail) => {
+      if (!controller.signal.aborted) setOrderResource(publicId, { status: "ready", value: detail });
+    }, (error: unknown) => {
+      if (!controller.signal.aborted) setOrderResource(publicId, { status: "error", messageKey: errorMessageKey(error) });
     });
-  }, [client, push]);
+  }, [client, language, setOrderResource]);
+  const openOrder = useCallback((order: BuyerOrder) => {
+    push({ name: "order", publicId: order.publicId, order: { status: "loading" } });
+    loadOrderDetail(order.publicId);
+  }, [loadOrderDetail, push]);
+  const retryOrder = useCallback(() => {
+    if (route.name === "order") loadOrderDetail(route.publicId);
+  }, [loadOrderDetail, route]);
+  useEffect(() => {
+    if (route.name === "order" && route.order.status === "ready") loadOrderDetail(route.publicId);
+    // Language changes must refetch the open detail with the current Accept-Language.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+  }, [language]);
 
   const addToCart = useCallback((product: Product) => {
     const result = addProduct(cart, product);
@@ -341,6 +353,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
         language={language}
         order={route.order}
         actions={actions}
+        onRetry={retryOrder}
         onBack={back}
       />
     );

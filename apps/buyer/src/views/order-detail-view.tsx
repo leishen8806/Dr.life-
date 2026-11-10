@@ -21,15 +21,16 @@ export function OrderDetailView({
   language,
   order,
   actions,
+  onRetry,
   onBack
-}: { order: Resource<BuyerOrder>; actions?: ReactNode; onBack: () => void } & LocaleProps) {
+}: { order: Resource<BuyerOrder>; actions?: ReactNode; onRetry?: () => void; onBack: () => void } & LocaleProps) {
   return (
     <div className="buyer-page">
       <AppHeader slogan={t("order.detailTitle")} actions={actions} />
       <main className="buyer-page__body">
         <button type="button" className="buyer-back" onClick={onBack}>{t("common.back")}</button>
         {order.status === "loading" && <Card><p>{t("common.loading")}</p></Card>}
-        {order.status === "error" && <Card><p className="buyer-order-warning">{t(order.messageKey)}</p></Card>}
+        {order.status === "error" && <Card><p className="buyer-order-warning">{t(order.messageKey)}</p>{onRetry && <button type="button" onClick={onRetry}>{t("common.retry")}</button>}</Card>}
         {order.status === "ready" && <>
         <Card>
           <div className="buyer-order-detail__heading">
