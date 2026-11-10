@@ -87,6 +87,11 @@ test("Khmer typography keeps readable line heights at every width", () => {
   assert.match(styles, /@media\s*\(min-width:\s*521px\) and \(max-width:\s*900px\)/);
 });
 
+test("base and mobile hero line heights match the typography specification", () => {
+  assert.match(styles, /:root\s*\{[\s\S]*?line-height:\s*1\.7;/);
+  assert.match(styles, /@media\s*\(max-width:\s*520px\)[\s\S]*?\.hero h1\s*\{[\s\S]*?line-height:\s*1\.15;/);
+});
+
 test("mobile stats keep the displayed number and unit together", () => {
   assert.match(styles, /\.stat strong\s*\{[\s\S]*?word-break:\s*keep-all;/);
 });

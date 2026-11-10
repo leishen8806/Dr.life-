@@ -20,7 +20,7 @@
   color: var(--graphite);
   background: var(--ivory);
   font-size: var(--fs-body);
-  line-height: 1.6;
+  line-height: 1.7;
 }
 * {
   box-sizing: border-box;
@@ -1085,7 +1085,7 @@ a:focus-visible {
 @media (max-width: 520px) {
   .hero h1 {
     font-size: var(--fs-display);
-    line-height: 1.1;
+    line-height: 1.15;
   }
   .site-header {
     gap: 12px;
