@@ -951,9 +951,9 @@ a:focus-visible {
   max-width: 560px;
   font-size: var(--fs-body);
 }
-.not-found-page__draft {
+.not-found-page > p.not-found-page__draft {
   color: var(--deep-gold);
-  font-size: var(--fs-small) !important;
+  font-size: var(--fs-small);
 }
 [data-lang="km"] .not-found-page__draft[hidden] {
   display: block;
@@ -967,9 +967,6 @@ a:focus-visible {
 [data-lang="km"] .merchant-faq h3,
 [data-lang="km"] .not-found-page h1,
 [data-lang="km"] .section-title {
-  font-family: "Noto Sans Khmer", sans-serif;
-}
-[data-lang="km"] .not-found-page h1 {
   font-family: "Noto Sans Khmer", sans-serif;
 }
 .mobile-menu summary {

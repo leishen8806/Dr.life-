@@ -397,6 +397,13 @@ test("mobile Khmer display headings have an explicit no-clipping wrap guard", ()
   );
 });
 
+test("not-found draft copy uses selector specificity instead of !important", () => {
+  const css = source("styles/global.css");
+  assert.match(css, /\.not-found-page > p\.not-found-page__draft\s*\{[^}]*font-size:\s*var\(--fs-small\);/);
+  assert.doesNotMatch(css, /\.not-found-page__draft\s*\{[^}]*!important/);
+  assert.equal((css.match(/\[data-lang="km"\] \.not-found-page h1\s*\{/g) ?? []).length, 0);
+});
+
 test("homepage service chain keeps its alignment and light-section eyebrow contrast", () => {
   const css = source("styles/global.css");
   assert.match(css, /\.chain\s*\{[^}]*margin:\s*64px auto 0/);
