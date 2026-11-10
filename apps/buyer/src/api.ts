@@ -66,6 +66,7 @@ function mapPaymentStatus(value: string): PaymentStatus {
 }
 
 function mapSuborder(suborder: ApiSuborder): BuyerSubOrder {
+  // Follow-up contract task: map localized merchant/item fields once OpenAPI exposes them.
   const lines: OrderLine[] = suborder.items.map((item, index) => ({
     publicId: `${suborder.public_id}-${item.sku_public_id}-${index}`,
     name: emptyLocalizedText,

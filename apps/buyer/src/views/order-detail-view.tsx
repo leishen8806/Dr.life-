@@ -65,6 +65,7 @@ export function OrderDetailView({
             <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(subOrder.totalE4)}</strong></p>
             {subOrder.shippingQuoteExpiresAt && subOrder.status === "awaiting_payment" && (
               <p className="buyer-order-detail__meta">
+                {/* Payment follow-up owns server-authoritative 409/3006 handling; this is display-only. */}
                 {new Date(subOrder.shippingQuoteExpiresAt).getTime() <
                 // The expiry is a server timestamp; this render-time comparison is intentionally best-effort.
                 // eslint-disable-next-line react-hooks/purity
