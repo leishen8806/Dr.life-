@@ -9,12 +9,18 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 )
 
-const TaskVerify = "files:verify:v1"
+const (
+	TaskVerify  = "files:verify:v1"
+	TaskCleanup = "files:cleanup:v1"
+)
 
 type QueueVerifier struct{ enqueuer *queue.Enqueuer }
 
 func RegisterTasks(registry *queue.Registry) error {
-	return registry.Register(queue.TypeSpec{Name: TaskVerify, Queue: queue.QueueDefault, Timeout: time.Minute, MaxRetry: 5})
+	if err := registry.Register(queue.TypeSpec{Name: TaskVerify, Queue: queue.QueueDefault, Timeout: time.Minute, MaxRetry: 5}); err != nil {
+		return err
+	}
+	return registry.Register(queue.TypeSpec{Name: TaskCleanup, Queue: queue.QueueDefault, Timeout: 5 * time.Minute, MaxRetry: 5})
 }
 
 func NewQueueVerifier(enqueuer *queue.Enqueuer) *QueueVerifier {

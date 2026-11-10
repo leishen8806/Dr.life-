@@ -22,6 +22,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/httpx"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
+	"github.com/leishen8806/Dr.life-/backend/internal/trade"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -121,6 +122,16 @@ type FileManagement interface {
 	DownloadURL(context.Context, int64, string) (storage.SignedURL, error)
 }
 
+type OrderManagement interface {
+	BuyerOrders(context.Context, int64, string, int) ([]trade.BuyerOrderView, string, error)
+	PlaceForDelivery(context.Context, int64, string, string, []trade.OrderLineInput) (trade.CreateOrder, error)
+	BuyerOrderDetail(context.Context, int64, string) (trade.BuyerOrderView, error)
+	Cancel(context.Context, int64, string) error
+	CreatePayment(context.Context, int64, string) (trade.PaymentResult, error)
+	MerchantOrders(context.Context, int64, string, int) ([]trade.MerchantOrderView, string, error)
+	MerchantOrderDetail(context.Context, int64, string) (trade.MerchantOrderView, error)
+}
+
 // Handler 实现 gen.ServerInterface。
 // 零值 Handler 只提供 /v1/public/ping；商品接口在依赖未注入时返回 500，
 // 这样 server.NewHandler(nil) 与契约测试的既有行为保持不变。
@@ -145,6 +156,123 @@ type Handler struct {
 	AdminPermissions AdminPermissionChecker
 	Files            FileManagement
 	AdminManagement  AdminManagement
+	Orders           OrderManagement
+}
+
+func (h Handler) ListBuyerOrders(w http.ResponseWriter, r *http.Request, params gen.ListBuyerOrdersParams) {
+	account, ok := h.orderAccount(w, r, false)
+	if !ok {
+		return
+	}
+	items, next, err := h.Orders.BuyerOrders(r.Context(), account.ID, stringValue(params.Cursor), intValue(params.PageSize))
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	data := make([]gen.BuyerOrderSummary, 0, len(items))
+	for _, item := range items {
+		data = append(data, buyerOrderSummary(item))
+	}
+	httpx.WriteOK(w, r, gen.BuyerOrderListData{Items: data, NextCursor: optionalString(next)})
+}
+
+func (h Handler) CreateBuyerOrder(w http.ResponseWriter, r *http.Request, params gen.CreateBuyerOrderParams) {
+	account, ok := h.orderAccount(w, r, false)
+	if !ok {
+		return
+	}
+	var body gen.OrderCreateRequest
+	if !decodeOrderJSON(w, r, &body) {
+		return
+	}
+	lines := make([]trade.OrderLineInput, 0, len(body.Items))
+	for _, item := range body.Items {
+		lines = append(lines, trade.OrderLineInput{SKUPublicID: item.SkuPublicId, Quantity: item.Quantity})
+	}
+	created, err := h.Orders.PlaceForDelivery(r.Context(), account.ID, params.IdempotencyKey, body.ShippingAddressPublicId, lines)
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	order, err := h.Orders.BuyerOrderDetail(r.Context(), account.ID, created.PublicID)
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	httpx.WriteCreated(w, r, buyerOrder(order))
+}
+
+func (h Handler) GetBuyerOrder(w http.ResponseWriter, r *http.Request, publicID gen.PublicID) {
+	account, ok := h.orderAccount(w, r, false)
+	if !ok {
+		return
+	}
+	order, err := h.Orders.BuyerOrderDetail(r.Context(), account.ID, publicID)
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, buyerOrder(order))
+}
+
+func (h Handler) CancelBuyerOrder(w http.ResponseWriter, r *http.Request, publicID gen.PublicID, _ gen.CancelBuyerOrderParams) {
+	account, ok := h.orderAccount(w, r, false)
+	if !ok {
+		return
+	}
+	if err := h.Orders.Cancel(r.Context(), account.ID, publicID); err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	order, err := h.Orders.BuyerOrderDetail(r.Context(), account.ID, publicID)
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, buyerOrder(order))
+}
+
+func (h Handler) CreateBuyerOrderPayment(w http.ResponseWriter, r *http.Request, publicID gen.PublicID, _ gen.CreateBuyerOrderPaymentParams) {
+	account, ok := h.orderAccount(w, r, false)
+	if !ok {
+		return
+	}
+	payment, err := h.Orders.CreatePayment(r.Context(), account.ID, publicID)
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	httpx.WriteCreated(w, r, gen.OrderPaymentData{PaymentNo: payment.PaymentNo, PaymentLink: payment.PaymentLink, ExpiresAt: payment.ExpiresAt})
+}
+
+func (h Handler) ListMerchantSuborders(w http.ResponseWriter, r *http.Request, params gen.ListMerchantSubordersParams) {
+	account, ok := h.orderAccount(w, r, true)
+	if !ok {
+		return
+	}
+	items, next, err := h.Orders.MerchantOrders(r.Context(), *account.MerchantID, stringValue(params.Cursor), intValue(params.PageSize))
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	data := make([]gen.MerchantSuborder, 0, len(items))
+	for _, item := range items {
+		data = append(data, merchantSuborder(item))
+	}
+	httpx.WriteOK(w, r, gen.MerchantSuborderListData{Items: data, NextCursor: optionalString(next)})
+}
+
+func (h Handler) GetMerchantSuborder(w http.ResponseWriter, r *http.Request, publicID gen.PublicID) {
+	account, ok := h.orderAccount(w, r, true)
+	if !ok {
+		return
+	}
+	order, err := h.Orders.MerchantOrderDetail(r.Context(), *account.MerchantID, publicID)
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, merchantSuborder(order))
 }
 
 type adminStepUpRequest struct {
@@ -1485,6 +1613,118 @@ func decodeJSON[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 		return body, false
 	}
 	return body, true
+}
+
+func decodeOrderJSON(w http.ResponseWriter, r *http.Request, body *gen.OrderCreateRequest) bool {
+	bounded := r.Clone(r.Context())
+	bounded.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	if err := httpx.DecodeJSON(bounded, body); err != nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeInvalidArgument))
+		return false
+	}
+	return true
+}
+
+func (h Handler) orderAccount(w http.ResponseWriter, r *http.Request, merchant bool) (iam.AccountResolution, bool) {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok || identity.AccountID == "" {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return iam.AccountResolution{}, false
+	}
+	if h.Orders == nil || h.Directory == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return iam.AccountResolution{}, false
+	}
+	account, found, err := h.Directory.Resolve(r.Context(), identity.AccountID)
+	if err != nil || !found || account.ID <= 0 {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return iam.AccountResolution{}, false
+	}
+	if merchant && account.MerchantID == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return iam.AccountResolution{}, false
+	}
+	return account, true
+}
+
+func (h Handler) orderError(w http.ResponseWriter, r *http.Request, err error) {
+	code := httpx.CodeInternalError
+	switch {
+	case errors.Is(err, trade.ErrOrderNotVisible):
+		code = httpx.CodeResourceNotFound
+	case errors.Is(err, trade.ErrAddressNotFound):
+		code = httpx.CodeResourceNotFound
+	case errors.Is(err, trade.ErrIdempotencyConflict):
+		code = httpx.CodeIdempotencyConflict
+	case errors.Is(err, trade.ErrInvalidOrderLine), errors.Is(err, trade.ErrNoMatchingTier), errors.Is(err, trade.ErrPriceNotWholeCent):
+		code = httpx.CodeOrderInvalidItem
+	case errors.Is(err, trade.ErrInsufficientAvailability):
+		code = httpx.CodeOrderInsufficientStock
+	case errors.Is(err, trade.ErrReservationReleased):
+		code = httpx.CodeOrderCancelledOrReleased
+	case errors.Is(err, trade.ErrPaymentAmount):
+		code = httpx.CodeOrderAmountMismatch
+	case errors.Is(err, trade.ErrInvalidTransition), errors.Is(err, trade.ErrPaymentConfirming), errors.Is(err, trade.ErrPaymentReconciliation):
+		code = httpx.CodeOrderStateConflict
+	case errors.Is(err, trade.ErrShippingQuoteExpired):
+		code = httpx.CodeOrderQuoteExpired
+	case errors.Is(err, trade.ErrBuyerInactive):
+		code = httpx.CodeAccountBlocked
+	case errors.Is(err, trade.ErrOrderAdaptersUnavailable):
+		code = httpx.CodeServiceUnavailable
+	}
+	if code == httpx.CodeInternalError && h.Logger != nil {
+		h.Logger.ErrorContext(r.Context(), "order request failed", "error", err, "request_id", httpx.RequestIDFromContext(r.Context()))
+	}
+	httpx.WriteError(w, r, httpx.NewAppError(code))
+}
+
+func buyerOrder(order trade.BuyerOrderView) gen.BuyerOrder {
+	subs := make([]gen.BuyerSuborder, 0, len(order.Children))
+	for _, child := range order.Children {
+		subs = append(subs, buyerSuborder(child))
+	}
+	return gen.BuyerOrder{PublicId: order.PublicID, PaymentStatus: gen.PaymentStatus(order.PaymentStatus), SummaryStatus: gen.OrderSummaryStatus(order.Status), GoodsAmountE4: order.GoodsAmountE4, ShippingAmountE4: order.ShippingAmountE4, PayableAmountE4: order.PayableAmountE4, ShippingAddressPublicId: order.ShippingAddress.PublicID, ShippingAddress: gen.BuyerShippingAddressSnapshot{RecipientName: order.ShippingAddress.RecipientName, AddressText: order.ShippingAddress.AddressText, Phone: order.ShippingAddress.Phone}, Suborders: subs, CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
+}
+
+func buyerOrderSummary(order trade.BuyerOrderView) gen.BuyerOrderSummary {
+	data := buyerOrder(order)
+	return gen.BuyerOrderSummary{PublicId: data.PublicId, PaymentStatus: data.PaymentStatus, SummaryStatus: data.SummaryStatus, GoodsAmountE4: data.GoodsAmountE4, ShippingAmountE4: data.ShippingAmountE4, PayableAmountE4: data.PayableAmountE4, ShippingAddressPublicId: data.ShippingAddressPublicId, Suborders: data.Suborders, CreatedAt: data.CreatedAt, UpdatedAt: data.UpdatedAt}
+}
+
+func buyerSuborder(order trade.MerchantOrderView) gen.BuyerSuborder {
+	return gen.BuyerSuborder{PublicId: order.PublicID, MerchantPublicId: order.MerchantPublicID, Status: gen.OrderStatus(order.Status), GoodsAmountE4: order.GoodsAmountE4, ShippingAmountE4: order.ShippingAmountE4, PayableAmountE4: order.PayableAmountE4, ShippingQuoteExpiresAt: order.ShippingQuoteExpiresAt, Items: orderLines(order.Lines)}
+}
+
+func merchantSuborder(order trade.MerchantOrderView) gen.MerchantSuborder {
+	return gen.MerchantSuborder{PublicId: order.PublicID, ParentPublicId: order.ParentPublicID, Status: gen.OrderStatus(order.Status), GoodsAmountE4: order.GoodsAmountE4, ShippingAmountE4: order.ShippingAmountE4, PayableAmountE4: order.PayableAmountE4, ShippingQuoteExpiresAt: order.ShippingQuoteExpiresAt, ShippingAddressPublicId: order.ShippingAddress.PublicID, ShippingAddress: gen.MerchantShippingAddressSnapshot{RecipientName: order.ShippingAddress.RecipientName, AddressText: order.ShippingAddress.AddressText, Phone: maskPhone(order.ShippingAddress.Phone)}, Items: orderLines(order.Lines), CreatedAt: order.CreatedAt, UpdatedAt: order.UpdatedAt}
+}
+
+func orderLines(lines []trade.OrderLineView) []gen.OrderLineSnapshot {
+	result := make([]gen.OrderLineSnapshot, 0, len(lines))
+	for _, line := range lines {
+		result = append(result, gen.OrderLineSnapshot{SkuPublicId: line.SKUPublicID, Quantity: line.Quantity, UnitPriceE4: line.UnitPriceE4, LineTotalE4: line.TotalE4})
+	}
+	return result
+}
+func maskPhone(phone string) string {
+	runes := []rune(phone)
+	if len(runes) < 4 {
+		return "****"
+	}
+	return "****" + string(runes[len(runes)-4:])
+}
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+func intValue(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 // decodeProductUpdateJSON preserves the distinction between an omitted spec and

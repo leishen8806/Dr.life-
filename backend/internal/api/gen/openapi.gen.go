@@ -500,6 +500,7 @@ const (
 	ErrorCodeOrderCancelledOrReleased ErrorCode = 3003
 	ErrorCodeOrderInsufficientStock   ErrorCode = 3002
 	ErrorCodeOrderInvalidItem         ErrorCode = 3001
+	ErrorCodeOrderQuoteExpired        ErrorCode = 3006
 	ErrorCodeOrderStateConflict       ErrorCode = 3005
 	ErrorCodePermissionDenied         ErrorCode = 2002
 	ErrorCodeRequestTooLarge          ErrorCode = 1007
@@ -542,6 +543,8 @@ func (e ErrorCode) Valid() bool {
 	case ErrorCodeOrderInsufficientStock:
 		return true
 	case ErrorCodeOrderInvalidItem:
+		return true
+	case ErrorCodeOrderQuoteExpired:
 		return true
 	case ErrorCodeOrderStateConflict:
 		return true
@@ -607,7 +610,6 @@ const (
 	Applicationpdf FilePresignRequestContentType = "application/pdf"
 	Imagejpeg      FilePresignRequestContentType = "image/jpeg"
 	Imagepng       FilePresignRequestContentType = "image/png"
-	Imagewebp      FilePresignRequestContentType = "image/webp"
 )
 
 // Valid indicates whether the value is a known member of the FilePresignRequestContentType enum.
@@ -618,8 +620,6 @@ func (e FilePresignRequestContentType) Valid() bool {
 	case Imagejpeg:
 		return true
 	case Imagepng:
-		return true
-	case Imagewebp:
 		return true
 	default:
 		return false

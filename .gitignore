@@ -20,6 +20,9 @@ dist/
 .env.*
 !.env.example
 
+# Local TLS certificates and private keys
+/tls/
+
 # Editors
 .idea/
 .vscode/*

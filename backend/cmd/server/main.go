@@ -30,6 +30,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
+	"github.com/leishen8806/Dr.life-/backend/internal/trade"
 )
 
 type adminStepUpVerifier struct{ tokens iam.TokenManager }
@@ -199,7 +200,11 @@ func main() {
 		reconciliation := logistics.RouteFitReconciliationConfig{
 			Schedule: cfg.RouteFitReconciliationSchedule, NoEventFor: cfg.RouteFitReconciliationNoEventFor,
 		}
-		scheduler, queueErr := queue.NewScheduler(fileEnqueuer, []queue.ScheduledTask{logistics.RouteFitReconciliationScheduledTask(reconciliation)})
+		scheduledTasks := []queue.ScheduledTask{logistics.RouteFitReconciliationScheduledTask(reconciliation)}
+		if cfg.StorageDriver != "" {
+			scheduledTasks = append(scheduledTasks, files.CleanupScheduledTask())
+		}
+		scheduler, queueErr := queue.NewScheduler(fileEnqueuer, scheduledTasks)
 		if queueErr != nil {
 			logger.Error("queue scheduler configuration failed", "error", queueErr)
 			os.Exit(1)
@@ -274,6 +279,7 @@ func main() {
 	var accountLinkService *iam.AccountLinkService
 	var consentService *iam.ConsentService
 	var accountDirectory *iam.AccountDirectory
+	var orderAccounts trade.AccountDirectory
 	var adminPermissions *iam.AdminPermissionStore
 	var stepUpVerifier gateway.StepUpVerifier
 	var adminStepUpJTIStore gateway.JTIStore
@@ -299,6 +305,7 @@ func main() {
 		}
 		defer iamDatabase.Close()
 		accountDirectory = &iam.AccountDirectory{DB: iamDatabase}
+		orderAccounts = accountDirectory
 		adminPermissions = &iam.AdminPermissionStore{DB: iamDatabase}
 		checks = append(checks, iamDatabase.Ping)
 		jwtKeys, keyErr := iam.LoadJWTKeyringFromEnvironment()
@@ -328,7 +335,8 @@ func main() {
 		}
 		checker := iam.DBSessionChecker{DB: iamDatabase, Cache: sessionCache, IdleTTL: cfg.SessionIdleTTL}
 		tokens := iam.TokenManager{Keys: jwtKeys, AccessTTL: cfg.AccessTokenTTL, Issuer: cfg.TokenIssuer, LegacyAcceptUntil: cfg.TokenLegacyAcceptUntil, Checker: checker}
-		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}, Audit: auditStore}
+		epochWriter := iam.EpochCacheWriter{Cache: sessionCache, Logger: logger, Metrics: metrics.Business(), Retry: iam.RetryEpochCacheWrite}
+		sessionService = &iam.SessionService{DB: iamDatabase, Tokens: tokens, Cache: sessionCache, Grace: cfg.RefreshTokenGrace, IdleTTL: cfg.SessionIdleTTL, AbsoluteTTL: cfg.RefreshTokenTTL, Metrics: metrics.Business(), Alerter: iam.LogSecurityAlerter{Logger: logger}, Audit: auditStore, EpochWriter: epochWriter}
 		accountProfileService = &iam.AccountProfileService{DB: iamDatabase}
 		accountLinkService = iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: iamDatabase}, ids.NewULID)
 		consentService = iam.NewConsentService(iam.PostgresConsentRepository{DB: iamDatabase}, nil)
@@ -381,6 +389,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	var orderService *trade.Service
+	if orderAccounts != nil {
+		orderService = trade.NewService(trade.NewPostgresStore(database), orderAccounts, unavailableOrderCatalog{})
+	}
 	handler := httpx.ETag(server.NewHandlerWithGateway(logger, server.GatewayOptions{
 		AppEnv: cfg.AppEnv,
 		OriginGroups: gateway.OriginGroups{
@@ -429,6 +441,7 @@ func main() {
 		AdminPermissions:    adminPermissions,
 		AdminManagement:     adminManagementService,
 		Files:               fileService,
+		Orders:              orderService,
 		Bulkhead:            bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)

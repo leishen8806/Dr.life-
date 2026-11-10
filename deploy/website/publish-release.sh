@@ -8,7 +8,7 @@ case "$release_id" in
   ''|*[!A-Za-z0-9-]*) exit 64 ;;
 esac
 
-site_root=/srv/settlecore
+site_root=/srv/drlifeplus
 incoming="$site_root/incoming/$release_id"
 staging="$site_root/staging"
 staged="$staging/$release_id"

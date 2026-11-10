@@ -15,9 +15,9 @@
 | 头像 | DR.LIFE+ 品牌标志（需设计公司提供方形透明底或黑底版本，正方形，建议 640×640） |
 | 品牌标语 | INFINITE POSSIBILITIES |
 | 描述图片（Description Picture） | 品牌标志 + 标语，640×360 |
-| 隐私政策链接（BotFather 里填） | `https://settlecore.org/privacy` |
-| 用户协议链接（欢迎语里附） | `https://settlecore.org/terms` |
-| Mini App 地址 | 买家 `miniapp.settlecore.org`、商家 `shop.settlecore.org`、司机 `driver.settlecore.org` |
+| 隐私政策链接（BotFather 里填） | `https://drlifeplus.com/privacy` |
+| 用户协议链接（欢迎语里附） | `https://drlifeplus.com/terms` |
+| Mini App 地址 | 买家 `miniapp.drlifeplus.com`、商家 `shop.drlifeplus.com`、司机 `driver.drlifeplus.com` |
 | 菜单按钮 | 每个 Bot 的菜单按钮直接打开自己的 Mini App |
 
 **Bot 用户名建议（可调整，须以 bot 结尾且未被占用）：**
@@ -54,8 +54,8 @@ INFINITE POSSIBILITIES
 ចុចប៊ូតុងខាងក្រោម ដើម្បីចាប់ផ្តើម 👇
 
 ការចុច «បើក DR.LIFE+» មានន័យថាអ្នកយល់ព្រមតាម កិច្ចព្រមព្រៀងអ្នកប្រើ និង គោលការណ៍ឯកជនភាព៖
-https://settlecore.org/terms
-https://settlecore.org/privacy
+https://drlifeplus.com/terms
+https://drlifeplus.com/privacy
 ```
 
 中文对照：你好！欢迎来到 DR.LIFE+ — INFINITE POSSIBILITIES。在这里你可以：找装修公司/设计师/施工队；买建材和装饰；跟踪配送每一步；按阶段安全付款。点下面按钮开始。点击“打开 DR.LIFE+”即表示同意用户协议和隐私政策。
@@ -96,8 +96,8 @@ INFINITE POSSIBILITIES
 ចុចប៊ូតុងខាងក្រោម ដើម្បីចាប់ផ្តើម 👇
 
 ការចុច «បើកហាង» មានន័យថាអ្នកយល់ព្រមតាម កិច្ចព្រមព្រៀងអ្នកប្រើ និង គោលការណ៍ឯកជនភាព៖
-https://settlecore.org/terms
-https://settlecore.org/privacy
+https://drlifeplus.com/terms
+https://drlifeplus.com/privacy
 ```
 
 中文对照：欢迎商家来到 DR.LIFE+。在这里：把货放进金边仓（仓储费低、佣金 0%）；管理订单、跟踪配送；查看余额和提现；添加员工、设置权限。
@@ -139,8 +139,8 @@ INFINITE POSSIBILITIES
 ចុចប៊ូតុងខាងក្រោម ដើម្បីចាប់ផ្តើម 👇
 
 ការចុច «បើកភារកិច្ច» មានន័យថាអ្នកយល់ព្រមតាម កិច្ចព្រមព្រៀងអ្នកប្រើ និង គោលការណ៍ឯកជនភាព៖
-https://settlecore.org/terms
-https://settlecore.org/privacy
+https://drlifeplus.com/terms
+https://drlifeplus.com/privacy
 ```
 
 中文对照：欢迎司机。在这里：接配送任务并在地图上查看；记录交货（拍照或验证码）；查看收入并提现；平台不向司机收费。
@@ -162,7 +162,7 @@ https://settlecore.org/privacy
 | 场景 | 高棉语 | 中文 |
 |---|---|---|
 | 用户发送普通文字 | សូមចុចប៊ូតុងម៉ឺនុយខាងក្រោម ដើម្បីបើកកម្មវិធី DR.LIFE+។ | 请点下面的菜单按钮打开 DR.LIFE+ 应用。 |
-| /help | ត្រូវការជំនួយ? សូមចូលកម្មវិធី ហើយចុច «ខ្ញុំ» → «ជំនួយ និងការពន្យល់»។ ឬទាក់ទងមកយើងតាម https://settlecore.org/contact | 需要帮助？进入应用点“我的”→“帮助与说明”，或通过官网联系我们。 |
+| /help | ត្រូវការជំនួយ? សូមចូលកម្មវិធី ហើយចុច «ខ្ញុំ» → «ជំនួយ និងការពន្យល់»។ ឬទាក់ទងមកយើងតាម https://drlifeplus.com/contact | 需要帮助？进入应用点“我的”→“帮助与说明”，或通过官网联系我们。 |
 | /lang | សូមចូលកម្មវិធី ហើយចុច «ខ្ញុំ» → «ភាសា» ដើម្បីប្តូរភាសា។ | 进入应用，点“我的”→“语言”更换语言。 |
 | 请求允许发消息之前的说明 | យើងនឹងផ្ញើការជូនដំណឹងអំពីការបញ្ជាទិញ និងប្រាក់ តាម Bot នេះ។ សូមអនុញ្ញាតដើម្បីមិនឱ្យខកខានព័ត៌មានសំខាន់។ | 我们会通过这个 Bot 发送订单和资金通知，请允许，避免错过重要信息。 |
 | 备用 Bot 引导（主 Bot 受限时） | ដើម្បីបន្តទទួលការជូនដំណឹង សូមចុច «ចាប់ផ្តើម» នៅ Bot ថ្មី៖ @{botname} | 为继续收到通知，请在新的 Bot 里点“开始”：@{botname} |

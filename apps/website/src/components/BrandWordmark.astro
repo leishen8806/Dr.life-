@@ -1,0 +1,24 @@
+---
+const { href, class: className } = Astro.props;
+const classes = ["brand-wordmark", className];
+---
+{
+  href ? (
+    <a class:list={classes} href={href} aria-label="DR.LIFE+">DR.LIFE<span aria-hidden="true">+</span></a>
+  ) : (
+    <span class:list={classes} role="img" aria-label="DR.LIFE+">DR.LIFE<span aria-hidden="true">+</span></span>
+  )
+}
+
+<style>
+  .brand-wordmark {
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .brand-wordmark span {
+    color: var(--gold);
+  }
+</style>

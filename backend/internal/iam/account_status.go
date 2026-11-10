@@ -32,6 +32,7 @@ type AccountStatusChange struct {
 type AccountStatusService struct {
 	DB          *pgxpool.Pool
 	Cache       SessionCache
+	EpochWriter EpochCacheWriter
 	AbsoluteTTL time.Duration
 	Now         func() time.Time
 	NewID       func() string
@@ -84,10 +85,17 @@ func (s *AccountStatusService) SetAccountStatus(ctx context.Context, accountPubl
 	if err = tx.Commit(ctx); err != nil {
 		return AccountStatusChange{}, httpx.NewAppError(httpx.CodeServiceUnavailable)
 	}
-	if to != "active" && s.Cache != nil {
-		_ = s.Cache.SetAccountEpoch(ctx, accountPublicID, epoch, s.absoluteTTL())
+	if to != "active" {
+		s.epochWriter().Write(ctx, accountPublicID, epoch, s.absoluteTTL(), "account_status")
 	}
 	return change, nil
+}
+
+func (s *AccountStatusService) epochWriter() EpochCacheWriter {
+	if s.EpochWriter.Cache != nil {
+		return s.EpochWriter
+	}
+	return EpochCacheWriter{Cache: s.Cache}
 }
 
 func (s *AccountStatusService) StatusHistory(ctx context.Context, accountPublicID string, limit int) ([]AccountStatusChange, error) {

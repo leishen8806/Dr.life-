@@ -23,3 +23,7 @@
  @media(max-width:520px){.hero h1{font-size:60px;line-height:1.1}.site-header{gap:12px}.header-actions{margin-left:auto}.languages{gap:2px}.languages a{padding:10px 6px;white-space:nowrap}.mobile-menu{margin-left:0}}
  @media(max-width:360px){.header-actions .languages{display:none}.mobile-menu-languages{display:flex}}
  @media(min-width:361px){.mobile-menu-languages{display:none}}
+/* Keep the homepage service chain and its note in the same readable container. */
+.section--light .eyebrow,.section:not(.section--dark) .eyebrow{color:var(--deep-gold)}
+.chain{margin:64px auto 0}
+.chain-note{max-width:1280px;margin:32px auto 0}

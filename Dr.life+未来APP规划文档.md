@@ -41,7 +41,7 @@
 | 项 | 建议 |
 |---|---|
 | 客户端 | 客户端用 React Native（Expo）+ TypeScript，一套代码打包 Android 和 iOS；定位、相机/扫码、推送（FCM/APNs/华为 HMS）、后台任务优先用 Expo 和社区插件，不满足时再写原生模块；支持 Expo Updates 热更新（仅限 JS 层修复，原生改动仍走应用商店） |
-| 接口 | **共用同一个统一 API 网关 `adminapi.settlecore.org`**，按路径和角色区分（`/v1/buyer`、`/merchant`、`/driver`、`/wms`），**业务规则不再复制到 App 里** |
+| 接口 | **共用同一个统一 API 网关 `adminapi.drlifeplus.com`**，按路径和角色区分（`/v1/buyer`、`/merchant`、`/driver`、`/wms`），**业务规则不再复制到 App 里** |
 | 登录 | 新增手机号 + 验证码登录；**与 Telegram 账号绑定**（App 里可"用 Telegram 登录"并绑定同一个"人"），保证 Mini App 与 App 是同一个账号、同一份数据 |
 | 推送 | Android：FCM；iOS：APNs；华为手机（无谷歌服务）：HMS Push（**已确认必须接**）；启动时识别手机类型，用户可手动选择 |
 | 离线 | 本地数据库 + 操作队列；写接口带幂等编号，恢复网络后补传；冲突以服务端为准并提示 |
@@ -96,7 +96,7 @@
 | 事项 | 要求与应对 |
 |---|---|
 | 商店 | Google Play、Apple App Store、华为 AppGallery（华为手机用户多时必须） |
-| 隐私政策与协议 | 使用官网固定网址 `settlecore.org/privacy`、`/terms`（后台统一管理的同一份版本），商店资料里填写 |
+| 隐私政策与协议 | 使用官网固定网址 `drlifeplus.com/privacy`、`/terms`（后台统一管理的同一份版本），商店资料里填写 |
 | 数据安全声明 | 按实际收集的数据逐项申报（Telegram 编号、手机号、位置、照片、设备信息、AI 聊天等） |
 | **账号删除入口** | 两大商店都要求 App 内能发起账号删除；官网要有删除说明页 `/delete-account`；有法定保留的账务数据做匿名化 |
 | 权限说明 | 定位、相机、通知、存储，**用到才申请**，申请前先解释用途；司机后台定位要单独声明 |

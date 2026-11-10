@@ -127,6 +127,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, "file queue handler error:", err)
 			os.Exit(1)
 		}
+		if err := files.RegisterCleanupHandler(worker, fileStore, fileObjects); err != nil {
+			fmt.Fprintln(os.Stderr, "file cleanup handler error:", err)
+			os.Exit(1)
+		}
 	}
 	// R-02 installs the RouteFit client runner. Until then the scheduled task is
 	// deliberately a no-op after the queue payload is validated by its contract.

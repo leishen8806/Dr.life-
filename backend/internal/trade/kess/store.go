@@ -34,14 +34,14 @@ func (s *PgStore) CreateIntent(ctx context.Context, source ReceivableSnapshot) (
 	}
 	intent := Intent{CompanyID: source.CompanyID, Channel: ChannelKESS, TradeNo: fmt.Sprintf("DRL-%s-%d", source.SourceRef, source.AttemptNo), SourceRef: source.SourceRef, AttemptNo: source.AttemptNo, AmountE4: source.AmountE4, Currency: source.Currency, ExpectedSellerCode: source.SellerCode, Status: StatusPending}
 	err = s.db.QueryRow(ctx, `
-		INSERT INTO trade.kess_payment_intent (public_id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		INSERT INTO trade.kess_payment_intent (public_id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		ON CONFLICT (company_id, source_ref, attempt_no) DO NOTHING
-		RETURNING id, public_id, trade_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at`, publicID, intent.CompanyID, intent.Channel, intent.TradeNo, intent.SourceRef, intent.AttemptNo, intent.AmountE4, intent.Currency, intent.ExpectedSellerCode, intent.Status).Scan(&intent.ID, &publicID, &intent.TradeNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt)
+		RETURNING id, public_id, trade_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at, expires_at, COALESCE(payment_url,'')`, publicID, intent.CompanyID, intent.Channel, intent.TradeNo, intent.SourceRef, intent.AttemptNo, intent.AmountE4, intent.Currency, intent.ExpectedSellerCode, intent.Status, source.ExpiresAt).Scan(&intent.ID, &publicID, &intent.TradeNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt, &intent.ExpiresAt, &intent.PaymentURL)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = s.db.QueryRow(ctx, `
-			SELECT id, public_id, trade_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at
-			FROM trade.kess_payment_intent WHERE company_id = $1 AND source_ref = $2 AND attempt_no = $3`, source.CompanyID, source.SourceRef, source.AttemptNo).Scan(&intent.ID, &publicID, &intent.TradeNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt)
+			SELECT id, public_id, trade_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at, expires_at, COALESCE(payment_url,'')
+			FROM trade.kess_payment_intent WHERE company_id = $1 AND source_ref = $2 AND attempt_no = $3`, source.CompanyID, source.SourceRef, source.AttemptNo).Scan(&intent.ID, &publicID, &intent.TradeNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt, &intent.ExpiresAt, &intent.PaymentURL)
 	}
 	if err != nil {
 		return Intent{}, err
@@ -55,9 +55,9 @@ func (s *PgStore) CreateIntent(ctx context.Context, source ReceivableSnapshot) (
 func (s *PgStore) Intent(ctx context.Context, id int64) (Intent, error) {
 	var intent Intent
 	err := s.db.QueryRow(ctx, `
-		SELECT id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at
+		SELECT id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at, expires_at, COALESCE(payment_url,'')
 		FROM trade.kess_payment_intent WHERE id = $1`, id).Scan(
-		&intent.ID, &intent.CompanyID, &intent.Channel, &intent.TradeNo, &intent.SourceRef, &intent.AttemptNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt,
+		&intent.ID, &intent.CompanyID, &intent.Channel, &intent.TradeNo, &intent.SourceRef, &intent.AttemptNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt, &intent.ExpiresAt, &intent.PaymentURL,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Intent{}, ErrNotFound

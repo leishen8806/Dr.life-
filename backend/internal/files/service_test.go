@@ -17,6 +17,12 @@ func TestPresignRejectsUnsupportedPurpose(t *testing.T) {
 	}
 }
 
+func TestUploadPolicyRejectsWebP(t *testing.T) {
+	if purposeAllows("product_image", "image/webp") {
+		t.Fatal("webp upload was allowed without a metadata sanitizer")
+	}
+}
+
 func TestPresignCreatesPendingFileAndSignsExactMetadata(t *testing.T) {
 	store := &memoryStore{}
 	objects := &fakeObjects{}
@@ -113,9 +119,33 @@ func TestDownloadURLRequiresOwnedReadyFile(t *testing.T) {
 	}
 }
 
+func TestReferenceManagerPrefixesOwningModule(t *testing.T) {
+	store := &memoryStore{}
+	service := New(store, nil, Options{})
+	reference := Reference{Module: ReferenceCatalog, PublicID: "product-1"}
+	if err := service.AttachReference(t.Context(), "file-1", reference); err != nil {
+		t.Fatal(err)
+	}
+	if store.referenceKey != "catalog:product-1" {
+		t.Fatalf("reference key=%q", store.referenceKey)
+	}
+	now := time.Now().UTC()
+	if err := service.ReleaseReference(t.Context(), "file-1", reference, now); err != nil {
+		t.Fatal(err)
+	}
+	if !store.releasedAt.Equal(now) {
+		t.Fatalf("released at=%s, want %s", store.releasedAt, now)
+	}
+	if err := service.AttachReference(t.Context(), "file-1", Reference{Module: "other", PublicID: "1"}); !errors.Is(err, ErrInvalidReference) {
+		t.Fatalf("invalid module error=%v", err)
+	}
+}
+
 type memoryStore struct {
-	file  File
-	usage Usage
+	file         File
+	usage        Usage
+	referenceKey string
+	releasedAt   time.Time
 }
 
 func (s *memoryStore) Create(_ context.Context, file File) error { s.file = file; return nil }
@@ -141,6 +171,15 @@ func (s *memoryStore) MarkPending(_ context.Context, owner int64, publicID strin
 }
 func (s *memoryStore) DailyUsage(context.Context, int64, time.Time) (Usage, error) {
 	return s.usage, nil
+}
+func (s *memoryStore) attachReference(_ context.Context, _, key string) error {
+	s.referenceKey = key
+	return nil
+}
+func (s *memoryStore) releaseReference(_ context.Context, _, key string, releasedAt time.Time) error {
+	s.referenceKey = key
+	s.releasedAt = releasedAt
+	return nil
 }
 
 type fakeObjects struct {
