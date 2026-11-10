@@ -1,4 +1,4 @@
-import { type ApiClientOptions, createApiClient } from "@drlife/api-client";
+import { ApiError, type ApiClientOptions, createApiClient } from "@drlife/api-client";
 import type { Language } from "@drlife/i18n";
 import type { Category, ProductPage } from "./types";
 import type { BuyerOrder, BuyerSubOrder, OrderLine, OrderStatus, PaymentStatus } from "./orders";
@@ -20,13 +20,11 @@ export function createBuyerApiClient(options: BuyerApiOptions): BuyerApiClient {
 
 export const buyerOrderPageSize = 20;
 
-function itemPlaceholder(index: number) {
-  return { zh: `商品 ${index}`, en: `Item ${index}`, km: `ទំនិញ ${index}` };
-}
-
-const merchantPlaceholder = { zh: "商家", en: "Merchant", km: "អ្នកលក់" };
+const emptyLocalizedText = { zh: "", en: "", km: "" };
 
 function money(value: number): bigint {
+  if (!Number.isSafeInteger(value) || value < 0 || value % 100 !== 0)
+    throw new ApiError(1001, "order-money", 502);
   return BigInt(value);
 }
 
@@ -70,7 +68,7 @@ function mapPaymentStatus(value: string): PaymentStatus {
 function mapSuborder(suborder: ApiSuborder): BuyerSubOrder {
   const lines: OrderLine[] = suborder.items.map((item, index) => ({
     publicId: `${suborder.public_id}-${item.sku_public_id}-${index}`,
-    name: itemPlaceholder(index + 1),
+    name: emptyLocalizedText,
     quantity: String(item.quantity),
     unit: "item",
     unitPriceE4: money(item.unit_price_e4),
@@ -78,9 +76,10 @@ function mapSuborder(suborder: ApiSuborder): BuyerSubOrder {
   }));
   return {
     publicId: suborder.public_id,
-    merchantName: merchantPlaceholder,
+    merchantName: emptyLocalizedText,
     status: mapOrderStatus(suborder.status),
     lines,
+    goodsAmountE4: money(suborder.goods_amount_e4),
     totalE4: money(suborder.payable_amount_e4),
     shippingAmountE4: money(suborder.shipping_amount_e4),
     shippingQuoteExpiresAt: suborder.shipping_quote_expires_at,
@@ -114,7 +113,7 @@ export async function loadBuyerOrders(
     params: { query: { cursor, page_size: buyerOrderPageSize } },
     signal
   });
-  if (!data) throw new Error("The order response was malformed");
+  if (!data) throw new ApiError(1001, "buyer-orders", 502);
   return {
     items: data.data.items.map(mapOrder),
     nextCursor: data.data.next_cursor ?? null
@@ -130,7 +129,7 @@ export async function loadBuyerOrder(
     params: { path: { public_id: publicId } },
     signal
   });
-  if (!data) throw new Error("The order response was malformed");
+  if (!data) throw new ApiError(1001, "buyer-order", 502);
   return mapOrder(data.data);
 }
 
@@ -162,7 +161,7 @@ export async function loadCategories(
       },
       signal
     });
-    if (!data) throw new Error("The category response was malformed");
+    if (!data) throw new ApiError(1001, "categories", 502);
     categories.push(...data.data.items);
     if (!data.data.items.length || categories.length >= data.data.total) break;
   }
@@ -185,6 +184,6 @@ export async function loadProducts(
     },
     signal
   });
-  if (!data) throw new Error("The product response was malformed");
+  if (!data) throw new ApiError(1001, "products", 502);
   return data.data;
 }

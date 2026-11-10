@@ -204,6 +204,27 @@ const apiOrder = {
 };
 
 describe("loadBuyerOrders", () => {
+  it("reads the current language for every request", async () => {
+    let language: "zh" | "en" | "km" = "zh";
+    const languages: string[] = [];
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      languages.push(new Request(input, init).headers.get("Accept-Language") ?? "");
+      return success({ items: [], next_cursor: null });
+    };
+    const buyerClient = createBuyerApiClient({
+      baseUrl: "http://api.test",
+      getLanguage: () => language,
+      fetch: transport,
+      resilience: { retry: { maxAttempts: 1 } }
+    });
+
+    await loadBuyerOrders(buyerClient);
+    language = "km";
+    await loadBuyerOrders(buyerClient);
+
+    expect(languages).toEqual(["zh", "km"]);
+  });
+
   it("loads one page and maps server money without exposing internal IDs", async () => {
     const second = { ...apiOrder, public_id: "01JORDER2" };
     const { urls, transport } = recordingFetch((call) =>
@@ -218,8 +239,8 @@ describe("loadBuyerOrders", () => {
         totalE4: 190_000n,
         subOrders: [{
           totalE4: 190_000n,
-          merchantName: { zh: "商家", en: "Merchant", km: "អ្នកលក់" },
-          lines: [{ name: { zh: "商品 1", en: "Item 1", km: "ទំនិញ 1" } }]
+          merchantName: { zh: "", en: "", km: "" },
+          lines: [{ name: { zh: "", en: "", km: "" } }]
         }]
       }],
       nextCursor: "next-page"

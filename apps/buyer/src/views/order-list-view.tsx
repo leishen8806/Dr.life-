@@ -62,7 +62,7 @@ export function OrderListView({
                   <span className="buyer-order-status">{statusSummary(item.subOrders, t)}</span>
                 </span>
                 <span className="buyer-order-card__merchant">
-                  {item.subOrders.map((subOrder) => localized(subOrder.merchantName, language)).join(" · ")}
+                  {item.subOrders.map((subOrder) => localized(subOrder.merchantName, language) || t("order.merchantFallback")).join(" · ")}
                 </span>
                 <span className="buyer-order-card__summary">
                   {t("order.subOrderCount", { count: item.subOrders.length })} · {t("order.items", {

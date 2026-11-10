@@ -59,7 +59,7 @@ describe("buyer order views", () => {
       <OrderDetailView
         t={translator("zh")}
         language="zh"
-        order={order}
+        order={{ status: "ready", value: order }}
         onBack={() => undefined}
       />
     );
@@ -74,7 +74,7 @@ describe("buyer order views", () => {
       <OrderDetailView
         t={translator("en")}
         language="en"
-        order={mockOrders[10]!}
+        order={{ status: "ready", value: mockOrders[10]! }}
         onBack={() => undefined}
       />
     );

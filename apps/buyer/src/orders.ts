@@ -39,6 +39,7 @@ export interface BuyerSubOrder {
   merchantName: LocalizedText;
   status: OrderStatus;
   lines: readonly OrderLine[];
+  goodsAmountE4: bigint;
   totalE4: bigint;
   shippingAmountE4: bigint;
   shippingQuoteExpiresAt: string;
@@ -81,6 +82,7 @@ function subOrder(
     status,
     merchantName,
     lines,
+    goodsAmountE4: lines.reduce((total, item) => total + item.totalE4, 0n),
     totalE4: lines.reduce((total, item) => total + item.totalE4, 0n),
     shippingAmountE4: 0n,
     shippingQuoteExpiresAt: `2026-11-${day}T10:30:00Z`,
