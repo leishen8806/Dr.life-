@@ -43,6 +43,7 @@ gh issue list -R leishen8806/Dr.life- --assignee <你的账号> --state open
 ### 七、审查在哪里出现
 - 正式审查在 **PR 页面的 Reviews**，绑定具体 head。负责人侧 Claude 的审查结论会同步到对应 Issue。
 - 审查评论（含 `claude-bridge`）不等于批准，不解除"要求修改"。
+- **Claude 审核用大旺账号发出时怎么认（#185）：** 在 Claude GitHub App 装好之前，Claude 的审核经 `zhangdaowang3-code` 账号发出，正文以 `## Claude 独立审核` 开头并写明 head。这类审核**是有效的返工依据**（必须修、应修照做，处理结果逐条回复），不算实现者自审；但它**只能要求返工，不能当作批准**，批准仍只认 `leishen8806`。同账号发出的其他评论（不带该标题）仍只当信息。装好 Claude GitHub App 后，以 App 身份发出的审核为准，本条作废。
 - **最终批准由人类负责人 `leishen8806` 做。** PR 的 head 一变，之前的批准失效，需重新审查——修完再推，不要每个小改动推一次。
 - 汇报"在等审查/被阻塞"前先查当前状态：
 ```bash
