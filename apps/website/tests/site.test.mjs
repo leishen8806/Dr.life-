@@ -402,8 +402,8 @@ test("mobile Khmer display headings have an explicit no-clipping wrap guard", ()
   );
   assert.match(css, /\.stat span\s*\{[^}]*overflow-wrap:\s*anywhere;/);
   assert.doesNotMatch(css, /\.stat span\s*\{[^}]*white-space:\s*nowrap/);
-  assert.match(css, /\.stat strong\s*\{[^}]*overflow-wrap:\s*anywhere;/);
-  assert.doesNotMatch(css, /\.stat strong\s*\{[^}]*white-space:\s*nowrap/);
+  assert.match(css, /\.stat strong\s*\{[^}]*word-break:\s*keep-all/);
+  assert.match(css, /\.stat strong\s*\{[^}]*white-space:\s*nowrap/);
   assert.doesNotMatch(css, /\.hero h1\s*\{[^}]*white-space:\s*nowrap/);
   assert.doesNotMatch(css, /\.subtitle\s*\{[^}]*white-space:\s*nowrap/);
 });
