@@ -77,6 +77,10 @@ test("responsive typography balances headings and keeps the locale eyebrow hyphe
   }
 });
 
+test("base typography uses the shared body-size variable", () => {
+  assert.match(styles, /:root\s*\{[\s\S]*?--fs-body:[^;]+;[\s\S]*?font-size:\s*var\(--fs-body\);/);
+});
+
 test("confirmed mobile layout keeps hero stats and ecosystem nodes compact", () => {
   assert.match(
     styles,

@@ -19,7 +19,7 @@
   font-family: Inter, "Noto Sans SC", "Noto Sans Khmer", sans-serif;
   color: var(--graphite);
   background: var(--ivory);
-  font-size: 16px;
+  font-size: var(--fs-body);
   line-height: 1.6;
 }
 * {
