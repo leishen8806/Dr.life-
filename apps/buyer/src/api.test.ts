@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readLanguagePreference, storeLanguagePreference } from "@drlife/i18n";
 import { ApiError } from "@drlife/api-client";
+import { createTelegramSession } from "@drlife/api-client/session";
 import { createBuyerApiClient, loadCategories, loadProducts, loadBuyerOrders, loadBuyerOrder } from "./api";
 import type { Category, Product } from "./types";
 
@@ -209,6 +210,41 @@ const apiOrder = {
 };
 
 describe("loadBuyerOrders", () => {
+  it("keeps the session client language dynamic after login", async () => {
+    let language: "zh" | "en" | "km" = "zh";
+    const languages: string[] = [];
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      const request = new Request(input, init);
+      languages.push(request.headers.get("Accept-Language") ?? "");
+      if (request.url.endsWith("/v1/public/auth/telegram"))
+        return success({
+          access_token: "access-1",
+          access_expires_in: 900,
+          refresh_token: "refresh-1",
+          refresh_expires_in: 2_592_000,
+          account: { public_id: "acct_1", role: "buyer", lang: "zh", status: "active" },
+          needs_language: false,
+          is_new_account: false
+        });
+      if (request.url.endsWith("/v1/buyer/me/consents")) return success({ items: [] });
+      return success({ items: [], next_cursor: null });
+    };
+    const session = createTelegramSession({
+      end: "buyer",
+      baseUrl: "http://api.test",
+      initData: () => "query_id=AAA&hash=BBB",
+      getLanguage: () => language,
+      fetch: transport
+    });
+
+    await session.login();
+    await loadBuyerOrders(session.client);
+    language = "km";
+    await loadBuyerOrders(session.client);
+
+    expect(languages).toEqual(["zh", "zh", "zh", "km"]);
+  });
+
   it("uses the newly stored language on the next request of one client", async () => {
     const languages: string[] = [];
     const preferences = new Map<string, string>();

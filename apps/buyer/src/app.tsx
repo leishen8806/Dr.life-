@@ -141,8 +141,13 @@ interface MoreOrders {
 
 /** Orders are paged independently from the first response and reset on language changes. */
 export function useOrderFeed(client: BuyerApiClient, language: string) {
+  const [readyLanguage, setReadyLanguage] = useState<string>();
   const loadOrders = useCallback(
-    (signal: AbortSignal) => loadBuyerOrders(client, undefined, signal),
+    (signal: AbortSignal) =>
+      loadBuyerOrders(client, undefined, signal).then((page) => {
+        setReadyLanguage(language);
+        return page;
+      }),
     [client, language]
   );
   const [orders, retryOrders] = useLoaded(loadOrders);
@@ -161,7 +166,8 @@ export function useOrderFeed(client: BuyerApiClient, language: string) {
 
   const loadMore = useCallback(() => {
     const current = moreOrders?.language === language ? moreOrders : undefined;
-    if (orders.status !== "ready" || current?.loading) return;
+    // The old first page remains visible while the language-keyed request is in flight.
+    if (orders.status !== "ready" || readyLanguage !== language || current?.loading) return;
     const currentItems = current?.items ?? orders.value.items;
     const cursor = current?.nextCursor ?? orders.value.nextCursor;
     if (!cursor) return;
@@ -195,7 +201,7 @@ export function useOrderFeed(client: BuyerApiClient, language: string) {
         });
       }
     );
-  }, [client, language, moreOrders, orders]);
+  }, [client, language, moreOrders, orders, readyLanguage]);
 
   const retry = useCallback(() => {
     moreOrdersRequest.current?.abort();
