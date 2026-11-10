@@ -393,7 +393,7 @@ test("mobile Khmer display headings have an explicit no-clipping wrap guard", ()
   const css = source("styles/global.css");
   assert.match(
     css,
-    /\[data-lang=km\][^}]*max-inline-size:100%;[^}]*overflow-wrap:anywhere;[^}]*word-break:break-word;[^}]*letter-spacing:normal/
+    /\[data-lang=\s*["']?km["']?\s*\][^}]*max-inline-size:\s*100%;[^}]*overflow-wrap:\s*anywhere;[^}]*word-break:\s*break-word;[^}]*letter-spacing:\s*normal/
   );
 });
 
