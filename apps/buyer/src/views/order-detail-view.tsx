@@ -49,7 +49,7 @@ export function OrderDetailView({
         {order.status === "ready" && <>
         <Card>
           <div className="buyer-order-detail__heading">
-            <h1 className="buyer-section__title">{order.value.publicId}</h1>
+            <h1 className="buyer-section__title">{t("order.orderFallback", { count: 1 })}</h1>
             <span className="buyer-order-status">{t("order.parentSummary")}</span>
           </div>
           <p className="buyer-order-detail__meta">{t("order.createdAt")}: {order.value.createdAt.slice(0, 10)}</p>
@@ -60,7 +60,7 @@ export function OrderDetailView({
               <h2 className="buyer-section__title">{localized(subOrder.merchantName, language) || t("order.merchantFallback")}</h2>
               <span className="buyer-order-status">{t(`order.buyerStatus.${subOrder.status}` as const)}</span>
             </div>
-            <p className="buyer-order-detail__meta">{t("order.subOrder")}: {subOrder.publicId}</p>
+            <p className="buyer-order-detail__meta">{t("order.subOrder")}</p>
             <p className="buyer-order-detail__meta">{t("order.paymentStatus")}: {t(`order.payment.${order.value.paymentStatus}` as const)}</p>
             {order.value.paymentStatus === "confirming" && <p className="buyer-order-warning">{t("order.paymentConfirming")}</p>}
             <h3 className="buyer-section__title">{t("order.itemsTitle")}</h3>
@@ -76,7 +76,7 @@ export function OrderDetailView({
               ))}
             </div>
             <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(subOrder.goodsAmountE4)}</strong></p>
-            <p className="buyer-order-detail__meta">{t("order.shipping")}: {formatPriceE4(subOrder.shippingAmountE4)}</p>
+            <p className="buyer-order-detail__meta">{t("order.shipping")}: {subOrder.shippingAmountE4 === 0n ? t("order.free") : formatPriceE4(subOrder.shippingAmountE4)}</p>
             <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(subOrder.totalE4)}</strong></p>
             {subOrder.shippingQuoteExpiresAt && subOrder.status === "awaiting_payment" && (
               <p className="buyer-order-detail__meta">
@@ -101,7 +101,7 @@ export function OrderDetailView({
         ))}
         <Card>
           <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(order.value.goodsAmountE4)}</strong></p>
-          <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{formatPriceE4(order.value.shippingAmountE4)}</strong></p>
+          <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{order.value.shippingAmountE4 === 0n ? t("order.free") : formatPriceE4(order.value.shippingAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(order.value.totalE4)}</strong></p>
         </Card>
         </>}

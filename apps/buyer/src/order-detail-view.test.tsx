@@ -52,6 +52,11 @@ describe("OrderDetailView quote expiry", () => {
 
   it("switches from valid to expired at the quote deadline", () => {
     renderDetail(order("awaiting_payment", "2026-11-11T00:00:01Z"));
+    expect(screen.getByText("Order 1")).toBeTruthy();
+    expect(screen.getByText("Sub-order")).toBeTruthy();
+    expect(screen.getAllByText("Free").length).toBeGreaterThan(0);
+    expect(screen.queryByText("ord_test")).toBeNull();
+    expect(screen.queryByText("sub_test")).toBeNull();
     expect(screen.getByText(/Shipping quote expires/)).toBeTruthy();
 
     vi.setSystemTime(new Date("2026-11-11T00:00:02Z"));
