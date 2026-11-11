@@ -16,26 +16,28 @@ h1 {
   flex-wrap: wrap;
 }
 button {
-  border: 1px solid #d6dce7;
-  border-radius: 8px;
-  background: #fff;
-  padding: 8px 12px;
+  border: 1px solid var(--drl-color-border-strong);
+  border-radius: var(--drl-radius-sm);
+  background: var(--drl-color-surface-raised);
+  padding: var(--drl-space-2) var(--drl-space-3);
+  color: var(--drl-color-text);
+  font: inherit;
 }
 button[aria-pressed="true"] {
-  color: #fff;
+  color: var(--drl-color-text-on-brand);
   background: var(--drl-color-brand);
   border-color: var(--drl-color-brand);
 }
 footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 18px;
-  color: #657089;
-  font-size: 13px;
+  gap: var(--drl-space-2) var(--drl-space-4);
+  margin-top: var(--drl-space-5);
+  color: var(--drl-color-text-muted);
+  font-size: var(--drl-font-size-sm);
 }
 .merchant-create {
-  margin: 14px 0 4px;
+  margin: var(--drl-space-3) 0 var(--drl-space-1);
 }
 .merchant-products {
   list-style: none;
@@ -43,14 +45,14 @@ footer {
   padding: 0;
 }
 .merchant-products__item + .merchant-products__item {
-  border-top: 1px solid #eef1f6;
-  margin-top: 10px;
-  padding-top: 10px;
+  border-top: 1px solid var(--drl-color-border);
+  margin-top: var(--drl-space-3);
+  padding-top: var(--drl-space-3);
 }
 .merchant-products__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--drl-space-2);
 }
 .merchant-form {
   display: grid;
@@ -58,22 +60,22 @@ footer {
 }
 .merchant-field {
   display: grid;
-  gap: 4px;
+  gap: var(--drl-space-1);
 }
 .merchant-field__label {
-  font-size: 13px;
-  color: #657089;
+  font-size: var(--drl-font-size-sm);
+  color: var(--drl-color-text-muted);
 }
 .merchant-field input,
 .merchant-field select {
-  border: 1px solid #d6dce7;
-  border-radius: 8px;
-  padding: 9px 10px;
+  border: 1px solid var(--drl-color-border-strong);
+  border-radius: var(--drl-radius-sm);
+  padding: var(--drl-space-2) var(--drl-space-3);
   font: inherit;
   min-width: 0;
 }
 .merchant-field__error {
-  color: #b42318;
+  color: var(--drl-color-danger);
 }
 /* 高棉语字形高，让它自由换行而不是截断。 */
 .merchant-field .drl-khmer {
@@ -82,16 +84,16 @@ footer {
   line-height: 1.9;
 }
 .merchant-form__tiers {
-  border: 1px solid #eef1f6;
+  border: 1px solid var(--drl-color-border);
   border-radius: var(--drl-radius);
   display: grid;
-  gap: 10px;
-  padding: 12px;
+  gap: var(--drl-space-3);
+  padding: var(--drl-space-3);
 }
 .merchant-form__tier {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: var(--drl-space-2);
   align-items: start;
 }
 .merchant-form__tier > button {
