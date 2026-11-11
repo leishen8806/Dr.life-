@@ -20,7 +20,7 @@
 
 Go 工具链版本以 `backend/go.mod` 的 `go` 指令为 CI 和本地开发基准，`backend/Dockerfile` 的构建镜像必须使用相同补丁版本。升级时同时核对两处，并运行 `go mod tidy`、`go vet`、`go test -race` 和 `govulncheck`。
 
-工作流只使用以下官方 Actions，均固定到主版本标签：`actions/checkout@v7`、`actions/setup-go@v7`、`actions/setup-node@v7`、`docker/setup-buildx-action@v4`、`docker/build-push-action@v7`。这些版本使用 Node 24，要求 Actions Runner 版本不低于 2.327.1；本仓库使用 GitHub 托管 runner。
+工作流只使用以下官方 Actions，均固定到主版本标签：`actions/checkout@v7`、`actions/setup-go@v7`、`actions/setup-node@v7`、`docker/setup-buildx-action@v4`、`docker/build-push-action@v7`。这些版本使用 Node 24，要求 Actions Runner 版本不低于 2.327.1；本仓库使用 GitHub 托管 runner。Go 工具链固定为 1.27.4。
 
 ## 本地复现
 
