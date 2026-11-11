@@ -71,7 +71,10 @@
   "order.listEmpty": "暂无订单",
   "order.listError": "订单加载失败",
   "order.viewDetails": "查看详情",
-  "order.mockNote": "接口桩数据：用于演示买家订单流程",
+  "order.loadMore": "加载更多",
+  "order.goods": "商品金额",
+  "order.shipping": "运费",
+  "order.shippingPending": "待报价",
   "order.items": "{count} 项商品",
   "order.itemsTitle": "商品明细",
   "order.merchant": "商家",
@@ -88,6 +91,7 @@
   "order.payment.succeeded": "付款成功",
   "order.payment.failed": "付款失败",
   "order.payment.refunded": "已退款",
+  "order.payment.unknown": "处理中",
   "order.buyerStatus.awaiting_payment": "等待付款确认",
   "order.buyerStatus.paid": "已付款，仓库处理中",
   "order.buyerStatus.submitted": "仓库处理中，等待受理",
@@ -102,6 +106,13 @@
   "order.buyerStatus.returning": "退货处理中",
   "order.buyerStatus.returned": "已退货",
   "order.buyerStatus.exception": "订单异常",
+  "order.buyerStatus.mixed": "子订单状态不一致",
+  "order.buyerStatus.unknown": "处理中",
+  "order.itemFallback": "商品 {count}",
+  "order.merchantFallback": "商家",
+  "order.quoteExpires": "运费报价有效期至",
+  "order.quoteExpired": "运费报价已过期",
+  "order.unit.item": "件",
   "shell.currentLanguage": "当前语言：{language}",
   "shell.developmentMode": "开发模式：正在使用浏览器模拟数据",
   "shell.telegramMode": "Telegram Mini App 模式",
@@ -232,6 +243,19 @@
 ,"mall.productsEmpty": "暂无在售商品"
 ,"mall.loadError": "加载失败"
 ,"mall.loadMore": "查看更多"
+,"payment.pageTitle": "订单付款"
+,"payment.number": "付款号"
+,"payment.notStarted": "尚未发起"
+,"payment.payNow": "去付款"
+,"payment.retry": "重新付款"
+,"payment.succeeded": "已付款，仓库处理中"
+,"payment.failed": "付款未完成。"
+,"payment.expired": "付款已过期。"
+,"payment.shipping": "运费"
+,"payment.freeShipping": "包邮"
+,"payment.quoteExpires": "运费报价有效期至 {date}"
+,"payment.subtotal": "子订单应付"
+,"payment.payable": "应付合计"
 ,"startup.brandLoading": "正在准备"
 ,"startup.skip": "跳过"
 ,"startup.signingIn": "正在登录"

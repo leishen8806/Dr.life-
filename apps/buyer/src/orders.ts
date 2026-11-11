@@ -14,9 +14,11 @@ export type OrderStatus =
   | "delivery_failed"
   | "returning"
   | "returned"
-  | "exception";
+  | "exception"
+  | "unknown"
+  | "mixed";
 
-export type PaymentStatus = "pending" | "confirming" | "succeeded" | "failed" | "refunded";
+export type PaymentStatus = "pending" | "confirming" | "succeeded" | "failed" | "refunded" | "unknown";
 
 export interface OrderLine {
   publicId: string;
@@ -37,14 +39,21 @@ export interface BuyerSubOrder {
   merchantName: LocalizedText;
   status: OrderStatus;
   lines: readonly OrderLine[];
+  goodsAmountE4: bigint;
   totalE4: bigint;
+  shippingAmountE4: bigint;
+  shippingQuoteExpiresAt: string;
   events: readonly OrderEvent[];
 }
 
 export interface BuyerOrder {
   publicId: string;
+  dataError?: boolean;
+  dataErrorPublicId?: string;
   createdAt: string;
   totalE4: bigint;
+  goodsAmountE4: bigint;
+  shippingAmountE4: bigint;
   paymentStatus: PaymentStatus;
   subOrders: readonly BuyerSubOrder[];
 }
@@ -67,7 +76,8 @@ function subOrder(
   productName: LocalizedText,
   quantity: string,
   unitPriceE4: bigint,
-  day: string
+  day: string,
+  shippingAmountE4 = 0n
 ): BuyerSubOrder {
   const lines = [line(`${publicId}-line`, productName, quantity, "m2", unitPriceE4)];
   return {
@@ -75,7 +85,10 @@ function subOrder(
     status,
     merchantName,
     lines,
+    goodsAmountE4: lines.reduce((total, item) => total + item.totalE4, 0n),
     totalE4: lines.reduce((total, item) => total + item.totalE4, 0n),
+    shippingAmountE4,
+    shippingQuoteExpiresAt: `2026-11-${day}T10:30:00Z`,
     events: [{ label: status, at: `2026-11-${day}T09:30:00Z` }]
   };
 }
@@ -85,6 +98,8 @@ function order(publicId: string, day: string, subOrders: readonly BuyerSubOrder[
     publicId,
     createdAt: `2026-11-${day}T09:30:00Z`,
     totalE4: subOrders.reduce((total, item) => total + item.totalE4, 0n),
+    goodsAmountE4: subOrders.reduce((total, item) => total + item.totalE4, 0n),
+    shippingAmountE4: subOrders.reduce((total, item) => total + item.shippingAmountE4, 0n),
     paymentStatus: "succeeded",
     subOrders
   };
@@ -101,7 +116,7 @@ const paint = { zh: "乳胶漆 18L", en: "Latex paint 18 L", km: "ថ្នា�
 
 /** Interface-stub data: deliberately covers every buyer-visible order state. */
 export const mockOrders: readonly BuyerOrder[] = [
-  order("ORD-1001", "01", [subOrder("SUB-1001-CN", "awaiting_payment", chinaMerchant, tile, "12", 95_000n, "01")]),
+  paymentOrder("ORD-1001", "01", "pending", [subOrder("SUB-1001-CN", "awaiting_payment", chinaMerchant, tile, "12", 95_000n, "01")]),
   order("ORD-1002", "02", [subOrder("SUB-1002-LC", "paid", localMerchant, paint, "4", 380_000n, "02")]),
   order("ORD-1003", "03", [subOrder("SUB-1003-CN", "submitted", chinaMerchant, tile, "100", 88_000n, "03")]),
   order("ORD-1004", "04", [subOrder("SUB-1004-LC", "accepted", localMerchant, paint, "6", 380_000n, "04")]),
@@ -123,7 +138,12 @@ export const mockOrders: readonly BuyerOrder[] = [
     subOrder("SUB-1016-CN", "shipped", chinaMerchant, tile, "2", 95_000n, "16"),
     subOrder("SUB-1016-LC", "in_fulfillment", localMerchant, paint, "1", 380_000n, "16")
   ]),
+  paymentOrder("ORD-1017", "17", "failed", [subOrder("SUB-1017-CN", "awaiting_payment", chinaMerchant, tile, "3", 95_000n, "17", 12_500n)]),
 ];
+
+export function payableAmountE4(subOrder: BuyerSubOrder): bigint {
+  return subOrder.totalE4 + subOrder.shippingAmountE4;
+}
 
 export function findOrder(
   orders: readonly BuyerOrder[],
