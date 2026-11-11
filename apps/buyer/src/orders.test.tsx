@@ -36,6 +36,7 @@ describe("buyer order views", () => {
     );
     expect(mockOrders).toHaveLength(17);
     expect(text(markup)).toContain("Awaiting payment confirmation");
+    expect(text(markup)).toContain("Quote pending");
     expect(text(markup)).toContain("Warehouse processing, awaiting acceptance");
     expect(text(markup)).toContain("$114.00");
     expect(text(markup).some((item) => item.includes("11/3/26"))).toBe(true);

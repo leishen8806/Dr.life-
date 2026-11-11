@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { AppHeader, EmptyState, ErrorState, Loading } from "@drlife/ui";
 import { localized } from "../localized";
 import { formatPriceE4 } from "../money";
@@ -7,6 +7,7 @@ import type { BuyerOrder, BuyerSubOrder, OrderStatus } from "../orders";
 import type { LocaleProps } from "./common";
 import type { TranslationKey } from "@drlife/i18n";
 import { formatOrderDateTime } from "../order-date";
+import { isOrderQuotePending } from "../order-quote";
 
 function statusKey(status: OrderStatus) {
   return `order.buyerStatus.${status}` as const;
@@ -37,6 +38,7 @@ export function OrderListView({
   loadingMore?: boolean;
   moreMessageKey?: TranslationKey;
 } & LocaleProps) {
+  const [now] = useState(() => Date.now());
   return (
     <div className="buyer-page">
       <AppHeader slogan={t("order.pageTitle")} actions={actions} />
@@ -75,7 +77,7 @@ export function OrderListView({
                   })}
                 </span>
                 <span className="buyer-order-card__footer">
-                  <strong>{formatPriceE4(item.totalE4)}</strong>
+                  <strong>{isOrderQuotePending(item, now) ? t("order.shippingPending") : formatPriceE4(item.totalE4)}</strong>
                   <span>{formatOrderDateTime(item.createdAt, language)}</span>
                   <span>{t("order.viewDetails")}</span>
                 </span>

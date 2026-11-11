@@ -8,6 +8,7 @@ import type { Resource } from "../resource";
 import { canPay } from "../payment";
 import type { LocaleProps } from "./common";
 import { formatOrderDateTime } from "../order-date";
+import { isOrderQuotePending, isShippingQuotePending } from "../order-quote";
 
 function formatQuoteExpiry(value: string, language: LocaleProps["language"]): string {
   const date = new Date(value);
@@ -49,9 +50,7 @@ export function OrderDetailView({
 
   // Client time only controls display/DEV mock gating; real payment must use
   // the server's 409/3006 response before creating a payment intent.
-  const paymentQuoteUnavailable = order.status === "ready" && order.value.subOrders.some((subOrder) =>
-    subOrder.status === "awaiting_payment" && (!subOrder.shippingQuoteExpiresAt || isExpiredQuote(subOrder.shippingQuoteExpiresAt, now))
-  );
+  const paymentQuoteUnavailable = order.status === "ready" && isOrderQuotePending(order.value, now);
 
   return (
     <div className="buyer-page">
@@ -90,10 +89,8 @@ export function OrderDetailView({
               ))}
             </div>
             <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(subOrder.goodsAmountE4)}</strong></p>
-            <p className="buyer-order-detail__meta">{t("order.shipping")}: {subOrder.shippingAmountE4 === 0n
-              ? subOrder.status === "awaiting_payment" && (!subOrder.shippingQuoteExpiresAt || isExpiredQuote(subOrder.shippingQuoteExpiresAt, now))
-                ? t("order.shippingPending")
-                : formatPriceE4(0n)
+            <p className="buyer-order-detail__meta">{t("order.shipping")}: {isShippingQuotePending(subOrder, now)
+              ? t("order.shippingPending")
               : formatPriceE4(subOrder.shippingAmountE4)}</p>
             <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(subOrder.totalE4)}</strong></p>
             {subOrder.shippingQuoteExpiresAt && subOrder.status === "awaiting_payment" && (
@@ -121,11 +118,6 @@ export function OrderDetailView({
           <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(order.value.goodsAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{paymentQuoteUnavailable
             ? t("order.shippingPending")
-            : order.value.shippingAmountE4 === 0n
-            ? order.value.subOrders.some((subOrder) =>
-              subOrder.status === "awaiting_payment" && (!subOrder.shippingQuoteExpiresAt || isExpiredQuote(subOrder.shippingQuoteExpiresAt, now)))
-              ? t("order.shippingPending")
-              : formatPriceE4(0n)
             : formatPriceE4(order.value.shippingAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{paymentQuoteUnavailable ? t("order.shippingPending") : formatPriceE4(order.value.totalE4)}</strong></p>
           {canPay(order.value) && !paymentQuoteUnavailable && onPay && <button type="button" className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</button>}
