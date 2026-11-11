@@ -58,11 +58,15 @@ const paymentStatuses = new Set<PaymentStatus>([
 ]);
 
 function mapOrderStatus(value: string): OrderStatus {
-  return orderStatuses.has(value as OrderStatus) ? (value as OrderStatus) : "unknown";
+  if (orderStatuses.has(value as OrderStatus)) return value as OrderStatus;
+  console.warn("[buyer] unknown order status", value);
+  return "unknown";
 }
 
 function mapPaymentStatus(value: string): PaymentStatus {
-  return paymentStatuses.has(value as PaymentStatus) ? (value as PaymentStatus) : "unknown";
+  if (paymentStatuses.has(value as PaymentStatus)) return value as PaymentStatus;
+  console.warn("[buyer] unknown payment status", value);
+  return "unknown";
 }
 
 function mapSuborder(suborder: ApiSuborder): BuyerSubOrder {

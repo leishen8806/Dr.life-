@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { AppHeader, EmptyState, ErrorState, Loading } from "@drlife/ui";
 import { localized } from "../localized";
 import { formatPriceE4 } from "../money";
@@ -38,7 +38,20 @@ export function OrderListView({
   loadingMore?: boolean;
   moreMessageKey?: TranslationKey;
 } & LocaleProps) {
-  const [now] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (orders.status !== "ready") return;
+    const nextExpiry = orders.value
+      .flatMap((order) => order.subOrders)
+      .filter((subOrder) => subOrder.status === "awaiting_payment")
+      .map((subOrder) => Date.parse(subOrder.shippingQuoteExpiresAt))
+      .filter((value) => Number.isFinite(value) && value > now)
+      .sort((a, b) => a - b)[0];
+    if (nextExpiry === undefined) return;
+    const timer = window.setTimeout(() => setNow(Date.now()), Math.min(nextExpiry - now, 2_147_483_647));
+    return () => window.clearTimeout(timer);
+  }, [now, orders]);
   return (
     <div className="buyer-page">
       <AppHeader slogan={t("order.pageTitle")} actions={actions} />
