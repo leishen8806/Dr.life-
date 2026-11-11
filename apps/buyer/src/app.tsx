@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type TranslationKey, useI18n } from "@drlife/i18n";
 import { LanguageSwitcher, useBackButton } from "@drlife/ui";
 import {
@@ -65,6 +65,13 @@ function useLoaded<T>(
     );
     return () => controller.abort();
   }, [enabled, load, attempt]);
+
+  useLayoutEffect(() => {
+    if (enabled) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setResource({ status: "loading" });
+    }
+  }, [enabled]);
 
   const retry = useCallback(() => {
     setResource({ status: "loading" });
@@ -167,7 +174,7 @@ export function useOrderFeed(client: BuyerApiClient, language: string, enabled =
   const [moreOrders, setMoreOrders] = useState<MoreOrders>();
   const moreOrdersRequest = useRef<AbortController | undefined>(undefined);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (enabled) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setMoreOrders(undefined);

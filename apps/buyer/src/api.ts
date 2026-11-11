@@ -124,7 +124,7 @@ function mapOrderForList(order: ApiOrder, index: number): BuyerOrder {
     return mapOrder(order);
   } catch (error) {
     if (error instanceof ApiError && error.code === 1001) {
-      console.warn("[buyer] malformed order", order.public_id);
+      if (import.meta.env.DEV) console.warn("[buyer] malformed order", order.public_id);
       return {
         publicId: `data-error:${order.public_id}:${index}`,
         dataErrorPublicId: order.public_id,
