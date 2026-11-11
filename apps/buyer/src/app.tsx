@@ -476,7 +476,8 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
         onBack={back}
         // #163 is the closed simulated-payment card; keep its interface stub out of
         // production until the real KESS endpoint and server-authoritative 409/3006
-        // handling are delivered by the payment task.
+        // handling are delivered by the payment task. The real payment task must
+        // refresh the order after 3006 before exposing a new payment attempt.
         onPay={import.meta.env.DEV ? openPaymentFromDetail : undefined}
       />
     );

@@ -46,6 +46,8 @@ export function OrderDetailView({
     return () => window.clearTimeout(timer);
   }, [now, order]);
 
+  // Client time only controls display/DEV mock gating; real payment must use
+  // the server's 409/3006 response before creating a payment intent.
   const paymentQuoteUnavailable = order.status === "ready" && order.value.subOrders.some((subOrder) =>
     subOrder.status === "awaiting_payment" && (!subOrder.shippingQuoteExpiresAt || isExpiredQuote(subOrder.shippingQuoteExpiresAt, now))
   );
