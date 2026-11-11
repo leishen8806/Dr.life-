@@ -38,7 +38,7 @@ describe("buyer order views", () => {
     expect(text(markup)).toContain("Awaiting payment confirmation");
     expect(text(markup)).toContain("Warehouse processing, awaiting acceptance");
     expect(text(markup)).toContain("$114.00");
-    expect(text(markup)).toContain("2026-11-01");
+    expect(text(markup).some((item) => item.includes("11/1/26"))).toBe(true);
   });
 
   it("renders loading, empty and error resources", () => {

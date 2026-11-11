@@ -15,6 +15,16 @@ function statusSummary(subOrders: readonly BuyerSubOrder[], t: LocaleProps["t"])
   return subOrders.map((item) => t(statusKey(item.status))).join(" · ");
 }
 
+function formatCreatedAt(value: string, language: LocaleProps["language"]): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(language, {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "Asia/Phnom_Penh"
+  }).format(date);
+}
+
 export function OrderListView({
   t,
   language,
@@ -75,7 +85,7 @@ export function OrderListView({
                 </span>
                 <span className="buyer-order-card__footer">
                   <strong>{formatPriceE4(item.totalE4)}</strong>
-                  <span>{item.createdAt.slice(0, 10)}</span>
+                  <span>{formatCreatedAt(item.createdAt, language)}</span>
                   <span>{t("order.viewDetails")}</span>
                 </span>
               </button>

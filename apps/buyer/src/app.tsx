@@ -68,6 +68,9 @@ function useLoaded<T>(
 
   useLayoutEffect(() => {
     if (enabled) {
+      // Layout phase clears stale rows before paint; the effect below owns the
+      // abortable request and enabled-transition bookkeeping. Keep these phases
+      // separate so a route re-entry cannot paint the previous page.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setResource({ status: "loading" });
     }
