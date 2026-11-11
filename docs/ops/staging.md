@@ -9,13 +9,17 @@ from `env.example` in the approved staging environment; `.env` is ignored.
 1. Copy `env.example` to `.env` and replace every `CHANGE_ME` value in the
    owner-managed secret store. Keep the three Redis URLs on separate services:
    state and queue use AOF/noeviction; cache uses allkeys-lru.
-2. Review the generated compose configuration:
+2. Run `backend/scripts/db-bootstrap` once with the owner-managed role
+   passwords. It is the single source of truth for login roles and least
+   privilege grants; `init.sql` intentionally does not create duplicate roles.
+3. Review the generated compose configuration:
    `docker compose --env-file .env -f compose.yaml config --quiet`.
-3. Run the migration as an explicit step:
+4. Run the migration as an explicit step:
    `docker compose --profile ops run --rm migrate`.
-4. Run the repository db-bootstrap command with the role passwords, then start
-   the stack. The API health check is `/healthz`; worker and routefitmock are
-   separate processes.
+5. Start the stack. The API health check is `/healthz`; worker and routefitmock
+   are separate processes. The migration connection uses the owner-managed
+   PostgreSQL migration credential in `.env`; application URLs use roles created
+   by `db-bootstrap`.
 
 ## Release and rollback
 

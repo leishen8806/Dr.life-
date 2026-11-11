@@ -22,7 +22,7 @@ services:
     image: drlife-api:${APP_RELEASE:-staging}
     env_file: [.env]
     environment: { APP_ENV: staging, MIGRATIONS_DIR: /migrations }
-    command: [/worker]
+    entrypoint: [/worker]
     depends_on: [postgres, redis-state, redis-queue]
     volumes: [../../backend/migrations:/migrations:ro]
   routefitmock:
@@ -30,13 +30,13 @@ services:
     image: drlife-api:${APP_RELEASE:-staging}
     env_file: [.env]
     environment: { APP_ENV: staging }
-    command: [/routefitmock]
+    entrypoint: [/routefitmock]
   migrate:
     build: { context: ../../backend, dockerfile: Dockerfile }
     image: drlife-api:${APP_RELEASE:-staging}
     env_file: [.env]
     environment: { APP_ENV: staging, MIGRATIONS_DIR: /migrations }
-    command: [/migrate]
+    entrypoint: [/migrate]
     depends_on: { postgres: { condition: service_healthy } }
     volumes: [../../backend/migrations:/migrations:ro]
     profiles: [ops]
@@ -78,13 +78,9 @@ services:
     volumes: [./static/admin:/usr/share/nginx/html:ro]
   cloudflared:
     image: cloudflare/cloudflared:2025.11.1
-    command:
-      - tunnel
-      - --no-autoupdate
-      - run
-      - --token
-      - '$${CLOUDFLARED_TUNNEL_TOKEN:?set in .env}'
-    env_file: [.env]
+    command: [tunnel, --no-autoupdate, run]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN:?set in .env}
     depends_on: [api, buyer, merchant, admin]
 
 volumes:

@@ -1,7 +1,3 @@
--- Placeholder-only bootstrap. Run migrations and db-bootstrap separately.
-CREATE ROLE migration NOLOGIN;
-CREATE ROLE app_iam NOLOGIN;
-CREATE ROLE app_report NOLOGIN;
-CREATE ROLE app_audit NOLOGIN;
+-- Placeholder-only bootstrap. Run migrations and backend/scripts/db-bootstrap
+-- separately with owner-managed passwords; it is the single role/grant source.
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
-GRANT CONNECT ON DATABASE drlife_staging TO migration, app_iam, app_report, app_audit;
