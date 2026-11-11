@@ -1,0 +1,92 @@
+name: drlife-staging
+
+services:
+  api:
+    build: { context: ../../backend, dockerfile: Dockerfile }
+    image: drlife-api:${APP_RELEASE:-staging}
+    env_file: [.env]
+    environment: { APP_ENV: staging, MIGRATIONS_DIR: /migrations }
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis-state: { condition: service_healthy }
+      redis-queue: { condition: service_healthy }
+      redis-cache: { condition: service_healthy }
+    volumes: [../../backend/migrations:/migrations:ro]
+    expose: ["8080"]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -q -O /dev/null http://127.0.0.1:8080/healthz'
+  worker:
+    build: { context: ../../backend, dockerfile: Dockerfile }
+    image: drlife-api:${APP_RELEASE:-staging}
+    env_file: [.env]
+    environment: { APP_ENV: staging, MIGRATIONS_DIR: /migrations }
+    entrypoint: [/worker]
+    depends_on: [postgres, redis-state, redis-queue]
+    volumes: [../../backend/migrations:/migrations:ro]
+  routefitmock:
+    build: { context: ../../backend, dockerfile: Dockerfile }
+    image: drlife-api:${APP_RELEASE:-staging}
+    env_file: [.env]
+    environment: { APP_ENV: staging }
+    entrypoint: [/routefitmock]
+  migrate:
+    build: { context: ../../backend, dockerfile: Dockerfile }
+    image: drlife-api:${APP_RELEASE:-staging}
+    environment:
+      APP_ENV: staging
+      MIGRATIONS_DIR: /migrations
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:?set MIGRATION_DATABASE_URL}
+    entrypoint: [/migrate]
+    depends_on: { postgres: { condition: service_healthy } }
+    volumes: [../../backend/migrations:/migrations:ro]
+    profiles: [ops]
+  postgres:
+    image: postgres:18.1-alpine
+    env_file: [.env]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-drlife_staging}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?set POSTGRES_ADMIN_PASSWORD}
+    volumes: [postgres-data:/var/lib/postgresql/data, ./postgres/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro]
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
+  redis-state:
+    image: redis:7.4-alpine
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory-policy, noeviction]
+    volumes: [redis-state:/data]
+    healthcheck: { test: [CMD, redis-cli, ping] }
+  redis-queue:
+    image: redis:7.4-alpine
+    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory-policy, noeviction]
+    volumes: [redis-queue:/data]
+    healthcheck: { test: [CMD, redis-cli, ping] }
+  redis-cache:
+    image: redis:7.4-alpine
+    command: [redis-server, --maxmemory-policy, allkeys-lru]
+    volumes: [redis-cache:/data]
+    healthcheck: { test: [CMD, redis-cli, ping] }
+  buyer:
+    image: nginx:1.29.3-alpine
+    volumes: [./static/buyer:/usr/share/nginx/html:ro]
+  merchant:
+    image: nginx:1.29.3-alpine
+    volumes: [./static/merchant:/usr/share/nginx/html:ro]
+  admin:
+    image: nginx:1.29.3-alpine
+    volumes: [./static/admin:/usr/share/nginx/html:ro]
+  cloudflared:
+    image: cloudflare/cloudflared:2025.11.1
+    command: [tunnel, --no-autoupdate, run]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN:?set in .env}
+    depends_on: [api, buyer, merchant, admin]
+
+volumes:
+  postgres-data:
+  redis-state:
+  redis-queue:
+  redis-cache:
