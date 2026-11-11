@@ -79,6 +79,8 @@ function mapSuborder(suborder: ApiSuborder): BuyerSubOrder {
   const shippingAmountE4 = money(suborder.shipping_amount_e4);
   const totalE4 = money(suborder.payable_amount_e4);
   const lineGoodsE4 = lines.reduce((sum, item) => sum + item.totalE4, 0n);
+  // The OpenAPI/database contract guarantees payable = goods + shipping and
+  // line totals = goods totals; reject a response that violates that contract.
   if (goodsAmountE4 !== lineGoodsE4 || totalE4 !== goodsAmountE4 + shippingAmountE4)
     throw new ApiError(1001, "order-money", 502);
   return {
@@ -102,6 +104,8 @@ function mapOrder(order: ApiOrder): BuyerOrder {
   const suborderGoodsE4 = subOrders.reduce((sum, subOrder) => sum + subOrder.goodsAmountE4, 0n);
   const suborderShippingE4 = subOrders.reduce((sum, subOrder) => sum + subOrder.shippingAmountE4, 0n);
   const suborderTotalE4 = subOrders.reduce((sum, subOrder) => sum + subOrder.totalE4, 0n);
+  // The OpenAPI/database contract guarantees the same invariants at parent level
+  // and that the parent equals the sum of its merchant suborders.
   if (
     goodsAmountE4 !== suborderGoodsE4 ||
     shippingAmountE4 !== suborderShippingE4 ||
@@ -124,7 +128,9 @@ function mapOrderForList(order: ApiOrder, index: number): BuyerOrder {
     return mapOrder(order);
   } catch (error) {
     if (error instanceof ApiError && error.code === 1001) {
-      if (import.meta.env.DEV) console.warn("[buyer] malformed order", order.public_id);
+      // Keep a non-sensitive public identifier visible in production diagnostics
+      // until the app has a unified error-reporting sink.
+      console.warn("[buyer] malformed order", order.public_id);
       return {
         publicId: `data-error:${order.public_id}:${index}`,
         dataErrorPublicId: order.public_id,

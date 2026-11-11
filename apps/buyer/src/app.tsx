@@ -474,8 +474,9 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
         actions={actions}
         onRetry={orderDetail.retry}
         onBack={back}
-        // The current payment flow is an interface stub; never expose it in production
-        // until the real KESS endpoint and server-authoritative 409/3006 handling exist.
+        // #163 is the closed simulated-payment card; keep its interface stub out of
+        // production until the real KESS endpoint and server-authoritative 409/3006
+        // handling are delivered by the payment task.
         onPay={import.meta.env.DEV ? openPaymentFromDetail : undefined}
       />
     );
