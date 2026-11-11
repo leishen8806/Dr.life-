@@ -34,8 +34,10 @@ services:
   migrate:
     build: { context: ../../backend, dockerfile: Dockerfile }
     image: drlife-api:${APP_RELEASE:-staging}
-    env_file: [.env]
-    environment: { APP_ENV: staging, MIGRATIONS_DIR: /migrations }
+    environment:
+      APP_ENV: staging
+      MIGRATIONS_DIR: /migrations
+      DATABASE_URL: ${MIGRATION_DATABASE_URL:?set MIGRATION_DATABASE_URL}
     entrypoint: [/migrate]
     depends_on: { postgres: { condition: service_healthy } }
     volumes: [../../backend/migrations:/migrations:ro]

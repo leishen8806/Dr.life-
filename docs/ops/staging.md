@@ -14,7 +14,9 @@ from `env.example` in the approved staging environment; `.env` is ignored.
    privilege grants; `init.sql` intentionally does not create duplicate roles.
 3. Review the generated compose configuration:
    `docker compose --env-file .env -f compose.yaml config --quiet`.
-4. Run the migration as an explicit step:
+4. Run the migration as an explicit step. Compose maps the owner-managed
+   `MIGRATION_DATABASE_URL` to the migration binary's required `DATABASE_URL`
+   and does not pass the application `.env` wholesale:
    `docker compose --profile ops run --rm migrate`.
 5. Start the stack. The API health check is `/healthz`; worker and routefitmock
    are separate processes. The migration connection uses the owner-managed
