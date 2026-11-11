@@ -75,6 +75,7 @@ export function OrderListView({
                 </span>
                 <span className="buyer-order-card__footer">
                   <strong>{formatPriceE4(item.totalE4)}</strong>
+                  <span>{item.createdAt.slice(0, 10)}</span>
                   <span>{t("order.viewDetails")}</span>
                 </span>
               </button>
