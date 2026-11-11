@@ -88,7 +88,8 @@ export function OrderDetailView({
             </div>
             <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(subOrder.goodsAmountE4)}</strong></p>
             <p className="buyer-order-detail__meta">{t("order.shipping")}: {subOrder.shippingAmountE4 === 0n
-              ? subOrder.status === "awaiting_payment" ? t("order.shippingPending") : t("order.free")
+              // OpenAPI has no confirmed-free-shipping flag; do not infer “Free” from zero.
+              ? t("order.shippingPending")
               : formatPriceE4(subOrder.shippingAmountE4)}</p>
             <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(subOrder.totalE4)}</strong></p>
             {subOrder.shippingQuoteExpiresAt && subOrder.status === "awaiting_payment" && (
@@ -115,7 +116,8 @@ export function OrderDetailView({
         <Card>
           <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(order.value.goodsAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{order.value.shippingAmountE4 === 0n
-            ? order.value.subOrders.some((subOrder) => subOrder.status === "awaiting_payment") ? t("order.shippingPending") : t("order.free")
+            // Keep the aggregate conservative for cancelled/failed orders too.
+            ? t("order.shippingPending")
             : formatPriceE4(order.value.shippingAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(order.value.totalE4)}</strong></p>
           {canPay(order.value) && !paymentQuoteUnavailable && onPay && <button type="button" className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</button>}

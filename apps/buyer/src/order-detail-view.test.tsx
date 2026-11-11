@@ -82,10 +82,10 @@ describe("OrderDetailView quote expiry", () => {
     expect(screen.queryByText("Pay now")).toBeNull();
   });
 
-  it("does not call an awaiting-payment zero quote free", () => {
+  it("does not infer free shipping from a zero amount", () => {
     cleanup();
     renderDetail(order("paid", "2026-11-10T23:59:00Z"));
-    expect(screen.getByText("Shipping: Free")).toBeTruthy();
+    expect(screen.getByText("Shipping: Quote pending")).toBeTruthy();
 
     cleanup();
     renderDetail(order("awaiting_payment", "2026-11-10T23:59:00Z"));
