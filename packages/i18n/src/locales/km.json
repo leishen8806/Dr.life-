@@ -71,7 +71,10 @@
   "order.listEmpty": "[TODO-KM-REVIEW] មិនទាន់មានការបញ្ជាទិញ",
   "order.listError": "[TODO-KM-REVIEW] ផ្ទុកការបញ្ជាទិញមិនបាន",
   "order.viewDetails": "[TODO-KM-REVIEW] មើលព័ត៌មាន",
-  "order.mockNote": "[TODO-KM-REVIEW] ទិន្នន័យចំណុចប្រទាក់សម្រាប់សាកល្បង",
+  "order.loadMore": "[TODO-KM-REVIEW] ផ្ទុកបន្ថែម",
+  "order.goods": "[TODO-KM-REVIEW] តម្លៃទំនិញ",
+  "order.shipping": "[TODO-KM-REVIEW] ថ្លៃដឹកជញ្ជូន",
+  "order.shippingPending": "[TODO-KM-REVIEW] រង់ចាំតម្លៃដឹកជញ្ជូន",
   "order.items": "[TODO-KM-REVIEW] ទំនិញ {count} មុខ",
   "order.itemsTitle": "[TODO-KM-REVIEW] ព័ត៌មានទំនិញ",
   "order.merchant": "[TODO-KM-REVIEW] អ្នកលក់",
@@ -88,6 +91,7 @@
   "order.payment.succeeded": "[TODO-KM-REVIEW] ការទូទាត់ជោគជ័យ",
   "order.payment.failed": "[TODO-KM-REVIEW] ការទូទាត់បរាជ័យ",
   "order.payment.refunded": "[TODO-KM-REVIEW] បានសងប្រាក់វិញ",
+  "order.payment.unknown": "[TODO-KM-REVIEW] កំពុងដំណើរការ",
   "order.buyerStatus.awaiting_payment": "[TODO-KM-REVIEW] រង់ចាំការបញ្ជាក់ការទូទាត់",
   "order.buyerStatus.paid": "[TODO-KM-REVIEW] បានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំង",
   "order.buyerStatus.submitted": "[TODO-KM-REVIEW] ឃ្លាំងកំពុងដំណើរការ រង់ចាំការទទួល",
@@ -102,6 +106,13 @@
   "order.buyerStatus.returning": "[TODO-KM-REVIEW] កំពុងប្រគល់ត្រឡប់",
   "order.buyerStatus.returned": "[TODO-KM-REVIEW] បានប្រគល់ត្រឡប់",
   "order.buyerStatus.exception": "[TODO-KM-REVIEW] ការបញ្ជាទិញមានបញ្ហា",
+  "order.buyerStatus.mixed": "[TODO-KM-REVIEW] ស្ថានភាពការបញ្ជាទិញរងមិនដូចគ្នា",
+  "order.buyerStatus.unknown": "[TODO-KM-REVIEW] កំពុងដំណើរការ",
+  "order.itemFallback": "[TODO-KM-REVIEW] ទំនិញ {count}",
+  "order.merchantFallback": "[TODO-KM-REVIEW] អ្នកលក់",
+  "order.quoteExpires": "[TODO-KM-REVIEW] សុពលភាពតម្លៃដឹកជញ្ជូនដល់",
+  "order.quoteExpired": "[TODO-KM-REVIEW] តម្លៃដឹកជញ្ជូនបានផុតកំណត់",
+  "order.unit.item": "[TODO-KM-REVIEW] ដុំ",
   "shell.currentLanguage": "ភាសាបច្ចុប្បន្ន៖ {language}",
   "shell.developmentMode": "[TODO-KM-REVIEW] Development mode: browser mock data is active",
   "shell.telegramMode": "[TODO-KM-REVIEW] Telegram Mini App mode",
@@ -133,7 +144,7 @@
 ,"error.2006": "[TODO-KM-REVIEW] This account is unavailable. Contact support."
 ,"error.2007": "[TODO-KM-REVIEW] Too many login attempts. Please wait a moment."
 ,"error.2007.countdown": "[TODO-KM-REVIEW] Too many login attempts. Wait {seconds}s."
-,"error.2008": "[TODO-KM-REVIEW] Please accept the current agreement to continue."
+,"error.2008": "[TODO-KM-REVIEW] សូមទទួលយកកិច្ចព្រមព្រៀងបច្ចុប្បន្ន ដើម្បីបន្ត។"
 ,"error.3001": "[TODO-KM-REVIEW] One or more order items are invalid."
 ,"error.3002": "[TODO-KM-REVIEW] There is not enough stock to place this order."
 ,"error.3003": "[TODO-KM-REVIEW] This order was cancelled or its stock reservation was released."
