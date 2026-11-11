@@ -58,7 +58,8 @@ try {
         const page = await context.newPage();
         const url = new URL(pageDefinition.path, origin);
         url.searchParams.set("lang", language);
-        await page.goto(url.toString(), { waitUntil: "networkidle" });
+        const response = await page.goto(url.toString(), { waitUntil: "networkidle" });
+        if (!response?.ok()) throw new Error(`Screenshot page failed: ${url} (${response?.status() ?? "no response"})`);
         await page.waitForTimeout(150);
         const relative = posix.join(String(width), language, `${pageDefinition.name}.png`);
         await mkdir(join(output, String(width), language), { recursive: true });
@@ -74,4 +75,6 @@ try {
 }
 
 await writeFile(join(output, "manifest.txt"), `${manifest.join("\n")}\n`, "utf8");
+const expected = widths.length * languages.length * pages.length;
+if (manifest.length !== expected) throw new Error(`Expected ${expected} screenshots, captured ${manifest.length}`);
 console.log(`Captured ${manifest.length} screenshots in ${output}`);

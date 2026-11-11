@@ -20,8 +20,10 @@ pnpm --filter @drlife/website capture:screenshots
 
 The command writes 66 full-page PNGs (11 widths × 3 languages × the homepage
 and `/merchant/`) plus `screenshots/manifest.txt` under `apps/website/`.
-GitHub Actions uploads this directory as the `website-screenshots` artifact
-for 14 days and lists every file in the job summary. Screenshots must not show
+GitHub Actions runs this evidence in a separate `screenshots` job, so a failed
+capture cannot block the production deployment job. It uploads this directory
+as the `website-screenshots` artifact for 14 days and lists every file in the
+job summary. Screenshots must not show
 server addresses; the local capture server binds only to `127.0.0.1` and is
 closed after capture. Playwright is pinned to `1.56.1` and is distributed
 under the Apache-2.0 license; Chromium is installed by Playwright's official
