@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { readLanguagePreference, storeLanguagePreference } from "@drlife/i18n";
 import { ApiError } from "@drlife/api-client";
 import { createTelegramSession } from "@drlife/api-client/session";
-import { createBuyerApiClient, loadCategories, loadProducts, loadBuyerOrders, loadBuyerOrder } from "./api";
+import { createBuyerApiClient, loadCategories, loadProducts, loadBuyerOrders, loadBuyerOrder, searchProducts, suggestProducts } from "./api";
 import type { Category, Product } from "./types";
 
 afterEach(() => {
@@ -183,6 +183,28 @@ describe("loadProducts", () => {
     await expect(loadProducts(client(transport), {})).rejects.toBeInstanceOf(
       ApiError
     );
+  });
+});
+
+describe("searchProducts", () => {
+  it("passes the generated search contract without hand-built URLs", async () => {
+    const { urls, transport } = recordingFetch(() => success({ items: [product], next_cursor: "next", recommendations: [], reason: null }));
+    await expect(searchProducts(client(transport), {
+      q: "tile",
+      category: "c4",
+      minPriceE4: 12500,
+      maxPriceE4: 25000,
+      sort: "price_asc",
+      cursor: "cursor-1",
+      pageSize: 20
+    })).resolves.toMatchObject({ items: [product], next_cursor: "next" });
+    expect(urls[0]).toBe("http://api.test/v1/public/search/products?q=tile&category=c4&min_price_e4=12500&max_price_e4=25000&sort=price_asc&cursor=cursor-1&page_size=20");
+  });
+
+  it("loads server-provided suggestions", async () => {
+    const { urls, transport } = recordingFetch(() => success({ items: [{ text: "tile" }] }));
+    await expect(suggestProducts(client(transport), "ti")).resolves.toEqual(["tile"]);
+    expect(urls[0]).toBe("http://api.test/v1/public/search/suggest?q=ti");
   });
 });
 
