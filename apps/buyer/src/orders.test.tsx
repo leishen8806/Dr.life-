@@ -21,8 +21,8 @@ function text(markup: string): string[] {
     .filter(Boolean);
 }
 
-describe("buyer order mock flow", () => {
-  it("covers parent orders, split merchants, payment confirmation and the interface-stub label", () => {
+describe("buyer order views", () => {
+  it("covers parent orders, split merchants and payment confirmation", () => {
     const markup = renderToStaticMarkup(
       <OrderListView
         t={translator("en")}
@@ -31,13 +31,15 @@ describe("buyer order mock flow", () => {
         onBack={() => undefined}
         onRetry={() => undefined}
         onOpen={() => undefined}
+        onLoadMore={() => undefined}
       />
     );
     expect(mockOrders).toHaveLength(17);
-    expect(text(markup)).toContain("Interface-stub data for the buyer order flow");
     expect(text(markup)).toContain("Awaiting payment confirmation");
+    expect(text(markup)).toContain("Quote pending");
     expect(text(markup)).toContain("Warehouse processing, awaiting acceptance");
     expect(text(markup)).toContain("$114.00");
+    expect(text(markup).some((item) => item.includes("11/3/26"))).toBe(true);
   });
 
   it("renders loading, empty and error resources", () => {
@@ -59,11 +61,12 @@ describe("buyer order mock flow", () => {
       <OrderDetailView
         t={translator("zh")}
         language="zh"
-        order={order}
+        order={{ status: "ready", value: order }}
         onBack={() => undefined}
       />
     );
     expect(text(markup)).toContain("订单详情");
+    expect(text(markup).some((item) => item.includes("2026/11/3"))).toBe(true);
     expect(text(markup)).toContain("仓库处理中，等待受理");
     expect(text(markup)).toContain("$880.00");
     expect(text(markup)).toContain("配送进度");
@@ -74,11 +77,24 @@ describe("buyer order mock flow", () => {
       <OrderDetailView
         t={translator("en")}
         language="en"
-        order={mockOrders[10]!}
+        order={{ status: "ready", value: mockOrders[10]! }}
         onBack={() => undefined}
       />
     );
     expect(text(markup)).toContain("Payment result is being confirmed. Please do not pay again.");
     expect(text(markup)).not.toContain("Pay now");
+  });
+
+  it("does not show an empty delivery section", () => {
+    const order = { ...mockOrders[2]!, subOrders: mockOrders[2]!.subOrders.map((subOrder) => ({ ...subOrder, events: [] })) };
+    const markup = renderToStaticMarkup(
+      <OrderDetailView
+        t={translator("en")}
+        language="en"
+        order={{ status: "ready", value: order }}
+        onBack={() => undefined}
+      />
+    );
+    expect(text(markup)).not.toContain("Delivery progress");
   });
 });
