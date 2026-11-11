@@ -144,7 +144,7 @@
 ,"error.2006": "[TODO-KM-REVIEW] This account is unavailable. Contact support."
 ,"error.2007": "[TODO-KM-REVIEW] Too many login attempts. Please wait a moment."
 ,"error.2007.countdown": "[TODO-KM-REVIEW] Too many login attempts. Wait {seconds}s."
-,"error.2008": "[TODO-KM-REVIEW] Please accept the current agreement to continue."
+,"error.2008": "[TODO-KM-REVIEW] សូមទទួលយកកិច្ចព្រមព្រៀងបច្ចុប្បន្ន ដើម្បីបន្ត។"
 ,"error.3001": "[TODO-KM-REVIEW] One or more order items are invalid."
 ,"error.3002": "[TODO-KM-REVIEW] There is not enough stock to place this order."
 ,"error.3003": "[TODO-KM-REVIEW] This order was cancelled or its stock reservation was released."
