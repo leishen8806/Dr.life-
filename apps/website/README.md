@@ -8,6 +8,25 @@
 pnpm -F @drlife/website dev
 ```
 
+### Responsive screenshot evidence
+
+To build the static site and generate the same evidence matrix used in CI,
+install the fixed Playwright dependency's Chromium once and run:
+
+```sh
+pnpm --filter @drlife/website exec playwright install chromium
+pnpm --filter @drlife/website capture:screenshots
+```
+
+The command writes 66 full-page PNGs (11 widths × 3 languages × the homepage
+and `/merchant/`) plus `screenshots/manifest.txt` under `apps/website/`.
+GitHub Actions uploads this directory as the `website-screenshots` artifact
+for 14 days and lists every file in the job summary. Screenshots must not show
+server addresses; the local capture server binds only to `127.0.0.1` and is
+closed after capture. Playwright is pinned to `1.56.1` and is distributed
+under the Apache-2.0 license; Chromium is installed by Playwright's official
+installer and is not committed to the repository.
+
 ## 语言
 
 站点使用查询参数路由：`?lang=zh`、`?lang=en`、`?lang=km`。中文为默认；静态 HTML 先渲染中文，浏览器脚本会根据该参数替换集中在 `src/i18n/` 的词条。该方案保留法律页的固定路径，例如 `/privacy` 与 `/terms`。

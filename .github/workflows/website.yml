@@ -57,6 +57,28 @@ jobs:
           path: apps/website/dist
           if-no-files-found: error
           retention-days: 14
+      - name: Install Chromium for screenshot evidence
+        run: pnpm --filter @drlife/website exec playwright install --with-deps chromium
+      - name: Capture responsive language screenshots
+        run: pnpm --filter @drlife/website exec node scripts/capture-screenshots.mjs
+      - name: Summarize screenshot files
+        run: |
+          {
+            echo '## Website screenshot evidence'
+            echo
+            echo 'Matrix: 11 widths × 3 languages × 2 pages = 66 screenshots.'
+            echo
+            echo '```text'
+            cat apps/website/screenshots/manifest.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload screenshot evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-screenshots
+          path: apps/website/screenshots
+          if-no-files-found: error
+          retention-days: 14
 
   deploy-production:
     name: Deploy production
