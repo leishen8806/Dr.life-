@@ -8,5 +8,6 @@ import { locales } from "../i18n";
   document.body.dataset.lang = language || "zh";
   const read = (path) => path.split(".").reduce((value, key) => value && value[key], copy) || "";
   document.querySelectorAll("[data-i18n]").forEach((node) => { node.textContent = read(node.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-alt]").forEach((node) => { node.setAttribute("alt", read(node.dataset.i18nAlt)); });
   document.querySelectorAll("[data-language]").forEach((node) => { if (node.dataset.language === (language || "zh")) node.setAttribute("aria-current", "true"); });
 </script>
