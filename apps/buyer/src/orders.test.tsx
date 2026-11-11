@@ -38,7 +38,7 @@ describe("buyer order views", () => {
     expect(text(markup)).toContain("Awaiting payment confirmation");
     expect(text(markup)).toContain("Warehouse processing, awaiting acceptance");
     expect(text(markup)).toContain("$114.00");
-    expect(text(markup).some((item) => item.includes("11/1/26"))).toBe(true);
+    expect(text(markup).some((item) => item.includes("11/3/26"))).toBe(true);
   });
 
   it("renders loading, empty and error resources", () => {
@@ -65,6 +65,7 @@ describe("buyer order views", () => {
       />
     );
     expect(text(markup)).toContain("订单详情");
+    expect(text(markup).some((item) => item.includes("2026/11/3"))).toBe(true);
     expect(text(markup)).toContain("仓库处理中，等待受理");
     expect(text(markup)).toContain("$880.00");
     expect(text(markup)).toContain("配送进度");

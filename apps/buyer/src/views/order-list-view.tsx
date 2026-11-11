@@ -6,6 +6,7 @@ import type { Resource } from "../resource";
 import type { BuyerOrder, BuyerSubOrder, OrderStatus } from "../orders";
 import type { LocaleProps } from "./common";
 import type { TranslationKey } from "@drlife/i18n";
+import { formatOrderDateTime } from "../order-date";
 
 function statusKey(status: OrderStatus) {
   return `order.buyerStatus.${status}` as const;
@@ -13,16 +14,6 @@ function statusKey(status: OrderStatus) {
 
 function statusSummary(subOrders: readonly BuyerSubOrder[], t: LocaleProps["t"]) {
   return subOrders.map((item) => t(statusKey(item.status))).join(" · ");
-}
-
-function formatCreatedAt(value: string, language: LocaleProps["language"]): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(language, {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "Asia/Phnom_Penh"
-  }).format(date);
 }
 
 export function OrderListView({
@@ -85,7 +76,7 @@ export function OrderListView({
                 </span>
                 <span className="buyer-order-card__footer">
                   <strong>{formatPriceE4(item.totalE4)}</strong>
-                  <span>{formatCreatedAt(item.createdAt, language)}</span>
+                  <span>{formatOrderDateTime(item.createdAt, language)}</span>
                   <span>{t("order.viewDetails")}</span>
                 </span>
               </button>

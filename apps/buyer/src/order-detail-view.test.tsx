@@ -78,7 +78,7 @@ describe("OrderDetailView quote expiry", () => {
 
     cleanup();
     renderDetail(order("awaiting_payment", ""), onPay);
-    expect(screen.getByText("Quote pending")).toBeTruthy();
+    expect(screen.getAllByText("Quote pending").length).toBeGreaterThan(0);
     expect(screen.queryByText("Pay now")).toBeNull();
   });
 

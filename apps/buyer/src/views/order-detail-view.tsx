@@ -7,6 +7,7 @@ import type { BuyerOrder } from "../orders";
 import type { Resource } from "../resource";
 import { canPay } from "../payment";
 import type { LocaleProps } from "./common";
+import { formatOrderDateTime } from "../order-date";
 
 function formatQuoteExpiry(value: string, language: LocaleProps["language"]): string {
   const date = new Date(value);
@@ -65,7 +66,7 @@ export function OrderDetailView({
             <h1 className="buyer-section__title">{t("order.detailTitle")}</h1>
             <span className="buyer-order-status">{t("order.parentSummary")}</span>
           </div>
-          <p className="buyer-order-detail__meta">{t("order.createdAt")}: {order.value.createdAt.slice(0, 10)}</p>
+          <p className="buyer-order-detail__meta">{t("order.createdAt")}: {formatOrderDateTime(order.value.createdAt, language)}</p>
         </Card>
         {order.value.subOrders.map((subOrder) => (
           <Card key={subOrder.publicId}>
@@ -118,13 +119,15 @@ export function OrderDetailView({
         ))}
         <Card>
           <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(order.value.goodsAmountE4)}</strong></p>
-          <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{order.value.shippingAmountE4 === 0n
+          <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{paymentQuoteUnavailable
+            ? t("order.shippingPending")
+            : order.value.shippingAmountE4 === 0n
             ? order.value.subOrders.some((subOrder) =>
               subOrder.status === "awaiting_payment" && (!subOrder.shippingQuoteExpiresAt || isExpiredQuote(subOrder.shippingQuoteExpiresAt, now)))
               ? t("order.shippingPending")
               : formatPriceE4(0n)
             : formatPriceE4(order.value.shippingAmountE4)}</strong></p>
-          <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{formatPriceE4(order.value.totalE4)}</strong></p>
+          <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{paymentQuoteUnavailable ? t("order.shippingPending") : formatPriceE4(order.value.totalE4)}</strong></p>
           {canPay(order.value) && !paymentQuoteUnavailable && onPay && <button type="button" className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</button>}
         </Card>
         </>}
