@@ -151,6 +151,17 @@ test("website navigation has keyboard-visible focus and images are explicitly ab
   assert.doesNotMatch(pages, /<img(?![^>]*\balt=)/, "any image must have an alt attribute");
 });
 
+test("homepage category images have localized alt text and local responsive sources", () => {
+  const source = page("index");
+  const localizer = readFileSync(fileURLToPath(new URL("../src/components/Localizer.astro", import.meta.url)), "utf8");
+  assert.match(source, /data-i18n-alt=\{`home\.categoryAlts\.\$\{index\}`\}/);
+  assert.match(source, /type="image\/avif"/);
+  assert.match(source, /type="image\/webp"/);
+  assert.match(source, /loading="lazy"/);
+  assert.match(source, /srcset=/);
+  assert.match(localizer, /data-i18n-alt/);
+});
+
 test("homepage and legal visible copy are i18n-backed", () => {
   for (const name of ["index", "merchant"]) {
     assert.doesNotMatch(page(name), cjk, `${name} page retains Chinese hard-coded copy`);
