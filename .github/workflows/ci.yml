@@ -245,6 +245,23 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
           govulncheck ./...
 
+  gitleaks:
+    needs: changes
+    if: always() && needs.changes.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Scan changed commits for secrets
+        uses: gitleaks/gitleaks-action@v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+
   ci-gate:
     if: always()
     needs:
@@ -256,6 +273,7 @@ jobs:
       - openapi-check
       - frontend-check
       - vuln-scan
+      - gitleaks
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
