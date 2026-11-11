@@ -1,0 +1,12 @@
+title = "Dr.life+ secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "These four paths contain documented, deterministic test fixtures only; they are not production credentials and are never used for external access. Review any new finding in these files before adding another exception."
+paths = [
+  '''^backend/internal/testutil/routefitmock/routefitmock_test\.go$''',
+  '''^packages/api-client/src/auth\.test\.ts$''',
+  '''^backend/internal/iam/admin_test\.go$''',
+]

@@ -14,9 +14,12 @@
 | `openapi-check` | 存在 `backend/scripts/check-generated.sh` 时检查生成代码，否则成功跳过 | API、后端或 CI 基础设施变化；F-04 合并后自动生效 |
 | `frontend-check` | 存在 `pnpm-workspace.yaml` 时先启用 pnpm，再安装、类型检查、构建和检查三语词条，否则成功跳过 | 前端或 CI 基础设施变化；F-06 合并后自动生效 |
 | `vuln-scan` | 使用固定版本 `govulncheck v1.9.0` 执行 `govulncheck ./...` | 后端或 CI 基础设施变化；阻塞 |
+| `gitleaks` | 使用固定版本 `gitleaks 8.30.1` 扫描 PR 改动提交或 main 推送提交 | 始终；阻塞 |
 | `ci-gate` | 汇总所有结果，必需任务失败或取消时失败，条件跳过视为通过 | 始终 |
 
-推送到 `main` 时不会按路径跳过任何重型任务。纯文档 PR 只运行 `changes`、`light-checks` 和 `ci-gate`。`vuln-scan` 使用固定版本 `v1.9.0` 并作为阻塞检查；升级 Go 工具链后应先在同一 govulncheck 版本下复扫，只有结果清零才能保持阻塞。
+推送到 `main` 时不会按路径跳过任何重型任务。纯文档 PR 仍运行 `changes`、`light-checks`、`gitleaks` 和 `ci-gate`。`vuln-scan` 使用固定版本 `v1.9.0` 并作为阻塞检查；升级 Go 工具链后应先在同一 govulncheck 版本下复扫，只有结果清零才能保持阻塞。
+
+`gitleaks` 使用固定版本 `gitleaks/gitleaks-action@v3.0.0` 与 Gitleaks CLI `8.30.1`，配置见根目录 `.gitleaks.toml`。PR 扫描改动提交，推送到 `main` 时扫描本次推送提交；结果纳入 `ci-gate`，不上传源代码，也不修改仓库 Secret scanning 设置。Gitleaks CLI 使用 GPL-3.0；Action 使用 GITLEAKS-ACTION END-USER LICENSE AGREEMENT（上游许可证）。
 
 Go 工具链版本以 `backend/go.mod` 的 `go` 指令为 CI 和本地开发基准，`backend/Dockerfile` 的构建镜像必须使用相同补丁版本。升级时同时核对两处，并运行 `go mod tidy`、`go vet`、`go test -race` 和 `govulncheck`。
 
@@ -38,6 +41,7 @@ cd ..
 backend/scripts/check-secrets.sh
 python3 backend/scripts/check-doc-index.py
 docker build -t drlife-backend:ci backend
+gitleaks detect --source . --config .gitleaks.toml --redact
 ```
 
 使用 Docker 验证工作流语法：
