@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { readLanguagePreference, storeLanguagePreference } from "@drlife/i18n";
 import { ApiError } from "@drlife/api-client";
-import { createBuyerApiClient, loadCategories, loadProducts } from "./api";
+import { createTelegramSession } from "@drlife/api-client/session";
+import { createBuyerApiClient, loadCategories, loadProducts, loadBuyerOrders, loadBuyerOrder } from "./api";
 import type { Category, Product } from "./types";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const category: Category = {
   public_id: "cat_tile",
@@ -177,5 +183,215 @@ describe("loadProducts", () => {
     await expect(loadProducts(client(transport), {})).rejects.toBeInstanceOf(
       ApiError
     );
+  });
+});
+
+const apiOrder = {
+  public_id: "01JORDER",
+  shipping_address_public_id: "01JADDRESS",
+  shipping_address: { recipient_name: "Buyer", address_text: "Phnom Penh", phone: "+85512345678" },
+  payment_status: "pending" as const,
+  summary_status: "awaiting_payment" as const,
+  suborders: [{
+    public_id: "01JSUBORDER",
+    merchant_public_id: "01JMERCHANT",
+    status: "awaiting_payment" as const,
+    items: [{ sku_public_id: "01JSKU", quantity: 2, unit_price_e4: 95_000, line_total_e4: 190_000 }],
+    goods_amount_e4: 190_000,
+    shipping_amount_e4: 0,
+    payable_amount_e4: 190_000,
+    shipping_quote_expires_at: "2026-11-08T10:00:00Z"
+  }],
+  goods_amount_e4: 190_000,
+  shipping_amount_e4: 0,
+  payable_amount_e4: 190_000,
+  created_at: "2026-11-08T09:00:00Z",
+  updated_at: "2026-11-08T09:00:00Z"
+};
+
+describe("loadBuyerOrders", () => {
+  it("keeps the session client language dynamic after login", async () => {
+    let language: "zh" | "en" | "km" = "zh";
+    const languages: string[] = [];
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      const request = new Request(input, init);
+      languages.push(request.headers.get("Accept-Language") ?? "");
+      if (request.url.endsWith("/v1/public/auth/telegram"))
+        return success({
+          access_token: "access-1",
+          access_expires_in: 900,
+          refresh_token: "refresh-1",
+          refresh_expires_in: 2_592_000,
+          account: { public_id: "acct_1", role: "buyer", lang: "zh", status: "active" },
+          needs_language: false,
+          is_new_account: false
+        });
+      if (request.url.endsWith("/v1/buyer/me/consents")) return success({ items: [] });
+      return success({ items: [], next_cursor: null });
+    };
+    const session = createTelegramSession({
+      end: "buyer",
+      baseUrl: "http://api.test",
+      initData: () => "query_id=AAA&hash=BBB",
+      getLanguage: () => language,
+      fetch: transport
+    });
+
+    await session.login();
+    await loadBuyerOrders(session.client);
+    language = "km";
+    await loadBuyerOrders(session.client);
+
+    expect(languages).toEqual(["zh", "zh", "zh", "km"]);
+  });
+
+  it("uses the newly stored language on the next request of one client", async () => {
+    const languages: string[] = [];
+    const preferences = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => preferences.get(key) ?? null,
+      setItem: (key: string, value: string) => preferences.set(key, value)
+    };
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      languages.push(new Request(input, init).headers.get("Accept-Language") ?? "");
+      return success({ items: [], next_cursor: null });
+    };
+    const buyerClient = createBuyerApiClient({
+      baseUrl: "http://api.test",
+      getLanguage: () => readLanguagePreference(storage) ?? "zh",
+      fetch: transport,
+      resilience: { retry: { maxAttempts: 1 } }
+    });
+
+    storeLanguagePreference("zh", storage);
+    await loadBuyerOrders(buyerClient);
+    storeLanguagePreference("km", storage);
+    await loadBuyerOrders(buyerClient);
+
+    expect(languages).toEqual(["zh", "km"]);
+  });
+
+  it("reads the current language for every request", async () => {
+    let language: "zh" | "en" | "km" = "zh";
+    const languages: string[] = [];
+    const transport: typeof globalThis.fetch = async (input, init) => {
+      languages.push(new Request(input, init).headers.get("Accept-Language") ?? "");
+      return success({ items: [], next_cursor: null });
+    };
+    const buyerClient = createBuyerApiClient({
+      baseUrl: "http://api.test",
+      getLanguage: () => language,
+      fetch: transport,
+      resilience: { retry: { maxAttempts: 1 } }
+    });
+
+    await loadBuyerOrders(buyerClient);
+    language = "km";
+    await loadBuyerOrders(buyerClient);
+
+    expect(languages).toEqual(["zh", "km"]);
+  });
+
+  it("loads one page and maps server money without exposing internal IDs", async () => {
+    const second = { ...apiOrder, public_id: "01JORDER2" };
+    const { urls, transport } = recordingFetch((call) =>
+      call === 0
+        ? success({ items: [apiOrder], next_cursor: "next-page" })
+        : success({ items: [second], next_cursor: null })
+    );
+
+    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
+      items: [{
+        publicId: "01JORDER",
+        totalE4: 190_000n,
+        subOrders: [{
+          totalE4: 190_000n,
+          merchantName: { zh: "", en: "", km: "" },
+          lines: [{ name: { zh: "", en: "", km: "" } }]
+        }]
+      }],
+      nextCursor: "next-page"
+    });
+    expect(urls).toEqual(["http://api.test/v1/buyer/orders?page_size=20"]);
+  });
+
+  it("keeps a malformed list row visible without hiding valid orders", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const malformed = { ...apiOrder, public_id: "01JBAD", payable_amount_e4: 101 };
+    const { transport } = recordingFetch(() =>
+      success({ items: [malformed, apiOrder], next_cursor: null })
+    );
+
+    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
+      items: [{ dataError: true, publicId: "data-error:01JBAD:0" }, { publicId: "01JORDER" }],
+      nextCursor: null
+    });
+    expect(warning).toHaveBeenCalledWith("[buyer] malformed order", "01JBAD");
+  });
+
+  it("rejects inconsistent parent and suborder totals as malformed data", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const malformed = { ...apiOrder, payable_amount_e4: 200_000 };
+    const { transport } = recordingFetch(() =>
+      success({ items: [malformed], next_cursor: null })
+    );
+
+    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
+      items: [{ dataError: true, publicId: "data-error:01JORDER:0" }]
+    });
+    expect(warning).toHaveBeenCalledWith("[buyer] malformed order", "01JORDER");
+  });
+
+  it("rejects inconsistent line and suborder totals as malformed data", async () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const malformed = {
+      ...apiOrder,
+      suborders: [{
+        ...apiOrder.suborders[0],
+        goods_amount_e4: 180_000,
+        payable_amount_e4: 180_000
+      }]
+    };
+    const { transport } = recordingFetch(() =>
+      success({ items: [malformed], next_cursor: null })
+    );
+
+    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
+      items: [{ dataError: true, publicId: "data-error:01JORDER:0" }]
+    });
+    expect(warning).toHaveBeenCalledWith("[buyer] malformed order", "01JORDER");
+  });
+
+  it("maps unknown server statuses to the localized processing fallback", async () => {
+    const unknown = {
+      ...apiOrder,
+      payment_status: "awaiting_review",
+      suborders: [{ ...apiOrder.suborders[0], status: "queued" }]
+    };
+    const { transport } = recordingFetch(() => success({ items: [unknown], next_cursor: null }));
+
+    await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
+      items: [{ paymentStatus: "unknown", subOrders: [{ status: "unknown" }] }]
+    });
+  });
+
+  it("loads one detail and preserves a server error code", async () => {
+    const { urls, transport } = recordingFetch((call) =>
+      call === 0 ? success(apiOrder) : failure(2008, 403)
+    );
+    await expect(loadBuyerOrder(client(transport), "01JORDER")).resolves.toMatchObject({
+      publicId: "01JORDER",
+      goodsAmountE4: 190_000n,
+      shippingAmountE4: 0n
+    });
+    await expect(loadBuyerOrder(client(transport), "01JORDER")).rejects.toMatchObject({
+      name: "ApiError",
+      code: 2008,
+      messageKey: "error.2008"
+    });
+    expect(urls).toEqual([
+      "http://api.test/v1/buyer/orders/01JORDER",
+      "http://api.test/v1/buyer/orders/01JORDER"
+    ]);
   });
 });

@@ -58,6 +58,52 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  screenshots:
+    name: Website screenshot evidence
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Enable pnpm
+        run: corepack enable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Download static artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: website-dist
+          path: apps/website/dist
+      - name: Install Chromium for screenshot evidence
+        run: pnpm --filter @drlife/website exec playwright install --with-deps chromium
+      - name: Capture responsive language screenshots
+        run: pnpm --filter @drlife/website exec node scripts/capture-screenshots.mjs
+      - name: Summarize screenshot files
+        if: always()
+        run: |
+          {
+            echo '## Website screenshot evidence'
+            echo
+            echo 'Matrix: 11 widths × 3 languages × 2 pages = 66 screenshots.'
+            echo
+            echo '```text'
+            test -f apps/website/screenshots/manifest.txt && cat apps/website/screenshots/manifest.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload screenshot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-screenshots
+          path: apps/website/screenshots
+          if-no-files-found: ignore
+          retention-days: 14
+
   deploy-production:
     name: Deploy production
     if: >-
