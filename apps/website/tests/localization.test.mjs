@@ -56,18 +56,66 @@ test("English entries for the localized content contain no Chinese characters", 
 });
 
 test("mobile English headings and supporting copy have a wrapping safeguard", () => {
-  assert.match(styles, /@media\(max-width:520px\).*\.eyebrow.*overflow-wrap:anywhere/s);
-  assert.match(styles, /@media\(max-width:520px\).*\.merchant-hero \.section-title.*overflow-wrap:anywhere/s);
+  assert.match(
+    styles,
+    /@media\s*\(\s*max-width:\s*520px\s*\)[\s\S]*?\.eyebrow[\s\S]*?overflow-wrap:\s*anywhere\s*;/
+  );
+  assert.match(
+    styles,
+    /@media\s*\(\s*max-width:\s*520px\s*\)[\s\S]*?\.merchant-hero \.section-title[\s\S]*?overflow-wrap:\s*anywhere\s*;/
+  );
+});
+
+test("responsive typography balances headings and keeps the locale eyebrow hyphen unbroken", () => {
+  assert.match(styles, /h1,\s*h2,\s*h3,\s*\.eyebrow\s*\{[\s\S]*?text-wrap:\s*balance\s*;/);
+  assert.match(styles, /body\s*\{[\s\S]*?text-wrap:\s*pretty\s*;/);
+
+  for (const name of ["zh", "en", "km"]) {
+    const locale = readFileSync(fileURLToPath(new URL(`../src/i18n/${name}.json`, import.meta.url)), "utf8");
+    assert.match(locale, /NEXT‑GENERATION/);
+    assert.doesNotMatch(locale, /NEXT-GENERATION/);
+  }
+});
+
+test("base typography uses the shared body-size variable", () => {
+  assert.match(styles, /:root\s*\{[\s\S]*?--fs-body:[^;]+;[\s\S]*?font-size:\s*var\(--fs-body\);/);
+});
+
+test("Khmer typography keeps readable line heights at every width", () => {
+  assert.match(styles, /\[data-lang="km"\]\s*\{\s*line-height:\s*1\.85;/);
+  assert.match(styles, /\[data-lang="km"\] \.hero h1,[\s\S]*?line-height:\s*1\.35;/);
+  assert.match(styles, /@media\s*\(min-width:\s*521px\) and \(max-width:\s*900px\)/);
+});
+
+test("base and mobile hero line heights match the typography specification", () => {
+  assert.match(styles, /:root\s*\{[\s\S]*?line-height:\s*1\.7;/);
+  assert.match(styles, /@media\s*\(max-width:\s*520px\)[\s\S]*?\.hero h1\s*\{[\s\S]*?line-height:\s*1\.15;/);
+});
+
+test("mobile stats keep the displayed number and unit together", () => {
+  assert.match(styles, /\.stat strong\s*\{[\s\S]*?word-break:\s*keep-all;/);
 });
 
 test("confirmed mobile layout keeps hero stats and ecosystem nodes compact", () => {
-  assert.match(styles, /@media\(max-width:520px\).*\.stats\{grid-template-columns:repeat\(4,1fr\)/s);
-  assert.match(styles, /@media\(max-width:520px\).*\.ecosystem-orbit\{height:auto;display:grid;grid-template-columns:repeat\(2,1fr\)/s);
-  assert.match(styles, /@media\(max-width:520px\).*\.hero h1\{font-size:60px/s);
+  assert.match(
+    styles,
+    /@media\s*\(\s*max-width:\s*520px\s*\)[\s\S]*?\.stats\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/
+  );
+  assert.match(
+    styles,
+    /@media\s*\(\s*max-width:\s*520px\s*\)[\s\S]*?\.ecosystem-orbit\s*\{[\s\S]*?height:\s*auto;[\s\S]*?display:\s*grid;[\s\S]*?grid-template-columns:\s*repeat\(2,\s*1fr\)/
+  );
+  assert.match(
+    styles,
+    /@media\s*\(\s*max-width:\s*520px\s*\)[\s\S]*?\.hero h1\s*\{[\s\S]*?font-size:\s*var\(--fs-display\)/
+  );
 });
 
 test("mobile language links stay on one line beside the menu", () => {
-  assert.match(styles, /@media\(max-width:520px\).*\.languages a\{padding:10px 6px;white-space:nowrap\}.*\.mobile-menu\{margin-left:0\}/s);
+  assert.match(
+    styles,
+    /@media\s*\(\s*max-width:\s*520px\s*\)[\s\S]*?\.languages a\s*\{[\s\S]*?padding:\s*10px 6px;[\s\S]*?white-space:\s*nowrap[\s\S]*?\.mobile-menu\s*\{[\s\S]*?margin-left:\s*0/
+  );
 });
 
 test("320px header moves language selection into the accessible hamburger menu", () => {
@@ -77,9 +125,18 @@ test("320px header moves language selection into the accessible hamburger menu",
   assert.match(header, /data-language="zh"/);
   assert.match(header, /data-language="en"/);
   assert.match(header, /data-language="km"/);
-  assert.match(styles, /@media\(max-width:360px\)\{\.header-actions \.languages\{display:none\}\.mobile-menu-languages\{display:flex\}\}/);
-  assert.match(styles, /@media\(min-width:361px\)\{\.mobile-menu-languages\{display:none\}\}/);
-  assert.match(styles, /\.mobile-menu summary:focus-visible\{outline:3px solid var\(--gold\);outline-offset:4px\}/);
+  assert.match(
+    styles,
+    /@media\s*\(\s*max-width:\s*360px\s*\)[\s\S]*?\.header-actions \.languages\s*\{[\s\S]*?display:\s*none[\s\S]*?\.mobile-menu-languages\s*\{[\s\S]*?display:\s*flex/
+  );
+  assert.match(
+    styles,
+    /@media\s*\(\s*min-width:\s*361px\s*\)[\s\S]*?\.mobile-menu-languages\s*\{[\s\S]*?display:\s*none/
+  );
+  assert.match(
+    styles,
+    /\.mobile-menu summary:focus-visible\s*\{[\s\S]*?outline:\s*3px solid var\(--gold\)[\s\S]*?outline-offset:\s*4px/
+  );
 });
 
 test("website navigation has keyboard-visible focus and images are explicitly absent or accessible", () => {
@@ -87,7 +144,10 @@ test("website navigation has keyboard-visible focus and images are explicitly ab
     .map((name) => readFileSync(fileURLToPath(new URL(`../src/pages/${name}.astro`, import.meta.url)), "utf8"))
     .join("\n");
 
-  assert.match(styles, /a:focus-visible\{outline:3px solid var\(--gold\);outline-offset:4px\}/);
+  assert.match(
+    styles,
+    /a:focus-visible\s*\{[\s\S]*?outline:\s*3px solid var\(--gold\)[\s\S]*?outline-offset:\s*4px/
+  );
   assert.doesNotMatch(pages, /<img(?![^>]*\balt=)/, "any image must have an alt attribute");
 });
 
