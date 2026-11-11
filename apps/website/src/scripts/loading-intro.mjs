@@ -1,6 +1,6 @@
-const FONT_WAIT_MS = 600;
-const MAX_VISIBLE_MS = 1200;
-const FADE_MS = 180;
+const FONT_WAIT_MS = 250;
+const MAX_VISIBLE_MS = 700;
+const FADE_MS = 120;
 
 export function initLoadingIntro(windowObject, documentObject) {
   const overlay = documentObject.getElementById("site-loading-intro");

@@ -84,8 +84,8 @@ test("only html.intro makes the server-rendered overlay visible", () => {
   assert.match(componentSource, /:global\(html\.intro\) \.site-loader\s*\{\s*display:\s*grid;/);
 });
 
-test("CSS hides and disables the overlay after 1.5 seconds if JavaScript fails", () => {
-  assert.match(componentSource, /animation:\s*site-loader-failsafe 0s linear 1\.5s forwards;/);
+test("CSS hides and disables the overlay after 0.9 seconds if JavaScript fails", () => {
+  assert.match(componentSource, /animation:\s*site-loader-failsafe 0s linear 0\.9s forwards;/);
   assert.match(componentSource, /@keyframes site-loader-failsafe\s*\{[\s\S]*?visibility:\s*hidden;[\s\S]*?pointer-events:\s*none;/);
 });
 
@@ -109,12 +109,12 @@ test("a missing intro class removes the hidden overlay immediately", () => {
   assert.equal(env.overlay.removed, true);
 });
 
-test("the overlay is always removed by 1.2 seconds from navigation start", () => {
+test("the overlay is always removed by 0.7 seconds from navigation start", () => {
   const env = createEnvironment({ nowAtStart: 125 });
   initLoadingIntro(env.windowObject, env.documentObject);
-  env.advanceTo(1199);
+  env.advanceTo(699);
   assert.equal(env.overlay.removed, false);
-  env.advanceTo(1200);
+  env.advanceTo(700);
   assert.equal(env.overlay.removed, true);
   assert.equal(env.htmlClasses.contains("intro"), false);
 });
