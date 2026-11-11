@@ -10,6 +10,6 @@ for candidate in $(find "$releases" -mindepth 1 -maxdepth 1 -type d -print | sor
   previous=$candidate
 done
 test -n "$previous"
-ln -s "releases/$(basename "$previous")" "$site_root/.current.next"
+ln -sfn "releases/$(basename "$previous")" "$site_root/.current.next"
 mv -Tf "$site_root/.current.next" "$current"
 printf 'rolled back to %s\n' "$(readlink "$current")"

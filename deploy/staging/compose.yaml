@@ -2,10 +2,14 @@ name: drlife-staging
 
 services:
   api:
-    build: { context: ../../backend, dockerfile: Dockerfile }
     image: drlife-api:${APP_RELEASE:-staging}
     env_file: [.env]
-    environment: { APP_ENV: staging, MIGRATIONS_DIR: /migrations }
+    environment:
+      APP_ENV: staging
+      MIGRATIONS_DIR: /migrations
+      REDIS_URL: redis://:${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}@redis-state:6379/0
+      QUEUE_REDIS_URL: redis://:${REDIS_QUEUE_PASSWORD:?set REDIS_QUEUE_PASSWORD}@redis-queue:6379/0
+      CACHE_REDIS_URL: redis://:${REDIS_CACHE_PASSWORD:?set REDIS_CACHE_PASSWORD}@redis-cache:6379/0
     depends_on:
       postgres: { condition: service_healthy }
       redis-state: { condition: service_healthy }
@@ -18,21 +22,23 @@ services:
         - CMD-SHELL
         - 'wget -q -O /dev/null http://127.0.0.1:8080/healthz'
   worker:
-    build: { context: ../../backend, dockerfile: Dockerfile }
     image: drlife-api:${APP_RELEASE:-staging}
     env_file: [.env]
-    environment: { APP_ENV: staging, MIGRATIONS_DIR: /migrations }
+    environment:
+      APP_ENV: staging
+      MIGRATIONS_DIR: /migrations
+      REDIS_URL: redis://:${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}@redis-state:6379/0
+      QUEUE_REDIS_URL: redis://:${REDIS_QUEUE_PASSWORD:?set REDIS_QUEUE_PASSWORD}@redis-queue:6379/0
+      CACHE_REDIS_URL: redis://:${REDIS_CACHE_PASSWORD:?set REDIS_CACHE_PASSWORD}@redis-cache:6379/0
     entrypoint: [/worker]
     depends_on: [postgres, redis-state, redis-queue]
     volumes: [../../backend/migrations:/migrations:ro]
   routefitmock:
-    build: { context: ../../backend, dockerfile: Dockerfile }
     image: drlife-api:${APP_RELEASE:-staging}
     env_file: [.env]
     environment: { APP_ENV: staging }
     entrypoint: [/routefitmock]
   migrate:
-    build: { context: ../../backend, dockerfile: Dockerfile }
     image: drlife-api:${APP_RELEASE:-staging}
     environment:
       APP_ENV: staging
@@ -56,28 +62,34 @@ services:
         - 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
   redis-state:
     image: redis:7.4-alpine
-    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory-policy, noeviction]
+    environment:
+      REDIS_STATE_PASSWORD: "${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}"
+    command: [sh, -c, 'exec redis-server --appendonly yes --appendfsync everysec --maxmemory-policy noeviction --requirepass "$${REDIS_STATE_PASSWORD}"']
     volumes: [redis-state:/data]
-    healthcheck: { test: [CMD, redis-cli, ping] }
+    healthcheck: { test: [CMD-SHELL, 'redis-cli -a "$${REDIS_STATE_PASSWORD}" ping'] }
   redis-queue:
     image: redis:7.4-alpine
-    command: [redis-server, --appendonly, "yes", --appendfsync, everysec, --maxmemory-policy, noeviction]
+    environment:
+      REDIS_QUEUE_PASSWORD: "${REDIS_QUEUE_PASSWORD:?set REDIS_QUEUE_PASSWORD}"
+    command: [sh, -c, 'exec redis-server --appendonly yes --appendfsync everysec --maxmemory-policy noeviction --requirepass "$${REDIS_QUEUE_PASSWORD}"']
     volumes: [redis-queue:/data]
-    healthcheck: { test: [CMD, redis-cli, ping] }
+    healthcheck: { test: [CMD-SHELL, 'redis-cli -a "$${REDIS_QUEUE_PASSWORD}" ping'] }
   redis-cache:
     image: redis:7.4-alpine
-    command: [redis-server, --maxmemory-policy, allkeys-lru]
+    environment:
+      REDIS_CACHE_PASSWORD: "${REDIS_CACHE_PASSWORD:?set REDIS_CACHE_PASSWORD}"
+    command: [sh, -c, 'exec redis-server --maxmemory-policy allkeys-lru --requirepass "$${REDIS_CACHE_PASSWORD}"']
     volumes: [redis-cache:/data]
-    healthcheck: { test: [CMD, redis-cli, ping] }
+    healthcheck: { test: [CMD-SHELL, 'redis-cli -a "$${REDIS_CACHE_PASSWORD}" ping'] }
   buyer:
     image: nginx:1.29.3-alpine
-    volumes: [./static/buyer:/usr/share/nginx/html:ro]
+    volumes: ["${STAGING_SITE_ROOT:?set STAGING_SITE_ROOT}/current:/usr/share/nginx/html:ro"]
   merchant:
     image: nginx:1.29.3-alpine
-    volumes: [./static/merchant:/usr/share/nginx/html:ro]
+    volumes: ["${STAGING_SITE_ROOT:?set STAGING_SITE_ROOT}/current:/usr/share/nginx/html:ro"]
   admin:
     image: nginx:1.29.3-alpine
-    volumes: [./static/admin:/usr/share/nginx/html:ro]
+    volumes: ["${STAGING_SITE_ROOT:?set STAGING_SITE_ROOT}/current:/usr/share/nginx/html:ro"]
   cloudflared:
     image: cloudflare/cloudflared:2025.11.1
     command: [tunnel, --no-autoupdate, run]
