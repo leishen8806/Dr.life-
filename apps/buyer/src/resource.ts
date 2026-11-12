@@ -5,7 +5,7 @@ import type { TranslationKey } from "@drlife/i18n";
 export type Resource<T> =
   | { status: "loading" }
   | { status: "ready"; value: T }
-  | { status: "error"; messageKey: TranslationKey };
+  | { status: "error"; messageKey: TranslationKey; previous?: T };
 
 /**
  * The dictionary carries one message per server error code. Listing them makes

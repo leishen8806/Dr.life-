@@ -111,7 +111,7 @@ export function useProductSearch(client: BuyerApiClient, language: Language) {
         });
       },
       (error: unknown) => {
-        if (!controller.signal.aborted) setResource({ status: "error", messageKey: errorMessageKey(error) });
+        if (!controller.signal.aborted) setResource({ status: "error", messageKey: errorMessageKey(error), previous: resource.status === "ready" ? resource.value : undefined });
       }
     );
   }, [activeQuery, client, resource]);
@@ -169,7 +169,7 @@ export function SearchView({
           </form>
         </Card>
         {resource.status === "loading" && <p role="status">{t("common.loading")}</p>}
-        {resource.status === "error" && <Card><p className="buyer-search-error" role="alert">{t(resource.messageKey)}</p><button type="button" onClick={retry}>{t("common.retry")}</button></Card>}
+        {resource.status === "error" && <Card><p className="buyer-search-error" role="alert">{t(resource.messageKey)}</p><button type="button" onClick={retry}>{t("common.retry")}</button>{resource.previous && resource.previous.items.length > 0 && <ProductList products={resource.previous.items} t={t} language={language} onSelect={onSelectProduct} />}</Card>}
         {resource.status === "ready" && resource.value.items.length === 0 && (
           <Card>
             <h2 className="buyer-section__title">{t("mall.searchNoResults")}</h2>
