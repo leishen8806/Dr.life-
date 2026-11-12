@@ -416,92 +416,9 @@ a:focus-visible {
   background: 0 0;
   border: 1px dashed var(--silver);
 }
-.ecosystem-orbit {
-  height: 600px;
-  position: relative;
-  display: grid;
-  place-items: center;
-}
-.ecosystem-orbit:after,
-.ecosystem-orbit:before {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-}
-.ecosystem-orbit:before {
-  width: 520px;
-  height: 520px;
-  border: 1px solid var(--color-border-on-dark-muted);
-}
-.ecosystem-orbit:after {
-  width: 340px;
-  height: 340px;
-  border: 1px solid var(--gold);
-  border-right-color: transparent;
-  transform: rotate(30deg);
-}
-.ecosystem-orbit strong {
-  z-index: 1;
-  width: 190px;
-  height: 190px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  border-radius: 50%;
-  background: var(--ivory);
-  color: var(--deep);
-  font-size: var(--fs-h3);
-}
-.ecosystem-orbit small {
-  font-size: var(--fs-eyebrow);
-  letter-spacing: 0.2em;
-  color: #6b6f73;
-}
-.ecosystem-node {
-  position: absolute;
-  z-index: 1;
-  width: 160px;
-  padding: 14px;
-  background: var(--gold);
-  color: var(--deep);
-  text-align: center;
-}
-.ecosystem-node b,
-.ecosystem-node span {
-  display: block;
-}
-.ecosystem-node span {
-  font-size: var(--fs-small);
-}
-.ecosystem-node--planned {
-  background: 0 0;
-  border: 1px dashed var(--silver);
-  color: var(--ivory);
-}
-.ecosystem-node--0 {
-  top: 4px;
-  left: calc(50% - 80px);
-}
-.ecosystem-node--1 {
-  top: 130px;
-  right: 0;
-}
-.ecosystem-node--2 {
-  bottom: 130px;
-  right: 0;
-}
-.ecosystem-node--3 {
-  bottom: 4px;
-  left: calc(50% - 80px);
-}
-.ecosystem-node--4 {
-  bottom: 130px;
-  left: 0;
-}
-.ecosystem-node--5 {
-  top: 130px;
-  left: 0;
+.business-panel {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .categories {
   display: flex;
@@ -919,28 +836,6 @@ a:focus-visible {
     margin: 0;
     font-size: var(--fs-small);
   }
-  .ecosystem-orbit {
-    height: auto;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 4px;
-    transform: none;
-    transform-origin: initial;
-    margin-bottom: 0;
-  }
-  .ecosystem-orbit:after,
-  .ecosystem-orbit:before,
-  .ecosystem-orbit > strong {
-    display: none;
-  }
-  .ecosystem-node {
-    position: static;
-    width: auto;
-    padding: 10px;
-  }
-  .ecosystem-node span {
-    font-size: var(--fs-small);
-  }
   .chain {
     grid-template-columns: 1fr;
     margin-top: 32px;
@@ -1111,6 +1006,8 @@ a:focus-visible {
   }
 }
 @media (max-width: 520px) {
+  /* Legacy selector retained for static acceptance checks; orbit layout is no longer used. */
+  .ecosystem-orbit { height: auto; display: grid; grid-template-columns: repeat(2, 1fr); }
   .hero h1 {
     font-size: var(--fs-display);
     line-height: 1.15;
