@@ -18,7 +18,7 @@
   --fs-body: clamp(15px, 14.3px + 0.19vw, 17px);
   --fs-small: clamp(12px, 11.3px + 0.19vw, 14px);
   --fs-eyebrow: clamp(11px, 10.3px + 0.19vw, 13px);
-  font-family: Inter, "Noto Sans SC", "Noto Sans Khmer", sans-serif;
+  font-family: var(--font-sans);
   color: var(--graphite);
   background: var(--ivory);
   font-size: var(--fs-body);
@@ -72,6 +72,9 @@
 body {
   margin: 0;
   text-wrap: pretty;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
 }
 h1,
 h2,
@@ -99,13 +102,13 @@ a:focus-visible {
   outline-offset: 4px;
 }
 .site-header {
-  min-height: 84px;
-  max-width: 1376px;
+  min-height: var(--header-h);
+  max-width: var(--container);
   margin: auto;
-  padding: 28px 48px;
+  padding: var(--space-5) var(--gutter);
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: var(--space-6);
   position: relative;
   z-index: 3;
 }
@@ -124,7 +127,7 @@ a:focus-visible {
 .main-nav {
   display: flex;
   flex: 1;
-  gap: 36px;
+  gap: var(--space-6);
   flex-wrap: wrap;
 }
 .footer-links a,
@@ -134,7 +137,7 @@ a:focus-visible {
 .header-actions,
 .languages {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: center;
 }
 .languages a,
@@ -144,9 +147,9 @@ a:focus-visible {
   text-decoration: none;
 }
 .shop-link {
-  border: 1px solid var(--gold);
-  color: #d8c08f;
-  padding-inline: 22px;
+  border: 1px solid var(--color-gold);
+  color: var(--color-gold);
+  padding-inline: var(--button-pad-x);
 }
 .site-header--dark {
   color: var(--ivory);
@@ -576,15 +579,15 @@ a:focus-visible {
 .merchant-cta,
 .merchant-hero__inner,
 .merchant-section {
-  max-width: 1200px;
+  max-width: var(--container);
   margin: auto;
-  padding: 80px 32px;
+  padding: var(--section-y) var(--gutter);
 }
 .merchant-cta,
 .merchant-hero__inner {
   display: flex;
   flex-wrap: wrap;
-  gap: 48px;
+  gap: var(--space-7);
   justify-content: space-between;
   align-items: end;
 }
@@ -593,7 +596,7 @@ a:focus-visible {
 }
 .merchant-stats {
   display: flex;
-  gap: 32px;
+  gap: var(--space-6);
 }
 .merchant-stats strong {
   display: block;
@@ -603,22 +606,22 @@ a:focus-visible {
 .steps {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
+  gap: var(--grid-gap);
   padding: 0;
   list-style: none;
 }
 .step {
-  padding: 24px;
-  background: var(--light);
-  border: 1px solid #e3ded3;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--color-border);
 }
 .step strong {
   color: var(--gold);
 }
 .merchant-fee-table {
   overflow-x: auto;
-  border: 1px solid #e3ded3;
-  background: #fff;
+  border: 1px solid var(--color-border);
+  background: var(--surface);
 }
 .merchant-fee-table table {
   min-width: 760px;
@@ -628,33 +631,33 @@ a:focus-visible {
 }
 .merchant-fee-table td,
 .merchant-fee-table th {
-  padding: 18px 20px;
-  border-bottom: 1px solid #e3ded3;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
 }
 .merchant-fee-table thead {
   background: var(--graphite);
   color: var(--ivory);
 }
 .merchant-faq {
-  background: var(--light);
-  border-block: 1px solid #e3ded3;
+  background: var(--surface);
+  border-block: 1px solid var(--color-border);
 }
 .merchant-faq > div {
-  max-width: 1200px;
+  max-width: var(--container);
   margin: auto;
-  padding: 80px 32px;
+  padding: var(--section-y) var(--gutter);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  gap: var(--grid-gap);
 }
 .merchant-cta h2,
 .merchant-faq h3 {
   font-family: var(--font-serif);
 }
 .legal-page {
-  max-width: 1200px;
+  max-width: var(--container);
   margin: auto;
-  padding: 62px 48px 100px;
+  padding: var(--section-y) var(--gutter) var(--space-9);
 }
 .legal-page h1 {
   font-size: var(--fs-h2);
@@ -663,16 +666,16 @@ a:focus-visible {
 .legal-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-2);
 }
 .legal-meta a,
 .legal-meta span,
 .legal-nav a {
-  min-height: 44px;
+  min-height: var(--tap-min);
   display: inline-flex;
   align-items: center;
-  padding: 8px 14px;
-  border: 1px solid var(--silver);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border-strong);
   text-decoration: none;
 }
 .legal-current {
@@ -681,24 +684,24 @@ a:focus-visible {
 }
 .legal-history,
 .legal-note {
-  max-width: 780px;
-  padding: 18px;
-  border: 1px solid #e3ded3;
-  background: var(--light);
+  max-width: var(--measure);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  background: var(--surface);
 }
 .legal-layout {
   display: grid;
   grid-template-columns: 240px minmax(0, 760px);
-  gap: 56px;
-  margin-top: 34px;
+  gap: var(--space-7);
+  margin-top: var(--space-6);
 }
 .legal-toc {
   position: sticky;
   top: 12px;
   align-self: start;
-  padding: 18px;
-  border: 1px solid #e3ded3;
-  background: #fff;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  background: var(--surface);
 }
 .legal-toc a {
   display: block;
@@ -710,12 +713,12 @@ a:focus-visible {
   font-size: var(--fs-h2);
 }
 .site-footer {
-  background: var(--graphite);
-  color: #d9d6cf;
-  padding: 54px max(20px, calc((100% - 1280px) / 2 + 48px));
+  background: var(--color-black);
+  color: var(--color-on-dark-muted);
+  padding: var(--space-7) var(--gutter);
   display: grid;
   grid-template-columns: 1.5fr 1fr;
-  gap: 18px 42px;
+  gap: var(--space-4) var(--space-6);
 }
 .site-footer .brand {
   color: var(--ivory);
@@ -807,8 +810,8 @@ a:focus-visible {
   }
   .merchant-fee-table {
     overflow-x: auto;
-    border: 1px solid #e3ded3;
-    background: #fff;
+    border: 1px solid var(--color-border);
+    background: var(--surface);
   }
   .merchant-fee-table table {
     min-width: 520px;
