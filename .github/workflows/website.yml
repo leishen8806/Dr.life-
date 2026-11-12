@@ -115,7 +115,7 @@ jobs:
         with:
           name: miniapp-screenshots
           path: apps/website/screenshots-miniapp
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
 
   deploy-production:

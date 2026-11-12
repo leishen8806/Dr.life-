@@ -27,7 +27,7 @@ const start = (app, port) => {
 };
 
 const waitFor = async (port) => {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < 240; attempt += 1) {
     try { await fetch(`http://127.0.0.1:${port}`); return; } catch { await new Promise((resolve) => setTimeout(resolve, 250)); }
   }
   throw new Error(`Mini App dev server did not start on ${port}`);

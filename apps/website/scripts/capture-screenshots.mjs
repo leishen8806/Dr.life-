@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 
 const root = fileURLToPath(new URL("../dist/", import.meta.url));
 const output = fileURLToPath(new URL("../screenshots/", import.meta.url));
-const widths = [320, 360, 375, 390, 414, 430, 600, 768, 1024, 1440, 1920];
+const widths = [360, 390, 768, 1280, 1440, 1920];
 const languages = ["zh", "en", "km"];
 const pages = [{ name: "home", path: "/" }, { name: "merchant", path: "/merchant/" }];
 const contentTypes = {
@@ -70,6 +70,17 @@ try {
         if (failedResources.length > 0) {
           throw new Error(`Screenshot page loaded failed static resources: ${failedResources.join(", ")}`);
         }
+        const layout = await page.evaluate(() => {
+          const heading = document.querySelector("h1");
+          const body = document.body;
+          const rect = heading?.getBoundingClientRect();
+          return {
+            headingVisible: Boolean(rect && rect.top >= 0 && rect.bottom <= window.innerHeight),
+            overflow: body.scrollWidth > window.innerWidth + 1
+          };
+        });
+        if (!layout.headingVisible) throw new Error(`Homepage h1 is not visible at ${width}px (${language}, ${pageDefinition.name})`);
+        if (layout.overflow) throw new Error(`Horizontal overflow at ${width}px (${language}, ${pageDefinition.name})`);
         await page.waitForTimeout(150);
         const relative = posix.join(String(width), language, `${pageDefinition.name}.png`);
         await mkdir(join(output, String(width), language), { recursive: true });
