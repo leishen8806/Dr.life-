@@ -1,0 +1,156 @@
+/* Dr.life+ UI 标准 v1 · 设计变量（2026-11-12）
+ * 基准：老板提供的官网首页 v2（design/website/homepage-v2/source.html）
+ * 结构、高棉语与可访问性规则沿用 Design 方案 A（ai-shared-memory #30 / PR #31）
+ * 官网与 Mini App 共用本文件；Mini App 加 [data-surface="miniapp"]。
+ * 字体全部自托管（CSP：font-src 'self'），不用外部 CDN。
+ */
+:root {
+  /* ── 颜色：品牌（数值取自首页 v2） ── */
+  --color-black: #111210;        /* 页脚、最深底 */
+  --color-dark: #171817;         /* 深色区块底、深色页头 */
+  --color-dark-2: #20211f;       /* 深色区块里的次级底（App 下载区） */
+  --color-cream: #f6f2e9;        /* 默认页面底 */
+  --color-sand: #eee8dc;         /* 浅色区块交替底 */
+  --color-paper: #fbf8f1;        /* 卡片、弹窗、输入框底 */
+  --color-ink: #24241f;          /* 正文与标题  13.95:1 on cream */
+  --color-muted: #5d5c52;        /* 次要文字    6.03:1 on cream / 5.52:1 on sand */
+  --color-bronze: #80612e;       /* 浅底上的强调字、eyebrow、文字链接  5.13:1 on cream / 4.69:1 on sand（余量小，不得调浅） */
+  --color-gold: #d6b97e;         /* 主按钮底、深底上的强调字  9.41:1 on dark。浅底上不能当文字色（1.69:1） */
+  --color-on-dark: #f6f2e9;      /* 深底正文 15.94:1 */
+  --color-on-dark-muted: #d4cec1;/* 深底次要文字 11.36:1 */
+  --color-rule: #d8d0c1;         /* 分隔线（装饰用） */
+  --color-border: #cfc2ab;       /* 卡片描边（装饰用） */
+  --color-border-strong: #7d705a;/* 输入框、次按钮描边 4.33:1 on cream，满足非文本 3:1 */
+
+  /* ── 颜色：功能（浅底 / 深底各一套，均 ≥ 4.5:1） ── */
+  --color-success: #2c6e4a;  /* 5.47:1 on cream */
+  --color-warning: #8a5a12;  /* 5.29:1 */
+  --color-danger:  #b13830;  /* 5.40:1 */
+  --color-info:    #3d5a73;  /* 6.46:1 */
+
+  /* ── 语义映射（组件只用这一层） ── */
+  --bg: var(--color-cream);
+  --bg-alt: var(--color-sand);
+  --surface: var(--color-paper);
+  --text: var(--color-ink);
+  --text-muted: var(--color-muted);
+  --accent-text: var(--color-bronze);
+  --accent-fill: var(--color-gold);
+  --accent-on-fill: var(--color-dark);
+
+  /* ── 字体 ── */
+  --font-serif: "DR Serif", "Noto Serif CJK SC", "Noto Serif SC", serif;            /* 标题 h1–h3、宣言 */
+  --font-sans: "DR Sans", "Noto Sans CJK SC", "Noto Sans SC", "PingFang SC", sans-serif; /* 正文、导航、按钮 */
+  --font-latin-display: system-ui, sans-serif;  /* 英文副标题、编号 */
+  --font-latin-quote: Georgia, serif;            /* 英文宣言（斜体） */
+  --font-khmer: "Noto Sans Khmer", sans-serif;   /* 高棉语全部文字 */
+
+  /* ── 字号（360px→1440px 连续缩放；同级标题全站一致） ── */
+  --fs-display: clamp(42px, 7.35vw, 112px);  /* 只用于首页首屏 h1；按语义断两行，320px 宽下每行不再折行 */
+  --fs-h1:      clamp(32px, 4vw, 54px);      /* 内页主标题 = 区块标题 */
+  --fs-h2:      clamp(30px, 4vw, 54px);      /* 区块标题 */
+  --fs-h3:      clamp(24px, 2.55vw, 36px);   /* 版块卡片标题 */
+  --fs-h4:      clamp(15px, 1.2vw, 19px);    /* 小卡片、步骤、列表标题 */
+  --fs-quote:   clamp(21px, 2.5vw, 35px);    /* 宣言 */
+  --fs-lead:    clamp(16px, 1.6vw, 22px);    /* 首屏定位句、导语 */
+  --fs-tagline: clamp(12px, 1.35vw, 17px);   /* 首屏英文副标题 */
+  --fs-body:    clamp(14px, 1.1vw, 16px);
+  --fs-small:   13px;                         /* 列表、说明、页脚 */
+  --fs-caption: 12px;                         /* 标签、图片说明、eyebrow —— 全站最小字号 */
+  --fs-stat:    clamp(34px, 3vw, 44px);       /* 步骤编号、数据 */
+
+  --fw-regular: 400;
+  --fw-medium: 650;   /* 按钮、导语 */
+  --fw-bold: 700;     /* 标题、eyebrow */
+
+  --lh-display: 1.01;
+  --lh-title: 1.32;
+  --lh-body: 1.8;
+  --lh-tight: 1.5;
+  --lh-title-km: 1.35;
+  --lh-body-km: 1.85;
+
+  --track-display: -0.055em;
+  --track-title: -0.028em;
+  --track-eyebrow: 0.17em;
+  --track-tagline: 0.24em;
+
+  --measure: 62ch;   /* 段落最大行宽 */
+
+  /* ── 布局 ── */
+  --container: 1260px;
+  --gutter: clamp(20px, 5.6vw, 90px);
+  --section-y: clamp(60px, 8vw, 122px);
+  --header-h: 76px;
+  --grid-gap: clamp(12px, 1.5vw, 21px);
+  --split-gap: clamp(24px, 5vw, 74px);
+
+  /* ── 间距档位 ── */
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px; --space-9: 96px;
+
+  /* ── 组件 ── */
+  --radius: 0;                 /* 官网：直角 */
+  --button-h: 48px;
+  --button-pad-x: 18px;
+  --input-h: 44px;
+  --tap-min: 44px;
+  --shadow-dialog: 0 24px 72px rgb(0 0 0 / 33%);
+  --focus-ring: 2px solid var(--color-bronze);
+  --focus-offset: 3px;
+  --ease: .18s ease;
+}
+
+@media (max-width: 760px) {
+  :root { --header-h: 64px; --track-tagline: 0.16em; }
+}
+
+/* 深色区块：页头、首屏、一仓入柬、App 下载、页脚 */
+.on-dark, [data-tone="dark"] {
+  --bg: var(--color-dark);
+  --surface: var(--color-dark-2);
+  --text: var(--color-on-dark);
+  --text-muted: var(--color-on-dark-muted);
+  --accent-text: var(--color-gold);
+  --focus-ring: 2px solid var(--color-gold);
+}
+
+/* 高棉语：不加字距、不用衬线、行高放宽、最小 13px */
+:lang(km) {
+  --font-serif: var(--font-khmer);
+  --font-sans: var(--font-khmer);
+  --lh-body: var(--lh-body-km);
+  --lh-title: var(--lh-title-km);
+  --lh-display: var(--lh-title-km);
+  --track-display: 0; --track-title: 0; --track-eyebrow: 0; --track-tagline: 0;
+  --fs-small: 14px;
+  --fs-caption: 13px;
+}
+
+/* Mini App（Telegram 内，360–430px 竖屏） */
+[data-surface="miniapp"] {
+  --radius: 8px;
+  --radius-sheet: 16px;
+  --gutter: 16px;
+  --section-y: 24px;
+  --fs-h1: 22px;
+  --fs-h2: 18px;
+  --fs-h3: 16px;
+  --fs-body: 15px;
+  --shadow-card: 0 2px 10px rgb(17 18 16 / 6%);
+}
+
+/* Telegram 暗色主题（colorScheme === "dark"） */
+[data-surface="miniapp"][data-color-scheme="dark"] {
+  --bg: var(--color-black);
+  --surface: var(--color-dark-2);
+  --text: var(--color-on-dark);
+  --text-muted: #bdb6a8;          /* 8.83:1 */
+  --accent-text: var(--color-gold);
+  --color-border: #4a4943;
+  --color-border-strong: #8c8573;
+  --color-success: #41a26d;  /* 5.61:1 on dark */
+  --color-warning: #c48424;  /* 5.66:1 */
+  --color-danger:  #e07068;  /* 5.67:1 */
+  --color-info:    #7195b4;  /* 5.65:1 */
+}
