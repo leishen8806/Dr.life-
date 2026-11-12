@@ -29,7 +29,7 @@ import BrandWordmark from "./BrandWordmark.astro";
 
   :global(html.intro) .site-loader {
     display: grid;
-    animation: site-loader-failsafe 0s linear 1.5s forwards;
+    animation: site-loader-failsafe 0s linear 0.9s forwards;
   }
 
   .site-loader.is-leaving {
@@ -64,7 +64,7 @@ import BrandWordmark from "./BrandWordmark.astro";
     background: var(--gold);
     transform: scaleX(0);
     transform-origin: left;
-    animation: site-loader-progress 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: site-loader-progress 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
 
   @keyframes site-loader-progress {

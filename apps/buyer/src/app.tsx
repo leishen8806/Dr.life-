@@ -23,10 +23,12 @@ import { ProductDetailView } from "./views/product-detail-view";
 import { OrderDetailView } from "./views/order-detail-view";
 import { OrderListView } from "./views/order-list-view";
 import { PaymentView } from "./views/payment-view";
+import { SearchView, useProductSearch } from "./views/search-view";
 
 type Route =
   | { name: "home" }
   | { name: "category"; code?: string }
+  | { name: "search" }
   | { name: "product"; product: Product }
   | { name: "orders" }
   | { name: "order"; publicId: string }
@@ -372,6 +374,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     (code?: string) => push({ name: "category", code }),
     [push]
   );
+  const openSearch = useCallback(() => push({ name: "search" }), [push]);
   const switchCategory = useCallback(
     (code?: string) => replace({ name: "category", code }),
     [replace]
@@ -383,6 +386,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const openOrders = useCallback(() => push({ name: "orders" }), [push]);
   const { resource: orders, retry: retryOrders, loadMore: loadMoreOrders, loadingMore, moreMessageKey: moreOrdersMessageKey, nextCursor: nextOrderCursor } =
     useOrderFeed(client, language, route.name === "orders");
+  const search = useProductSearch(client, language);
   const orderList = orders;
   const openOrder = useCallback((order: BuyerOrder) => {
     push({ name: "order", publicId: order.publicId });
@@ -531,6 +535,19 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       />
     );
 
+  if (route.name === "search")
+    return (
+      <SearchView
+        t={t}
+        language={language}
+        categories={knownCategories}
+        actions={actions}
+        search={search}
+        onSelectProduct={openProduct}
+        onBack={back}
+      />
+    );
+
   if (route.name === "product")
     return (
       <ProductDetailView
@@ -568,6 +585,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       onRetryFeatured={retryFeatured}
       onSelectCategory={openCategory}
       onSelectProduct={openProduct}
+      onSearch={openSearch}
     />
   );
 }

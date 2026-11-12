@@ -31,6 +31,7 @@ const zh = {
 const en = {
   home: {
     intro: "DR.LIFE+ is Cambodia's next-generation integrated commerce platform. Starting with building materials and home furnishings, it connects China's supply chain, local warehousing and fulfilment, and online transactions, making every purchase simpler and more reliable.",
+    stats: [["0%", "Sales commission"], ["15,000 m³", "Warehouse capacity"], ["US$15", "Storage from"], ["3+", "Chinese · English · Khmer"]],
     visionIntro: "We first go deep in one industry, then extend the same supply-chain, warehousing, fulfilment, transaction and settlement capabilities to more categories and everyday scenarios.",
     visionTitleLines: ["Starting with building materials and home,", "becoming Cambodia's commerce infrastructure"],
     ecosystemNodes: [["Online marketplace", "Telegram trilingual marketplace", "open"], ["Local warehousing and fulfilment", "Phnom Penh warehouse and delivery", "open"], ["Payment and settlement", "Online payment and settlement after receipt", "open"], ["Lifestyle services", "Planned", "planned"], ["Merchant services", "Planned", "planned"], ["Cross-border supply chain", "China → Cambodia", "open"]],
@@ -57,6 +58,7 @@ const en = {
 const km = {
   home: {
     intro: "DR.LIFE+ គឺជាវេទិកាពាណិជ្ជកម្មរួមបញ្ចូលគ្នាជំនាន់ថ្មីសម្រាប់កម្ពុជា។ ដោយចាប់ផ្តើមពីសម្ភារៈសំណង់ និងគេហដ្ឋាន យើងភ្ជាប់ខ្សែសង្វាក់ផ្គត់ផ្គង់ពីចិន ការស្តុក និងដឹកជញ្ជូនក្នុងស្រុក និងពាណិជ្ជកម្មតាមអនឡាញ ដើម្បីធ្វើឱ្យការទិញកាន់តែងាយស្រួល និងគួរឱ្យទុកចិត្ត។",
+    stats: [["0%", "កម្រៃជើងសារលក់"], ["15,000 m³", "សមត្ថភាពឃ្លាំង"], ["US$15", "ថ្លៃស្តុកចាប់ពី"], ["3+", "中文 · English · ខ្មែរ"]],
     visionIntro: "យើងចាប់ផ្តើមដោយធ្វើឱ្យស៊ីជម្រៅក្នុងឧស្សាហកម្មមួយ រួចពង្រីកសមត្ថភាពខ្សែសង្វាក់ផ្គត់ផ្គង់ ស្តុក ដឹកជញ្ជូន ពាណិជ្ជកម្ម និងការទូទាត់ដដែលនេះ ទៅកាន់ប្រភេទទំនិញ និងស្ថានភាពជីវិតកាន់តែច្រើន។",
     visionTitleLines: ["ចាប់ផ្តើមពីសម្ភារៈសំណង់ និងគេហដ្ឋាន", "ក្លាយជាហេដ្ឋារចនាសម្ព័ន្ធពាណិជ្ជកម្មនៅកម្ពុជា"],
     ecosystemNodes: [["ផ្សារតាមអនឡាញ", "ផ្សារតាម Telegram ជា 3 ភាសា", "open"], ["ស្តុក និងដឹកជញ្ជូនក្នុងស្រុក", "ឃ្លាំង និងដឹកជញ្ជូននៅភ្នំពេញ", "open"], ["ការទូទាត់ និងការទូទាត់ចេញ", "ការទូទាត់តាមអនឡាញ និងទូទាត់ចេញបន្ទាប់ពីទទួលទំនិញ", "open"], ["សេវាជីវិត", "គ្រោងទុក", "planned"], ["សេវាពាណិជ្ជករ", "គ្រោងទុក", "planned"], ["ខ្សែសង្វាក់ផ្គត់ផ្គង់ឆ្លងដែន", "ចិន → កម្ពុជា", "open"]],

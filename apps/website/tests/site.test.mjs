@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -39,6 +39,9 @@ test("confirmed-design sections remain present in the source", () => {
     assert.match(imageCredits, new RegExp(photographer.replace(" ", "\\s+")), `image credits missing ${photographer}`);
   }
   assert.equal((imageCredits.match(/https:\/\/unsplash\.com\/photos\//g) || []).length, 5, "each local image needs its original source page");
+  for (const url of imageCredits.match(/https:\/\/unsplash\.com\/photos\/[^\s)]+/g) || []) {
+    assert.match(url, /^https:\/\/unsplash\.com\/photos\/[A-Za-z0-9][A-Za-z0-9-]+$/);
+  }
   for (const marker of ["merchant-fee-table", "merchant-cta"]) {
     assert.match(
       merchant,
@@ -49,6 +52,20 @@ test("confirmed-design sections remain present in the source", () => {
   for (const marker of ["legal-history", "legal-note", "legal-current"]) {
     assert.match(legal, new RegExp(marker), `legal page is missing ${marker}`);
   }
+});
+
+test("published website images stay below the 200 KB budget", () => {
+  for (const file of readdirSync(fileURLToPath(new URL("../public/images/", import.meta.url)))) {
+    if (file === "CREDITS.md") continue;
+    assert.ok(statSync(join(fileURLToPath(new URL("../public/images/", import.meta.url)), file)).size < 200 * 1024, `${file} exceeds 200 KB`);
+  }
+});
+
+test("screenshot capture keeps traversal protection and static-resource failures", () => {
+  const capture = readFileSync(fileURLToPath(new URL("../scripts/capture-screenshots.mjs", import.meta.url)), "utf8");
+  assert.match(capture, /relative\(root, candidate\)/);
+  assert.match(capture, /resourceResponse\.status\(\) >= 400/);
+  assert.match(capture, /resourceType\(\) !== "document"/);
 });
 
 test("release output includes a localized, non-indexable 404 page with site icons", () => {

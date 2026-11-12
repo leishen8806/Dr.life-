@@ -1,0 +1,45 @@
+name: Staging deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Release identifier
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v3
+      - name: Build staging image
+        env:
+          RELEASE: ${{ inputs.release }}
+        run: |
+          set -eu
+          case "$RELEASE" in ''|*[!A-Za-z0-9-]*) echo "release must contain only letters, numbers, and hyphens" >&2; exit 64;; esac
+          docker build -f backend/Dockerfile -t "drlife-api:$RELEASE" ./backend
+      - name: Validate compose template
+        run: docker compose --env-file deploy/staging/env.example -f deploy/staging/compose.yaml config --quiet
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - uses: actions/checkout@v6
+      - name: Publish through Cloudflare Tunnel
+        env:
+          RELEASE: ${{ inputs.release }}
+          STAGING_SSH_TARGET: ${{ secrets.STAGING_SSH_TARGET }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          test -n "$STAGING_SSH_TARGET" -a -n "$STAGING_SSH_KEY"
+          echo "Deployment is intentionally approval-gated and uses owner-managed Tunnel SSH secrets."
+          echo "Release: $RELEASE"

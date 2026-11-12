@@ -192,6 +192,56 @@ export interface ProductQuery {
   pageSize?: number;
 }
 
+export type ProductSearchSort = "relevance" | "price_asc" | "price_desc" | "newest";
+
+export interface ProductSearchQuery {
+  q: string;
+  category?: string;
+  minPriceE4?: number;
+  maxPriceE4?: number;
+  sort?: ProductSearchSort;
+  cursor?: string;
+  pageSize?: number;
+}
+
+export type ProductSearchData = components["schemas"]["SearchProductData"];
+
+export async function searchProducts(
+  client: BuyerApiClient,
+  query: ProductSearchQuery,
+  signal?: AbortSignal
+): Promise<ProductSearchData> {
+  const { data } = await client.GET("/v1/public/search/products", {
+    params: {
+      query: {
+        q: query.q,
+        category: query.category,
+        min_price_e4: query.minPriceE4,
+        max_price_e4: query.maxPriceE4,
+        sort: query.sort,
+        cursor: query.cursor,
+        page_size: query.pageSize ?? productPageSize
+      }
+    },
+    signal
+  });
+  if (!data) throw new ApiError(1001, "search-products", 502);
+  return data.data;
+}
+
+export async function suggestProducts(
+  client: BuyerApiClient,
+  query: string,
+  signal?: AbortSignal
+): Promise<string[]> {
+  const { data } = await client.GET("/v1/public/search/suggest", {
+    params: { query: { q: query } },
+    signal
+  });
+  if (!data) throw new ApiError(1001, "search-suggest", 502);
+  return data.data.items.map((item) => item.text);
+}
+
 const categoryPageSize = 100;
 /** The catalogue is bounded, but a runaway total must not loop forever. */
 const maxCategoryPages = 20;
