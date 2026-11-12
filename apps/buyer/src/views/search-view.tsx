@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { AppHeader, Card } from "@drlife/ui";
+import { AppHeader, Button, Card } from "@drlife/ui";
 import type { Language, TranslationKey } from "@drlife/i18n";
 import type { BuyerApiClient, ProductSearchData, ProductSearchQuery, ProductSearchSort } from "../api";
 import { searchProducts, suggestProducts } from "../api";
@@ -144,7 +144,7 @@ export function SearchView({
     <div className="buyer-page">
       <AppHeader slogan={t("mall.categories")} actions={actions} />
       <main className="buyer-page__body">
-        <button type="button" className="buyer-back" onClick={onBack}>{t("common.back")}</button>
+        <Button variant="text" className="buyer-back" onClick={onBack}>{t("common.back")}</Button>
         <Card>
           <form className="buyer-search-form" role="search" onSubmit={(event) => { event.preventDefault(); submit(); }}>
             <label>
@@ -154,7 +154,7 @@ export function SearchView({
             {suggestions.length > 0 && (
               <div className="buyer-search-suggestions" aria-label={t("mall.searchSuggest")}>
                 {suggestions.map((suggestion) => (
-                  <button key={suggestion} type="button" onClick={() => submit({ ...draft, q: suggestion })}>{suggestion}</button>
+                  <Button key={suggestion} variant="text" onClick={() => submit({ ...draft, q: suggestion })}>{suggestion}</Button>
                 ))}
               </div>
             )}
@@ -165,11 +165,11 @@ export function SearchView({
             </div>
             <label><span>{t("mall.searchSort")}</span><select value={draft.sort} onChange={(event) => update({ sort: event.target.value as ProductSearchSort })}><option value="relevance">{t("mall.searchSortRelevance")}</option><option value="price_asc">{t("mall.searchSortPriceAsc")}</option><option value="price_desc">{t("mall.searchSortPriceDesc")}</option><option value="newest">{t("mall.searchSortNewest")}</option></select></label>
             {priceError && <p className="buyer-search-error" role="alert">{t(priceError)}</p>}
-            <button type="submit" className="buyer-search-submit">{t("mall.searchSubmit")}</button>
+            <Button type="submit" className="buyer-search-submit">{t("mall.searchSubmit")}</Button>
           </form>
         </Card>
         {resource.status === "loading" && <p role="status">{t("common.loading")}</p>}
-        {resource.status === "error" && <Card><p className="buyer-search-error" role="alert">{t(resource.messageKey)}</p><button type="button" onClick={retry}>{t("common.retry")}</button>{resource.previous && resource.previous.items.length > 0 && <ProductList products={resource.previous.items} t={t} language={language} onSelect={onSelectProduct} />}</Card>}
+        {resource.status === "error" && <Card><p className="buyer-search-error" role="alert">{t(resource.messageKey)}</p><Button variant="secondary" onClick={retry}>{t("common.retry")}</Button>{resource.previous && resource.previous.items.length > 0 && <ProductList products={resource.previous.items} t={t} language={language} onSelect={onSelectProduct} />}</Card>}
         {resource.status === "ready" && resource.value.items.length === 0 && (
           <Card>
             <h2 className="buyer-section__title">{t("mall.searchNoResults")}</h2>
@@ -177,7 +177,7 @@ export function SearchView({
             {resource.value.recommendations.length > 0 && <><h3>{t("mall.searchRecommendations")}</h3><ProductList products={resource.value.recommendations} t={t} language={language} onSelect={onSelectProduct} /></>}
           </Card>
         )}
-        {resource.status === "ready" && resource.value.items.length > 0 && <Card><ProductList products={resource.value.items} t={t} language={language} onSelect={onSelectProduct} />{resource.value.next_cursor && <button type="button" className="buyer-load-more" onClick={loadMore}>{t("mall.loadMore")}</button>}</Card>}
+        {resource.status === "ready" && resource.value.items.length > 0 && <Card><ProductList products={resource.value.items} t={t} language={language} onSelect={onSelectProduct} />{resource.value.next_cursor && <Button variant="secondary" className="buyer-load-more" onClick={loadMore}>{t("mall.loadMore")}</Button>}</Card>}
       </main>
     </div>
   );

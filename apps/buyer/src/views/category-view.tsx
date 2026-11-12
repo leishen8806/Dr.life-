@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AppHeader, Card } from "@drlife/ui";
+import { AppHeader, Button, Card } from "@drlife/ui";
 import { plural, type TranslationKey } from "@drlife/i18n";
 import type { ProductFeed } from "../feed";
 import { localized } from "../localized";
@@ -23,25 +23,25 @@ function CategoryRail({
 } & Pick<LocaleProps, "language">) {
   return (
     <nav className="buyer-category-rail" aria-label={allLabel}>
-      <button
-        type="button"
+      <Button
+        variant="text"
+        ariaPressed={activeCode === undefined}
         className="buyer-category-rail__item"
-        aria-pressed={activeCode === undefined}
         onClick={() => onSelect(undefined)}
       >
         {allLabel}
-      </button>
+      </Button>
       {categories.map((category) => (
-        <button
+        <Button
           key={category.public_id}
-          type="button"
+          variant="text"
           className="buyer-category-rail__item"
           lang={language}
-          aria-pressed={category.code === activeCode}
+          ariaPressed={category.code === activeCode}
           onClick={() => onSelect(category.code)}
         >
           {localized(category.name, language)}
-        </button>
+        </Button>
       ))}
     </nav>
   );
@@ -69,15 +69,14 @@ function LoadMore({
           {t(moreMessageKey)}
         </p>
       )}
-      <button
-        type="button"
+      <Button
+        variant="text"
         className="buyer-load-more"
-        disabled={loadingMore}
-        aria-busy={loadingMore}
+        loading={loadingMore}
         onClick={onLoadMore}
       >
         {t(loadingMore ? "common.loading" : "mall.loadMore")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -117,9 +116,9 @@ export function CategoryView({
     <div className="buyer-page">
       <AppHeader slogan={t("mall.categories")} actions={actions} />
       <main className="buyer-page__body">
-        <button type="button" className="buyer-back" onClick={onBack}>
+        <Button variant="text" className="buyer-back" onClick={onBack}>
           {t("common.back")}
-        </button>
+        </Button>
         <div className="buyer-mall">
           <CategoryRail
             categories={categories}
