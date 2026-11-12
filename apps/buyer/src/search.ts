@@ -11,7 +11,7 @@ export function parsePriceE4(value: string): PriceParseResult {
     return { ok: false, messageKey: "mall.searchPriceInvalid" };
   }
   const [whole, fraction = ""] = text.split(".");
-  const e4Text = `${whole}${fraction.padEnd(2, "0")}`;
+  const e4Text = `${whole}${fraction.padEnd(2, "0")}00`;
   const e4 = Number.parseInt(e4Text, 10);
   if (!Number.isSafeInteger(e4)) {
     return { ok: false, messageKey: "mall.searchPriceInvalid" };
