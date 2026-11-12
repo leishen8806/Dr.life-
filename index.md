@@ -19,5 +19,5 @@ The remaining 24 files are the CI-produced buyer/merchant matrix at 360/430 pixe
 ## Acceptance evidence
 
 - Website screenshot evidence: PASS — run `43228490592`, current head `a4eb54a`.
-- CI gate: IN_PROGRESS — run `43228490321`, current head `a4eb54a`.
+- CI gate: PASS — run `43228490321`, current head `a4eb54a`.
 - The screenshot job also asserted visible h1 content and no horizontal overflow at each viewport.
