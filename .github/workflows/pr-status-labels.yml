@@ -1,0 +1,63 @@
+# PR 状态标签（DISPATCH 七-D）：把“谁在等谁”写成机器可读的标签。
+# 执行方与派单方巡检只看标签行动，不再解析评论文字。只改标签，不合并、不批准、不改代码。
+name: PR Status Labels
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, converted_to_draft, synchronize]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: pr-status-labels-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: compute and apply status label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          labels=("状态:进行中" "状态:待审核" "状态:需返工" "状态:待owner批准" "状态:可合并")
+          colors=("c5def5" "fbca04" "d93f0b" "0e8a16" "1d76db")
+          for i in "${!labels[@]}"; do
+            gh api "repos/$REPO/labels" -f name="${labels[$i]}" -f color="${colors[$i]}" >/dev/null 2>&1 || true
+          done
+          pr=$(gh api "repos/$REPO/pulls/$PR")
+          state=$(jq -r .state <<<"$pr"); draft=$(jq -r .draft <<<"$pr"); head=$(jq -r .head.sha <<<"$pr")
+          [ "$state" = "open" ] || exit 0
+          reviews=$(gh api "repos/$REPO/pulls/$PR/reviews?per_page=100")
+          bot_body=$(jq -r --arg h "$head" '[.[]|select(.user.login=="claude[bot]" and .commit_id==$h)]|last|.body // ""' <<<"$reviews")
+          owner_ok=$(jq -r --arg h "$head" '[.[]|select(.user.login=="leishen8806" and .commit_id==$h and (.state=="APPROVED" or .state=="CHANGES_REQUESTED"))]|last|.state // ""' <<<"$reviews")
+          if [ "$draft" = "true" ]; then
+            want="状态:进行中"
+          elif [ "$owner_ok" = "CHANGES_REQUESTED" ]; then
+            want="状态:需返工"
+          elif [ -z "$bot_body" ]; then
+            want="状态:待审核"
+          elif grep -q '有 [0-9]* *项必须修' <<<"$bot_body"; then
+            want="状态:需返工"
+          elif grep -q '无必须修' <<<"$bot_body"; then
+            if [ "$owner_ok" = "APPROVED" ]; then want="状态:可合并"; else want="状态:待owner批准"; fi
+          else
+            want="状态:待审核"
+          fi
+          echo "PR #$PR head=${head:0:7} draft=$draft owner=$owner_ok -> $want"
+          for l in "${labels[@]}"; do
+            if [ "$l" != "$want" ]; then
+              gh api -X DELETE "repos/$REPO/issues/$PR/labels/$(jq -rn --arg s "$l" '$s|@uri')" >/dev/null 2>&1 || true
+            fi
+          done
+          gh api "repos/$REPO/issues/$PR/labels" -f "labels[]=$want" >/dev/null

@@ -1,1 +1,28 @@
-* @leishen8806
+# 风险分级（DISPATCH 七-F，大旺 11-12 要求减少人工批准）
+# 只有下列高风险路径需要 owner（leishen8806）审核批准；其余改动靠自动关卡
+# （ci-gate + claude-review 状态检查 + 七-C/七-E 关卡）合并，不需要人工批准。
+
+# 后端全部：资金、登录与权限、订单、数据库迁移
+/backend/                         @leishen8806
+# 部署、服务器、发布与 CI 规则
+/deploy/                          @leishen8806
+/.github/                         @leishen8806
+# 规则文件本身
+/AGENTS.md                        @leishen8806
+/docs/ops/                        @leishen8806
+# 官网对外文案（含法律文字、价格、金融表述）
+/apps/website/src/i18n/           @leishen8806
+/apps/website/src/pages/privacy.astro         @leishen8806
+/apps/website/src/pages/terms.astro           @leishen8806
+/apps/website/src/pages/delete-account.astro  @leishen8806
+# 前端里涉及付款、钱包、登录的文件
+**/*pay*                          @leishen8806
+**/*Pay*                          @leishen8806
+**/*wallet*                       @leishen8806
+**/*Wallet*                       @leishen8806
+**/*auth*                         @leishen8806
+**/*Auth*                         @leishen8806
+**/*login*                        @leishen8806
+**/*Login*                        @leishen8806
+**/*consent*                      @leishen8806
+**/*Consent*                      @leishen8806
