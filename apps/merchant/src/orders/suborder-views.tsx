@@ -52,10 +52,10 @@ export function SuborderListView({
     {error && <ErrorState title={translate("common.failure")} description={translate("common.failure")} retryLabel={translate("common.retry")} onRetry={onRetry ?? (() => undefined)} />}
     {!loading && !error && filtered.length === 0 ? <EmptyState title={translate("order.merchant.listEmpty")} /> : null}
     {!loading && !error && filtered.length > 0 ? <Card><ul className="merchant-orders">
-      {filtered.map((order) => <li key={order.public_id}><button type="button" className="merchant-order-item" onClick={() => onOpen(order)}>
+      {filtered.map((order) => <li key={order.public_id}><Button variant="text" className="merchant-order-item" onClick={() => onOpen(order)}>
         <ListItem title={order.public_id} description={`${summary(order)} · ${order.shipping_address.phone}`} trailing={<StatusTag tone="neutral">{translate(statusKey(order.status))}</StatusTag>} />
         <span className="merchant-order-item__total">{formatPriceE4(order.payable_amount_e4)}</span>
-      </button></li>)}
+      </Button></li>)}
     </ul>{hasMore && <Button variant="secondary" loading={loading} onClick={onLoadMore}>{translate("order.loadMore")}</Button>}</Card> : null}
   </>;
 }
