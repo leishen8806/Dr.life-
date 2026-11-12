@@ -1,4 +1,5 @@
 import React, { type KeyboardEvent, type ReactNode } from "react";
+import type { Language } from "@drlife/i18n";
 
 export function AppHeader({
   brand = "Dr.life+",
@@ -275,28 +276,58 @@ export function FormField({ label, error, children }: { label: string; error?: s
   return <label className="drl-form-field"><span>{label}</span>{children}{error && <small className="drl-form-field__error" role="alert">{error}</small>}</label>;
 }
 
-export function Money({ value, invalidLabel = "Invalid amount" }: { value: bigint | string; invalidLabel?: string }) {
-  const text = typeof value === "bigint" ? value.toString() : value;
-  const valid = /^\d+$/.test(text) && Number.isSafeInteger(Number(text)) && Number(text) % 100 === 0;
-  if (!valid) return <span className="drl-money drl-money--error" role="alert">{invalidLabel}</span>;
-  return <span className="drl-money" data-e4={text}>{text.slice(0, -2) || "0"}.{text.slice(-2)}</span>;
+function parseMoneyE4(value: bigint | string): bigint | undefined {
+  const text = typeof value === "bigint" ? value.toString() : value.trim();
+  if (!/^\d+$/.test(text)) return undefined;
+  try {
+    const amount = BigInt(text);
+    return amount % 100n === 0n ? amount : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
-export function TieredPrice({ tiers, invalidLabel = "Invalid amount" }: { tiers: readonly { label: string; value: bigint | string }[]; invalidLabel?: string }) {
-  return <ul className="drl-tiered-price">{tiers.map((tier) => <li key={tier.label}><span>{tier.label}</span><Money value={tier.value} invalidLabel={invalidLabel} /></li>)}</ul>;
+export function formatMoneyE4(
+  value: bigint | string,
+  { invalidLabel, currencySymbol, language }: { invalidLabel: string; currencySymbol: string; language: Language }
+): string {
+  const amount = parseMoneyE4(value);
+  if (amount === undefined) return invalidLabel;
+  const whole = amount / 10_000n;
+  const cents = (amount / 100n) % 100n;
+  const groupedWhole = new Intl.NumberFormat(language).format(whole);
+  return `${currencySymbol}${groupedWhole}.${cents.toString().padStart(2, "0")}`;
+}
+
+export function Money({ value, invalidLabel, currencySymbol, language }: { value: bigint | string; invalidLabel: string; currencySymbol: string; language: Language }) {
+  const amount = parseMoneyE4(value);
+  if (amount === undefined) return <span className="drl-money drl-money--error" role="alert">{invalidLabel}</span>;
+  return <span className="drl-money" data-e4={amount.toString()}>{formatMoneyE4(value, { invalidLabel, currencySymbol, language })}</span>;
+}
+
+export function TieredPrice({ tiers, invalidLabel, currencySymbol, language }: { tiers: readonly { label: string; value: bigint | string }[]; invalidLabel: string; currencySymbol: string; language: Language }) {
+  return <ul className="drl-tiered-price">{tiers.map((tier) => <li key={tier.label}><span>{tier.label}</span><Money value={tier.value} invalidLabel={invalidLabel} currencySymbol={currencySymbol} language={language} /></li>)}</ul>;
 }
 
 export function ProductCard({ imageUrl, imageAlt, name, price, badge, onClick }: { imageUrl?: string; imageAlt: string; name: string; price: ReactNode; badge?: ReactNode; onClick?: () => void }) {
-  const content = <><ImagePlaceholder src={imageUrl} alt={imageAlt} /><span className="drl-product-card__body"><strong>{name}</strong><span>{price}</span></span>{badge && <Badge>{badge}</Badge>}</>;
+  const content = <><ImagePlaceholder src={imageUrl} alt={imageAlt} /><span className="drl-product-card__body"><h3>{name}</h3><span>{price}</span></span>{badge && <Badge>{badge}</Badge>}</>;
   return onClick ? <button type="button" className="drl-product-card" onClick={onClick}>{content}</button> : <article className="drl-product-card">{content}</article>;
 }
 
 export function Tabs({ tabs, activeId, onChange, ariaLabel }: { tabs: readonly { id: string; label: string }[]; activeId: string; onChange: (id: string) => void; ariaLabel: string }) {
-  return <div className="drl-tabs" role="tablist" aria-label={ariaLabel}>{tabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={tab.id === activeId} onClick={() => onChange(tab.id)}>{tab.label}</button>)}</div>;
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const offset = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : event.key === "Home" ? -index : event.key === "End" ? tabs.length - index - 1 : 0;
+    if (!offset || tabs.length === 0) return;
+    event.preventDefault();
+    const nextIndex = (index + offset + tabs.length) % tabs.length;
+    onChange(tabs[nextIndex]!.id);
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]")[nextIndex]?.focus();
+  };
+  return <div className="drl-tabs" role="tablist" aria-label={ariaLabel}>{tabs.map((tab, index) => <button key={tab.id} type="button" role="tab" aria-selected={tab.id === activeId} tabIndex={tab.id === activeId ? 0 : -1} onKeyDown={(event) => handleKeyDown(event, index)} onClick={() => onChange(tab.id)}>{tab.label}</button>)}</div>;
 }
 
 export function Toast({ children, role = "status" }: { children: ReactNode; role?: "status" | "alert" }) {
-  return <div className="drl-toast" role={role} aria-live="polite">{children}</div>;
+  return <div className="drl-toast" role={role} aria-live={role === "status" ? "polite" : undefined}>{children}</div>;
 }
 
 export function Skeleton({ width = "100%", height = "1em" }: { width?: string; height?: string }) {

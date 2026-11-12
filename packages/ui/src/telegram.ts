@@ -80,9 +80,26 @@ export function useMainButton(
 }
 
 export function mountTelegramTheme() {
+  if (!initialized) {
+    try {
+      init();
+      initialized = true;
+    } catch {
+      return;
+    }
+  }
   if (!initialized || !themeParams.mountSync.isAvailable()) return;
   themeParams.mountSync();
   if (themeParams.bindCssVars.isAvailable()) themeParams.bindCssVars();
+}
+
+export function watchTelegramTheme(onChange: (colorScheme: "light" | "dark") => void) {
+  if (!initialized || typeof miniApp.isDark !== "function") return () => undefined;
+  const signal = miniApp.isDark as unknown as {
+    sub?: (listener: (current: boolean) => void) => () => void;
+  };
+  if (typeof signal.sub !== "function") return () => undefined;
+  return signal.sub((current) => onChange(resolveMiniAppColorScheme(current)));
 }
 
 export function applyMiniAppTheme(colorScheme: "light" | "dark") {

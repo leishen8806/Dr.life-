@@ -141,7 +141,7 @@ body {
 .drl-tiered-price li { display: flex; justify-content: space-between; gap: var(--space-3); }
 .drl-product-card { position: relative; display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: var(--space-3); width: 100%; min-height: var(--tap-min); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); color: var(--text); background: var(--surface); font: inherit; text-align: start; }
 .drl-product-card__body { display: grid; gap: var(--space-1); min-width: 0; }
-.drl-product-card__body strong { overflow-wrap: anywhere; }
+.drl-product-card__body h3 { margin: 0; font: inherit; font-weight: var(--fw-bold); overflow-wrap: anywhere; }
 .drl-image-placeholder { display: block; width: 72px; height: 72px; border-radius: var(--radius); object-fit: cover; background: var(--bg-alt); }
 .drl-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); border-bottom: 1px solid var(--color-border); }
 .drl-tabs button { min-height: var(--tap-min); border: 0; border-bottom: 2px solid transparent; color: var(--text-muted); background: transparent; font: inherit; }
