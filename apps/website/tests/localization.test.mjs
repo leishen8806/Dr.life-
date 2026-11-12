@@ -187,6 +187,17 @@ test("homepage and legal visible copy are i18n-backed", () => {
   assert.doesNotMatch(legal, cjk, "legal page retains Chinese hard-coded copy");
 });
 
+test("homepage app access uses dedicated trilingual copy and working anchors", () => {
+  const home = page("index");
+  const copy = readFileSync(fileURLToPath(new URL("../src/i18n/page-copy.ts", import.meta.url)), "utf8");
+  for (const key of ["appsLabel", "appsTitle", "appsIntro", "appMarketplaceTitle", "appMarketplaceBody", "appMerchantTitle", "appMerchantBody"])
+    assert.equal((copy.match(new RegExp(`\\b${key}:`, "g")) ?? []).length, 3, `${key} must be present in zh/en/km`);
+  assert.match(home, /id="about"/);
+  assert.doesNotMatch(home, /data-copy-channel/);
+  assert.doesNotMatch(styles, /\.business-panels|\.category-groups|\.panel-list/);
+  assert.doesNotMatch(styles, /#c9c1b4|#4b4f53|#57534d|#b7b5b0|font-family: "Noto Serif SC"/);
+});
+
 test("confirmed-page Khmer additions do not fall back to Chinese", () => {
   const copy = readFileSync(fileURLToPath(new URL("../src/i18n/page-copy.ts", import.meta.url)), "utf8");
 
