@@ -22,7 +22,7 @@ const launchParams = (theme, language) => {
 };
 
 const start = (app, port) => {
-  const child = spawn("pnpm", ["dev", "--", "--host", "127.0.0.1", "--port", String(port)], {
+  const child = spawn("pnpm", ["exec", "vite", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
     cwd: join(root, "apps", app),
     stdio: "inherit"
   });
