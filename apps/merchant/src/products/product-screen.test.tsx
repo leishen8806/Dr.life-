@@ -44,7 +44,9 @@ function readOnlyApi(): MerchantProductApi {
     listCategories: () => Promise.resolve(categories),
     create: unexpected,
     update: unexpected,
-    publish: unexpected
+    publish: unexpected,
+    listSuborders: () => Promise.resolve({ items: [], nextCursor: null }),
+    getSuborder: unexpected
   };
 }
 

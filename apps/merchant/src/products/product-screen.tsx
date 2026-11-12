@@ -40,17 +40,20 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
   const [unpublishing, setUnpublishing] = useState<Product>();
   const [busy, setBusy] = useState(false);
   const [subordersOpen, setSubordersOpen] = useState(false);
+  const [suborders, setSuborders] = useState<MerchantSuborder[]>([]);
   const [selectedSuborder, setSelectedSuborder] = useState<MerchantSuborder>();
   const [suborderStatus, setSuborderStatus] = useState<SuborderStatus>();
 
   const reload = useCallback(async () => {
     try {
-      const [items, enabled] = await Promise.all([
+      const [items, enabled, suborderPage] = await Promise.all([
         api.list("all"),
-        api.listCategories()
+        api.listCategories(),
+        api.listSuborders ? api.listSuborders() : Promise.resolve({ items: [], nextCursor: null })
       ]);
       setProducts(items);
       setCategories(enabled);
+      setSuborders(suborderPage.items);
       setFailure(undefined);
     } catch (error) {
       setFailure(productErrorKey(error, "load"));
@@ -100,6 +103,16 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
     setErrors([]);
   };
 
+  const openSuborder = (order: MerchantSuborder) => {
+    if (!api.getSuborder) {
+      setSelectedSuborder(order);
+      return;
+    }
+    void api.getSuborder(order.public_id).then(setSelectedSuborder).catch((error) => {
+      setFailure(productErrorKey(error, "load"));
+    });
+  };
+
   const startCreating = () => setEditing({ draft: emptyProductDraft() });
 
   return (
@@ -115,7 +128,7 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
           <>
             <button type="button" className="merchant-back" onClick={() => setSubordersOpen(false)}>{t("common.back")}</button>
             <h1>{t("order.suborders")}</h1>
-            <SuborderListView language={language} translate={t} selected={suborderStatus} onSelectStatus={setSuborderStatus} onOpen={setSelectedSuborder} />
+            <SuborderListView language={language} translate={t} orders={suborders} selected={suborderStatus} onSelectStatus={setSuborderStatus} onOpen={openSuborder} />
           </>
         )
       ) : null}
