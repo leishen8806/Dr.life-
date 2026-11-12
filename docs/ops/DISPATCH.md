@@ -98,11 +98,11 @@ gh api repos/leishen8806/Dr.life-/pulls/<N>/reviews
 | `状态:待审核` | 已 Ready，当前 head 还没有 Claude 审核 | 新转 Ready 会自动审；返工推送后执行方评论一次触发复审 |
 | `状态:需返工` | 当前 head 的 Claude 审核“有必须修”，或 owner 要求修改 | 执行方立即返工，不等任何人 |
 | `状态:待owner批准` | 当前 head 审核“无必须修” | owner 批准 |
-| `状态:可合并` | owner 已批准当前 head | 自动合并（见下） |
+| `状态:可合并` | owner 已批准当前 head | 已开自动合并的等 CI 自动合；没开的由大旺回复“合并 #编号” |
 
 执行方和派单方巡检**以标签为准**行动，不靠解读评论文字。标签与实际不符时在 #220 报“异常：”。
 
-**自动合并：** owner 批准当前 head 后，派单方开启 GitHub 自动合并（squash），必需检查通过即合并，不再需要聊天里说“合并”。**以下 PR 不开自动合并**，仍由 owner / 大旺逐张明确指令：资金、登录与权限、数据库迁移、部署与服务器、`.github/workflows/` 改动、法律文字。官网发布（Deploy production）仍需 owner 在 Actions 批准，并先过七-C 的发布前目检。
+**自动合并：** 仓库开启 Allow auto-merge 后，owner 在批准时顺手点 **Enable auto-merge（Squash）**，必需检查通过即自动合并，不再需要大旺在聊天里说“合并”。（无人值守的巡检不代开自动合并。）**以下 PR 不开自动合并**，仍由 owner / 大旺逐张明确指令：资金、登录与权限、数据库迁移、部署与服务器、`.github/workflows/` 改动、法律文字。官网发布（Deploy production）仍需 owner 在 Actions 批准，并先过七-C 的发布前目检。
 
 ### 七-E、上线发布验收流程（大旺 11-12 要求完善）
 发布分四段，前一段不过不进下一段：
