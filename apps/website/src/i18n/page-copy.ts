@@ -140,32 +140,42 @@ const homepageV2Acceptance = {
     ...homepageV2Localized.zh,
     business: {
       ...homepageV2Localized.zh.business,
-      details: [["线上平台", "DR智慧建材城", "装修服务", "0% 平台交易佣金"], ["中国端", "柬埔寨端", "一仓入柬"], ["云仓作业", "同城速送", "大件交付"], []],
+      details: [
+        [["线上平台", "浏览建材、家具、家电、家居用品与日用百货，对接商家及装修服务。"], ["DR智慧建材城", "按品类规划展厅，便于集中看样、比较材料和对接供应商。"], ["装修服务", "自主选择设计、施工和材料，按需对接平台装修监理与验收服务。"], ["0% 平台交易佣金", "平台交易零佣金；物流、仓配、安装等服务按实际使用另计。"]],
+        [["中国端", "按货物品类、体积和发货计划沟通集货与运输。"], ["柬埔寨端", "对接金边入仓、收货清点及后续出库安排。"], ["一仓入柬", "让同一批货物接上本地展示、销售和交付。"]],
+        [["云仓作业", "提供入库、储存、分拣、贴标与出库服务。"], ["同城速送", "按货物体积、地址及预约时间，安排同城即时配送或预约配送。"], ["大件交付", "按项目需要衔接装卸搬运、上门安装与签收。"]],
+        []
+      ],
       note: "金融服务只与持牌机构合作，金融服务尚未开放。"
     },
-    market: { ...homepageV2Localized.zh.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["瓷砖和地面材料体验区", "定制家居与家具体验区", "工具和日用商品体验区"], note: "一期规划：建材与装修、定制与家居、工具与日用。" },
-    route: { ...homepageV2Localized.zh.route, note: "路线、关税责任、服务费用和时效以每批货物及订单报价为准。" },
-    culture: { ...homepageV2Localized.zh.culture, quote: "相信生活有更多可能！" },
+    market: { ...homepageV2Localized.zh.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["瓷砖和地面材料体验区", "定制家居与家具体验区", "工具和日用商品体验区"], note: "展厅为一期规划，具体品类与开放安排以公告为准。" },
+    route: { ...homepageV2Localized.zh.route, note: "可在平台上按需选择运输、仓储、展示、销售或配送服务；具体安排按货品、订单与服务约定确定。" },
+    culture: { ...homepageV2Localized.zh.culture, quote: "永远不要灰心，要继续探索生活，因为它充满了无限的可能！", quoteEn: "Never lose your heart and continue to explore life since it is full of infinite possibilities." },
     partners: {
       ...homepageV2Localized.zh.partners,
       cards: [...homepageV2Localized.zh.partners.cards, ["FINANCE", "商户金融咨询", "只与持牌机构合作、金融服务尚未开放。"]],
-      fields: [["项目或采购需求", "设计、施工或安装范围", "预算与交付时间"], ["产品目录与规格", "供货能力与交期", "入柬销售计划"], ["服务区域与团队能力", "仓配或安装范围", "合作资质"], ["订单量与货物类型", "仓储需求", "配送范围"], []]
+      fields: [["所需品类、数量或项目面积", "预算范围与期望交付日期", "看样、采购、配送或安装需求", "设计、施工、平台监理与验收需求"], ["品牌、产品目录及主推品类", "起订量、包装规格及预计发货量", "希望对接的运输、展厅或销售方式"], ["企业或团队名称及经营范围", "主营品类、服务区域及以往项目", "拟合作方式：入驻、展厅或本地服务"], ["货品类别、库存体积及订单量", "配送范围、大件搬运与安装要求", "期望时效、退换货及系统对接需求"], []]
     }
   },
   en: {
     ...homepageV2Localized.en,
     business: {
       ...homepageV2Localized.en.business,
-      details: [["Online platform", "DR Smart Building-Materials City", "Renovation services", "0% platform transaction commission"], ["China side", "Cambodia side", "One warehouse into Cambodia"], ["Cloud-warehouse operations", "Same-city express delivery", "Large-item delivery"], []],
+      details: [
+        [["Online platform", "Browse building materials, furniture, appliances, home goods and daily goods, and connect with merchants and renovation services."], ["DR Smart Building-Materials City", "Plan showrooms by category to make sampling, material comparison and supplier matching easier."], ["Renovation services", "Choose design, construction and materials, then connect to platform supervision and acceptance services as needed."], ["0% platform transaction commission", "Platform transactions carry zero commission; logistics, warehousing and installation are charged only when used."]],
+        [["China side", "Discuss consolidation and transport by goods category, volume and shipping plan."], ["Cambodia side", "Connect Phnom Penh inbound warehousing, receipt checks and subsequent outbound arrangements."], ["One warehouse into Cambodia", "Connect the same shipment to local display, sales and delivery."]],
+        [["Cloud-warehouse operations", "Provide inbound receipt, storage, sorting, labelling and outbound services."], ["Same-city express delivery", "Arrange same-city immediate or scheduled delivery by goods volume, address and appointment time."], ["Large-item delivery", "Connect loading, handling, door-to-door installation and sign-off as projects require."]],
+        []
+      ],
       note: "Financial services work only with licensed institutions and are not yet available."
     },
-    market: { ...homepageV2Localized.en.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["Tiles and flooring showroom", "Custom home and furniture showroom", "Tools and daily-goods showroom"], note: "Phase-one plan: building and renovation, custom and home, tools and daily goods." },
-    route: { ...homepageV2Localized.en.route, note: "Routes, customs responsibility, service fees and timing are confirmed per shipment and order quote." },
-    culture: { ...homepageV2Localized.en.culture, quote: "Believe that life has more possibilities!" },
+    market: { ...homepageV2Localized.en.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["Tiles and flooring showroom", "Custom home and furniture showroom", "Tools and daily-goods showroom"], note: "The showroom is planned for phase one; categories and opening arrangements are subject to announcement." },
+    route: { ...homepageV2Localized.en.route, note: "Choose transport, warehousing, display, sales or delivery services on the platform as needed; arrangements depend on the goods, order and service agreement." },
+    culture: { ...homepageV2Localized.en.culture, quote: "Never lose your heart and continue to explore life since it is full of infinite possibilities.", quoteEn: "Never lose your heart and continue to explore life since it is full of infinite possibilities." },
     partners: {
       ...homepageV2Localized.en.partners,
       cards: [...homepageV2Localized.en.partners.cards, ["FINANCE", "Merchant finance consultation", "Work only with licensed institutions; financial services are not yet available."]],
-      fields: [["Project or procurement needs", "Design, construction or installation scope", "Budget and delivery timing"], ["Product catalogue and specifications", "Supply capacity and lead time", "Cambodia sales plan"], ["Service area and team capability", "Fulfilment or installation scope", "Partnership credentials"], ["Order volume and goods type", "Warehousing needs", "Delivery scope"], []]
+      fields: [["Required categories, quantity or project area", "Budget range and expected delivery date", "Sampling, procurement, delivery or installation needs", "Design, construction, platform supervision and acceptance needs"], ["Brand, product catalogue and priority categories", "Minimum order quantity, packaging specifications and expected shipment volume", "Preferred transport, showroom or sales arrangement"], ["Business or team name and scope", "Main categories, service area and previous projects", "Proposed cooperation: onboarding, showroom or local service"], ["Goods category, inventory volume and order volume", "Delivery area, large-item handling and installation requirements", "Expected timing, returns and system integration requirements"], []]
     }
   },
   km: {
@@ -173,16 +183,21 @@ const homepageV2Acceptance = {
     ...homepageV2Localized.km,
     business: {
       ...homepageV2Localized.km.business,
-      details: [["វេទិកាអនឡាញ", "ទីក្រុងសម្ភារៈ DR", "សេវាជួសជុល និងតុបតែង", "កម្រៃជើងសារប្រតិបត្តិការវេទិកា 0%"], ["ភាគីចិន", "ភាគីកម្ពុជា", "ឃ្លាំងមួយទៅកម្ពុជា"], ["ប្រតិបត្តិការឃ្លាំងឆ្លាតវៃ", "ដឹកជញ្ជូនលឿនក្នុងទីក្រុង", "ដឹកជញ្ជូនទំនិញធំ"], []],
+      details: [
+        [["វេទិកាអនឡាញ", "រកមើលសម្ភារៈសំណង់ គ្រឿងសង្ហារឹម ឧបករណ៍ប្រើប្រាស់ និងទំនិញប្រចាំថ្ងៃ ហើយភ្ជាប់ជាមួយពាណិជ្ជករ និងសេវាជួសជុល។"], ["ទីក្រុងសម្ភារៈ DR", "រៀបចំបន្ទប់តាំងបង្ហាញតាមប្រភេទ ដើម្បីងាយមើលគំរូ ប្រៀបធៀបសម្ភារៈ និងភ្ជាប់អ្នកផ្គត់ផ្គង់។"], ["សេវាជួសជុល និងតុបតែង", "ជ្រើសរើសការរចនា ការសាងសង់ និងសម្ភារៈដោយខ្លួនឯង ហើយភ្ជាប់សេវាត្រួតពិនិត្យ និងទទួលស្គាល់តាមតម្រូវការ។"], ["កម្រៃជើងសារប្រតិបត្តិការវេទិកា 0%", "ប្រតិបត្តិការលើវេទិកាគ្មានកម្រៃជើងសារ។ សេវាដឹកជញ្ជូន ឃ្លាំង និងដំឡើង គិតថ្លៃតាមការប្រើប្រាស់ជាក់ស្តែង។"]],
+        [["ភាគីចិន", "ពិភាក្សាការប្រមូលទំនិញ និងការដឹកជញ្ជូនតាមប្រភេទ បរិមាណ និងផែនការផ្ញើទំនិញ។"], ["ភាគីកម្ពុជា", "ភ្ជាប់ការចូលឃ្លាំងនៅភ្នំពេញ ការត្រួតពិនិត្យទទួលទំនិញ និងការរៀបចំបញ្ចេញទំនិញបន្ត។"], ["ឃ្លាំងមួយទៅកម្ពុជា", "ភ្ជាប់ទំនិញដឹកជញ្ជូនដដែលទៅនឹងការតាំងបង្ហាញ ការលក់ និងការប្រគល់ក្នុងស្រុក។"]],
+        [["ប្រតិបត្តិការឃ្លាំងឆ្លាតវៃ", "ផ្តល់សេវាទទួលចូល រក្សាទុក តម្រៀប បិទស្លាក និងបញ្ចេញទំនិញ។"], ["ដឹកជញ្ជូនលឿនក្នុងទីក្រុង", "រៀបចំការដឹកជញ្ជូនភ្លាមៗ ឬតាមការកក់ទុកក្នុងក្រុង តាមបរិមាណទំនិញ អាសយដ្ឋាន និងពេលណាត់។"], ["ដឹកជញ្ជូនទំនិញធំ", "សម្របសម្រួលការលើកដាក់ ការដឹកជញ្ជូន ការដំឡើងដល់ទីកន្លែង និងការចុះហត្ថលេខាទទួល។"]],
+        []
+      ],
       note: "សេវាហិរញ្ញវត្ថុធ្វើការតែជាមួយស្ថាប័នមានអាជ្ញាបណ្ណ ហើយមិនទាន់បើកដំណើរការទេ។"
     },
-    market: { ...homepageV2Localized.km.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["កន្លែងបង្ហាញក្បឿង និងកម្រាល", "កន្លែងបង្ហាញគ្រឿងសង្ហារឹម និងគេហដ្ឋាន", "កន្លែងបង្ហាញឧបករណ៍ និងរបស់ប្រចាំថ្ងៃ"], note: "ផែនការដំណាក់កាលទី១៖ សំណង់ និងជួសជុល ការកំណត់តាមតម្រូវការ និងគេហដ្ឋាន ឧបករណ៍ និងរបស់ប្រចាំថ្ងៃ។" },
-    route: { ...homepageV2Localized.km.route, note: "ផ្លូវ ការទទួលខុសត្រូវគយ ថ្លៃសេវា និងរយៈពេល ត្រូវបញ្ជាក់តាមការដឹកជញ្ជូន និងសម្រង់តម្លៃនីមួយៗ។" },
-    culture: { ...homepageV2Localized.km.culture, quote: "ជឿថាជីវិតមានលទ្ធភាពច្រើនជាងនេះ!" },
+    market: { ...homepageV2Localized.km.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["កន្លែងបង្ហាញក្បឿង និងកម្រាល", "កន្លែងបង្ហាញគ្រឿងសង្ហារឹម និងគេហដ្ឋាន", "កន្លែងបង្ហាញឧបករណ៍ និងរបស់ប្រចាំថ្ងៃ"], note: "បន្ទប់តាំងបង្ហាញគឺជាផែនការដំណាក់កាលទី១។ ប្រភេទទំនិញ និងការបើកដំណើរការជាក់លាក់ សូមរង់ចាំការប្រកាស។" },
+    route: { ...homepageV2Localized.km.route, note: "អាចជ្រើសរើសសេវាដឹកជញ្ជូន ឃ្លាំង ការតាំងបង្ហាញ ការលក់ ឬការប្រគល់តាមតម្រូវការនៅលើវេទិកា។ ការរៀបចំជាក់លាក់អាស្រ័យលើទំនិញ ការបញ្ជាទិញ និងកិច្ចព្រមព្រៀងសេវា។" },
+    culture: { ...homepageV2Localized.km.culture, quote: "កុំបោះបង់ក្តីសង្ឃឹម ហើយបន្តស្វែងរកជីវិត ព្រោះជីវិតពោរពេញដោយលទ្ធភាពគ្មានដែនកំណត់!", quoteEn: "Never lose your heart and continue to explore life since it is full of infinite possibilities." },
     partners: {
       ...homepageV2Localized.km.partners,
       cards: [...homepageV2Localized.km.partners.cards, ["FINANCE", "ការប្រឹក្សាហិរញ្ញវត្ថុពាណិជ្ជករ", "ធ្វើការតែជាមួយស្ថាប័នមានអាជ្ញាបណ្ណ; សេវាហិរញ្ញវត្ថុមិនទាន់បើកដំណើរការទេ។"]],
-      fields: [["តម្រូវការគម្រោង ឬការទិញ", "វិសាលភាពរចនា សាងសង់ ឬដំឡើង", "ថវិកា និងពេលប្រគល់"], ["កាតាឡុក និងលក្ខណៈផលិតផល", "សមត្ថភាពផ្គត់ផ្គង់ និងពេលវេលា", "ផែនការលក់នៅកម្ពុជា"], ["តំបន់សេវា និងសមត្ថភាពក្រុម", "វិសាលភាពឃ្លាំង ឬដំឡើង", "លក្ខខណ្ឌកិច្ចសហការ"], ["ចំនួនបញ្ជាទិញ និងប្រភេទទំនិញ", "តម្រូវការឃ្លាំង", "វិសាលភាពដឹកជញ្ជូន"], []]
+      fields: [["ប្រភេទទំនិញ បរិមាណ ឬទំហំគម្រោងដែលត្រូវការ", "ជួរថវិកា និងកាលបរិច្ឆេទប្រគល់ដែលរំពឹង", "តម្រូវការមើលគំរូ ទិញ ដឹកជញ្ជូន ឬដំឡើង", "តម្រូវការរចនា សាងសង់ ត្រួតពិនិត្យ និងទទួលស្គាល់ដោយវេទិកា"], ["ម៉ាក កាតាឡុកផលិតផល និងប្រភេទសំខាន់ៗ", "បរិមាណបញ្ជាទិញអប្បបរមា លក្ខណៈវេចខ្ចប់ និងបរិមាណផ្ញើដែលរំពឹង", "វិធីដឹកជញ្ជូន បន្ទប់តាំងបង្ហាញ ឬការលក់ដែលចង់ភ្ជាប់"], ["ឈ្មោះអាជីវកម្ម ឬក្រុម និងវិសាលភាពការងារ", "ប្រភេទសំខាន់ៗ តំបន់សេវា និងគម្រោងកន្លងមក", "វិធីសហការដែលស្នើ៖ ចូលជាសមាជិក បន្ទប់តាំងបង្ហាញ ឬសេវាក្នុងស្រុក"], ["ប្រភេទទំនិញ បរិមាណស្តុក និងចំនួនបញ្ជាទិញ", "តំបន់ប្រគល់ តម្រូវការលើកដាក់ទំនិញធំ និងដំឡើង", "ពេលវេលាដែលរំពឹង ការប្តូរទំនិញ និងតម្រូវការភ្ជាប់ប្រព័ន្ធ"], []]
     }
   }
 } as const;
