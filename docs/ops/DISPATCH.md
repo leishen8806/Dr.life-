@@ -83,5 +83,12 @@ gh api repos/leishen8806/Dr.life-/pulls/<N>/reviews
 - **一律不审：** 草稿 PR（包括评论里 @claude 的草稿）、机器人提的 PR（dependabot 依赖升级等）。依赖升级 PR 由 owner 看 CI 直接处理。
 - **上限：** 单次审核最多 30 轮、20 分钟。PR 太大审不完时，审核里会写“未审范围”；按三-A 拆小或分批，不要反复 @ 补审。
 
+### 七-C、界面改动与官网发布的关卡（大旺 11-12 定，起因：090ee1d 首页在宽屏上版块重叠、内容未按设计稿替换就上线）
+- **截图矩阵覆盖宽屏：** 官网 PR 的截图证据至少包含 360、390、768、1280、1440、1920px × 中 / 英 / 高棉语；Mini App 至少 360、430px × 三语 × 亮 / 暗。截图作业失败即 ci-gate 失败。
+- **自动断言：** 截图测试除“无横向滚动”外，还要断言首屏 h1 与其他可见块的边界框不相交、任何块不超出视口宽度。
+- **对照设计稿验收：** 有设计源（如 `design/website/homepage-v2/source.html`）的 PR，描述里必须逐版块写“设计稿版块 → 实现位置 → PASS/FAIL”，并附 1440 与 1920px 实现截图和设计稿截图并排对照。缺这张表视为验收项未达成（必须修）。
+- **发布前人工过目：** 官网发布（Actions → Website → Deploy production）前，负责人侧 Claude 先下载该 PR 的截图 artifact，亲自看 1920 / 1440 / 390px 首页与改动页面，在 PR 写“发布前目检：PASS/FAIL + 看了哪些截图”；FAIL 不提醒 owner 批准发布。owner 批准前也可直接看这些截图。
+- **快速回滚：** 线上出问题时先回滚再修。回滚方法：打开上一次正常发布的 Website 运行（Actions → Website，找最近一次 Deploy production 成功的运行），Re-run jobs → 只重跑 Deploy production → owner 批准。构建产物保留 14 天；超过期限则 revert 对应提交后重新发布。回滚由 owner 执行。
+
 ### 八、周计划
 每周一个 Milestone（W46、W47…）。Issue 列表以 GitHub 当前状态为准，本文件不登记具体任务。
