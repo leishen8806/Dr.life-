@@ -41,7 +41,7 @@ export function OrderDetailView({
       .sort((a, b) => a - b)[0], [order]);
 
   useEffect(() => {
-    if (expiry === undefined) return;
+    if (expiry === undefined || expiry <= now) return;
     const delay = Math.min(expiry - now, 2_147_483_647);
     const timer = window.setTimeout(() => setNow(Date.now()), delay);
     return () => window.clearTimeout(timer);

@@ -42,6 +42,7 @@ export {
   getTelegramEnvironment,
   mountTelegramTheme,
   applyMiniAppTheme,
+  resolveMiniAppColorScheme,
   useBackButton,
   useMainButton,
   type TelegramEnvironment

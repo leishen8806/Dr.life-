@@ -47,7 +47,7 @@ export function OrderListView({
       .sort((a, b) => a - b)[0], [orders]);
 
   useEffect(() => {
-    if (nextExpiry === undefined) return;
+    if (nextExpiry === undefined || nextExpiry <= now) return;
     const timer = window.setTimeout(() => setNow(Date.now()), Math.min(nextExpiry - now, 2_147_483_647));
     return () => window.clearTimeout(timer);
   }, [nextExpiry, now]);

@@ -2,6 +2,7 @@ import {
   backButton,
   init,
   mainButton,
+  miniApp,
   retrieveLaunchParams,
   retrieveRawInitData,
   themeParams
@@ -14,6 +15,10 @@ export interface TelegramEnvironment {
   languageCode?: string;
   backgroundColor: string;
   colorScheme: "light" | "dark";
+}
+
+export function resolveMiniAppColorScheme(isDark: boolean): "light" | "dark" {
+  return isDark ? "dark" : "light";
 }
 
 let initialized = false;
@@ -30,7 +35,7 @@ export function getTelegramEnvironment(): TelegramEnvironment {
       initData: retrieveRawInitData() ?? "",
       languageCode: launch.tgWebAppData?.user?.languageCode,
       backgroundColor: launch.tgWebAppThemeParams.bgColor ?? "#ffffff",
-      colorScheme: (launch.tgWebAppThemeParams as { colorScheme?: string }).colorScheme === "dark" ? "dark" : "light"
+      colorScheme: resolveMiniAppColorScheme(miniApp.isDark())
     };
   } catch {
     return {

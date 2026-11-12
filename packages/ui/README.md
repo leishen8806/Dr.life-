@@ -17,8 +17,8 @@
 ## D-02 design tokens
 
 All shared colors, typography, spacing, radii, shadows, and motion values live
-in `src/styles.css` as `--drl-*` custom properties. D-01 branding changes only
-the brand token values; components must not add literal colors or sizes.
+in `design/ui-standard/tokens.css`. The package exposes `--drl-*` compatibility
+aliases from `src/styles.css`; components must not add literal colors or sizes.
 
 | Group | Variables | Notes |
 | --- | --- | --- |
@@ -29,6 +29,7 @@ the brand token values; components must not add literal colors or sizes.
 | Motion | `--drl-transition-fast`, `--drl-transition-normal` | Keep motion short and non-essential |
 
 Telegram `themeParams` are mounted by `mountTelegramTheme()`, which binds the
-SDK CSS variables when available. The default is to keep the light brand token
-surface; following Telegram dark mode remains a configurable follow-up until
-the owner chooses the D-01 brand direction.
+SDK CSS variables when available. `getTelegramEnvironment()` reads the SDK
+`miniApp.isDark()` signal, and `applyMiniAppTheme()` applies the resulting
+`data-color-scheme` to the document. The Mini App therefore follows Telegram's
+light/dark mode while the shared brand tokens remain the source of truth.
