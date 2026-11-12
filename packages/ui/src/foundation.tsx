@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import React, { type KeyboardEvent, type ReactNode } from "react";
 
 export function AppHeader({
   brand = "Dr.life+",
@@ -260,4 +260,55 @@ export function ConfirmDialog({
       </section>
     </div>
   );
+}
+
+export type ButtonVariant = "primary" | "secondary" | "danger" | "text";
+
+export function Button({ children, variant = "primary", loading = false, disabled = false, type = "button", onClick }: {
+  children: ReactNode; variant?: ButtonVariant; loading?: boolean; disabled?: boolean;
+  type?: "button" | "submit" | "reset"; onClick?: () => void;
+}) {
+  return <button type={type} className={`drl-button drl-button--${variant}`} disabled={disabled || loading} aria-busy={loading || undefined} onClick={onClick}>{children}</button>;
+}
+
+export function FormField({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+  return <label className="drl-form-field"><span>{label}</span>{children}{error && <small className="drl-form-field__error" role="alert">{error}</small>}</label>;
+}
+
+export function Money({ value, invalidLabel = "Invalid amount" }: { value: bigint | string; invalidLabel?: string }) {
+  const text = typeof value === "bigint" ? value.toString() : value;
+  const valid = /^\d+$/.test(text) && Number.isSafeInteger(Number(text)) && Number(text) % 100 === 0;
+  if (!valid) return <span className="drl-money drl-money--error" role="alert">{invalidLabel}</span>;
+  return <span className="drl-money" data-e4={text}>{text.slice(0, -2) || "0"}.{text.slice(-2)}</span>;
+}
+
+export function TieredPrice({ tiers, invalidLabel = "Invalid amount" }: { tiers: readonly { label: string; value: bigint | string }[]; invalidLabel?: string }) {
+  return <ul className="drl-tiered-price">{tiers.map((tier) => <li key={tier.label}><span>{tier.label}</span><Money value={tier.value} invalidLabel={invalidLabel} /></li>)}</ul>;
+}
+
+export function ProductCard({ imageUrl, imageAlt, name, price, badge, onClick }: { imageUrl?: string; imageAlt: string; name: string; price: ReactNode; badge?: ReactNode; onClick?: () => void }) {
+  const content = <><ImagePlaceholder src={imageUrl} alt={imageAlt} /><span className="drl-product-card__body"><strong>{name}</strong><span>{price}</span></span>{badge && <Badge>{badge}</Badge>}</>;
+  return onClick ? <button type="button" className="drl-product-card" onClick={onClick}>{content}</button> : <article className="drl-product-card">{content}</article>;
+}
+
+export function Tabs({ tabs, activeId, onChange, ariaLabel }: { tabs: readonly { id: string; label: string }[]; activeId: string; onChange: (id: string) => void; ariaLabel: string }) {
+  return <div className="drl-tabs" role="tablist" aria-label={ariaLabel}>{tabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={tab.id === activeId} onClick={() => onChange(tab.id)}>{tab.label}</button>)}</div>;
+}
+
+export function Toast({ children, role = "status" }: { children: ReactNode; role?: "status" | "alert" }) {
+  return <div className="drl-toast" role={role} aria-live="polite">{children}</div>;
+}
+
+export function Skeleton({ width = "100%", height = "1em" }: { width?: string; height?: string }) {
+  return <span className="drl-skeleton" aria-hidden="true" style={{ width, height }} />;
+}
+
+export function ImagePlaceholder({ src, alt }: { src?: string; alt: string }) {
+  const [failed, setFailed] = React.useState(false);
+  if (!src || failed) return <span className="drl-image-placeholder" role="img" aria-label={alt} />;
+  return <img className="drl-image-placeholder" src={src} alt={alt} onError={() => setFailed(true)} />;
+}
+
+export function Badge({ children }: { children: ReactNode }) {
+  return <span className="drl-badge">{children}</span>;
 }

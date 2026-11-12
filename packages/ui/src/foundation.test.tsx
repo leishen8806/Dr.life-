@@ -3,16 +3,25 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
   AppHeader,
+  Badge,
+  Button,
   BottomNavigation,
   BottomSheet,
   Card,
   ConfirmDialog,
   EmptyState,
   ErrorState,
+  FormField,
   ListItem,
   Loading,
+  Money,
+  ProductCard,
+  Skeleton,
   StatusTag,
-  Stepper
+  Stepper,
+  Tabs,
+  TieredPrice,
+  Toast
 } from "./index";
 
 function findByRole(node: ReactNode, role: string): { props: Record<string, unknown> } | undefined {
@@ -42,6 +51,20 @@ function expectWrappingRule(styles: string, selector: string) {
 }
 
 describe("foundation components", () => {
+  it("exports the reusable Mini App component states", () => {
+    const click = vi.fn();
+    expect(Button({ children: "Save", loading: true }).props["aria-busy"]).toBe(true);
+    expect(FormField({ label: "Name", error: "Required", children: <input /> }).props.className).toBe("drl-form-field");
+    expect(Money({ value: "12500" }).props["data-e4"]).toBe("12500");
+    expect(Money({ value: "12501" }).props.role).toBe("alert");
+    expect(TieredPrice({ tiers: [{ label: "1–9", value: "12500" }] }).type).toBe("ul");
+    expect(ProductCard({ imageAlt: "Tile", name: "Tile", price: "1.25", onClick: click }).type).toBe("button");
+    expect(Tabs({ tabs: [{ id: "a", label: "A" }], activeId: "a", onChange: click, ariaLabel: "Tabs" }).props.role).toBe("tablist");
+    expect(Toast({ children: "Saved" }).props.role).toBe("status");
+    expect(Skeleton({}).props["aria-hidden"]).toBe("true");
+    expect(Badge({ children: "New" }).props.className).toBe("drl-badge");
+  });
+
   it("renders the reusable shell with accessible navigation and snapshots", () => {
     const navigation = BottomNavigation({
       ariaLabel: "Primary navigation",
