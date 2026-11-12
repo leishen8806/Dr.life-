@@ -9,6 +9,16 @@ incoming="$site_root/incoming/$release_id"
 releases="$site_root/releases"
 test -d "$incoming"; test -d "$releases"; test ! -e "$releases/$release_id"
 mv "$incoming" "$releases/$release_id"
-ln -s "releases/$release_id" "$site_root/.current.next"
+ln -sfn "releases/$release_id" "$site_root/.current.next"
 mv -Tf "$site_root/.current.next" "$site_root/current"
-ls -1dt "$releases"/* | tail -n +6 | xargs -r rm -rf
+current_target=$(readlink -f "$site_root/current")
+kept=0
+for release_dir in $(ls -1dt "$releases"/*); do
+  test -d "$release_dir" || continue
+  test "$(readlink -f "$release_dir")" = "$current_target" && continue
+  if test "$kept" -lt 4; then
+    kept=$((kept + 1))
+  else
+    rm -rf -- "$release_dir"
+  fi
+done

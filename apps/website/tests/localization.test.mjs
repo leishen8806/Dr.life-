@@ -62,6 +62,10 @@ test("mobile English headings and supporting copy have a wrapping safeguard", ()
   );
   assert.match(
     styles,
+    /@media\s*\(\s*min-width:\s*521px\s*\)\s*and\s*\(\s*max-width:\s*600px\s*\)[\s\S]*?\[data-lang="km"\] \.hero h1[\s\S]*?overflow-wrap:\s*anywhere\s*;/
+  );
+  assert.match(
+    styles,
     /@media\s*\(\s*max-width:\s*520px\s*\)[\s\S]*?\.merchant-hero \.section-title[\s\S]*?overflow-wrap:\s*anywhere\s*;/
   );
 });
@@ -109,6 +113,19 @@ test("confirmed mobile layout keeps hero stats and ecosystem nodes compact", () 
     styles,
     /@media\s*\(\s*max-width:\s*520px\s*\)[\s\S]*?\.hero h1\s*\{[\s\S]*?font-size:\s*var\(--fs-display\)/
   );
+});
+
+test("320px stats use a two-column fallback and can wrap long numbers", () => {
+  assert.match(
+    styles,
+    /@media\s*\(\s*max-width:\s*360px\s*\)[\s\S]*?\.stats\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)[\s\S]*?\.stat strong[\s\S]*?white-space:\s*normal/
+  );
+});
+
+test("English and Khmer homepage stats use the same three-language count", () => {
+  const copy = readFileSync(fileURLToPath(new URL("../src/i18n/page-copy.ts", import.meta.url)), "utf8");
+  assert.match(copy, /stats: \[\["0%"[\s\S]*?\["3\+", "Chinese · English · Khmer"\]\]/);
+  assert.match(copy, /stats: \[\["0%"[\s\S]*?\["3\+", "中文 · English · ខ្មែរ"\]\]/);
 });
 
 test("mobile language links stay on one line beside the menu", () => {

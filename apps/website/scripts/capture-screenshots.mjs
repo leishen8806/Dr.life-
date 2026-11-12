@@ -1,7 +1,7 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { extname, join, normalize, posix } from "node:path";
+import { extname, join, normalize, posix, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
@@ -19,9 +19,10 @@ const contentTypes = {
 
 function safeFileForUrl(requestUrl) {
   const pathname = new URL(requestUrl, "http://127.0.0.1").pathname;
-  const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-  const candidate = normalize(join(root, relative));
-  if (!candidate.startsWith(root)) return null;
+  const requestedPath = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
+  const candidate = normalize(join(root, requestedPath));
+  const relativePath = relative(root, candidate);
+  if (relativePath.startsWith("..") || posix.isAbsolute(relativePath)) return null;
   if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
   if (existsSync(join(candidate, "index.html"))) return join(candidate, "index.html");
   return null;
@@ -56,10 +57,19 @@ try {
           deviceScaleFactor: 1
         });
         const page = await context.newPage();
+        const failedResources = [];
+        page.on("response", (resourceResponse) => {
+          if (resourceResponse.request().resourceType() !== "document" && resourceResponse.status() >= 400) {
+            failedResources.push(`${resourceResponse.status()} ${resourceResponse.url()}`);
+          }
+        });
         const url = new URL(pageDefinition.path, origin);
         url.searchParams.set("lang", language);
         const response = await page.goto(url.toString(), { waitUntil: "networkidle" });
         if (!response?.ok()) throw new Error(`Screenshot page failed: ${url} (${response?.status() ?? "no response"})`);
+        if (failedResources.length > 0) {
+          throw new Error(`Screenshot page loaded failed static resources: ${failedResources.join(", ")}`);
+        }
         await page.waitForTimeout(150);
         const relative = posix.join(String(width), language, `${pageDefinition.name}.png`);
         await mkdir(join(output, String(width), language), { recursive: true });
