@@ -19,11 +19,11 @@
 
 推送到 `main` 时不会按路径跳过任何重型任务。纯文档 PR 仍运行 `changes`、`light-checks`、`gitleaks` 和 `ci-gate`。`vuln-scan` 使用固定版本 `v1.9.0` 并作为阻塞检查；升级 Go 工具链后应先在同一 govulncheck 版本下复扫，只有结果清零才能保持阻塞。
 
-`gitleaks` 使用固定版本 `gitleaks/gitleaks-action@v3.0.0` 与 Gitleaks CLI `8.30.1`，配置见根目录 `.gitleaks.toml`。PR 扫描改动提交，推送到 `main` 时扫描本次推送提交；结果纳入 `ci-gate`，不上传源代码，也不修改仓库 Secret scanning 设置。Gitleaks CLI 使用 GPL-3.0；Action 使用 GITLEAKS-ACTION END-USER LICENSE AGREEMENT（上游许可证）。
+`gitleaks` 使用固定版本 `gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e`（v3.0.0）与 Gitleaks CLI `8.30.1`，配置见根目录 `.gitleaks.toml`。PR 扫描改动提交，推送到 `main` 时扫描本次推送提交；结果纳入 `ci-gate`，不上传源代码，也不修改仓库 Secret scanning 设置。Gitleaks CLI 使用 GPL-3.0；Action 使用 GITLEAKS-ACTION END-USER LICENSE AGREEMENT（上游许可证）。
 
 Go 工具链版本以 `backend/go.mod` 的 `go` 指令为 CI 和本地开发基准，`backend/Dockerfile` 的构建镜像必须使用相同补丁版本。升级时同时核对两处，并运行 `go mod tidy`、`go vet`、`go test -race` 和 `govulncheck`。
 
-工作流只使用以下官方 Actions，均固定到主版本标签：`actions/checkout@v7`、`actions/setup-go@v7`、`actions/setup-node@v7`、`docker/setup-buildx-action@v4`、`docker/build-push-action@v7`。这些版本使用 Node 24，要求 Actions Runner 版本不低于 2.327.1；本仓库使用 GitHub 托管 runner。Go 工具链固定为 1.27.4。
+工作流只使用以下官方 Actions，均固定到主版本标签：`actions/checkout@v7`、`actions/setup-go@v7`、`actions/setup-node@v7`、`docker/setup-buildx-action@v4`、`docker/build-push-action@v7`。这些版本使用 Node 24，要求 Actions Runner 版本不低于 2.327.1；本仓库使用 GitHub 托管 runner。Go 工具链版本以 `backend/go.mod` 的 `go` 指令为准。
 
 ## 本地复现
 
