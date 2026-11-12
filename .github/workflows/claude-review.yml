@@ -44,6 +44,7 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
+      statuses: write
     steps:
       # 评论触发时事件里没有草稿状态，这里查一次：草稿或机器人提的 PR 直接跳过，不启动审核。
       - name: gate
@@ -101,3 +102,29 @@ jobs:
             涉及资金、登录权限、数据库迁移的改动，在结论里注明“需 owner 亲审”。
             本次审核最多 30 轮：改动很大时优先看 Issue 验收项和 AGENTS.md 第 4 节相关的文件，
             看不完的部分在审核里写明“未审范围”，不要因为轮数用完而没发出审核——留出最后几轮先发审核。
+      # 把审核结论写成提交状态 claude-review（DISPATCH 七-F）：“无必须修”=success，“有必须修”=failure。
+      # main 分支保护把 claude-review 设为必需检查后，低风险 PR 无需人工批准即可在审核通过后合并；
+      # 推送新提交后新 head 没有该状态，必须重新审核才能合并。
+      - name: set claude-review status
+        if: always() && steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number || github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          head=$(gh api "repos/$REPO/pulls/$PR" --jq .head.sha)
+          short=${head:0:7}
+          body=$(gh api "repos/$REPO/pulls/$PR/reviews?per_page=100" --jq "[.[]|select(.user.login==\"claude[bot]\" and .commit_id==\"$head\")]|last|.body // \"\"")
+          if [ -z "$body" ]; then
+            body=$(gh api "repos/$REPO/issues/$PR/comments?per_page=100" --jq "[.[]|select(.user.login==\"claude[bot]\" and (.body|contains(\"$short\")))]|last|.body // \"\"")
+          fi
+          if grep -q '有 [0-9]* *项必须修' <<<"$body"; then
+            state=failure; desc="Claude 审核：有必须修，需返工"
+          elif grep -q '无必须修' <<<"$body"; then
+            state=success; desc="Claude 审核：无必须修"
+          else
+            state=error; desc="Claude 审核未针对当前 head 发出结论"
+          fi
+          echo "head=$short -> $state"
+          gh api "repos/$REPO/statuses/$head" -f state="$state" -f context="claude-review" -f description="$desc" >/dev/null
