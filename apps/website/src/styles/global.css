@@ -1,3 +1,5 @@
+@import "../../../../design/ui-standard/tokens.css";
+
 :root {
   --graphite: #202326;
   --deep: #131517;
@@ -21,6 +23,52 @@
   background: var(--ivory);
   font-size: var(--fs-body);
   line-height: 1.7;
+}
+
+/* Homepage v2 uses the shared UI-standard tokens. Legacy aliases remain for inner pages. */
+.hero--v2 { background: var(--color-dark); color: var(--color-on-dark); }
+.hero--v2 .hero-inner { max-width: var(--container); margin-inline: auto; }
+.hero--v2 h1 { font-family: var(--font-serif); font-size: var(--fs-display); line-height: var(--lh-display); letter-spacing: var(--track-display); }
+.hero--v2 .hero-position { color: var(--color-on-dark-muted); }
+.hero--v2 .button.gold { background: var(--accent-fill); color: var(--accent-on-fill); }
+.hero--v2 .button.ghost { color: var(--color-on-dark); border-color: var(--color-border-strong); }
+.container { width: min(calc(100% - 2 * var(--gutter)), var(--container)); margin-inline: auto; }
+.section > .container, .hero-index > .container { max-width: var(--container); }
+.section-title, .panel h3, .steps h3, .values h3, .partner h3, .access-card h3 { font-family: var(--font-serif); }
+.section-title { font-size: var(--fs-h2); line-height: var(--lh-title); letter-spacing: var(--track-title); }
+.lead, .panel p, .steps p, .values p, .partner p, .access-card p { font-size: var(--fs-body); line-height: var(--lh-body); }
+.hero-index { background: var(--color-dark-2); }
+.hero-index a { color: var(--color-on-dark); border-color: rgb(255 255 255 / .16); }
+.hero-index b, .hero-index .arrow { color: var(--color-gold); }
+.business-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--grid-gap); margin-top: var(--space-7); }
+.business-grid .panel { display: flex; min-height: 0; background: var(--surface); border: 1px solid var(--color-rule); }
+.business-grid .panel-copy { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3); width: 100%; padding: clamp(var(--space-5), 4vw, var(--space-8)); }
+.business-grid .panel h3 { font-size: var(--fs-h3); margin: 0; }
+.business-grid .panel .text-link { margin-top: auto; color: var(--accent-text); }
+.market { background: var(--bg-alt); }
+.category-groups { gap: var(--grid-gap); margin-top: var(--space-6); }
+.category-group { border-top: 2px solid var(--accent-text); background: var(--surface); }
+.category-group h3 { color: var(--accent-text); }
+.category-group .pills span { border-color: var(--color-border); background: var(--surface); font-size: var(--fs-small); }
+.dark, .section--dark { background: var(--color-dark); color: var(--color-on-dark); }
+.dark .lead, .dark .steps p, .route-note { color: var(--color-on-dark-muted); }
+.dark .eyebrow { color: var(--color-gold); }
+.steps li { border-color: rgb(255 255 255 / .16); }
+.steps span { color: var(--color-gold); }
+.values { gap: var(--grid-gap); }
+.values article { border-top-color: var(--color-rule); }
+.values article > span, .partner small { color: var(--accent-text); font-size: var(--fs-caption); }
+.partner-grid { gap: var(--grid-gap); border: 0; }
+.partner-grid .partner { border: 1px solid var(--color-border); background: var(--surface); }
+.partner .text-link { color: var(--accent-text); }
+.access-card { background: var(--color-dark-2); color: var(--color-on-dark); border: 1px solid rgb(255 255 255 / .16); }
+.access-card p { color: var(--color-on-dark-muted); }
+.channel-account { color: var(--color-gold) !important; font-size: var(--fs-h4) !important; letter-spacing: .08em; }
+.text-link:focus-visible, button:focus-visible, a:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+@media (max-width: 760px) {
+  .business-grid, .category-groups, .partner-grid, .access-grid { grid-template-columns: 1fr; }
+  .hero--v2 h1 { font-size: var(--fs-display); }
+  .hero-index .container { grid-template-columns: 1fr 1fr; }
 }
 * {
   box-sizing: border-box;
