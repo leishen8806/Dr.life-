@@ -90,5 +90,19 @@ gh api repos/leishen8806/Dr.life-/pulls/<N>/reviews
 - **发布前人工过目：** 官网发布（Actions → Website → Deploy production）前，负责人侧 Claude 先下载该 PR 的截图 artifact，亲自看 1920 / 1440 / 390px 首页与改动页面，在 PR 写“发布前目检：PASS/FAIL + 看了哪些截图”；FAIL 不提醒 owner 批准发布。owner 批准前也可直接看这些截图。
 - **快速回滚：** 线上出问题时先回滚再修。回滚方法：打开上一次正常发布的 Website 运行（Actions → Website，找最近一次 Deploy production 成功的运行），Re-run jobs → 只重跑 Deploy production → owner 批准。构建产物保留 14 天；超过期限则 revert 对应提交后重新发布。回滚由 owner 执行。
 
+### 七-D、状态标签与自动合并（大旺 11-12 批准）
+**状态标签（工作流 `pr-status-labels.yml` 自动维护，每张 PR 只有一个）：**
+| 标签 | 含义 | 谁行动 |
+| --- | --- | --- |
+| `状态:进行中` | 草稿，还在做 | 执行方继续做，完成、CI 绿后自己转 Ready |
+| `状态:待审核` | 已 Ready，当前 head 还没有 Claude 审核 | 新转 Ready 会自动审；返工推送后执行方评论一次触发复审 |
+| `状态:需返工` | 当前 head 的 Claude 审核“有必须修”，或 owner 要求修改 | 执行方立即返工，不等任何人 |
+| `状态:待owner批准` | 当前 head 审核“无必须修” | owner 批准 |
+| `状态:可合并` | owner 已批准当前 head | 自动合并（见下） |
+
+执行方和派单方巡检**以标签为准**行动，不靠解读评论文字。标签与实际不符时在 #220 报“异常：”。
+
+**自动合并：** owner 批准当前 head 后，派单方开启 GitHub 自动合并（squash），必需检查通过即合并，不再需要聊天里说“合并”。**以下 PR 不开自动合并**，仍由 owner / 大旺逐张明确指令：资金、登录与权限、数据库迁移、部署与服务器、`.github/workflows/` 改动、法律文字。官网发布（Deploy production）仍需 owner 在 Actions 批准，并先过七-C 的发布前目检。
+
 ### 八、周计划
 每周一个 Milestone（W46、W47…）。Issue 列表以 GitHub 当前状态为准，本文件不登记具体任务。
