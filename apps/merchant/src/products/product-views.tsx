@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Language, TranslationKey } from "@drlife/i18n";
-import { Card, EmptyState, ListItem, StatusTag } from "@drlife/ui";
+import { Button, Card, EmptyState, ListItem, StatusTag } from "@drlife/ui";
 import {
   formatPriceE4,
   type Category,
@@ -117,23 +117,22 @@ export function ProductListView({
               />
               <div className="merchant-products__actions">
                 {actions.canEdit && (
-                  <button type="button" onClick={() => onEdit(product)}>
+                  <Button variant="secondary" onClick={() => onEdit(product)}>
                     {translate("product.action.edit")}
-                  </button>
+                  </Button>
                 )}
                 {actions.canPublish && (
-                  <button type="button" onClick={() => onPublish(product)}>
+                  <Button variant="secondary" onClick={() => onPublish(product)}>
                     {translate("product.action.publish")}
-                  </button>
+                  </Button>
                 )}
                 {actions.canUnpublish && (
-                  <button
-                    type="button"
-                    className="drl-button--danger"
+                  <Button
+                    variant="danger"
                     onClick={() => onUnpublish(product)}
                   >
                     {translate("product.action.unpublish")}
-                  </button>
+                  </Button>
                 )}
               </div>
             </li>
@@ -353,8 +352,8 @@ export function ProductFormView({
               </Field>
               {/* 上架至少要两档，所以只有多出来的档位才给删除入口。 */}
               {draft.tiers.length > 2 && (
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={() =>
                     patch({
                       tiers: draft.tiers.filter(
@@ -364,27 +363,27 @@ export function ProductFormView({
                   }
                 >
                   {translate("product.tier.remove", { index: index + 1 })}
-                </button>
+                </Button>
               )}
             </div>
           ))}
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={() =>
               patch({ tiers: [...draft.tiers, { minQty: "", unitPrice: "" }] })
             }
           >
             {translate("product.tier.add")}
-          </button>
+          </Button>
         </fieldset>
 
         <footer className="merchant-form__actions">
-          <button type="button" onClick={onCancel}>
+          <Button variant="secondary" onClick={onCancel}>
             {translate("common.cancel")}
-          </button>
-          <button type="submit" disabled={busy}>
+          </Button>
+          <Button type="submit" loading={busy}>
             {translate("common.save")}
-          </button>
+          </Button>
         </footer>
       </form>
     </Card>

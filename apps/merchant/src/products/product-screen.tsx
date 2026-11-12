@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useI18n, type TranslationKey } from "@drlife/i18n";
 import {
   AppHeader,
+  Button,
   ConfirmDialog,
   ErrorState,
   LanguageSwitcher,
@@ -40,22 +41,50 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
   const [unpublishing, setUnpublishing] = useState<Product>();
   const [busy, setBusy] = useState(false);
   const [subordersOpen, setSubordersOpen] = useState(false);
+  const [suborders, setSuborders] = useState<MerchantSuborder[]>([]);
+  const [subordersNextCursor, setSubordersNextCursor] = useState<string | null>(null);
+  const [subordersLoading, setSubordersLoading] = useState(false);
+  const [subordersError, setSubordersError] = useState(false);
   const [selectedSuborder, setSelectedSuborder] = useState<MerchantSuborder>();
   const [suborderStatus, setSuborderStatus] = useState<SuborderStatus>();
 
   const reload = useCallback(async () => {
+    setSubordersLoading(true);
+    setSubordersError(false);
     try {
-      const [items, enabled] = await Promise.all([
+      const [items, enabled, suborderPage] = await Promise.all([
         api.list("all"),
-        api.listCategories()
+        api.listCategories(),
+        api.listSuborders ? api.listSuborders() : Promise.resolve({ items: [], nextCursor: null })
       ]);
       setProducts(items);
       setCategories(enabled);
+      setSuborders(suborderPage.items);
+      setSubordersNextCursor(suborderPage.nextCursor);
       setFailure(undefined);
     } catch (error) {
       setFailure(productErrorKey(error, "load"));
+      setSubordersError(true);
+    } finally {
+      setSubordersLoading(false);
     }
   }, [api]);
+
+  const loadMoreSuborders = useCallback(async () => {
+    if (!api.listSuborders || !subordersNextCursor || subordersLoading) return;
+    setSubordersLoading(true);
+    setSubordersError(false);
+    try {
+      const page = await api.listSuborders(subordersNextCursor);
+      setSuborders((current) => [...current, ...page.items]);
+      setSubordersNextCursor(page.nextCursor);
+    } catch (error) {
+      setSubordersError(true);
+      setFailure(productErrorKey(error, "load"));
+    } finally {
+      setSubordersLoading(false);
+    }
+  }, [api, subordersLoading, subordersNextCursor]);
 
   useEffect(() => {
     // 包一层 async 是为了让 react-hooks/set-state-in-effect 看见 await 边界：
@@ -100,22 +129,32 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
     setErrors([]);
   };
 
+  const openSuborder = (order: MerchantSuborder) => {
+    if (!api.getSuborder) {
+      setSelectedSuborder(order);
+      return;
+    }
+    void api.getSuborder(order.public_id).then(setSelectedSuborder).catch((error) => {
+      setFailure(productErrorKey(error, "load"));
+    });
+  };
+
   const startCreating = () => setEditing({ draft: emptyProductDraft() });
 
   return (
     <main className="mini-shell">
       <AppHeader slogan={t("brand.slogan")} actions={<>
         <LanguageSwitcher />
-        <button type="button" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</button>
+        <Button variant="secondary" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
       </>} />
       {subordersOpen ? (
         selectedSuborder ? (
           <SuborderDetailView order={selectedSuborder} language={language} translate={t} onBack={() => setSelectedSuborder(undefined)} />
         ) : (
           <>
-            <button type="button" className="merchant-back" onClick={() => setSubordersOpen(false)}>{t("common.back")}</button>
+            <Button variant="secondary" className="merchant-back" onClick={() => setSubordersOpen(false)}>{t("common.back")}</Button>
             <h1>{t("order.suborders")}</h1>
-            <SuborderListView language={language} translate={t} selected={suborderStatus} onSelectStatus={setSuborderStatus} onOpen={setSelectedSuborder} />
+            <SuborderListView language={language} translate={t} orders={suborders} selected={suborderStatus} onSelectStatus={setSuborderStatus} onOpen={openSuborder} loading={subordersLoading} error={subordersError} onRetry={() => void reload()} hasMore={subordersNextCursor !== null} onLoadMore={() => void loadMoreSuborders()} />
           </>
         )
       ) : null}
@@ -146,13 +185,13 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
         />
       ) : (
         <>
-          <button
-            type="button"
+          <Button
+            variant="primary"
             className="merchant-create"
             onClick={startCreating}
           >
             {t("product.list.create")}
-          </button>
+          </Button>
           <ProductListView
             products={products}
             language={language}

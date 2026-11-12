@@ -5,6 +5,7 @@ import { ApiError } from "@drlife/api-client";
 import { CategoryView } from "./views/category-view";
 import { HomeView } from "./views/home-view";
 import { ProductDetailView } from "./views/product-detail-view";
+import { SearchView } from "./views/search-view";
 import { errorMessageKey } from "./resource";
 import type { ProductFeed } from "./feed";
 import type { Translate } from "./views/common";
@@ -325,6 +326,37 @@ describe("category view", () => {
 
     expect(text).not.toContain("0 products");
     expect(text).toContain("No products on sale");
+  });
+});
+
+describe("search view", () => {
+  it("keeps the previous results visible when retry fails", () => {
+    const markup = renderToStaticMarkup(
+      <SearchView
+        t={translator("en")}
+        language="en"
+        categories={categories}
+        onBack={noOp}
+        onSelectProduct={noOp}
+        search={{
+          draft: { q: "tile", minPrice: "", maxPrice: "", sort: "relevance" },
+          setDraft: noOp,
+          resource: {
+            status: "error",
+            messageKey: "common.networkError",
+            previous: { items: [product], next_cursor: null, recommendations: [], reason: null }
+          },
+          suggestions: [],
+          priceError: undefined,
+          submit: noOp,
+          retry: noOp,
+          loadMore: noOp
+        }}
+      />
+    );
+    expect(visibleText(markup)).toContain("Network error");
+    expect(visibleText(markup)).toContain("Polished tile 800×800");
+    expect(visibleText(markup)).toContain("Retry");
   });
 });
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AppHeader, Card } from "@drlife/ui";
+import { AppHeader, Button, Card } from "@drlife/ui";
 import { localized } from "../localized";
 import { entryTier, formatPriceE4, sortedTiers } from "../money";
 import type { Product } from "../types";
@@ -41,9 +41,9 @@ export function ProductDetailView({
     <div className="buyer-page">
       <AppHeader slogan={t("mall.detail")} actions={actions} />
       <main className="buyer-page__body">
-        <button type="button" className="buyer-back" onClick={onBack}>
+        <Button variant="text" className="buyer-back" onClick={onBack}>
           {t("common.back")}
-        </button>
+        </Button>
         <Card>
           <OriginTag product={product} t={t} />
           <h1 className="buyer-detail__name" lang={language}>
@@ -62,9 +62,9 @@ export function ProductDetailView({
               <small> / {product.unit}</small>
             </p>
           )}
-          <button type="button" className="buyer-cart-primary" onClick={onAddToCart}>
+          <Button className="buyer-cart-primary" onClick={onAddToCart}>
             {t("mall.cart")}
-          </button>
+          </Button>
         </Card>
         <Card>
           <h2 className="buyer-section__title">{t("mall.tiers")}</h2>

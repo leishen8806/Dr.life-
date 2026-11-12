@@ -245,7 +245,9 @@ export function useOrderFeed(client: BuyerApiClient, language: string, enabled =
   const current = moreOrders?.language === language ? moreOrders : undefined;
   const resource = orders.status === "ready" && readyLanguage === language
     ? { status: "ready" as const, value: current?.items ?? orders.value.items }
-    : orders.status === "ready" ? { status: "loading" as const } : orders;
+    : orders.status === "ready" ? { status: "loading" as const }
+    : orders.status === "error" ? { status: "error" as const, messageKey: orders.messageKey, previous: orders.previous?.items }
+    : orders;
   return {
     resource,
     retry,
