@@ -22,13 +22,20 @@ const launchParams = (theme, language) => {
 };
 
 const start = (app, port) => {
-  const child = spawn("pnpm", ["dev"], { cwd: join(root, "apps", app), stdio: "inherit" });
+  const child = spawn("pnpm", ["dev", "--", "--host", "127.0.0.1", "--port", String(port)], {
+    cwd: join(root, "apps", app),
+    stdio: "inherit"
+  });
   return { child, port };
 };
 
 const waitFor = async (port) => {
   for (let attempt = 0; attempt < 240; attempt += 1) {
-    try { await fetch(`http://127.0.0.1:${port}`); return; } catch { await new Promise((resolve) => setTimeout(resolve, 250)); }
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(1000) });
+      if (response.ok) return;
+    } catch { /* Vite is still starting. */ }
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(`Mini App dev server did not start on ${port}`);
 };
