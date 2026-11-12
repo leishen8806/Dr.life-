@@ -1,6 +1,6 @@
 # PR #233 screenshot evidence
 
-Generated from Website workflow run `43219375492` for head `a23fbf4a04a97f3ea191bd22ff4797ebb78fa030`.
+Generated from Website workflow run `43228490592` for head `a4eb54a421faeca4c5671d02e1415e088b0da47b`.
 
 All files in this branch are WebP and are below 300 KB each.
 
@@ -18,6 +18,6 @@ The remaining 24 files are the CI-produced buyer/merchant matrix at 360/430 pixe
 
 ## Acceptance evidence
 
-- Website screenshot evidence: PASS — run `43219375492`, current head `a23fbf4`.
-- CI gate: PASS — run `43219375979`, current head `a23fbf4`.
+- Website screenshot evidence: PASS — run `43228490592`, current head `a4eb54a`.
+- CI gate: IN_PROGRESS — run `43228490321`, current head `a4eb54a`.
 - The screenshot job also asserted visible h1 content and no horizontal overflow at each viewport.
