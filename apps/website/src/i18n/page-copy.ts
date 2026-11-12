@@ -116,4 +116,23 @@ const homepageV2Full = {
   km: { ...homepageV2.km, hero: { title: "ជីវិត·លទ្ធភាពគ្មានដែនកំណត់", subtitle: "INFINITE POSSIBILITIES!", intro: "មានមូលដ្ឋាននៅភ្នំពេញ និងភ្ជាប់ការផ្គត់ផ្គង់សកលទៅជីវិតកម្ពុជា។ DR.LIFE+ ភ្ជាប់ពាណិជ្ជកម្ម បន្ទប់តាំងបង្ហាញ ការដឹកជញ្ជូន ឃ្លាំង និងសេវាពាណិជ្ជករ។" }, partners: { label: "WORK WITH DR / សហការជាមួយ DR", title: "រីកចម្រើនជាមួយ DR.LIFE+", intro: "ស្វែងរកអាជីវកម្មដែលពាក់ព័ន្ធ និងត្រៀមព័ត៌មានសម្រាប់ការពិភាក្សាបន្ទាប់។", cards: [["BUYERS & PROJECTS", "អ្នកប្រើ និងក្រុមគម្រោង", "ជ្រើសរើសការរចនា សំណង់ និងសម្ភារៈ រួចសម្របសម្រួលគំរូ ការទិញ ការដំឡើង និងការត្រួតពិនិត្យ។"], ["BRANDS & FACTORIES", "ម៉ាក និងរោងចក្រចិន", "រៀបចំការលក់ និងការប្រគល់នៅកម្ពុជាតាមឃ្លាំងមួយ ការចុះឈ្មោះពាណិជ្ជករ និងការបង្ហាញក្នុងស្រុក។"], ["LOCAL MERCHANTS", "ពាណិជ្ជករ និងដៃគូសេវាក្នុងស្រុក", "ពិភាក្សាការចូលវេទិកា បន្ទប់តាំងបង្ហាញ និងកិច្ចសហការជួសជុល និងដំឡើង។"], ["FULFILLMENT CLIENTS", "អតិថិជនវេទិកា និងឃ្លាំង", "ពិភាក្សាសេវាឃ្លាំង និងដឹកជញ្ជូនតាមចំនួនបញ្ជាទិញ និងប្រភេទទំនិញ។"]] }, channels: { label: "OFFICIAL CHANNELS / ឆានែលផ្លូវការ", intro: "ស្វែងរក DR520 នៅលើវេទិកាដែលពាក់ព័ន្ធ ដើម្បីទទួលព័ត៌មានថ្មីៗ។", items: ["Telegram · DR520", "Facebook · DR520", "WeChat Official Account · DR520"] } }
 } as const;
 
-export const pageCopy = { zh: { ...zh, home: { ...zh.home, homepageV2: homepageV2Full.zh } }, en: { ...en, home: { ...en.home, homepageV2: homepageV2Full.en } }, km: { ...km, home: { ...km.home, homepageV2: homepageV2Full.km } } } as const;
+const homepageV2Localized = {
+  zh: {
+    ...homepageV2Full.zh,
+    hero: { ...homepageV2Full.zh.hero, eyebrow: "DR.LIFE+ / 生活家", primary: "洽谈合作", secondary: "探索四大版块" },
+    business: { ...homepageV2Full.zh.business, ctas: ["了解生活家", "了解跨境物流", "了解仓配服务", "金融服务暂未开放"] }
+  },
+  en: {
+    ...homepageV2Full.en,
+    hero: { ...homepageV2Full.en.hero, eyebrow: "DR.LIFE+ / LIFE & HOME", primary: "Discuss cooperation", secondary: "Explore four businesses" },
+    business: { ...homepageV2Full.en.business, ctas: ["Explore LIFE & HOME", "Explore logistics", "Explore fulfilment", "Finance not yet available"] }
+  },
+  km: {
+    ...homepageV2Full.km,
+    hero: { ...homepageV2Full.km.hero, eyebrow: "DR.LIFE+ / ជីវិត និងគេហដ្ឋាន", primary: "ពិភាក្សាកិច្ចសហការ", secondary: "ស្វែងរកអាជីវកម្ម ៤" },
+    business: { ...homepageV2Full.km.business, ctas: ["ស្វែងយល់អំពីជីវិត និងគេហដ្ឋាន", "ស្វែងយល់អំពីដឹកជញ្ជូន", "ស្វែងយល់អំពីឃ្លាំង", "ហិរញ្ញវត្ថុមិនទាន់បើក"] },
+    market: { ...homepageV2Full.km.market, groups: [["សំណង់ និងជួសជុល", "ក្បឿង · បន្ទប់ទឹក · ថ្មសិប្បនិម្មិត · ថ្ម · ទ្វារ · ភ្លើង · ឧបករណ៍ · បន្ទះសម្ភារៈ · ថ្នាំលាប"], ["ការកំណត់តាមតម្រូវការ និងគេហដ្ឋាន", "គេហដ្ឋានតាមតម្រូវការ · គ្រឿងសង្ហារឹម · ឧបករណ៍ប្រើប្រាស់"], homepageV2Full.km.market.groups[2]] }
+  }
+} as const;
+
+export const pageCopy = { zh: { ...zh, home: { ...zh.home, homepageV2: homepageV2Localized.zh } }, en: { ...en, home: { ...en.home, homepageV2: homepageV2Localized.en } }, km: { ...km, home: { ...km.home, homepageV2: homepageV2Localized.km } } } as const;

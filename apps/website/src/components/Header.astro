@@ -8,7 +8,7 @@ const isMerchant = Astro.url.pathname.startsWith("/merchant");
 const links = isMerchant
   ? [["/", "merchant.nav.0"], ["#join", "merchant.nav.1"], ["#fees", "merchant.nav.2"], ["/contact", "merchant.nav.3"]]
   : [["#business", "home.homepageV2.homepageNav.0"], ["#market", "home.homepageV2.homepageNav.1"], ["#route", "home.homepageV2.homepageNav.2"], ["#culture", "home.homepageV2.homepageNav.3"], ["#apps", "home.homepageV2.homepageNav.4"], ["/contact", "home.homepageV2.homepageNav.5"]];
-const action = isMerchant ? { href: EXTERNAL_LINKS.merchantBot, label: "merchant.headerAction" } : { href: EXTERNAL_LINKS.buyerBot, label: "nav.shop" };
+const action = isMerchant ? { href: EXTERNAL_LINKS.merchantBot, label: "merchant.headerAction" } : { href: "/#apps", label: "home.homepageV2.homepageNav.4" };
 ---
 <header class:list={["site-header", { "site-header--dark": dark }]}>
   <BrandWordmark class="brand" href="/" />

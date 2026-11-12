@@ -22,7 +22,8 @@ const launchParams = (theme, language) => {
 };
 
 const start = (app, port) => {
-  const child = spawn("pnpm", ["exec", "vite", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
+  const vite = join(root, "node_modules", ".bin", "vite");
+  const child = spawn(vite, ["--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
     cwd: join(root, "apps", app),
     stdio: "inherit"
   });
@@ -53,9 +54,11 @@ try {
         const page = await browser.newPage({ viewport: { width: item.width, height: 900 }, colorScheme: item.theme });
         const url = `http://127.0.0.1:${port}/${launchParams(item.theme, item.language)}`;
         await page.goto(url, { waitUntil: "networkidle" });
+        const title = await page.title();
+        if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
         const name = `${app}-${item.width}-${item.theme}-${item.language}.png`;
         await page.screenshot({ path: join(output, name), fullPage: true });
-        manifest.push(name);
+        manifest.push(`${name}\t${title || "untitled"}`);
         await page.close();
       }
     }
