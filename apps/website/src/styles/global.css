@@ -178,6 +178,59 @@ a:focus-visible {
   font-weight: 600;
   line-height: 1.15;
 }
+
+/* Homepage v2: black/gold editorial layout from design/homepage-v2. */
+.container { max-width: 1280px; margin-inline: auto; padding-inline: 48px; }
+.hero-index { position: relative; z-index: 2; border-top: 1px solid rgb(199 203 207 / .25); }
+.hero-index .container { display: grid; grid-template-columns: repeat(4, 1fr); padding-block: 24px; }
+.hero-index a { display: flex; gap: 12px; align-items: center; min-height: 52px; color: var(--silver); text-decoration: none; border-right: 1px solid rgb(199 203 207 / .25); padding-inline: 18px; }
+.hero-index a:first-child { padding-left: 0; }
+.hero-index a:last-child { border-right: 0; }
+.hero-index b { color: var(--gold); font-family: "Noto Serif SC", serif; font-size: 1.25rem; }
+.arrow { color: var(--gold); margin-left: auto; }
+.split-intro { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr); gap: 72px; align-items: end; }
+.lead { max-width: 560px; font-size: var(--fs-lead); line-height: 1.8; color: #57534d; }
+.section--dark .lead { color: #d9d6cf; }
+.business-panels { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin-top: 72px; background: #c9c1b4; border: 1px solid #c9c1b4; }
+.business-panel { display: grid; grid-template-columns: 72px 1fr; gap: 24px; min-height: 390px; padding: 42px; background: var(--light); }
+.panel-index { color: var(--gold-text); font-family: "Noto Serif SC", serif; font-size: 3.2rem; line-height: 1; }
+.panel-copy h3 { margin: 8px 0 12px; font-family: "Noto Serif SC", serif; font-size: var(--fs-h3); }
+.panel-copy h3 span { color: var(--gold); }
+.business-tagline { color: var(--gold-text); font-size: 1.2rem; }
+.panel-list { display: grid; gap: 12px; padding: 0; list-style: none; }
+.panel-list li { display: grid; grid-template-columns: 110px 1fr; gap: 10px; border-top: 1px solid #d7d0c6; padding-top: 10px; }
+.panel-list strong { color: var(--gold-text); }
+.text-link { color: var(--gold-text); font-weight: 700; text-decoration-thickness: 1px; text-underline-offset: 5px; }
+.market { background: #eae5db; }
+.category-groups { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 28px; margin-top: 64px; }
+.category-group { padding: 28px; border-top: 2px solid var(--gold); background: rgb(255 255 255 / .28); }
+.category-group h3 { margin-top: 0; font-family: "Noto Serif SC", serif; }
+.pills { display: flex; flex-wrap: wrap; gap: 10px; }
+.pills span { border: 1px solid #b8ad9c; border-radius: 999px; padding: 7px 13px; font-size: var(--fs-small); }
+.route .split-intro { margin-bottom: 72px; }
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; padding: 0; list-style: none; }
+.steps li { min-height: 230px; padding: 24px; border-left: 1px solid #4b4f53; }
+.steps li > span { color: var(--gold); font-family: "Noto Serif SC", serif; font-size: 2rem; }
+.steps h3 { margin: 28px 0 8px; font-family: "Noto Serif SC", serif; }
+.steps p { color: #b7b5b0; }
+.culture .intro, .partners .intro { max-width: 720px; }
+.values, .partner-grid, .access-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 72px; background: #c9c1b4; }
+.values article, .partner-grid .partner, .access-card { padding: 34px; background: var(--light); }
+.values article h3, .partner h3, .access-card h3 { font-family: "Noto Serif SC", serif; }
+.partner-grid { grid-template-columns: repeat(2, 1fr); }
+.partner small, .demo-tag { color: var(--gold-text); letter-spacing: .18em; }
+.access-grid { grid-template-columns: repeat(2, 1fr); background: #4b4f53; }
+.access-card { background: #202326; color: var(--ivory); }
+.access-card p { color: #c7cbcf; }
+@media (max-width: 800px) {
+  .container { padding-inline: 20px; }
+  .hero-index .container, .business-panels, .category-groups, .steps, .values, .partner-grid, .access-grid { grid-template-columns: 1fr; }
+  .hero-index a, .hero-index a:first-child { border-right: 0; border-bottom: 1px solid rgb(199 203 207 / .25); padding: 12px 0; }
+  .split-intro { grid-template-columns: 1fr; gap: 18px; }
+  .business-panel { grid-template-columns: 48px 1fr; padding: 28px 20px; }
+  .section { padding-block: 88px; }
+  .steps li { border-left: 0; border-top: 1px solid #4b4f53; }
+}
 .hero h1 {
   font-size: var(--fs-display);
   letter-spacing: 0.02em;
