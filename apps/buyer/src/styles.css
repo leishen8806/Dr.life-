@@ -38,12 +38,83 @@
 }
 
 .buyer-search__placeholder {
+  padding: 0;
+  border: 0;
   color: var(--drl-color-text-muted);
+  background: transparent;
+  font: inherit;
+  text-align: start;
   overflow-wrap: anywhere;
 }
 
 .buyer-search__note {
   color: var(--drl-color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.buyer-search-form {
+  display: grid;
+  gap: var(--drl-space-3);
+}
+
+.buyer-search-form label {
+  display: grid;
+  gap: var(--drl-space-1);
+  min-width: 0;
+}
+
+.buyer-search-form label > span {
+  color: var(--drl-color-text-muted);
+  font-size: var(--drl-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.buyer-search-form input,
+.buyer-search-form select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--drl-space-5);
+  padding: var(--drl-space-2);
+  border: 1px solid var(--drl-color-border);
+  border-radius: var(--drl-radius);
+  color: inherit;
+  background: var(--drl-color-surface);
+  font: inherit;
+}
+
+.buyer-search-form__prices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--drl-space-2);
+}
+
+.buyer-search-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--drl-space-1);
+}
+
+.buyer-search-suggestions button,
+.buyer-search-submit,
+.buyer-load-more {
+  min-height: var(--drl-space-5);
+  padding: var(--drl-space-2) var(--drl-space-3);
+  border: 1px solid var(--drl-color-border);
+  border-radius: var(--drl-radius);
+  color: inherit;
+  background: var(--drl-color-surface-muted);
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+
+.buyer-search-submit {
+  color: var(--drl-color-on-brand);
+  background: var(--drl-color-brand);
+}
+
+.buyer-search-error {
+  margin: 0;
+  color: var(--drl-color-danger);
   overflow-wrap: anywhere;
 }
 
