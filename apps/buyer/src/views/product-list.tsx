@@ -1,4 +1,4 @@
-import { StatusTag } from "@drlife/ui";
+import { Button, StatusTag } from "@drlife/ui";
 import { localized } from "../localized";
 import { entryTier, formatPriceE4 } from "../money";
 import type { Product } from "../types";
@@ -31,8 +31,8 @@ export function ProductRow({
 } & LocaleProps) {
   const tier = entryTier(product.tiers);
   return (
-    <button
-      type="button"
+    <Button
+      variant="text"
       className="buyer-product"
       onClick={() => onSelect(product)}
     >
@@ -67,7 +67,7 @@ export function ProductRow({
           <small> / {product.unit}</small>
         </span>
       )}
-    </button>
+    </Button>
   );
 }
 

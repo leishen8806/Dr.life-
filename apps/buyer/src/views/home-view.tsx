@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AppHeader, Card } from "@drlife/ui";
+import { AppHeader, Button, Card } from "@drlife/ui";
 import { localized } from "../localized";
 import type { Resource } from "../resource";
 import type { Category, Product } from "../types";
@@ -13,9 +13,9 @@ import { isEmptyList, ResourceSection } from "./resource-section";
 export function SearchEntry({ t, onSearch }: { t: Translate; onSearch: () => void }) {
   return (
     <div className="buyer-search" role="search">
-      <button type="button" className="buyer-search__placeholder" onClick={onSearch}>
+      <Button variant="text" className="buyer-search__placeholder" onClick={onSearch}>
         {t("mall.searchPlaceholder")}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -31,15 +31,15 @@ export function CategoryGrid({
   return (
     <div className="buyer-category-grid">
       {categories.map((category) => (
-        <button
+        <Button
           key={category.public_id}
-          type="button"
+          variant="text"
           className="buyer-category"
           lang={language}
           onClick={() => onSelect(category.code)}
         >
           {localized(category.name, language)}
-        </button>
+        </Button>
       ))}
     </div>
   );

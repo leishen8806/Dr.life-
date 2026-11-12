@@ -6,6 +6,7 @@ import type {
   ProductUpdateRequest
 } from "./form";
 import type { ProductStatus } from "./status";
+import type { MerchantSuborder } from "../orders/suborders";
 
 type ApiClient = ReturnType<typeof createApiClient>;
 
@@ -20,6 +21,8 @@ export interface MerchantProductApi {
   create(request: ProductCreateRequest): Promise<Product>;
   update(publicId: string, patch: ProductUpdateRequest): Promise<Product>;
   publish(publicId: string): Promise<Product>;
+  listSuborders?(cursor?: string): Promise<{ items: MerchantSuborder[]; nextCursor: string | null }>;
+  getSuborder?(publicId: string): Promise<MerchantSuborder>;
 }
 
 /** 网关拒绝大写路径段；响应里回来的仍是规范的大写 ULID。 */
@@ -77,6 +80,19 @@ export function createMerchantProductApi(client: ApiClient): MerchantProductApi 
           }
         }
       );
+      return required(data).data;
+    },
+    async listSuborders(cursor) {
+      const { data } = await client.GET("/v1/merchant/suborders", {
+        params: { query: { cursor, page_size: maxPageSize } }
+      });
+      const payload = required(data).data;
+      return { items: payload.items, nextCursor: payload.next_cursor };
+    },
+    async getSuborder(publicId) {
+      const { data } = await client.GET("/v1/merchant/suborders/{public_id}", {
+        params: { path: { public_id: publicId.toLowerCase() } }
+      });
       return required(data).data;
     }
   };

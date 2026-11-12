@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card, AppHeader } from "@drlife/ui";
+import { AppHeader, Button, Card } from "@drlife/ui";
 import { localized } from "../localized";
 import { cartTotalE4, lineTotalE4, lineUnitPrice, type CartError, type CartItem } from "../cart";
 import { formatPriceE4 } from "../money";
@@ -45,12 +45,12 @@ export function CartView({
     <div className="buyer-page">
       <AppHeader slogan={t("mall.cart")} actions={actions} />
       <main className="buyer-page__body">
-        <button type="button" className="buyer-back" onClick={onBack}>{t("common.back")}</button>
+        <Button variant="text" className="buyer-back" onClick={onBack}>{t("common.back")}</Button>
         {items.length === 0 ? (
           <Card>
             <section className="buyer-cart-empty" aria-live="polite">
               <h1>{t("mall.cartEmpty")}</h1>
-              <button type="button" className="buyer-cart-primary" onClick={onBack}>{t("mall.browseProducts")}</button>
+              <Button className="buyer-cart-primary" onClick={onBack}>{t("mall.browseProducts")}</Button>
             </section>
           </Card>
         ) : (
@@ -71,7 +71,7 @@ export function CartView({
                           <small>{t("mall.cartAvailable", { quantity: item.availableQuantity })}</small>
                         </div>
                         <div className="buyer-cart-line__controls">
-                          <button type="button" aria-label={`${t("mall.cartQuantity")} -`} onClick={() => onStepQuantity(item, -1)}>−</button>
+                          <Button variant="text" ariaLabel={`${t("mall.cartQuantity")} -`} onClick={() => onStepQuantity(item, -1)}>−</Button>
                           <input
                             aria-label={t("mall.cartQuantity")}
                             inputMode="numeric"
@@ -81,11 +81,11 @@ export function CartView({
                             value={item.quantity}
                             onChange={(event) => onUpdateQuantity(item, event.target.value)}
                           />
-                          <button type="button" aria-label={`${t("mall.cartQuantity")} +`} onClick={() => onStepQuantity(item, 1)}>+</button>
+                          <Button variant="text" ariaLabel={`${t("mall.cartQuantity")} +`} onClick={() => onStepQuantity(item, 1)}>+</Button>
                         </div>
                         <div className="buyer-cart-line__total">
                           <strong>{formatPriceE4(lineTotalE4(item))}</strong>
-                          <button type="button" className="buyer-cart-remove" onClick={() => onRemove(item)}>{t("mall.cartRemove")}</button>
+                          <Button variant="text" className="buyer-cart-remove" onClick={() => onRemove(item)}>{t("mall.cartRemove")}</Button>
                         </div>
                       </article>
                     ))}
@@ -97,7 +97,7 @@ export function CartView({
             <Card>
               <p className="buyer-cart-total"><span>{t("mall.cartTotal")}</span><strong>{formatPriceE4(cartTotalE4(items))}</strong></p>
               <p className="buyer-cart-note">{t("mall.cartEstimateNote")}</p>
-              <button type="button" className="buyer-cart-primary" disabled>{t("mall.cartPlaceOrder")}</button>
+              <Button className="buyer-cart-primary" disabled>{t("mall.cartPlaceOrder")}</Button>
             </Card>
           </>
         )}

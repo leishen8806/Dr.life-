@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AppHeader, EmptyState, ErrorState, Loading } from "@drlife/ui";
+import { AppHeader, Button, EmptyState, ErrorState, Loading } from "@drlife/ui";
 import { localized } from "../localized";
 import { formatPriceE4 } from "../money";
 import type { Resource } from "../resource";
@@ -55,7 +55,7 @@ export function OrderListView({
     <div className="buyer-page">
       <AppHeader slogan={t("order.pageTitle")} actions={actions} />
       <main className="buyer-page__body">
-        <button type="button" className="buyer-back" onClick={onBack}>{t("common.back")}</button>
+        <Button variant="text" className="buyer-back" onClick={onBack}>{t("common.back")}</Button>
         {orders.status === "loading" && <Loading label={t("common.loading")} skeleton />}
         {orders.status === "error" && (
           <ErrorState
@@ -75,7 +75,7 @@ export function OrderListView({
                 <strong>{t("error.1001")}</strong>
               </div>
             ) : (
-              <button type="button" className="buyer-order-card" key={item.publicId} onClick={() => onOpen(item)}>
+              <Button variant="text" className="buyer-order-card" key={item.publicId} onClick={() => onOpen(item)}>
                 <span className="buyer-order-card__header">
                   <strong>{t("order.detailTitle")}</strong>
                   <span className="buyer-order-status">{statusSummary(item.subOrders, t)}</span>
@@ -93,16 +93,16 @@ export function OrderListView({
                   <span>{formatOrderDateTime(item.createdAt, language)}</span>
                   <span>{t("order.viewDetails")}</span>
                 </span>
-              </button>
+              </Button>
             ))}
           </section>
         )}
         {orders.status === "ready" && orders.value.length > 0 && onLoadMore && (
           <div className="buyer-order-list__more">
             {moreMessageKey && <p className="buyer-order-warning">{t(moreMessageKey)}</p>}
-            <button type="button" onClick={onLoadMore} disabled={loadingMore}>
+            <Button variant="secondary" onClick={onLoadMore} loading={loadingMore}>
               {loadingMore ? t("common.loading") : t("order.loadMore")}
-            </button>
+            </Button>
           </div>
         )}
       </main>

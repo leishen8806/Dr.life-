@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { AppHeader, Card } from "@drlife/ui";
+import { AppHeader, Button, Card } from "@drlife/ui";
 import { localized } from "../localized";
 import { formatPriceE4 } from "../money";
 import type { BuyerOrder } from "../orders";
@@ -55,9 +55,9 @@ export function OrderDetailView({
     <div className="buyer-page">
       <AppHeader slogan={t("order.detailTitle")} actions={actions} />
       <main className="buyer-page__body">
-        <button type="button" className="buyer-back" onClick={onBack}>{t("common.back")}</button>
+        <Button variant="text" className="buyer-back" onClick={onBack}>{t("common.back")}</Button>
         {order.status === "loading" && <Card><p>{t("common.loading")}</p></Card>}
-        {order.status === "error" && <Card><p className="buyer-order-warning">{t(order.messageKey)}</p>{onRetry && <button type="button" onClick={onRetry}>{t("common.retry")}</button>}</Card>}
+        {order.status === "error" && <Card><p className="buyer-order-warning">{t(order.messageKey)}</p>{onRetry && <Button variant="secondary" onClick={onRetry}>{t("common.retry")}</Button>}</Card>}
         {order.status === "ready" && <>
         <Card>
           <div className="buyer-order-detail__heading">
@@ -119,7 +119,7 @@ export function OrderDetailView({
             ? t("order.shippingPending")
             : formatPriceE4(order.value.shippingAmountE4)}</strong></p>
           <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{paymentQuoteUnavailable ? t("order.shippingPending") : formatPriceE4(order.value.totalE4)}</strong></p>
-          {canPay(order.value) && !paymentQuoteUnavailable && onPay && <button type="button" className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</button>}
+          {canPay(order.value) && !paymentQuoteUnavailable && onPay && <Button className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</Button>}
         </Card>
         </>}
       </main>

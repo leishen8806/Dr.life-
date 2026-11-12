@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { AppHeader, Card } from "@drlife/ui";
+import { AppHeader, Button, Card } from "@drlife/ui";
 import { localized } from "../localized";
 import { formatPriceE4 } from "../money";
 import { payableAmountE4, type BuyerOrder } from "../orders";
@@ -35,15 +35,15 @@ export function PaymentView({
     <div className="buyer-page">
       <AppHeader slogan={t("payment.pageTitle")} actions={actions} />
       <main className="buyer-page__body">
-        <button type="button" className="buyer-back" onClick={onBack}>{t("common.back")}</button>
+        <Button variant="text" className="buyer-back" onClick={onBack}>{t("common.back")}</Button>
         <Card>
           <h1 className="buyer-section__title">{order.publicId}</h1>
           <p>{t("payment.number")}: {attempt.paymentNumber ?? t("payment.notStarted")}</p>
           {attempt.status === "confirming" && <p className="buyer-order-warning" role="status">{t("order.paymentConfirming")}</p>}
           {attempt.status === "succeeded" && <p role="status">{t("payment.succeeded")}</p>}
           {attempt.status === "failed" && <p className="buyer-cart-error" role="alert">{t(expired ? "payment.expired" : "payment.failed")}</p>}
-          {attempt.status === "pending" && <button type="button" className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</button>}
-          {attempt.status === "failed" && <button type="button" className="buyer-cart-primary" onClick={onRetry}>{t("payment.retry")}</button>}
+          {attempt.status === "pending" && <Button className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</Button>}
+          {attempt.status === "failed" && <Button className="buyer-cart-primary" onClick={onRetry}>{t("payment.retry")}</Button>}
         </Card>
         {order.subOrders.map((subOrder) => (
           <Card key={subOrder.publicId}>
