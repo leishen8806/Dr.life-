@@ -2,6 +2,7 @@ import {
   backButton,
   init,
   mainButton,
+  miniApp,
   retrieveLaunchParams,
   retrieveRawInitData,
   themeParams
@@ -13,6 +14,11 @@ export interface TelegramEnvironment {
   initData: string;
   languageCode?: string;
   backgroundColor: string;
+  colorScheme: "light" | "dark";
+}
+
+export function resolveMiniAppColorScheme(isDark: boolean): "light" | "dark" {
+  return isDark ? "dark" : "light";
 }
 
 let initialized = false;
@@ -28,14 +34,16 @@ export function getTelegramEnvironment(): TelegramEnvironment {
       isTelegram: true,
       initData: retrieveRawInitData() ?? "",
       languageCode: launch.tgWebAppData?.user?.languageCode,
-      backgroundColor: launch.tgWebAppThemeParams.bgColor ?? "#ffffff"
+      backgroundColor: launch.tgWebAppThemeParams.bgColor ?? "#ffffff",
+      colorScheme: resolveMiniAppColorScheme(miniApp.isDark())
     };
   } catch {
     return {
       isTelegram: false,
       initData: "dev_mock_init_data",
       languageCode: "en",
-      backgroundColor: "#f4f6f8"
+      backgroundColor: "#f4f6f8",
+      colorScheme: "light"
     };
   }
 }
@@ -75,4 +83,9 @@ export function mountTelegramTheme() {
   if (!initialized || !themeParams.mountSync.isAvailable()) return;
   themeParams.mountSync();
   if (themeParams.bindCssVars.isAvailable()) themeParams.bindCssVars();
+}
+
+export function applyMiniAppTheme(colorScheme: "light" | "dark") {
+  document.documentElement.dataset.surface = "miniapp";
+  document.documentElement.dataset.colorScheme = colorScheme;
 }

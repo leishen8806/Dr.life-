@@ -52,6 +52,7 @@ describe("OrderDetailView quote expiry", () => {
   });
 
   it("switches from valid to expired at the quote deadline", () => {
+    const setTimeoutSpy = vi.spyOn(window, "setTimeout");
     renderDetail(order("awaiting_payment", "2026-11-11T00:00:01Z"));
     expect(screen.getAllByText("Order details").length).toBeGreaterThan(0);
     expect(screen.getByText("Sub-order")).toBeTruthy();
@@ -64,6 +65,8 @@ describe("OrderDetailView quote expiry", () => {
     act(() => vi.runOnlyPendingTimers());
 
     expect(screen.getByText(/Shipping quote expired/)).toBeTruthy();
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+    setTimeoutSpy.mockRestore();
   });
 
   it("does not show a quote for a non-payment order", () => {

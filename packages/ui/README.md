@@ -6,10 +6,30 @@
 
 - 中文与英文使用系统字体栈；高棉语依次使用 `Noto Sans Khmer`、`Khmer UI`、`Leelawadee UI` 和系统 sans-serif。
 - 不从外部 CDN 加载字体。当前不携带字体文件；待决策：是否在获得许可与体积评估后，自托管 Noto Sans Khmer 子集。
-- `:lang(km)` 正文行高为 1.7，标题行高为 1.5，字号不低于 13px，避免上下标音符被裁切。
+- `:lang(km)` 正文行高为 1.85，标题行高为 1.35，字号不低于 13px，避免上下标音符被裁切。
 - 语言按钮使用内容宽度、允许换行且保持可见。关键按钮、标签和导航不得使用固定宽度、`overflow: hidden` 或省略号截断。
 - `LanguageSwitcher` 提供中、英、高棉语切换，立即更新根元素 `lang` 和本地偏好，并保留 `onChange` 供 A-04 上报账户语言。
 
 高棉语真实字体渲染仍需在 Windows、Android 和 iOS/Telegram WebView 人工目检；jsdom 无法验证字形与裁切，因此本任务使用 CSS 静态约束和词条长度警告，不引入 Playwright。
 
 设计依据：`Dr.life+交互文档.md` 第 1.5 节及 `AGENTS.md` 第 4、6 节。
+
+## D-02 design tokens
+
+All shared colors, typography, spacing, radii, shadows, and motion values live
+in `design/ui-standard/tokens.css`. The package exposes `--drl-*` compatibility
+aliases from `src/styles.css`; components must not add literal colors or sizes.
+
+| Group | Variables | Notes |
+| --- | --- | --- |
+| Brand and state | `--drl-color-brand*`, `--drl-color-success`, `--drl-color-warning`, `--drl-color-danger`, `--drl-color-info` | Brand palette and feedback states |
+| Surfaces and text | `--drl-color-surface*`, `--drl-color-text*`, `--drl-color-border*` | Page, raised-card, text, and border hierarchy |
+| Type | `--drl-font-size-*`, `--drl-font-weight-*`, `--drl-line-height-*` | Title 1–3, body, auxiliary, and Khmer-specific rules |
+| Layout | `--drl-space-1` … `--drl-space-5`, `--drl-radius*`, `--drl-shadow` | Reusable spacing and shape scale |
+| Motion | `--drl-transition-fast`, `--drl-transition-normal` | Keep motion short and non-essential |
+
+Telegram `themeParams` are mounted by `mountTelegramTheme()`, which binds the
+SDK CSS variables when available. `getTelegramEnvironment()` reads the SDK
+`miniApp.isDark()` signal, and `applyMiniAppTheme()` applies the resulting
+`data-color-scheme` to the document. The Mini App therefore follows Telegram's
+light/dark mode while the shared brand tokens remain the source of truth.

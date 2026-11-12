@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppHeader, Card } from "@drlife/ui";
 import { localized } from "../localized";
 import { formatPriceE4 } from "../money";
@@ -35,18 +35,17 @@ export function OrderDetailView({
   onPay
 }: { order: Resource<BuyerOrder>; actions?: ReactNode; onRetry?: () => void; onBack: () => void; onPay?: () => void } & LocaleProps) {
   const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (order.status !== "ready") return;
-    const expiry = order.value.subOrders
+  const expiry = useMemo(() => order.status !== "ready" ? undefined : order.value.subOrders
       .map((subOrder) => Date.parse(subOrder.shippingQuoteExpiresAt))
       .filter((value) => Number.isFinite(value) && value > now)
-      .sort((a, b) => a - b)[0];
-    if (expiry === undefined) return;
+      .sort((a, b) => a - b)[0], [order]);
+
+  useEffect(() => {
+    if (expiry === undefined || expiry <= now) return;
     const delay = Math.min(expiry - now, 2_147_483_647);
     const timer = window.setTimeout(() => setNow(Date.now()), delay);
     return () => window.clearTimeout(timer);
-  }, [now, order]);
+  }, [expiry, now]);
 
   // Client time only controls display/DEV mock gating; real payment must use
   // the server's 409/3006 response before creating a payment intent.
