@@ -10,13 +10,12 @@ import { isEmptyList, ResourceSection } from "./resource-section";
 /**
  * Entry only for now: the result page lands with the search slice (T-03).
  */
-export function SearchEntry({ t }: { t: Translate }) {
+export function SearchEntry({ t, onSearch }: { t: Translate; onSearch: () => void }) {
   return (
     <div className="buyer-search" role="search">
-      <span className="buyer-search__placeholder">
+      <button type="button" className="buyer-search__placeholder" onClick={onSearch}>
         {t("mall.searchPlaceholder")}
-      </span>
-      <small className="buyer-search__note">{t("mall.searchComingSoon")}</small>
+      </button>
     </div>
   );
 }
@@ -55,7 +54,8 @@ export function HomeView({
   onRetryCategories,
   onRetryFeatured,
   onSelectCategory,
-  onSelectProduct
+  onSelectProduct,
+  onSearch
 }: {
   categories: Resource<Category[]>;
   featured: Resource<Product[]>;
@@ -64,12 +64,13 @@ export function HomeView({
   onRetryFeatured: () => void;
   onSelectCategory: (code: string) => void;
   onSelectProduct: (product: Product) => void;
+  onSearch: () => void;
 } & LocaleProps) {
   return (
     <div className="buyer-page">
       <AppHeader slogan={t("brand.slogan")} actions={actions} />
       <main className="buyer-page__body">
-        <SearchEntry t={t} />
+        <SearchEntry t={t} onSearch={onSearch} />
         <Card>
           <h2 className="buyer-section__title">{t("mall.categories")}</h2>
           <ResourceSection

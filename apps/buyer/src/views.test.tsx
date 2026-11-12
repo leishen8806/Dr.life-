@@ -88,6 +88,7 @@ function home(
       onRetryFeatured={noOp}
       onSelectCategory={noOp}
       onSelectProduct={noOp}
+      onSearch={noOp}
       {...overrides}
     />
   );

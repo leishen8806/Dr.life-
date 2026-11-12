@@ -60,6 +60,7 @@ jobs:
 
   screenshots:
     name: Website screenshot evidence
+    if: github.event_name != 'push'
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
