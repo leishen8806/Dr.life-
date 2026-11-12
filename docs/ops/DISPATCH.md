@@ -57,6 +57,7 @@ gh issue list -R leishen8806/Dr.life- --assignee <你的账号> --state open
 ### 七、审查在哪里出现
 - 正式审查在 **PR 页面的 Reviews**，绑定具体 head。负责人侧 Claude 的审查结论会同步到对应 Issue。
 - 审查评论（含 `claude-bridge`）不等于批准，不解除"要求修改"。
+- **Claude 独立审核以 PR 正式审核（Reviews，状态 Comment）发出**，正文第二行是结论。结论为“有 N 项必须修”时，实现者必须返工，不能当作“没有正式审核”去等 owner；结论为“无必须修”才交 owner 复审。派单方在 PR 里留的“派单方说明”同样要处理。
 - **最终批准由人类负责人 `leishen8806` 做。** PR 的 head 一变，之前的批准失效，需重新审查——修完再推，不要每个小改动推一次。
 - `main` 已启用 Code Owners 审核，只有 `leishen8806` 的批准计入合并条件。
 - 汇报"在等审查/被阻塞"前先查当前状态：

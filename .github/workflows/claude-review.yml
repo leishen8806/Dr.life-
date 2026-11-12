@@ -69,7 +69,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
             --max-turns 30
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Write,Grep,Glob"
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr review:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Write,Grep,Glob"
           prompt: |
             REPO: ${{ github.repository }}
             PR: ${{ github.event.pull_request.number || github.event.issue.number }}
@@ -82,7 +82,9 @@ jobs:
             三语齐全、官网 CSP 不放宽、不写入服务器地址/密钥/令牌）。
             发审核的方法固定为两步，不要用管道、heredoc、cat 或 echo：
             第一步用 Write 工具把审核全文写到 /tmp/claude-review.md；
-            第二步运行一条命令：gh pr comment <PR 编号> --body-file /tmp/claude-review.md
+            第二步运行一条命令：gh pr review <PR 编号> --comment --body-file /tmp/claude-review.md
+            （以 PR 正式审核 Reviews 的形式发出，状态为 Comment；不要用 --approve，也不要用 --request-changes。）
+            如果这条命令失败，改用 gh pr comment <PR 编号> --body-file /tmp/claude-review.md 发出。
             需要逐行指出的再用行内评论工具。审核开头写“## Claude 独立审核 · PR #<编号>（head <短哈希>）”，
             按“必须修 / 应修 / 低”分级，每条写清位置、原因、怎么改。分级标准（docs/ops/DISPATCH.md 七-A）：
             必须修只限：违反 AGENTS.md 第 4 节或已定决定、Issue 验收项未达成、会导致错误结果或安全问题；
