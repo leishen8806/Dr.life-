@@ -1,4 +1,4 @@
-import { Button, Card, EmptyState, ListItem, StatusTag } from "@drlife/ui";
+import { Button, Card, EmptyState, ErrorState, ListItem, Loading, StatusTag } from "@drlife/ui";
 import type { Language, TranslationKey } from "@drlife/i18n";
 import { suborderStatuses, type MerchantSuborder, type SuborderStatus } from "./suborders";
 
@@ -23,7 +23,12 @@ export function SuborderListView({
   orders,
   selected,
   onSelectStatus,
-  onOpen
+  onOpen,
+  loading = false,
+  error = false,
+  onRetry,
+  hasMore = false,
+  onLoadMore
 }: {
   language: Language;
   translate: Translate;
@@ -31,6 +36,11 @@ export function SuborderListView({
   selected?: SuborderStatus;
   onSelectStatus: (status?: SuborderStatus) => void;
   onOpen: (order: MerchantSuborder) => void;
+  loading?: boolean;
+  error?: boolean;
+  onRetry?: () => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
 }) {
   const filtered = selected ? orders.filter((item) => item.status === selected) : orders;
   return <>
@@ -38,12 +48,15 @@ export function SuborderListView({
       <Button variant="secondary" ariaPressed={selected === undefined} onClick={() => onSelectStatus()}>{translate("order.merchant.all")}</Button>
       {suborderStatuses.map((status) => <Button key={status} variant="secondary" ariaPressed={selected === status} onClick={() => onSelectStatus(status)}>{translate(statusKey(status))}</Button>)}
     </div>
-    {filtered.length === 0 ? <EmptyState title={translate("order.merchant.listEmpty")} /> : <Card><ul className="merchant-orders">
+    {loading && <Loading label={translate("common.loading")} skeleton />}
+    {error && <ErrorState title={translate("common.failure")} description={translate("common.failure")} retryLabel={translate("common.retry")} onRetry={onRetry ?? (() => undefined)} />}
+    {!loading && !error && filtered.length === 0 ? <EmptyState title={translate("order.merchant.listEmpty")} /> : null}
+    {!loading && !error && filtered.length > 0 ? <Card><ul className="merchant-orders">
       {filtered.map((order) => <li key={order.public_id}><button type="button" className="merchant-order-item" onClick={() => onOpen(order)}>
         <ListItem title={order.public_id} description={`${summary(order)} · ${order.shipping_address.phone}`} trailing={<StatusTag tone="neutral">{translate(statusKey(order.status))}</StatusTag>} />
         <span className="merchant-order-item__total">{formatPriceE4(order.payable_amount_e4)}</span>
       </button></li>)}
-    </ul></Card>}
+    </ul>{hasMore && <Button variant="secondary" loading={loading} onClick={onLoadMore}>{translate("order.loadMore")}</Button>}</Card> : null}
   </>;
 }
 

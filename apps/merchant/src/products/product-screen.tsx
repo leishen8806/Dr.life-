@@ -42,10 +42,15 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
   const [busy, setBusy] = useState(false);
   const [subordersOpen, setSubordersOpen] = useState(false);
   const [suborders, setSuborders] = useState<MerchantSuborder[]>([]);
+  const [subordersNextCursor, setSubordersNextCursor] = useState<string | null>(null);
+  const [subordersLoading, setSubordersLoading] = useState(false);
+  const [subordersError, setSubordersError] = useState(false);
   const [selectedSuborder, setSelectedSuborder] = useState<MerchantSuborder>();
   const [suborderStatus, setSuborderStatus] = useState<SuborderStatus>();
 
   const reload = useCallback(async () => {
+    setSubordersLoading(true);
+    setSubordersError(false);
     try {
       const [items, enabled, suborderPage] = await Promise.all([
         api.list("all"),
@@ -55,11 +60,31 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
       setProducts(items);
       setCategories(enabled);
       setSuborders(suborderPage.items);
+      setSubordersNextCursor(suborderPage.nextCursor);
       setFailure(undefined);
     } catch (error) {
       setFailure(productErrorKey(error, "load"));
+      setSubordersError(true);
+    } finally {
+      setSubordersLoading(false);
     }
   }, [api]);
+
+  const loadMoreSuborders = useCallback(async () => {
+    if (!api.listSuborders || !subordersNextCursor || subordersLoading) return;
+    setSubordersLoading(true);
+    setSubordersError(false);
+    try {
+      const page = await api.listSuborders(subordersNextCursor);
+      setSuborders((current) => [...current, ...page.items]);
+      setSubordersNextCursor(page.nextCursor);
+    } catch (error) {
+      setSubordersError(true);
+      setFailure(productErrorKey(error, "load"));
+    } finally {
+      setSubordersLoading(false);
+    }
+  }, [api, subordersLoading, subordersNextCursor]);
 
   useEffect(() => {
     // 包一层 async 是为了让 react-hooks/set-state-in-effect 看见 await 边界：
@@ -129,7 +154,7 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
           <>
             <Button variant="secondary" className="merchant-back" onClick={() => setSubordersOpen(false)}>{t("common.back")}</Button>
             <h1>{t("order.suborders")}</h1>
-            <SuborderListView language={language} translate={t} orders={suborders} selected={suborderStatus} onSelectStatus={setSuborderStatus} onOpen={openSuborder} />
+            <SuborderListView language={language} translate={t} orders={suborders} selected={suborderStatus} onSelectStatus={setSuborderStatus} onOpen={openSuborder} loading={subordersLoading} error={subordersError} onRetry={() => void reload()} hasMore={subordersNextCursor !== null} onLoadMore={() => void loadMoreSuborders()} />
           </>
         )
       ) : null}
