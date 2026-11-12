@@ -1,15 +1,25 @@
 export {
   AppHeader,
+  Badge,
+  Button,
   BottomNavigation,
   BottomSheet,
   Card,
   ConfirmDialog,
   EmptyState,
   ErrorState,
+  FormField,
+  ImagePlaceholder,
   ListItem,
   Loading,
+  Money,
+  ProductCard,
+  Skeleton,
   StatusTag,
   Stepper,
+  Tabs,
+  TieredPrice,
+  Toast,
   type NavigationItem
 } from "./foundation";
 export { LanguageSwitcher, LanguageSwitcherView } from "./language-switcher";
@@ -31,6 +41,7 @@ export type {
 export {
   getTelegramEnvironment,
   mountTelegramTheme,
+  applyMiniAppTheme,
   useBackButton,
   useMainButton,
   type TelegramEnvironment

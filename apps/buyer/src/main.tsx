@@ -9,6 +9,7 @@ import {
 } from "@drlife/i18n";
 import {
   getTelegramEnvironment,
+  applyMiniAppTheme,
   mountTelegramTheme,
   StartupGate
 } from "@drlife/ui";
@@ -18,6 +19,7 @@ import { BuyerApp } from "./app";
 
 const environment = getTelegramEnvironment();
 mountTelegramTheme();
+applyMiniAppTheme(environment.colorScheme);
 
 const initialLanguage = resolveLanguage(
   readLanguagePreference(),
