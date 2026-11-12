@@ -135,4 +135,56 @@ const homepageV2Localized = {
   }
 } as const;
 
-export const pageCopy = { zh: { ...zh, home: { ...zh.home, homepageV2: homepageV2Localized.zh } }, en: { ...en, home: { ...en.home, homepageV2: homepageV2Localized.en } }, km: { ...km, home: { ...km.home, homepageV2: homepageV2Localized.km } } } as const;
+const homepageV2Acceptance = {
+  zh: {
+    ...homepageV2Localized.zh,
+    business: {
+      ...homepageV2Localized.zh.business,
+      details: [["线上平台", "DR智慧建材城", "装修服务", "0% 平台交易佣金"], ["中国端", "柬埔寨端", "一仓入柬"], ["云仓作业", "同城速送", "大件交付"], []],
+      note: "金融服务只与持牌机构合作，金融服务尚未开放。"
+    },
+    market: { ...homepageV2Localized.zh.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["瓷砖和地面材料体验区", "定制家居与家具体验区", "工具和日用商品体验区"], note: "一期规划：建材与装修、定制与家居、工具与日用。" },
+    route: { ...homepageV2Localized.zh.route, note: "路线、关税责任、服务费用和时效以每批货物及订单报价为准。" },
+    culture: { ...homepageV2Localized.zh.culture, quote: "相信生活有更多可能！" },
+    partners: {
+      ...homepageV2Localized.zh.partners,
+      cards: [...homepageV2Localized.zh.partners.cards, ["FINANCE", "商户金融咨询", "只与持牌机构合作、金融服务尚未开放。"]],
+      fields: [["项目或采购需求", "设计、施工或安装范围", "预算与交付时间"], ["产品目录与规格", "供货能力与交期", "入柬销售计划"], ["服务区域与团队能力", "仓配或安装范围", "合作资质"], ["订单量与货物类型", "仓储需求", "配送范围"], []]
+    }
+  },
+  en: {
+    ...homepageV2Localized.en,
+    business: {
+      ...homepageV2Localized.en.business,
+      details: [["Online platform", "DR Smart Building-Materials City", "Renovation services", "0% platform transaction commission"], ["China side", "Cambodia side", "One warehouse into Cambodia"], ["Cloud-warehouse operations", "Same-city express delivery", "Large-item delivery"], []],
+      note: "Financial services work only with licensed institutions and are not yet available."
+    },
+    market: { ...homepageV2Localized.en.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["Tiles and flooring showroom", "Custom home and furniture showroom", "Tools and daily-goods showroom"], note: "Phase-one plan: building and renovation, custom and home, tools and daily goods." },
+    route: { ...homepageV2Localized.en.route, note: "Routes, customs responsibility, service fees and timing are confirmed per shipment and order quote." },
+    culture: { ...homepageV2Localized.en.culture, quote: "Believe that life has more possibilities!" },
+    partners: {
+      ...homepageV2Localized.en.partners,
+      cards: [...homepageV2Localized.en.partners.cards, ["FINANCE", "Merchant finance consultation", "Work only with licensed institutions; financial services are not yet available."]],
+      fields: [["Project or procurement needs", "Design, construction or installation scope", "Budget and delivery timing"], ["Product catalogue and specifications", "Supply capacity and lead time", "Cambodia sales plan"], ["Service area and team capability", "Fulfilment or installation scope", "Partnership credentials"], ["Order volume and goods type", "Warehousing needs", "Delivery scope"], []]
+    }
+  },
+  km: {
+    // [TODO-KM-REVIEW] Native-speaker review remains required before final publication.
+    ...homepageV2Localized.km,
+    business: {
+      ...homepageV2Localized.km.business,
+      details: [["វេទិកាអនឡាញ", "ទីក្រុងសម្ភារៈ DR", "សេវាជួសជុល និងតុបតែង", "កម្រៃជើងសារប្រតិបត្តិការវេទិកា 0%"], ["ភាគីចិន", "ភាគីកម្ពុជា", "ឃ្លាំងមួយទៅកម្ពុជា"], ["ប្រតិបត្តិការឃ្លាំងឆ្លាតវៃ", "ដឹកជញ្ជូនលឿនក្នុងទីក្រុង", "ដឹកជញ្ជូនទំនិញធំ"], []],
+      note: "សេវាហិរញ្ញវត្ថុធ្វើការតែជាមួយស្ថាប័នមានអាជ្ញាបណ្ណ ហើយមិនទាន់បើកដំណើរការទេ។"
+    },
+    market: { ...homepageV2Localized.km.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["កន្លែងបង្ហាញក្បឿង និងកម្រាល", "កន្លែងបង្ហាញគ្រឿងសង្ហារឹម និងគេហដ្ឋាន", "កន្លែងបង្ហាញឧបករណ៍ និងរបស់ប្រចាំថ្ងៃ"], note: "ផែនការដំណាក់កាលទី១៖ សំណង់ និងជួសជុល ការកំណត់តាមតម្រូវការ និងគេហដ្ឋាន ឧបករណ៍ និងរបស់ប្រចាំថ្ងៃ។" },
+    route: { ...homepageV2Localized.km.route, note: "ផ្លូវ ការទទួលខុសត្រូវគយ ថ្លៃសេវា និងរយៈពេល ត្រូវបញ្ជាក់តាមការដឹកជញ្ជូន និងសម្រង់តម្លៃនីមួយៗ។" },
+    culture: { ...homepageV2Localized.km.culture, quote: "ជឿថាជីវិតមានលទ្ធភាពច្រើនជាងនេះ!" },
+    partners: {
+      ...homepageV2Localized.km.partners,
+      cards: [...homepageV2Localized.km.partners.cards, ["FINANCE", "ការប្រឹក្សាហិរញ្ញវត្ថុពាណិជ្ជករ", "ធ្វើការតែជាមួយស្ថាប័នមានអាជ្ញាបណ្ណ; សេវាហិរញ្ញវត្ថុមិនទាន់បើកដំណើរការទេ។"]],
+      fields: [["តម្រូវការគម្រោង ឬការទិញ", "វិសាលភាពរចនា សាងសង់ ឬដំឡើង", "ថវិកា និងពេលប្រគល់"], ["កាតាឡុក និងលក្ខណៈផលិតផល", "សមត្ថភាពផ្គត់ផ្គង់ និងពេលវេលា", "ផែនការលក់នៅកម្ពុជា"], ["តំបន់សេវា និងសមត្ថភាពក្រុម", "វិសាលភាពឃ្លាំង ឬដំឡើង", "លក្ខខណ្ឌកិច្ចសហការ"], ["ចំនួនបញ្ជាទិញ និងប្រភេទទំនិញ", "តម្រូវការឃ្លាំង", "វិសាលភាពដឹកជញ្ជូន"], []]
+    }
+  }
+} as const;
+
+export const pageCopy = { zh: { ...zh, home: { ...zh.home, homepageV2: homepageV2Acceptance.zh } }, en: { ...en, home: { ...en.home, homepageV2: homepageV2Acceptance.en } }, km: { ...km, home: { ...km.home, homepageV2: homepageV2Acceptance.km } } } as const;

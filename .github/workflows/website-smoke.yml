@@ -9,8 +9,26 @@ permissions:
   contents: read
 
 jobs:
+  guard:
+    name: Check public URL configuration
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          WEBSITE_PUBLIC_URL: ${{ secrets.WEBSITE_PUBLIC_URL }}
+        run: |
+          if [ -z "$WEBSITE_PUBLIC_URL" ]; then
+            echo "::notice::WEBSITE_PUBLIC_URL is not configured; smoke and Lighthouse checks are skipped."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
   smoke:
     name: Post-release smoke and daily patrol
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -32,7 +50,7 @@ jobs:
         run: pnpm --filter @drlife/website exec node scripts/website-smoke.mjs
       - name: Run Lighthouse acceptance gate
         run: >-
-          npx --yes lighthouse "$WEBSITE_PUBLIC_URL" --output=json
+          npx --yes lighthouse@12.6.0 "$WEBSITE_PUBLIC_URL" --output=json
           --output-path=/tmp/lighthouse.json --chrome-flags="--headless --no-sandbox"
       - name: Check Lighthouse thresholds
         run: pnpm --filter @drlife/website exec node scripts/check-lighthouse.mjs /tmp/lighthouse.json
