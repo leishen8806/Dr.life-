@@ -14,7 +14,7 @@
   --color-paper: #fbf8f1;        /* 卡片、弹窗、输入框底 */
   --color-ink: #24241f;          /* 正文与标题  13.95:1 on cream */
   --color-muted: #5d5c52;        /* 次要文字    6.03:1 on cream / 5.52:1 on sand */
-  --color-bronze: #80612e;       /* 浅底上的强调字、eyebrow、文字链接  5.13:1 on cream */
+  --color-bronze: #80612e;       /* 浅底上的强调字、eyebrow、文字链接  5.13:1 on cream / 4.69:1 on sand（余量小，不得调浅） */
   --color-gold: #d6b97e;         /* 主按钮底、深底上的强调字  9.41:1 on dark。浅底上不能当文字色（1.69:1） */
   --color-on-dark: #f6f2e9;      /* 深底正文 15.94:1 */
   --color-on-dark-muted: #d4cec1;/* 深底次要文字 11.36:1 */
@@ -46,7 +46,7 @@
   --font-khmer: "Noto Sans Khmer", sans-serif;   /* 高棉语全部文字 */
 
   /* ── 字号（360px→1440px 连续缩放；同级标题全站一致） ── */
-  --fs-display: clamp(54px, 7.35vw, 112px);  /* 只用于首页首屏 h1 */
+  --fs-display: clamp(42px, 7.35vw, 112px);  /* 只用于首页首屏 h1；按语义断两行，320px 宽下每行不再折行 */
   --fs-h1:      clamp(32px, 4vw, 54px);      /* 内页主标题 = 区块标题 */
   --fs-h2:      clamp(30px, 4vw, 54px);      /* 区块标题 */
   --fs-h3:      clamp(24px, 2.55vw, 36px);   /* 版块卡片标题 */
