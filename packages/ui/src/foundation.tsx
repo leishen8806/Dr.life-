@@ -264,11 +264,11 @@ export function ConfirmDialog({
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "text";
 
-export function Button({ children, variant = "primary", loading = false, disabled = false, type = "button", onClick }: {
+export function Button({ children, variant = "primary", loading = false, disabled = false, type = "button", onClick, className, ariaPressed }: {
   children: ReactNode; variant?: ButtonVariant; loading?: boolean; disabled?: boolean;
-  type?: "button" | "submit" | "reset"; onClick?: () => void;
+  type?: "button" | "submit" | "reset"; onClick?: () => void; className?: string; ariaPressed?: boolean;
 }) {
-  return <button type={type} className={`drl-button drl-button--${variant}`} disabled={disabled || loading} aria-busy={loading || undefined} onClick={onClick}>{children}</button>;
+  return <button type={type} className={["drl-button", `drl-button--${variant}`, className].filter(Boolean).join(" ")} disabled={disabled || loading} aria-busy={loading || undefined} aria-pressed={ariaPressed} onClick={onClick}>{children}</button>;
 }
 
 export function FormField({ label, error, children }: { label: string; error?: string; children: ReactNode }) {

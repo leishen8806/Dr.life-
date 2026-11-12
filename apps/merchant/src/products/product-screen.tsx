@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useI18n, type TranslationKey } from "@drlife/i18n";
 import {
   AppHeader,
+  Button,
   ConfirmDialog,
   ErrorState,
   LanguageSwitcher,
@@ -119,14 +120,14 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
     <main className="mini-shell">
       <AppHeader slogan={t("brand.slogan")} actions={<>
         <LanguageSwitcher />
-        <button type="button" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</button>
+        <Button variant="secondary" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
       </>} />
       {subordersOpen ? (
         selectedSuborder ? (
           <SuborderDetailView order={selectedSuborder} language={language} translate={t} onBack={() => setSelectedSuborder(undefined)} />
         ) : (
           <>
-            <button type="button" className="merchant-back" onClick={() => setSubordersOpen(false)}>{t("common.back")}</button>
+            <Button variant="secondary" className="merchant-back" onClick={() => setSubordersOpen(false)}>{t("common.back")}</Button>
             <h1>{t("order.suborders")}</h1>
             <SuborderListView language={language} translate={t} orders={suborders} selected={suborderStatus} onSelectStatus={setSuborderStatus} onOpen={openSuborder} />
           </>
@@ -159,13 +160,13 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
         />
       ) : (
         <>
-          <button
-            type="button"
+          <Button
+            variant="primary"
             className="merchant-create"
             onClick={startCreating}
           >
             {t("product.list.create")}
-          </button>
+          </Button>
           <ProductListView
             products={products}
             language={language}

@@ -1,4 +1,4 @@
-import { Card, EmptyState, ListItem, StatusTag } from "@drlife/ui";
+import { Button, Card, EmptyState, ListItem, StatusTag } from "@drlife/ui";
 import type { Language, TranslationKey } from "@drlife/i18n";
 import { suborderStatuses, type MerchantSuborder, type SuborderStatus } from "./suborders";
 
@@ -35,8 +35,8 @@ export function SuborderListView({
   const filtered = selected ? orders.filter((item) => item.status === selected) : orders;
   return <>
     <div className="merchant-order-filters">
-      <button type="button" aria-pressed={selected === undefined} onClick={() => onSelectStatus()}>{translate("order.merchant.all")}</button>
-      {suborderStatuses.map((status) => <button key={status} type="button" aria-pressed={selected === status} onClick={() => onSelectStatus(status)}>{translate(statusKey(status))}</button>)}
+      <Button variant="secondary" ariaPressed={selected === undefined} onClick={() => onSelectStatus()}>{translate("order.merchant.all")}</Button>
+      {suborderStatuses.map((status) => <Button key={status} variant="secondary" ariaPressed={selected === status} onClick={() => onSelectStatus(status)}>{translate(statusKey(status))}</Button>)}
     </div>
     {filtered.length === 0 ? <EmptyState title={translate("order.merchant.listEmpty")} /> : <Card><ul className="merchant-orders">
       {filtered.map((order) => <li key={order.public_id}><button type="button" className="merchant-order-item" onClick={() => onOpen(order)}>
@@ -49,7 +49,7 @@ export function SuborderListView({
 
 export function SuborderDetailView({ order, translate, onBack }: { order: MerchantSuborder; language: Language; translate: Translate; onBack: () => void }) {
   return <>
-    <button type="button" className="merchant-back" onClick={onBack}>{translate("common.back")}</button>
+    <Button variant="secondary" className="merchant-back" onClick={onBack}>{translate("common.back")}</Button>
     <Card><div className="merchant-order-detail__heading"><h2>{order.public_id}</h2><StatusTag tone="neutral">{translate(statusKey(order.status))}</StatusTag></div>
       <p>{translate("order.buyer")}: {order.shipping_address.recipient_name}</p>
       <p>{translate("order.merchant.delivery")}: {translate(statusKey(order.status))}</p>
