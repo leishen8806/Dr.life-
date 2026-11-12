@@ -7,7 +7,7 @@ const copy = locales.zh;
 const isMerchant = Astro.url.pathname.startsWith("/merchant");
 const links = isMerchant
   ? [["/", "merchant.nav.0"], ["#join", "merchant.nav.1"], ["#fees", "merchant.nav.2"], ["/contact", "merchant.nav.3"]]
-  : [["#business", "nav.vision"], ["#market", "nav.ecosystem"], ["#route", "nav.service"], ["/merchant", "nav.merchant"], ["#culture", "nav.about"]];
+  : [["#business", "nav.vision"], ["#market", "nav.ecosystem"], ["#route", "nav.service"], ["/merchant", "nav.merchant"], ["#about", "nav.about"]];
 const action = isMerchant ? { href: EXTERNAL_LINKS.merchantBot, label: "merchant.headerAction" } : { href: EXTERNAL_LINKS.buyerBot, label: "nav.shop" };
 ---
 <header class:list={["site-header", { "site-header--dark": dark }]}>
