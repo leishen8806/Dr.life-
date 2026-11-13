@@ -126,6 +126,10 @@ footer {
   flex-wrap: nowrap;
 }
 
+.merchant-back {
+  margin-bottom: var(--drl-space-2);
+}
+
 .merchant-order-filters > * {
   flex: 0 0 auto;
 }

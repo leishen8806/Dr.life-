@@ -18,6 +18,15 @@ vi.mock("@telegram-apps/sdk", () => ({
 import { getTelegramEnvironment, resolveMiniAppColorScheme, watchTelegramTheme } from "./telegram";
 
 describe("Telegram theme mapping", () => {
+  it("returns a no-op cleanup when the Telegram theme subscription is unavailable", () => {
+    const listener = vi.fn();
+    mocks.isDark.sub.mockReturnValueOnce(undefined);
+    const cleanup = watchTelegramTheme(listener);
+    expect(cleanup()).toBeUndefined();
+    expect(listener).not.toHaveBeenCalled();
+    mocks.isDark.sub.mockReset();
+  });
+
   it("maps the SDK miniApp dark signal to the document theme contract", () => {
     expect(resolveMiniAppColorScheme(true)).toBe("dark");
     expect(resolveMiniAppColorScheme(false)).toBe("light");
