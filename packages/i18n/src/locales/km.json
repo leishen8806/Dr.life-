@@ -7,14 +7,16 @@
   "common.edit": "[TODO-KM-REVIEW] កែប្រែ",
   "common.search": "[TODO-KM-REVIEW] ស្វែងរក",
   "common.refresh": "[TODO-KM-REVIEW] ផ្ទុកឡើងវិញ",
-  "common.submit": "[TODO-KM-REVIEW] បញ្ជូន",
+  "common.submit": "បញ្ជូន",
   "common.close": "[TODO-KM-REVIEW] បិទ",
   "common.loading": "កំពុងផ្ទុក",
-  "common.empty": "[TODO-KM-REVIEW] គ្មានទិន្នន័យ",
+  "common.empty": "គ្មានទិន្នន័យ",
   "common.networkError": "បញ្ហាបណ្ដាញ",
   "common.retry": "ព្យាយាមម្ដងទៀត",
   "common.success": "[TODO-KM-REVIEW] ប្រតិបត្តិការបានជោគជ័យ",
   "common.failure": "[TODO-KM-REVIEW] ប្រតិបត្តិការបរាជ័យ",
+  "common.invalidAmount": "[TODO-KM-REVIEW] ចំនួនទឹកប្រាក់មិនត្រឹមត្រូវ",
+  "common.currencyUsd": "$",
   "validation.required": "[TODO-KM-REVIEW] ត្រូវបំពេញចន្លោះនេះ",
   "validation.invalidFormat": "[TODO-KM-REVIEW] សូមបញ្ចូលតម្លៃត្រឹមត្រូវ",
   "validation.tooShort": "[TODO-KM-REVIEW] តម្លៃខ្លីពេក",
@@ -30,7 +32,7 @@
   "role.driver": "[TODO-KM-REVIEW] អ្នកបើកបរ",
   "role.wms": "[TODO-KM-REVIEW] ឃ្លាំង និងដឹកជញ្ជូន",
   "role.admin": "[TODO-KM-REVIEW] អ្នកគ្រប់គ្រងវេទិកា",
-  "language.select": "[TODO-KM-REVIEW] ជ្រើសរើសភាសា",
+  "language.select": "ជ្រើសរើសភាសា",
   "language.zh": "中文",
   "language.en": "English",
   "language.km": "ខ្មែរ",
@@ -132,7 +134,7 @@
   "app.merchant": "[TODO-KM-REVIEW] Merchant",
   "app.driver": "[TODO-KM-REVIEW] Driver",
   "app.admin": "[TODO-KM-REVIEW] Platform Admin",
-  "app.wms": "[TODO-KM-REVIEW] Warehouse Admin"
+  "app.wms": "អ្នកគ្រប់គ្រងឃ្លាំង"
 ,"error.1007": "[TODO-KM-REVIEW] Request is too large."
 ,"error.1008": "[TODO-KM-REVIEW] Request format is not supported."
 ,"error.1009": "[TODO-KM-REVIEW] This action conflicts with an earlier request."
@@ -283,56 +285,61 @@
 ,"startup.throttledTitle": "[TODO-KM-REVIEW] Sign-in paused"
 ,"startup.blockedTitle": "[TODO-KM-REVIEW] Account unavailable"
 ,"startup.signInAgain": "[TODO-KM-REVIEW] Sign in again"
- ,"wms.loginUnavailable": "[TODO-KM-REVIEW] Warehouse login is not open"
- ,"wms.loginUnavailableHint": "[TODO-KM-REVIEW] Sign-in is required before warehouse data can be shown."
- ,"wms.inventory": "[TODO-KM-REVIEW] Inventory"
- ,"wms.inventoryHint": "[TODO-KM-REVIEW] Stock by product, zone and location."
- ,"wms.receiving": "[TODO-KM-REVIEW] Receiving"
- ,"wms.receivingHint": "[TODO-KM-REVIEW] Compare scheduled and measured quantities."
- ,"wms.dispatch": "[TODO-KM-REVIEW] Dispatch"
- ,"wms.dispatchHint": "[TODO-KM-REVIEW] Pick, pack and assign delivery."
- ,"wms.product": "[TODO-KM-REVIEW] Product"
- ,"wms.zone": "[TODO-KM-REVIEW] Zone"
- ,"wms.location": "[TODO-KM-REVIEW] Location"
- ,"wms.quantity": "[TODO-KM-REVIEW] Quantity"
- ,"wms.available": "[TODO-KM-REVIEW] Available"
- ,"wms.status": "[TODO-KM-REVIEW] Status"
- ,"wms.mismatch": "[TODO-KM-REVIEW] Mismatch"
- ,"wms.mismatchHint": "[TODO-KM-REVIEW] Stock total differs from location sum."
- ,"wms.ok": "[TODO-KM-REVIEW] Consistent"
- ,"wms.adjust": "[TODO-KM-REVIEW] Stock count adjustment"
- ,"wms.reason": "[TODO-KM-REVIEW] Reason"
- ,"wms.detail": "[TODO-KM-REVIEW] Details"
- ,"wms.export": "[TODO-KM-REVIEW] Export CSV"
- ,"wms.searchProduct": "[TODO-KM-REVIEW] Search product"
- ,"wms.filterZone": "[TODO-KM-REVIEW] Filter zone"
- ,"wms.reference": "[TODO-KM-REVIEW] Reference"
- ,"wms.scheduled": "[TODO-KM-REVIEW] Scheduled"
- ,"wms.measured": "[TODO-KM-REVIEW] Measured"
- ,"wms.needsMerchantConfirm": "[TODO-KM-REVIEW] Merchant confirmation needed"
- ,"wms.ready": "[TODO-KM-REVIEW] Ready"
- ,"wms.putaway": "[TODO-KM-REVIEW] Recommended location"
- ,"wms.pickTask": "[TODO-KM-REVIEW] Pick task"
- ,"wms.items": "[TODO-KM-REVIEW] Items"
- ,"wms.deliveryMethod": "[TODO-KM-REVIEW] Delivery method"
- ,"wms.driver": "[TODO-KM-REVIEW] Driver"
- ,"wms.forbidden": "[TODO-KM-REVIEW] 403 - Access denied"
- ,"wms.forbiddenHint": "[TODO-KM-REVIEW] This account cannot access the selected page."
- ,"wms.id": "[TODO-KM-REVIEW] ID"
- ,"wms.locationTotal": "[TODO-KM-REVIEW] Location total"
- ,"wms.locations": "[TODO-KM-REVIEW] Location details"
- ,"wms.movement": "[TODO-KM-REVIEW] Inventory movement"
- ,"wms.volume": "[TODO-KM-REVIEW] Measured volume"
- ,"wms.receive": "[TODO-KM-REVIEW] Record receiving"
- ,"wms.actions": "[TODO-KM-REVIEW] Actions"
- ,"wms.pack": "[TODO-KM-REVIEW] Pack"
- ,"wms.assignHint": "[TODO-KM-REVIEW] Choose delivery and assign a driver."
- ,"wms.zto": "[TODO-KM-REVIEW] ZTO"
- ,"wms.inhouse": "[TODO-KM-REVIEW] In-house"
- ,"wms.status.ready": "[TODO-KM-REVIEW] Ready to pack"
- ,"wms.status.packed": "[TODO-KM-REVIEW] Packed"
- ,"wms.status.dispatched": "[TODO-KM-REVIEW] Dispatched"
- ,"wms.inbound": "[TODO-KM-REVIEW] Inbound orders"
- ,"wms.interfaces": "[TODO-KM-REVIEW] Interface status"
- ,"wms.notFound": "[TODO-KM-REVIEW] Page not found"
+ ,"wms.loginUnavailable": "ការចូលប្រើឃ្លាំងមិនទាន់បើក"
+ ,"wms.loginUnavailableHint": "ត្រូវចូលគណនីសិន ទើបអាចមើលទិន្នន័យឃ្លាំងបាន។"
+ ,"wms.inventory": "ស្តុកទំនិញ"
+ ,"wms.inventoryHint": "មើលស្តុកតាមទំនិញ តំបន់ និងទីតាំង។"
+ ,"wms.receiving": "ទទួលចូលឃ្លាំង"
+ ,"wms.receivingHint": "ប្រៀបធៀបចំនួនដែលបានកំណត់ និងចំនួនដែលបានទទួលពិត។"
+ ,"wms.dispatch": "បញ្ចេញ និងដឹកជញ្ជូន"
+ ,"wms.dispatchHint": "រើសទំនិញ វេចខ្ចប់ និងចាត់ចែងការដឹកជញ្ជូន។"
+ ,"wms.product": "ទំនិញ"
+ ,"wms.zone": "តំបន់"
+ ,"wms.location": "ទីតាំង"
+ ,"wms.quantity": "ចំនួនស្តុក"
+ ,"wms.available": "ចំនួនអាចប្រើបាន"
+ ,"wms.status": "ស្ថានភាព"
+ ,"wms.mismatch": "មិនត្រូវគ្នា"
+ ,"wms.mismatchHint": "ចំនួនស្តុកមិនត្រូវនឹងផលបូកតាមទីតាំង។ សូមពិនិត្យជួរដែលបានបន្លិច។"
+ ,"wms.ok": "ត្រូវគ្នា"
+ ,"wms.adjust": "កែសម្រួលស្តុក"
+ ,"wms.reason": "មូលហេតុ"
+ ,"wms.detail": "ព័ត៌មានលម្អិត"
+ ,"wms.export": "នាំចេញ CSV"
+ ,"wms.searchProduct": "ស្វែងរកទំនិញ"
+ ,"wms.filterZone": "ត្រងតំបន់"
+ ,"wms.reference": "លេខយោង"
+ ,"wms.scheduled": "ចំនួនបានកំណត់"
+ ,"wms.measured": "ចំនួនវាស់បាន"
+ ,"wms.needsMerchantConfirm": "រង់ចាំអ្នកលក់បញ្ជាក់"
+ ,"wms.ready": "រួចរាល់ដាក់ចូល"
+ ,"wms.putaway": "ទីតាំងណែនាំ"
+ ,"wms.pickTask": "ប័ណ្ណរើសទំនិញ"
+ ,"wms.items": "ចំនួនមុខ"
+ ,"wms.deliveryMethod": "វិធីដឹកជញ្ជូន"
+ ,"wms.driver": "អ្នកបើកបរ"
+ ,"wms.phone": "ទូរស័ព្ទ"
+ ,"wms.product.ceramicTile": "ក្បឿងសេរ៉ាមិច"
+ ,"wms.product.ledPanel": "បន្ទះ LED"
+ ,"wms.forbidden": "៤០៣ - គ្មានសិទ្ធិចូលប្រើ"
+ ,"wms.forbiddenHint": "គណនីនេះមិនអាចចូលទំព័រឃ្លាំងដែលបានជ្រើសទេ។"
+ ,"wms.id": "លេខសម្គាល់"
+ ,"wms.locationTotal": "សរុបតាមទីតាំង"
+ ,"wms.locations": "ព័ត៌មានទីតាំង"
+ ,"wms.movement": "ចលនាស្តុក"
+ ,"wms.volume": "មាឌវាស់បាន"
+ ,"wms.threshold": "កម្រិតខុសគ្នា"
+ ,"wms.receive": "កត់ត្រាការទទួល"
+ ,"wms.actions": "ប្រតិបត្តិការ"
+ ,"wms.pack": "វេចខ្ចប់"
+ ,"wms.assignHint": "ជ្រើសវិធីដឹកជញ្ជូន ហើយចាត់ចែងអ្នកបើកបរ បន្ទាប់ពីវេចខ្ចប់។"
+ ,"wms.assign": "ចាត់ចែង"
+ ,"wms.zto": "ZTO"
+ ,"wms.inhouse": "ដឹកជញ្ជូនផ្ទាល់ខ្លួន"
+ ,"wms.status.ready": "រង់ចាំវេចខ្ចប់"
+ ,"wms.status.packed": "បានវេចខ្ចប់"
+ ,"wms.status.dispatched": "បានចាត់ចែង"
+ ,"wms.inbound": "ទំនិញកំពុងចូល"
+ ,"wms.interfaces": "ស្ថានភាព API"
+ ,"wms.notFound": "រកមិនឃើញទំព័រ"
 }

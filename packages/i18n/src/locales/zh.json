@@ -15,6 +15,8 @@
   "common.retry": "重试",
   "common.success": "操作成功",
   "common.failure": "操作失败",
+  "common.invalidAmount": "金额无效",
+  "common.currencyUsd": "$",
   "validation.required": "此项为必填项",
   "validation.invalidFormat": "请输入有效内容",
   "validation.tooShort": "输入内容过短",
@@ -316,6 +318,9 @@
  ,"wms.items": "件数"
  ,"wms.deliveryMethod": "配送方式"
  ,"wms.driver": "司机"
+ ,"wms.phone": "电话"
+ ,"wms.product.ceramicTile": "瓷砖"
+ ,"wms.product.ledPanel": "LED 面板"
  ,"wms.forbidden": "403 - 无权限"
  ,"wms.forbiddenHint": "当前账号不能访问该仓储页面。"
  ,"wms.id": "编号"
@@ -323,10 +328,12 @@
  ,"wms.locations": "库位明细"
  ,"wms.movement": "库存流水"
  ,"wms.volume": "实测体积"
+ ,"wms.threshold": "差异阈值"
  ,"wms.receive": "收货录入"
  ,"wms.actions": "操作"
  ,"wms.pack": "打包"
  ,"wms.assignHint": "打包后选择配送方式并派单给司机。"
+ ,"wms.assign": "指派"
  ,"wms.zto": "中通"
  ,"wms.inhouse": "自建配送"
  ,"wms.status.ready": "待打包"

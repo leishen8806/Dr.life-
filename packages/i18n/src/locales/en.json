@@ -15,6 +15,8 @@
   "common.retry": "Retry",
   "common.success": "Operation successful",
   "common.failure": "Operation failed",
+  "common.invalidAmount": "Invalid amount",
+  "common.currencyUsd": "$",
   "validation.required": "This field is required",
   "validation.invalidFormat": "Enter a valid value",
   "validation.tooShort": "The value is too short",
@@ -316,6 +318,9 @@
  ,"wms.items": "Items"
  ,"wms.deliveryMethod": "Delivery method"
  ,"wms.driver": "Driver"
+ ,"wms.phone": "Phone"
+ ,"wms.product.ceramicTile": "Ceramic tile"
+ ,"wms.product.ledPanel": "LED panel"
  ,"wms.forbidden": "403 - Access denied"
  ,"wms.forbiddenHint": "This account cannot access the selected warehouse page."
  ,"wms.id": "ID"
@@ -323,10 +328,12 @@
  ,"wms.locations": "Location details"
  ,"wms.movement": "Inventory movement"
  ,"wms.volume": "Measured volume"
+ ,"wms.threshold": "Variance threshold"
  ,"wms.receive": "Record receiving"
  ,"wms.actions": "Actions"
  ,"wms.pack": "Pack"
  ,"wms.assignHint": "Choose a delivery method and assign a driver after packing."
+ ,"wms.assign": "Assign"
  ,"wms.zto": "ZTO"
  ,"wms.inhouse": "In-house"
  ,"wms.status.ready": "Ready to pack"
