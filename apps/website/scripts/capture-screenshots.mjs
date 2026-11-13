@@ -89,13 +89,13 @@ try {
         }
         if (width === 1920 && pageDefinition.name === "home") {
           const geometry = await page.evaluate(() => {
-            const navItems = [...document.querySelectorAll(".site-header .main-nav a")]
+            const navItems = [...document.querySelectorAll(".topbar .nav > a:not(.nav-cta)")]
               .filter((item) => getComputedStyle(item).display !== "none" && item.getBoundingClientRect().width > 0);
             const partnerContainer = document.querySelector(".section.partners > .container");
             const partnerGrid = document.querySelector(".partner-grid");
             const partnerCards = [...document.querySelectorAll(".partner-grid .partner")];
-            const accessGrid = document.querySelector(".access-grid");
-            const accessCards = [...document.querySelectorAll(".access-grid .access-card")];
+            const accessGrid = document.querySelector(".app-grid");
+            const accessCards = [...document.querySelectorAll(".app-grid .app-card")];
             const businessContainer = document.querySelector("#business > .container");
             const routeContainer = document.querySelector(".route .container");
             const steps = document.querySelector(".route .steps");
@@ -141,7 +141,7 @@ try {
             });
             const partnerGrid = document.querySelector(".partner-grid");
             const apps = document.querySelector("#apps");
-            const navItems = [...document.querySelectorAll(".site-header .main-nav a")]
+            const navItems = [...document.querySelectorAll(".topbar .nav a")]
               .filter((item) => getComputedStyle(item).display !== "none" && item.getBoundingClientRect().width > 0);
             const language = document.querySelector(".header-actions .languages");
             const shop = document.querySelector(".header-actions .shop-link");
@@ -172,19 +172,16 @@ try {
             throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);
           }
           if ([1280, 1440].includes(width)) {
-            const menuButton = page.locator(".mobile-menu summary");
-            const menuButtonBox = await menuButton.boundingBox();
-            if (!menuButtonBox || menuButtonBox.width <= 0 || menuButtonBox.height <= 0 || menuButtonBox.left < 0 || menuButtonBox.right > width) {
-              throw new Error(`Desktop menu button is not visible in the viewport at ${width}px (${language})`);
+            const navLink = page.locator(".nav a").first();
+            const appLink = page.locator(".nav-apps");
+            if (!(await navLink.isVisible()) || !(await appLink.isVisible())) {
+              throw new Error(`Desktop navigation or App entry is hidden at ${width}px (${language})`);
             }
-            await menuButton.click();
-            const appLink = page.locator(".mobile-menu[open] nav a[href='#apps']");
-            if (!(await appLink.isVisible())) throw new Error(`Desktop menu lacks a visible App entry at ${width}px (${language})`);
           }
           if (width >= 1441) {
-            const desktopNav = page.locator(".main-nav a").first();
-            const shopLink = page.locator(".shop-link");
-            if (!(await desktopNav.isVisible()) || !(await shopLink.isVisible())) {
+            const desktopNav = page.locator(".nav a").first();
+            const appLink = page.locator(".nav-apps");
+            if (!(await desktopNav.isVisible()) || !(await appLink.isVisible())) {
               throw new Error(`Desktop navigation or App entry is hidden at ${width}px (${language})`);
             }
           }
