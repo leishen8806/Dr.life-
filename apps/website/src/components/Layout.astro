@@ -35,7 +35,14 @@ const canonical = new URL(Astro.url.pathname, SITE_URL).href;
     <slot name="head" />
     <link rel="preload" href="/fonts/inter-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/noto-sans-khmer-ijwCs5roRME5LLRxjsRb-gssOenAyendxrgV2c-Zw-9vR1kFeg.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="/fonts/fonts.css" media="print" onload="this.media='all'" />
+    <script is:inline>
+      window.addEventListener("load", () => {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "/fonts/fonts.css";
+        document.head.append(link);
+      }, { once: true });
+    </script>
     <noscript><link rel="stylesheet" href="/fonts/fonts.css" /></noscript>
   </head>
   <body data-lang={lang}>
