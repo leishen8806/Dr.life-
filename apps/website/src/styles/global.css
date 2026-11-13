@@ -133,9 +133,9 @@ a:focus-visible {
   min-width: 0;
   flex-wrap: nowrap;
 }
-.main-nav a { white-space: nowrap; font-size: clamp(11px, .7vw, 14px); }
+.main-nav a { white-space: nowrap; font-size: var(--fs-small); }
 [data-lang="km"] .main-nav { gap: clamp(6px, .55vw, 10px); }
-[data-lang="km"] .main-nav a { font-size: clamp(10px, .65vw, 13px); }
+[data-lang="km"] .main-nav a { font-size: var(--fs-small); }
 .footer-links a,
 .main-nav a {
   text-decoration: none;
