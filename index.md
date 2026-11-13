@@ -1,8 +1,8 @@
 # PR #233 screenshot evidence
 
-Generated from Website workflow run `43238382805` for head `d4a3ba2fee53042706799c629a799618166f742e`.
+Generated from the local capture scripts for PR head `deb020a` (`fix(website): address B5 review findings`).
 
-All 60 evidence files in this branch are WebP and are below 300 KB each.
+All 72 evidence files in this branch are WebP and are below 300 KB each.
 
 ## Website matrix (D/F)
 
@@ -10,14 +10,14 @@ The website captures cover the requested 360, 390, 768, 1280, 1440 and 1920 pixe
 
 - `site-{home,merchant}-{360,390,768,1280,1440,1920}-{zh,en,km}.webp`
 
-The CI capture job exercised the full website matrix with h1 visibility, failed-resource, and horizontal-overflow assertions.
+The capture job exercised the full website matrix with h1 visibility, failed-resource, horizontal-overflow, and the 1920px Chinese route-title assertions.
 
 ## Mini App matrix
 
-The remaining 24 files are the CI-produced buyer/merchant matrix at 360/430 pixels, light/dark themes and zh/en/km locales. The job completed successfully and wrote `manifest.txt` before these files were converted to WebP. The largest evidence file is 296,860 bytes, below the 300 KB limit.
+The remaining 36 files are the buyer home and order-list plus merchant home matrix at 360/430 pixels, light/dark themes and zh/en/km locales. The capture uses deterministic local API responses, waits through the splash gate, asserts business-page headings, and writes the requested locale into the page before capture.
 
 ## Acceptance evidence
 
-- Website screenshot evidence: PASS — run `43238382805`, current head `d4a3ba2`.
-- CI gate: PASS — run `43238382755`, current head `d4a3ba2`.
-- The screenshot job also asserted visible h1 content and no horizontal overflow at each viewport.
+- Website screenshot evidence: PASS — 36 current-head captures for `deb020a`.
+- Mini App screenshot evidence: PASS — 36 current-head captures for `deb020a`, including buyer home/order list and merchant home.
+- Local verification: PASS — website tests 50/50, Astro build, screenshot captures, and `git diff --check`.
