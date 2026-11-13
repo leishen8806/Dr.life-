@@ -263,8 +263,6 @@ dialog .actions{margin-top:15px}
 
 /* B11 accessibility and brand guardrails. */
 body { min-width: 0; overflow-x: hidden; }
-body, button, input, textarea { font-size: max(12px, 1em); }
-body[data-lang="km"], body[data-lang="km"] button, body[data-lang="km"] input, body[data-lang="km"] textarea { font-size: max(13px, 1em); }
 body[data-lang="km"] .eyebrow,
 body[data-lang="km"] .hero-caption,
 body[data-lang="km"] .photo-caption,
@@ -275,22 +273,83 @@ body[data-lang="km"] .app-card strong,
 body[data-lang="km"] .app-card figcaption span { font-size: 13px; }
 .bronze, .text-link, .nav-cta, .partner a { color: var(--color-bronze, var(--bronze)); }
 
-/* B11 parity fixes for the frozen 1440/390 dispatcher renders. */
-.values article{background:transparent;border:0;border-top:1px solid var(--rule);padding:13px 0 0}
-.access-section,.access-section .app-card{background:var(--dark)}
-@media(max-width:520px){
-  .hero .actions{flex-wrap:nowrap;gap:8px}
-  .hero .actions .button{flex:1 1 0;min-width:0;padding-inline:9px;gap:8px;font-size:12px}
-  .business-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-  .business-grid .panel{min-width:0}
-  .business-grid .panel figure{aspect-ratio:1.25}
-  .business-grid .panel-copy{padding:12px 9px}
-  .business-grid .panel .eyebrow{white-space:nowrap;letter-spacing:.03em;font-size:12px;gap:5px}
-  .business-grid .panel .eyebrow::before{width:12px}
-  .business-grid .panel h3{font-size:20px}
-  .business-grid .panel p,.business-grid .panel-list{font-size:12px}
-  .business-grid .panel-list li{grid-template-columns:1fr;gap:2px;padding:5px 0}
-  .access-section .app-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
-  .access-section .app-card{display:block;text-align:center;padding:7px 4px}
-  .access-section .app-card img{width:min(96px,100%);margin:0 auto 7px}
+/* Keep the source page's own geometry ahead of the shared legacy stylesheet. */
+body.homepage-source-page.homepage-source-page {
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.82;
+  text-wrap: initial;
+}
+body.homepage-source-page.homepage-source-page .hero-content {
+  max-width: 650px;
+  margin: 0;
+  padding: 0;
+}
+body.homepage-source-page.homepage-source-page .section {
+  max-width: none;
+  margin: 0;
+  padding-inline: 0;
+  padding-block: clamp(60px, 8vw, 122px);
+}
+body.homepage-source-page.homepage-source-page .hero h1 {
+  font-size: clamp(61px, 7.35vw, 112px);
+  letter-spacing: -0.055em;
+  line-height: 1.01;
+  margin: 28px 0 15px;
+}
+body.homepage-source-page.homepage-source-page .hero-index .container {
+  grid-template-columns: repeat(4, 1fr);
+  padding-block: 0;
+}
+body.homepage-source-page.homepage-source-page .hero-index a { min-height: 84px; }
+body.homepage-source-page.homepage-source-page .business-grid .panel-copy {
+  padding: clamp(18px, 2.5vw, 35px);
+}
+body.homepage-source-page.homepage-source-page .steps { grid-template-columns: repeat(4, 1fr); }
+body.homepage-source-page.homepage-source-page .values { gap: 14px; }
+body.homepage-source-page.homepage-source-page .partner-grid { gap: 12px; }
+body.homepage-source-page.homepage-source-page .partner-grid .partner {
+  padding: clamp(15px, 2vw, 24px);
+}
+body.homepage-source-page.homepage-source-page .access-section {
+  padding-block: clamp(45px, 6.4vw, 90px);
+}
+body.homepage-source-page.homepage-source-page .section-title { margin: 0; }
+body.homepage-source-page.homepage-source-page .eyebrow { font-size: 11px; }
+body.homepage-source-page.homepage-source-page .lead { font-size: 16px; line-height: 1.82; }
+body.homepage-source-page.homepage-source-page .panel p,
+body.homepage-source-page.homepage-source-page .market p { font-size: 15px; line-height: normal; }
+body.homepage-source-page.homepage-source-page .steps p { font-size: 14px; line-height: 1.72; }
+body.homepage-source-page.homepage-source-page .values p { font-size: 14px; line-height: normal; }
+body.homepage-source-page.homepage-source-page .partner p { font-size: 14px; line-height: 1.7; }
+body.homepage-source-page.homepage-source-page .access-card p { font-size: 13px; line-height: 1.6; }
+body.homepage-source-page.homepage-source-page .business-grid { margin-top: 0; }
+body.homepage-source-page.homepage-source-page .business-grid .panel-copy {
+  width: auto;
+  gap: normal;
+}
+body.homepage-source-page.homepage-source-page .hero-index .container { padding-block: 0; }
+body.homepage-source-page.homepage-source-page .hero-index a { padding: 10px 15px; }
+body.homepage-source-page.homepage-source-page .values article { background: transparent; }
+body.homepage-source-page.homepage-source-page .partner-grid,
+body.homepage-source-page.homepage-source-page .access-grid { margin-top: 0; }
+body.homepage-source-page.homepage-source-page .section.partners { padding-block: clamp(60px, 8vw, 122px); }
+body.homepage-source-page.homepage-source-page .section.partners > .container {
+  width: min(calc(100% - 2 * var(--pad)), var(--content));
+}
+@media (max-width: 680px) {
+  body.homepage-source-page.homepage-source-page .hero h1 {
+    margin-top: 21px;
+    font-size: clamp(54px, 13.5vw, 83px);
+  }
+  body.homepage-source-page.homepage-source-page .hero-index .container {
+    grid-template-columns: 1fr 1fr;
+  }
+  body.homepage-source-page.homepage-source-page .hero-index a {
+    min-height: 57px;
+    padding: 8px;
+  }
+  body.homepage-source-page.homepage-source-page .steps {
+    grid-template-columns: 1fr 1fr;
+  }
 }

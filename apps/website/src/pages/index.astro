@@ -8,7 +8,7 @@ const sourcePath = path.resolve(process.cwd(), "src/data/homepage-source.html");
 const sourceBody = fs.readFileSync(sourcePath, "utf8");
 ---
 
-<Layout titleKey="home.title" descriptionKey="home.intro">
+<Layout titleKey="home.title" descriptionKey="home.intro" homepageSource>
   <span id="about" hidden></span>
   <Fragment set:html={sourceBody} />
   <script src="/scripts/homepage-source.js" defer></script>
