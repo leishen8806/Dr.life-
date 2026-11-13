@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5176 --strictPort",
-    "prebuild": "pnpm --filter @drlife/i18n i18n:check",
+    "prebuild": "pnpm --config.engine-strict=false --filter @drlife/i18n i18n:check",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "@drlife/i18n": "workspace:*",
