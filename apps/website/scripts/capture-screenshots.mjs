@@ -126,6 +126,45 @@ try {
           if (geometry.stepsRatio < 0.98 || geometry.stepColumns !== 4) throw new Error(`Route steps use too little width: ${geometry.stepsRatio} / ${geometry.stepColumns} columns`);
           if (geometry.skipVisible) throw new Error("Skip link is visible before focus");
         }
+        if (pageDefinition.name === "home") {
+          const homepageGeometry = await page.evaluate(() => {
+            const overlap = (a, b) => a && b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+            const sections = [".market", ".route", ".access-section", ".partners"].map((selector) => {
+              const node = document.querySelector(selector);
+              const rect = node?.getBoundingClientRect();
+              const background = node ? getComputedStyle(node).backgroundColor : "";
+              return { selector, left: rect?.left ?? 0, right: rect?.right ?? 0, background };
+            });
+            const partnerGrid = document.querySelector(".partner-grid");
+            const apps = document.querySelector("#apps");
+            const navItems = [...document.querySelectorAll(".site-header .main-nav a")];
+            const language = document.querySelector(".header-actions .languages");
+            const shop = document.querySelector(".header-actions .shop-link");
+            const partnerContainer = document.querySelector(".section.partners > .container");
+            const businessContainer = document.querySelector("#business > .container");
+            return {
+              sections,
+              partnerLeftDelta: (partnerContainer?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0),
+              partnerGap: (apps?.getBoundingClientRect().top ?? 0) - (partnerGrid?.getBoundingClientRect().bottom ?? 0),
+              navOverlap: navItems.some((item) => {
+                const rect = item.getBoundingClientRect();
+                return overlap(rect, language?.getBoundingClientRect()) || overlap(rect, shop?.getBoundingClientRect());
+              })
+            };
+          });
+          for (const section of homepageGeometry.sections) {
+            if (section.left > 1 || section.right < width - 1) throw new Error(`Homepage section is not full-bleed at ${width}px (${language}): ${section.selector} ${section.left}..${section.right}`);
+          }
+          if ([360, 390, 768].includes(width) && Math.abs(homepageGeometry.partnerLeftDelta) > 2) {
+            throw new Error(`Partner left edge is not aligned at ${width}px (${language}): ${homepageGeometry.partnerLeftDelta}px`);
+          }
+          if ([1280, 1440, 1920].includes(width) && homepageGeometry.navOverlap) {
+            throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);
+          }
+          if ([1440, 1920].includes(width) && homepageGeometry.partnerGap < 64) {
+            throw new Error(`Partner cards touch the app section at ${width}px (${language}): ${homepageGeometry.partnerGap}px gap`);
+          }
+        }
         await page.waitForTimeout(150);
         const relative = posix.join(String(width), language, `${pageDefinition.name}.png`);
         await mkdir(join(output, String(width), language), { recursive: true });

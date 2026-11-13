@@ -129,11 +129,13 @@ a:focus-visible {
 .main-nav {
   display: flex;
   flex: 1;
-  gap: var(--space-6);
+  gap: clamp(6px, .55vw, 10px);
   min-width: 0;
   flex-wrap: nowrap;
 }
-.main-nav a { white-space: nowrap; }
+.main-nav a { white-space: nowrap; font-size: clamp(11px, .7vw, 14px); }
+[data-lang="km"] .main-nav { gap: clamp(6px, .55vw, 10px); }
+[data-lang="km"] .main-nav a { font-size: clamp(10px, .65vw, 13px); }
 .footer-links a,
 .main-nav a {
   text-decoration: none;
@@ -263,10 +265,16 @@ a:focus-visible {
 .section.partners {
   display: block;
   width: auto;
-  max-width: 1280px;
+  max-width: none;
   margin: 0 auto;
-  padding-inline: 48px;
+  padding-inline: 0;
 }
+.section.partners > .container {
+  width: min(calc(100% - 2 * var(--gutter)), var(--container));
+  max-width: 1280px;
+  padding-inline: 0;
+}
+.section.partners { background: var(--ivory); }
 .partner small, .demo-tag { color: var(--accent-text); letter-spacing: var(--track-eyebrow); }
 .access-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--color-border-strong); }
 .access-card { background: var(--color-dark-2); color: var(--color-on-dark); }
@@ -280,6 +288,12 @@ a:focus-visible {
   .market-visual { min-height: 280px; }
   .section { padding-block: 88px; }
   .steps li { border-left: 0; border-top: 1px solid var(--color-border-on-dark); }
+}
+@media (max-width: 520px) {
+  .section.partners > .container { width: calc(100% - 40px - 2 * var(--gutter)); }
+}
+@media (min-width: 521px) and (max-width: 800px) {
+  .section.partners > .container { width: calc(100% - 64px - 2 * var(--gutter)); }
 }
 @media (min-width: 1200px) {
   .partner-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -350,6 +364,20 @@ a:focus-visible {
 .section {
   padding-block: 140px;
 }
+.market,
+.route,
+.partners,
+.access-section,
+#business {
+  max-width: none;
+}
+.section#business > .container { max-width: 1280px; margin-inline: auto; }
+.market > .container,
+.route > .container,
+.access-section > .container {
+  max-width: 1280px;
+  margin-inline: auto;
+}
 .section--dark {
   max-width: none;
   background: var(--deep);
@@ -387,6 +415,11 @@ a:focus-visible {
   margin: 54px 0 0;
   padding: 0;
   list-style: none;
+}
+.section.partners { padding-block: 96px; }
+.section.partners { display: block; }
+@media (max-width: 800px) {
+  .section.partners { padding-block: 88px; }
 }
 .partner,
 .stage {
