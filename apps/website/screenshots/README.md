@@ -1,10 +1,10 @@
 # PR #249 visual evidence
 
-Website head: `f53b8a9`; evidence refresh: `bb8da0a`
+Website head: `42a6be2`; evidence refresh: `cb2185e`
 
 Full-page height check (static capture, Chinese): 1440px original `6998`,
 implementation `6993` (0.07% difference); 390px original `9387`,
-implementation `9510` (1.31% difference). Both are within the 5% acceptance
+implementation `9459` (0.77% difference). Both are within the 5% acceptance
 threshold. The capture command was
 `pnpm --config.engine-strict=false --filter @drlife/website capture:screenshots`.
 
