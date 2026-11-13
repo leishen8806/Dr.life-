@@ -11,7 +11,7 @@ const cjk = /[\u3400-\u9fff]/;
 test("English home content paths are wired for every repeated buyer-visible section", () => {
   const source = page("index");
 
-  for (const key of ["home.stats", "home.stages", "home.ecosystemNodes", "home.chain", "home.partners"]) {
+  for (const key of ["home.homepageV2.business.cards", "home.homepageV2.market.groups", "home.homepageV2.route.steps", "home.homepageV2.culture.values", "home.homepageV2.partners.cards", "home.homepageV2.appsV2.cards"]) {
     assert.match(source, new RegExp("data-i18n=\\{`" + key + "\\.\\$\\{index\\}"), `${key} is not localized`);
   }
 });

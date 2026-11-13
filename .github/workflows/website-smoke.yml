@@ -1,0 +1,64 @@
+name: Website smoke and Lighthouse
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Check public URL configuration
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          WEBSITE_PUBLIC_URL: ${{ secrets.WEBSITE_PUBLIC_URL }}
+        run: |
+          if [ -z "$WEBSITE_PUBLIC_URL" ]; then
+            echo "::notice::WEBSITE_PUBLIC_URL is not configured; smoke and Lighthouse checks are skipped."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+  smoke:
+    name: Post-release smoke and daily patrol
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WEBSITE_PUBLIC_URL: ${{ secrets.WEBSITE_PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Enable pnpm
+        run: corepack enable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --filter @drlife/website exec playwright install --with-deps chromium
+      - name: Run website smoke
+        run: pnpm --filter @drlife/website exec node scripts/website-smoke.mjs
+      - name: Run Lighthouse acceptance gate
+        run: >-
+          npx --yes lighthouse@12.6.0 "$WEBSITE_PUBLIC_URL" --output=json
+          --output-path=/tmp/lighthouse.json --chrome-flags="--headless --no-sandbox"
+      - name: Check Lighthouse thresholds
+        run: pnpm --filter @drlife/website exec node scripts/check-lighthouse.mjs /tmp/lighthouse.json
+      - name: Upload smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-smoke-evidence
+          path: artifacts/website-smoke
+          if-no-files-found: warn
+          retention-days: 14

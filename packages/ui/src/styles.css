@@ -91,6 +91,15 @@ body {
   overflow: visible;
 }
 
+.drl-language-switcher .drl-button {
+  padding-inline: var(--drl-space-2);
+}
+.drl-language-switcher .drl-button[aria-pressed="true"] {
+  color: var(--accent-on-fill);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+}
+
 .drl-loading {
   display: inline-flex;
   align-items: center;
@@ -141,7 +150,7 @@ body {
 .drl-tiered-price li { display: flex; justify-content: space-between; gap: var(--space-3); }
 .drl-product-card { position: relative; display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: var(--space-3); width: 100%; min-height: var(--tap-min); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius); color: var(--text); background: var(--surface); font: inherit; text-align: start; }
 .drl-product-card__body { display: grid; gap: var(--space-1); min-width: 0; }
-.drl-product-card__body strong { overflow-wrap: anywhere; }
+.drl-product-card__body h3 { margin: 0; font: inherit; font-weight: var(--fw-bold); overflow-wrap: anywhere; }
 .drl-image-placeholder { display: block; width: 72px; height: 72px; border-radius: var(--radius); object-fit: cover; background: var(--bg-alt); }
 .drl-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); border-bottom: 1px solid var(--color-border); }
 .drl-tabs button { min-height: var(--tap-min); border: 0; border-bottom: 2px solid transparent; color: var(--text-muted); background: transparent; font: inherit; }
@@ -179,6 +188,9 @@ body {
 
 .drl-app-header__actions {
   display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: var(--drl-space-2);
 }
 
@@ -306,6 +318,11 @@ body {
 .drl-status-tag--success { color: var(--drl-color-brand-strong); background: color-mix(in srgb, var(--drl-color-success), transparent 85%); }
 .drl-status-tag--warning { color: var(--drl-color-warning); background: color-mix(in srgb, var(--drl-color-warning), transparent 85%); }
 .drl-status-tag--danger { color: var(--drl-color-danger); background: color-mix(in srgb, var(--drl-color-danger), transparent 85%); }
+
+[data-surface="miniapp"][data-color-scheme="dark"] .drl-status-tag--neutral {
+  color: var(--color-on-dark);
+  background: #3b3b37;
+}
 
 .drl-overlay {
   position: fixed;

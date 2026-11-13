@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "capture:screenshots": "pnpm build && node scripts/capture-screenshots.mjs",
+    "capture:miniapp-screenshots": "node scripts/capture-miniapp-screenshots.mjs",
     "dev": "astro dev",
     "build": "astro build",
     "lint": "eslint src tests astro.config.mjs",
