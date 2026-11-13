@@ -3,7 +3,7 @@ name: drlife-staging
 services:
   api:
     image: drlife-api:${APP_RELEASE:-staging}
-    env_file: [.env]
+    env_file: ["${STAGING_ENV_FILE:-.env}"]
     environment:
       APP_ENV: staging
       MIGRATIONS_DIR: /migrations
@@ -23,7 +23,7 @@ services:
         - 'wget -q -O /dev/null http://127.0.0.1:8080/healthz'
   worker:
     image: drlife-api:${APP_RELEASE:-staging}
-    env_file: [.env]
+    env_file: ["${STAGING_ENV_FILE:-.env}"]
     environment:
       APP_ENV: staging
       MIGRATIONS_DIR: /migrations
@@ -35,7 +35,7 @@ services:
     volumes: [../../backend/migrations:/migrations:ro]
   routefitmock:
     image: drlife-api:${APP_RELEASE:-staging}
-    env_file: [.env]
+    env_file: ["${STAGING_ENV_FILE:-.env}"]
     environment: { APP_ENV: staging }
     entrypoint: [/routefitmock]
   migrate:
@@ -50,7 +50,7 @@ services:
     profiles: [ops]
   postgres:
     image: postgres:18.1-alpine
-    env_file: [.env]
+    env_file: ["${STAGING_ENV_FILE:-.env}"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-drlife_staging}
       POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
@@ -83,18 +83,22 @@ services:
     healthcheck: { test: [CMD-SHELL, 'redis-cli -a "$${REDIS_CACHE_PASSWORD}" ping'] }
   buyer:
     image: nginx:1.29.3-alpine
-    volumes: ["${STAGING_SITE_ROOT:?set STAGING_SITE_ROOT}/current:/usr/share/nginx/html:ro"]
+    volumes: ["${STAGING_SITE_ROOT:?set STAGING_SITE_ROOT}/buyer/current:/usr/share/nginx/html:ro"]
   merchant:
     image: nginx:1.29.3-alpine
-    volumes: ["${STAGING_SITE_ROOT:?set STAGING_SITE_ROOT}/current:/usr/share/nginx/html:ro"]
+    volumes: ["${STAGING_SITE_ROOT:?set STAGING_SITE_ROOT}/merchant/current:/usr/share/nginx/html:ro"]
   admin:
     image: nginx:1.29.3-alpine
-    volumes: ["${STAGING_SITE_ROOT:?set STAGING_SITE_ROOT}/current:/usr/share/nginx/html:ro"]
-  cloudflared:
-    image: cloudflare/cloudflared:2025.11.1
-    command: [tunnel, --no-autoupdate, run]
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN:?set in .env}
+    volumes: ["${STAGING_SITE_ROOT:?set STAGING_SITE_ROOT}/admin/current:/usr/share/nginx/html:ro"]
+  edge:
+    image: nginx:1.29.3-alpine
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./nginx/staging.conf:/etc/nginx/conf.d/default.conf:ro
+      - "${STAGING_CLOUDFLARE_REAL_IP_CONFIG:-./nginx/cloudflare-real-ip.conf}:/etc/nginx/conf.d/cloudflare-real-ip.conf:ro"
+      - ./nginx/proxy_params:/etc/nginx/proxy_params:ro
+      - "${STAGING_ORIGIN_CERT_PATH:?set STAGING_ORIGIN_CERT_PATH}:/etc/nginx/tls/origin.crt:ro"
+      - "${STAGING_ORIGIN_KEY_PATH:?set STAGING_ORIGIN_KEY_PATH}:/etc/nginx/tls/origin.key:ro"
     depends_on: [api, buyer, merchant, admin]
 
 volumes:

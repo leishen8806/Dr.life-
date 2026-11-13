@@ -116,19 +116,25 @@ const homepageV2Full = {
   km: { ...homepageV2.km, hero: { title: "ជីវិត·លទ្ធភាពគ្មានដែនកំណត់", subtitle: "INFINITE POSSIBILITIES!", intro: "មានមូលដ្ឋាននៅភ្នំពេញ និងភ្ជាប់ការផ្គត់ផ្គង់សកលទៅជីវិតកម្ពុជា។ DR.LIFE+ ភ្ជាប់ពាណិជ្ជកម្ម បន្ទប់តាំងបង្ហាញ ការដឹកជញ្ជូន ឃ្លាំង និងសេវាពាណិជ្ជករ។" }, partners: { label: "WORK WITH DR / សហការជាមួយ DR", title: "រីកចម្រើនជាមួយ DR.LIFE+", intro: "ស្វែងរកអាជីវកម្មដែលពាក់ព័ន្ធ និងត្រៀមព័ត៌មានសម្រាប់ការពិភាក្សាបន្ទាប់។", cards: [["BUYERS & PROJECTS", "អ្នកប្រើ និងក្រុមគម្រោង", "ជ្រើសរើសការរចនា សំណង់ និងសម្ភារៈ រួចសម្របសម្រួលគំរូ ការទិញ ការដំឡើង និងការត្រួតពិនិត្យ។"], ["BRANDS & FACTORIES", "ម៉ាក និងរោងចក្រចិន", "រៀបចំការលក់ និងការប្រគល់នៅកម្ពុជាតាមឃ្លាំងមួយ ការចុះឈ្មោះពាណិជ្ជករ និងការបង្ហាញក្នុងស្រុក។"], ["LOCAL MERCHANTS", "ពាណិជ្ជករ និងដៃគូសេវាក្នុងស្រុក", "ពិភាក្សាការចូលវេទិកា បន្ទប់តាំងបង្ហាញ និងកិច្ចសហការជួសជុល និងដំឡើង។"], ["FULFILLMENT CLIENTS", "អតិថិជនវេទិកា និងឃ្លាំង", "ពិភាក្សាសេវាឃ្លាំង និងដឹកជញ្ជូនតាមចំនួនបញ្ជាទិញ និងប្រភេទទំនិញ។"]] }, channels: { label: "OFFICIAL CHANNELS / ឆានែលផ្លូវការ", intro: "ស្វែងរក DR520 នៅលើវេទិកាដែលពាក់ព័ន្ធ ដើម្បីទទួលព័ត៌មានថ្មីៗ។", items: ["Telegram · DR520", "Facebook · DR520", "WeChat Official Account · DR520"] } }
 } as const;
 
+const homepageV2WithSkip = {
+  zh: { ...homepageV2Full.zh, skip: "跳到正文" },
+  en: { ...homepageV2Full.en, skip: "Skip to content" },
+  km: { ...homepageV2Full.km, skip: "រំលងទៅមាតិកា" }
+} as const;
+
 const homepageV2Localized = {
   zh: {
-    ...homepageV2Full.zh,
+    ...homepageV2WithSkip.zh,
     hero: { ...homepageV2Full.zh.hero, eyebrow: "DR.LIFE+ / 生活家", primary: "洽谈合作", secondary: "探索四大版块" },
     business: { ...homepageV2Full.zh.business, ctas: ["了解金边智慧建材城", "了解一仓入柬", "了解仓配合作", "金融服务暂未开放"] }
   },
   en: {
-    ...homepageV2Full.en,
+    ...homepageV2WithSkip.en,
     hero: { ...homepageV2Full.en.hero, eyebrow: "DR.LIFE+ / LIFE & HOME", primary: "Discuss cooperation", secondary: "Explore four businesses" },
     business: { ...homepageV2Full.en.business, ctas: ["Explore Phnom Penh showroom", "Explore one warehouse into Cambodia", "Explore fulfilment cooperation", "Finance not yet available"] }
   },
   km: {
-    ...homepageV2Full.km,
+    ...homepageV2WithSkip.km,
     hero: { ...homepageV2Full.km.hero, eyebrow: "DR.LIFE+ / ជីវិត និងគេហដ្ឋាន", primary: "ពិភាក្សាកិច្ចសហការ", secondary: "ស្វែងរកអាជីវកម្ម ៤" },
     business: { ...homepageV2Full.km.business, ctas: ["ស្វែងយល់អំពីបន្ទប់តាំងបង្ហាញភ្នំពេញ", "ស្វែងយល់អំពីឃ្លាំងមួយទៅកម្ពុជា", "ស្វែងយល់អំពីកិច្ចសហការឃ្លាំង និងដឹកជញ្ជូន", "ហិរញ្ញវត្ថុមិនទាន់បើក"] },
     market: { ...homepageV2Full.km.market, groups: [["សំណង់ និងជួសជុល", "ក្បឿង · បន្ទប់ទឹក · ថ្មសិប្បនិម្មិត · ថ្ម · ទ្វារ · ភ្លើង · ឧបករណ៍ · បន្ទះសម្ភារៈ · ថ្នាំលាប"], ["ការកំណត់តាមតម្រូវការ និងគេហដ្ឋាន", "គេហដ្ឋានតាមតម្រូវការ · គ្រឿងសង្ហារឹម · ឧបករណ៍ប្រើប្រាស់"], homepageV2Full.km.market.groups[2]] }
@@ -146,7 +152,7 @@ const homepageV2Acceptance = {
         [["云仓作业", "提供入库、储存、分拣、贴标与出库服务。"], ["同城速送", "按货物体积、地址及预约时间，安排同城即时配送或预约配送。"], ["大件交付", "按项目需要衔接装卸搬运、上门安装与签收。"]],
         []
       ],
-      note: "金融服务只与持牌机构合作，金融服务尚未开放。"
+      note: ""
     },
     market: { ...homepageV2Localized.zh.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["瓷砖和地面材料体验区", "定制家居与家具体验区", "工具和日用商品体验区"], note: "展厅为一期规划，具体品类与开放安排以公告为准。" },
     route: { ...homepageV2Localized.zh.route, note: "可在平台上按需选择运输、仓储、展示、销售或配送服务；具体安排按货品、订单与服务约定确定。" },
@@ -167,7 +173,7 @@ const homepageV2Acceptance = {
         [["Cloud-warehouse operations", "Provide inbound receipt, storage, sorting, labelling and outbound services."], ["Same-city express delivery", "Arrange same-city immediate or scheduled delivery by goods volume, address and appointment time."], ["Large-item delivery", "Connect loading, handling, door-to-door installation and sign-off as projects require."]],
         []
       ],
-      note: "Financial services work only with licensed institutions and are not yet available."
+      note: ""
     },
     market: { ...homepageV2Localized.en.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["Tiles and flooring showroom", "Custom home and furniture showroom", "Tools and daily-goods showroom"], note: "The showroom is planned for phase one; categories and opening arrangements are subject to announcement." },
     route: { ...homepageV2Localized.en.route, note: "Choose transport, warehousing, display, sales or delivery services on the platform as needed; arrangements depend on the goods, order and service agreement." },
@@ -189,7 +195,7 @@ const homepageV2Acceptance = {
         [["ប្រតិបត្តិការឃ្លាំងឆ្លាតវៃ", "ផ្តល់សេវាទទួលចូល រក្សាទុក តម្រៀប បិទស្លាក និងបញ្ចេញទំនិញ។"], ["ដឹកជញ្ជូនលឿនក្នុងទីក្រុង", "រៀបចំការដឹកជញ្ជូនភ្លាមៗ ឬតាមការកក់ទុកក្នុងក្រុង តាមបរិមាណទំនិញ អាសយដ្ឋាន និងពេលណាត់។"], ["ដឹកជញ្ជូនទំនិញធំ", "សម្របសម្រួលការលើកដាក់ ការដឹកជញ្ជូន ការដំឡើងដល់ទីកន្លែង និងការចុះហត្ថលេខាទទួល។"]],
         []
       ],
-      note: "សេវាហិរញ្ញវត្ថុធ្វើការតែជាមួយស្ថាប័នមានអាជ្ញាបណ្ណ ហើយមិនទាន់បើកដំណើរការទេ។"
+      note: ""
     },
     market: { ...homepageV2Localized.km.market, images: ["category-tiles", "category-furniture", "category-doors"], alts: ["កន្លែងបង្ហាញក្បឿង និងកម្រាល", "កន្លែងបង្ហាញគ្រឿងសង្ហារឹម និងគេហដ្ឋាន", "កន្លែងបង្ហាញឧបករណ៍ និងរបស់ប្រចាំថ្ងៃ"], note: "បន្ទប់តាំងបង្ហាញគឺជាផែនការដំណាក់កាលទី១។ ប្រភេទទំនិញ និងការបើកដំណើរការជាក់លាក់ សូមរង់ចាំការប្រកាស។" },
     route: { ...homepageV2Localized.km.route, note: "អាចជ្រើសរើសសេវាដឹកជញ្ជូន ឃ្លាំង ការតាំងបង្ហាញ ការលក់ ឬការប្រគល់តាមតម្រូវការនៅលើវេទិកា។ ការរៀបចំជាក់លាក់អាស្រ័យលើទំនិញ ការបញ្ជាទិញ និងកិច្ចព្រមព្រៀងសេវា។" },

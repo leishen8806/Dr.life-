@@ -81,6 +81,129 @@ try {
         });
         if (!layout.headingVisible) throw new Error(`Homepage h1 is not visible at ${width}px (${language}, ${pageDefinition.name})`);
         if (layout.overflow) throw new Error(`Horizontal overflow at ${width}px (${language}, ${pageDefinition.name})`);
+        if (width === 1920 && language === "zh" && pageDefinition.name === "home") {
+          const routeTitle = await page.locator("#route-title").textContent();
+          if (!routeTitle?.includes("从中国工厂") || !routeTitle.includes("到柬埔寨消费者手中")) {
+            throw new Error(`Route title is not semantically split at ${width}px: ${routeTitle ?? "missing"}`);
+          }
+        }
+        if (width === 1920 && pageDefinition.name === "home") {
+          const geometry = await page.evaluate(() => {
+            const navItems = [...document.querySelectorAll(".site-header .main-nav a")]
+              .filter((item) => getComputedStyle(item).display !== "none" && item.getBoundingClientRect().width > 0);
+            const partnerContainer = document.querySelector(".section.partners > .container");
+            const partnerGrid = document.querySelector(".partner-grid");
+            const partnerCards = [...document.querySelectorAll(".partner-grid .partner")];
+            const accessGrid = document.querySelector(".access-grid");
+            const accessCards = [...document.querySelectorAll(".access-grid .access-card")];
+            const businessContainer = document.querySelector("#business > .container");
+            const routeContainer = document.querySelector(".route .container");
+            const steps = document.querySelector(".route .steps");
+            const channelList = document.querySelector(".channel-list");
+            const skip = document.querySelector(".skip");
+            const rounded = (value) => Math.round(value * 10) / 10;
+            return {
+              navTops: navItems.map((item) => Math.round(item.getBoundingClientRect().top)),
+              partnerMinWidth: Math.min(...partnerCards.map((item) => item.getBoundingClientRect().width)),
+              partnerLeftDelta: rounded((partnerContainer?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0)),
+              partnerColumns: getComputedStyle(partnerGrid).gridTemplateColumns.split(" ").length,
+              partnerTopRows: new Set(partnerCards.map((item) => Math.round(item.getBoundingClientRect().top))).size,
+              partnerBackground: getComputedStyle(partnerGrid).backgroundColor,
+              accessColumns: getComputedStyle(accessGrid).gridTemplateColumns.split(" ").length,
+              accessTopRows: new Set(accessCards.map((item) => Math.round(item.getBoundingClientRect().top))).size,
+              accessLeftDelta: rounded((accessGrid?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0)),
+              channelMarginTop: Number.parseFloat(getComputedStyle(channelList).marginTop),
+              stepsRatio: (steps?.getBoundingClientRect().width ?? 0) / (routeContainer?.getBoundingClientRect().width ?? 1),
+              stepColumns: getComputedStyle(steps).gridTemplateColumns.split(" ").length,
+              skipVisible: skip ? getComputedStyle(skip).clipPath !== "inset(50%)" : true
+            };
+          });
+          if (new Set(geometry.navTops).size !== 1) throw new Error("Header navigation wrapped at 1920px");
+          if (geometry.partnerMinWidth < 260) throw new Error(`Partner cards are too narrow: ${geometry.partnerMinWidth}px`);
+          if (Math.abs(geometry.partnerLeftDelta) > 2) throw new Error(`Partner section is not aligned: ${geometry.partnerLeftDelta}px`);
+          const partnerGridIsPacked = (geometry.partnerColumns === 5 && geometry.partnerTopRows === 1)
+            || (geometry.partnerColumns === 3 && geometry.partnerTopRows === 2);
+          if (!partnerGridIsPacked || geometry.partnerBackground !== "rgba(0, 0, 0, 0)") throw new Error(`Partner grid has an empty slot: ${geometry.partnerColumns} columns / ${geometry.partnerTopRows} rows / ${geometry.partnerBackground}`);
+          if (Math.abs(geometry.accessLeftDelta) > 2) throw new Error(`Access grid is not aligned: ${geometry.accessLeftDelta}px`);
+          if (geometry.accessColumns !== 3 || geometry.accessTopRows !== 1) throw new Error(`Access grid has an empty slot: ${geometry.accessColumns} columns / ${geometry.accessTopRows} rows`);
+          if (geometry.channelMarginTop < 24) throw new Error(`Official channels lack vertical separation: ${geometry.channelMarginTop}px`);
+          if (geometry.stepsRatio < 0.98 || geometry.stepColumns !== 4) throw new Error(`Route steps use too little width: ${geometry.stepsRatio} / ${geometry.stepColumns} columns`);
+          if (geometry.skipVisible) throw new Error("Skip link is visible before focus");
+        }
+        if (pageDefinition.name === "home") {
+          const homepageGeometry = await page.evaluate(() => {
+            const overlap = (a, b) => a && b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+            const sections = [".market", ".route", ".access-section", ".partners"].map((selector) => {
+              const node = document.querySelector(selector);
+              const rect = node?.getBoundingClientRect();
+              const background = node ? getComputedStyle(node).backgroundColor : "";
+              return { selector, left: rect?.left ?? 0, right: rect?.right ?? 0, background };
+            });
+            const partnerGrid = document.querySelector(".partner-grid");
+            const apps = document.querySelector("#apps");
+            const navItems = [...document.querySelectorAll(".site-header .main-nav a")]
+              .filter((item) => getComputedStyle(item).display !== "none" && item.getBoundingClientRect().width > 0);
+            const language = document.querySelector(".header-actions .languages");
+            const shop = document.querySelector(".header-actions .shop-link");
+            const partnerContainer = document.querySelector(".section.partners > .container");
+            const accessContainer = document.querySelector(".access-section > .container");
+            const businessContainer = document.querySelector("#business > .container");
+            const channelItems = [...document.querySelectorAll(".channel-list span")];
+            return {
+              sections,
+              partnerLeftDelta: (partnerContainer?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0),
+              accessLeftDelta: (partnerContainer?.getBoundingClientRect().left ?? 0) - (accessContainer?.getBoundingClientRect().left ?? 0),
+              partnerGap: (apps?.getBoundingClientRect().top ?? 0) - (partnerGrid?.getBoundingClientRect().bottom ?? 0),
+              navOverlap: navItems.some((item) => {
+                const rect = item.getBoundingClientRect();
+                return overlap(rect, language?.getBoundingClientRect()) || overlap(rect, shop?.getBoundingClientRect());
+              }),
+              navFontSizes: navItems.map((item) => Number.parseFloat(getComputedStyle(item).fontSize)),
+              channelItems
+            };
+          });
+          for (const section of homepageGeometry.sections) {
+            if (section.left > 1 || section.right < width - 1) throw new Error(`Homepage section is not full-bleed at ${width}px (${language}): ${section.selector} ${section.left}..${section.right}`);
+          }
+          if ([360, 390, 768].includes(width) && Math.abs(homepageGeometry.partnerLeftDelta) > 2) {
+            throw new Error(`Partner left edge is not aligned at ${width}px (${language}): ${homepageGeometry.partnerLeftDelta}px`);
+          }
+          if ([1280, 1440, 1920].includes(width) && homepageGeometry.navOverlap) {
+            throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);
+          }
+          if ([1280, 1440].includes(width)) {
+            const menuButton = page.locator(".mobile-menu summary");
+            const menuButtonBox = await menuButton.boundingBox();
+            if (!menuButtonBox || menuButtonBox.width <= 0 || menuButtonBox.height <= 0 || menuButtonBox.left < 0 || menuButtonBox.right > width) {
+              throw new Error(`Desktop menu button is not visible in the viewport at ${width}px (${language})`);
+            }
+            await menuButton.click();
+            const appLink = page.locator(".mobile-menu[open] nav a[href='#apps']");
+            if (!(await appLink.isVisible())) throw new Error(`Desktop menu lacks a visible App entry at ${width}px (${language})`);
+          }
+          if (width >= 1441) {
+            const desktopNav = page.locator(".main-nav a").first();
+            const shopLink = page.locator(".shop-link");
+            if (!(await desktopNav.isVisible()) || !(await shopLink.isVisible())) {
+              throw new Error(`Desktop navigation or App entry is hidden at ${width}px (${language})`);
+            }
+          }
+          if (homepageGeometry.navFontSizes.length > 0) {
+            const minimumNavFontSize = language === "km" ? 13 : 12;
+            if (homepageGeometry.navFontSizes.some((size) => size < minimumNavFontSize)) {
+              throw new Error(`Header navigation font is below ${minimumNavFontSize}px at ${width}px (${language}): ${homepageGeometry.navFontSizes.join(",")}`);
+            }
+          }
+          if ([1440, 1920].includes(width) && Math.abs(homepageGeometry.accessLeftDelta) > 2) {
+            throw new Error(`Partners and app sections are not aligned at ${width}px (${language}): ${homepageGeometry.accessLeftDelta}px`);
+          }
+          if (homepageGeometry.channelItems.some((item, index, items) => index > 0 && item.top === items[index - 1].top && item.left - items[index - 1].right < 12)) {
+            throw new Error(`Official channel items lack visible separation at ${width}px (${language})`);
+          }
+          if ([1440, 1920].includes(width) && homepageGeometry.partnerGap < 64) {
+            throw new Error(`Partner cards touch the app section at ${width}px (${language}): ${homepageGeometry.partnerGap}px gap`);
+          }
+        }
         await page.waitForTimeout(150);
         const relative = posix.join(String(width), language, `${pageDefinition.name}.png`);
         await mkdir(join(output, String(width), language), { recursive: true });

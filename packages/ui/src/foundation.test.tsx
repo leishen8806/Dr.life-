@@ -53,14 +53,15 @@ function expectWrappingRule(styles: string, selector: string) {
 describe("foundation components", () => {
   it("exports the reusable Mini App component states", () => {
     const click = vi.fn();
+    const moneyProps = { invalidLabel: "Invalid amount", currencySymbol: "$", language: "en" as const };
     const button = Button({ children: "Save", loading: true, className: "custom-action", ariaPressed: true });
     expect(button.props["aria-busy"]).toBe(true);
     expect(button.props["aria-pressed"]).toBe(true);
     expect(button.props.className).toContain("custom-action");
     expect(FormField({ label: "Name", error: "Required", children: <input /> }).props.className).toBe("drl-form-field");
-    expect(Money({ value: "12500" }).props["data-e4"]).toBe("12500");
-    expect(Money({ value: "12501" }).props.role).toBe("alert");
-    expect(TieredPrice({ tiers: [{ label: "1–9", value: "12500" }] }).type).toBe("ul");
+    expect(Money({ value: "12500", ...moneyProps }).props["data-e4"]).toBe("12500");
+    expect(Money({ value: "12501", ...moneyProps }).props.role).toBe("alert");
+    expect(TieredPrice({ tiers: [{ label: "1–9", value: "12500" }], ...moneyProps }).type).toBe("ul");
     expect(ProductCard({ imageAlt: "Tile", name: "Tile", price: "1.25", onClick: click }).type).toBe("button");
     expect(Tabs({ tabs: [{ id: "a", label: "A" }], activeId: "a", onChange: click, ariaLabel: "Tabs" }).props.role).toBe("tablist");
     expect(Toast({ children: "Saved" }).props.role).toBe("status");
