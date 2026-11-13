@@ -188,6 +188,13 @@ dialog .actions{margin-top:15px}
   .partner p,.partner .text-link{font-size:13px}
   .footer .container>div:first-child{flex-direction:column}
 }
+@media(min-width:701px) and (max-width:960px){
+  .menu-toggle{display:block}
+  .nav{display:none;position:absolute;left:0;right:0;top:100%;margin:0;background:var(--black);padding:9px var(--pad) 17px;flex-direction:column;align-items:stretch;gap:0;border-bottom:1px solid #d6b97e70}
+  .nav[data-open=true]{display:flex}
+  .nav>a{padding:10px 0;border-bottom:1px solid #ffffff20}
+  .nav .nav-cta{padding:9px 12px;align-self:start;margin-top:10px}
+}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{transition:none!important}}
 
 .market .market-subtitle{color:#524326;font-size:20px;font-weight:700;margin:9px 0 10px}
