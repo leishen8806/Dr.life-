@@ -1,6 +1,6 @@
 # PR #249 visual evidence
 
-Website head: `f53b8a9`; evidence refresh: `pending`
+Website head: `f53b8a9`; evidence refresh: `bb8da0a`
 
 Full-page height check (static capture, Chinese): 1440px original `6998`,
 implementation `6993` (0.07% difference); 390px original `9387`,
