@@ -1,0 +1,12 @@
+1440/zh/overview.png
+1440/zh/review.png
+1440/zh/orders.png
+1440/km/overview.png
+1440/km/review.png
+1440/km/orders.png
+1920/zh/overview.png
+1920/zh/review.png
+1920/zh/orders.png
+1920/km/overview.png
+1920/km/review.png
+1920/km/orders.png
