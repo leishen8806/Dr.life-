@@ -1,6 +1,6 @@
 # PR #249 visual evidence
 
-Website head: `6f72e55`; evidence refresh: `e855d54`
+Website head: `cad7a7f`; evidence refresh: `pending`
 
 The generated matrix contains the six responsive widths in `manifest.txt` for
 Chinese, English, and Khmer, plus section crops for the required 390px and
@@ -13,6 +13,10 @@ full-page captures beside those references. Ready-to-review composites are in
 `comparisons/390-zh-original-new.png` and
 `comparisons/1440-zh-original-new.png`. The business-entry evidence is in
 `sections/<width>/<lang>/business-tag-01.png` through `business-tag-04.png`.
+The required per-section original|new composites for the Chinese 390px and
+1440px review widths are in
+`comparisons/sections/<width>/zh/<section>-original-new.png` for header, hero,
+business, route, apps, partners, and footer.
 The capture script validates the same geometry and overflow assertions used by
 CI before writing the images.
 
