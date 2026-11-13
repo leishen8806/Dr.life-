@@ -6,8 +6,9 @@ from `env.example` in the approved staging environment; `.env` is ignored.
 
 ## First deployment
 
-1. Copy `env.example` to `.env` and replace every `CHANGE_ME` value in the
-   owner-managed secret store. Keep the three Redis URLs on separate services:
+1. Copy `env.example` to `.env`, change `STAGING_ENV_FILE` to `.env`, and
+   replace every `CHANGE_ME` value in the owner-managed secret store. Keep the
+   three Redis URLs on separate services:
    state and queue use AOF/noeviction; cache uses allkeys-lru.
 2. Run `backend/scripts/db-bootstrap` once with the owner-managed role
    passwords. It is the single source of truth for login roles and least
@@ -25,11 +26,43 @@ from `env.example` in the approved staging environment; `.env` is ignored.
 
 ## Release and rollback
 
-Upload a built static release to `incoming/<release-id>`, then run
-`publish-release.sh <release-id>`. It atomically switches `current` and keeps
-the five newest releases. Run `rollback-release.sh` to switch to the previous
-release. Database migration is deliberately separate and must succeed before
-the application release is switched.
+Upload a built static release to `incoming/<release-id>` below the selected
+application directory (`buyer`, `merchant`, or `admin`), then run
+`publish-release.sh <app> <release-id>`. It atomically switches that app's
+`current` symlink and keeps the five newest releases for that app. Run
+`rollback-release.sh <app>` to switch that app to its previous release.
+`deploy/staging/test-release-scripts.sh` exercises publish and rollback for all
+three applications with a temporary root. Database migration is deliberately
+separate and must succeed before the application release is switched.
+
+## E-01 domain direct-connection configuration
+
+This is a template only. Do not put real domains, certificate material,
+credentials, or firewall data in the repository.
+
+1. Create four Cloudflare DNS A records for placeholder hosts `test-api`,
+   `test-miniapp`, `test-shop`, and `test-admin`; enable the orange-cloud proxy.
+2. Set Cloudflare SSL/TLS to **Full (strict)**. Owner-managed Cloudflare
+   Origin certificate and key files are mounted through
+   `STAGING_ORIGIN_CERT_PATH` and `STAGING_ORIGIN_KEY_PATH`; they never enter
+   Git or the image.
+3. Start the `edge` service in `compose.yaml`. It is the only service exposing
+   host ports: 80 redirects to 443, and 443 routes by hostname to `api:8080`,
+   `buyer:80`, `merchant:80`, and `admin:80`. All other services stay internal.
+4. Restrict the server firewall to TCP 80/443 from the published Cloudflare IP
+   ranges. Protect `test-admin` with Cloudflare Access for the owner and the
+   大旺 account; the API and Mini App hosts must remain reachable by Telegram.
+5. Harden SSH with key-only authentication, no root login, no password login,
+   and fail2ban. If a fixed source IP is available, restrict SSH to it. The
+   workflow uses `STAGING_SSH_HOST`, `STAGING_SSH_USER`,
+   `STAGING_SSH_PRIVATE_KEY`, and `STAGING_SSH_KNOWN_HOSTS`; known_hosts is
+   written and `StrictHostKeyChecking=yes` is required.
+6. Verify each host without recording real output or addresses:
+   `curl -I https://test-api.<placeholder>` must return the API health status;
+   `curl -I https://test-miniapp.<placeholder>` and
+   `curl -I https://test-shop.<placeholder>` must return 200/3xx; the admin
+   host must first pass Access; SSH must connect only with the owner-managed
+   key and known_hosts entry.
 
 ## Backup, restore, and operations
 
