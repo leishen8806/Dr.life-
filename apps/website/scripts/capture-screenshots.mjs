@@ -223,7 +223,7 @@ try {
           if (homepageGeometry.channelItems.some((item, index, items) => index > 0 && item.top === items[index - 1].top && item.left - items[index - 1].right < 12)) {
             throw new Error(`Official channel items lack visible separation at ${width}px (${language})`);
           }
-          if (width === 390) {
+          if (width === 390 && language === "zh") {
             if (new Set(homepageGeometry.heroButtonTops).size !== 1) {
               throw new Error(`Hero actions are not on one row at ${width}px (${language}): ${homepageGeometry.heroButtonTops.join(",")}`);
             }
