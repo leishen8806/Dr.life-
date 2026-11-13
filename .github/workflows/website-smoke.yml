@@ -46,6 +46,7 @@ jobs:
           --output-path=/tmp/local-lighthouse.json --form-factor=mobile
           --screenEmulation.mobile --screenEmulation.width=360
           --screenEmulation.height=640 --screenEmulation.deviceScaleFactor=2
+          --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage"
       - name: Check local Lighthouse thresholds
         run: pnpm --filter @drlife/website exec node scripts/check-lighthouse.mjs /tmp/local-lighthouse.json
       - name: Upload local preview evidence
@@ -101,6 +102,7 @@ jobs:
           --output-path=/tmp/lighthouse.json --form-factor=mobile
           --screenEmulation.mobile --screenEmulation.width=360
           --screenEmulation.height=640 --screenEmulation.deviceScaleFactor=2
+          --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage"
       - name: Check Lighthouse thresholds
         run: pnpm --filter @drlife/website exec node scripts/check-lighthouse.mjs /tmp/lighthouse.json
       - name: Upload smoke evidence
