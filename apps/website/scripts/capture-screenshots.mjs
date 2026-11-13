@@ -183,6 +183,7 @@ try {
               navFontSizes: navItems.map((item) => Number.parseFloat(getComputedStyle(item).fontSize)),
               channelItems,
               heroButtonTops: heroButtons.map((item) => Math.round(item.getBoundingClientRect().top)),
+              heroButtonRights: heroButtons.map((item) => Math.round(item.getBoundingClientRect().right)),
               valuesBackground: values ? getComputedStyle(values).backgroundColor : "",
               accessBackground: accessSection ? getComputedStyle(accessSection).backgroundColor : "",
               accessGridBackground: accessGrid ? getComputedStyle(accessGrid).backgroundColor : ""
@@ -193,6 +194,9 @@ try {
           }
           if ([360, 390, 768].includes(width) && Math.abs(homepageGeometry.partnerLeftDelta) > 2) {
             throw new Error(`Partner left edge is not aligned at ${width}px (${language}): ${homepageGeometry.partnerLeftDelta}px`);
+          }
+          if ([360, 390, 768].includes(width) && homepageGeometry.heroButtonRights.some((right) => right > width)) {
+            throw new Error(`Hero button exceeds viewport at ${width}px (${language}): ${homepageGeometry.heroButtonRights.join(",")}`);
           }
           if ([1280, 1440, 1920].includes(width) && homepageGeometry.navOverlap) {
             throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);

@@ -353,7 +353,7 @@ body.homepage-source-page.homepage-source-page[data-lang="km"] .app-card figcapt
 }
 @media (max-width: 680px) {
   body.homepage-source-page.homepage-source-page .hero .actions {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
   }
   body.homepage-source-page.homepage-source-page .hero .actions .button {
     width: auto;
