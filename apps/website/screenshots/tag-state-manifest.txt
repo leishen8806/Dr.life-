@@ -1,0 +1,26 @@
+# Business entrypoint evidence generated from head 33e7fa6
+# Each row is a 390px or 1440px panel crop in zh/en/km.
+sections/390/zh/business-tag-01.png
+sections/390/zh/business-tag-02.png
+sections/390/zh/business-tag-03.png
+sections/390/zh/business-tag-04.png
+sections/390/en/business-tag-01.png
+sections/390/en/business-tag-02.png
+sections/390/en/business-tag-03.png
+sections/390/en/business-tag-04.png
+sections/390/km/business-tag-01.png
+sections/390/km/business-tag-02.png
+sections/390/km/business-tag-03.png
+sections/390/km/business-tag-04.png
+sections/1440/zh/business-tag-01.png
+sections/1440/zh/business-tag-02.png
+sections/1440/zh/business-tag-03.png
+sections/1440/zh/business-tag-04.png
+sections/1440/en/business-tag-01.png
+sections/1440/en/business-tag-02.png
+sections/1440/en/business-tag-03.png
+sections/1440/en/business-tag-04.png
+sections/1440/km/business-tag-01.png
+sections/1440/km/business-tag-02.png
+sections/1440/km/business-tag-03.png
+sections/1440/km/business-tag-04.png
