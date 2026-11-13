@@ -131,11 +131,14 @@
   "admin.products": "គ្រប់គ្រងផលិតផល",
   "admin.merchantOne": "ផ្សារឈូក",
   "admin.merchantTwo": "ផ្ទះមេគង្គ",
+  "admin.merchantName": "ឈ្មោះពាណិជ្ជករ",
+  "admin.productName": "ឈ្មោះផលិតផល",
   "admin.productOne": "ឆ្នាំងបាយអគ្គិសនី",
   "admin.productTwo": "កន្ត្រកផ្ទុក",
   "admin.buyerOne": "ពាណិជ្ជកម្មសុខា",
   "admin.buyerTwo": "លក់រាយដារ៉ា",
   "admin.deliveryPacking": "កំពុងវេចខ្ចប់",
+  "admin.deliveryPending": "រង់ចាំផ្ញើ",
   "admin.deliveryShipped": "បានផ្ញើ",
   "admin.orders": "គ្រប់គ្រងការបញ្ជាទិញ",
   "admin.operations": "ប្រតិបត្តិការ",
@@ -166,6 +169,7 @@
   "admin.amount": "ចំនួនទឹកប្រាក់",
   "admin.orderStatus": "ស្ថានភាពបញ្ជាទិញ",
   "admin.createdAt": "ពេលបង្កើត",
+  "admin.submittedAt": "ពេលដាក់ស្នើ",
   "admin.delivery": "ស្ថានភាពដឹកជញ្ជូន",
   "admin.suborders": "បញ្ជាទិញរង",
   "admin.noPermission": "អ្នកមិនមានសិទ្ធិសម្រាប់សកម្មភាពនេះទេ",
@@ -181,7 +185,7 @@
   "app.buyer": "[TODO-KM-REVIEW] Buyer",
   "app.merchant": "[TODO-KM-REVIEW] Merchant",
   "app.driver": "[TODO-KM-REVIEW] Driver",
-  "app.admin": "[TODO-KM-REVIEW] Platform Admin",
+  "app.admin": "រដ្ឋបាលវេទិកា",
   "app.wms": "[TODO-KM-REVIEW] Warehouse Admin"
 ,"error.1007": "[TODO-KM-REVIEW] Request is too large."
 ,"error.1008": "[TODO-KM-REVIEW] Request format is not supported."

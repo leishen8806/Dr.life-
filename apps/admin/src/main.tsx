@@ -1,10 +1,10 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Alert, Button, DatePicker, Drawer, Empty, Input, Layout, Menu, Result, Select, Skeleton, Space, Table, Tooltip, Typography } from "antd";
+import { Alert, Button, DatePicker, Drawer, Empty, Input, Layout, Menu, Result, Segmented, Select, Skeleton, Space, Table, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { I18nProvider, readLanguagePreference, resolveLanguage, useI18n, type TranslationKey } from "@drlife/i18n";
-import { LanguageSwitcher, Money, StatusTag } from "@drlife/ui";
+import { applyDocumentLanguage, I18nProvider, readLanguagePreference, resolveLanguage, storeLanguagePreference, useI18n, type Language, type TranslationKey } from "@drlife/i18n";
+import { Money, StatusTag } from "@drlife/ui";
 import { api } from "./api";
 import type { OrderRecord, RecordStatus, ReviewRecord } from "./api/types";
 import "antd/dist/reset.css";
@@ -18,6 +18,12 @@ const hasPermission = (permission: string) => permissions.includes(permission);
 
 function keyText(t: (key: TranslationKey) => string, key: string) {
   return t(key as TranslationKey);
+}
+
+function AdminLanguageSwitcher() {
+  const { language, setLanguage, t } = useI18n();
+  const options = [{ value: "zh", label: t("language.zh") }, { value: "en", label: t("language.en") }, { value: "km", label: t("language.km") }];
+  return <Segmented aria-label={t("language.select")} value={language} options={options} onChange={(value) => { const next = value as Language; storeLanguagePreference(next); applyDocumentLanguage(next); setLanguage(next); }} />;
 }
 
 function toneFor(status: string): "neutral" | "success" | "warning" | "danger" {
@@ -51,12 +57,12 @@ function Overview() {
   </div>;
 }
 
-export function ReviewTable({ rows, canManage, onApprove, onReject }: { rows: ReviewRecord[]; canManage: boolean; onApprove: (row: ReviewRecord) => void; onReject: (row: ReviewRecord) => void }) {
+export function ReviewTable({ rows, canManage, onApprove, onReject, kind }: { rows: ReviewRecord[]; canManage: boolean; onApprove: (row: ReviewRecord) => void; onReject: (row: ReviewRecord) => void; kind: "merchant" | "product" }) {
   const { t } = useI18n();
   const columns: ColumnsType<ReviewRecord> = [
-    { title: t("admin.review"), dataIndex: "nameKey", render: (value: string) => keyText(t, value) },
+    { title: kind === "merchant" ? t("admin.merchantName") : t("admin.productName"), dataIndex: "nameKey", render: (value: string) => keyText(t, value) },
     { title: t("admin.status"), dataIndex: "status", render: (value: string) => <StatusCell status={value} /> },
-    { title: t("admin.createdAt"), dataIndex: "createdAt" },
+    { title: t("admin.submittedAt"), dataIndex: "createdAt" },
     { title: t("admin.details"), key: "actions", render: (_value, row) => <Space wrap>
       <Tooltip title={!canManage ? t("admin.noPermission") : undefined}><span><Button type="primary" size="small" disabled={!canManage || row.status !== "pending"} onClick={() => onApprove(row)}>{t("admin.approve")}</Button></span></Tooltip>
       <Tooltip title={!canManage ? t("admin.noPermission") : undefined}><span><Button danger size="small" disabled={!canManage || row.status !== "pending"} onClick={() => onReject(row)}>{t("admin.reject")}</Button></span></Tooltip>
@@ -112,7 +118,7 @@ function ReviewPage() {
     </div>
     {actionError && <Alert type="error" showIcon message={t("admin.error")} />}
     {!hasPermission("admin.review") && <Alert type="warning" showIcon message={t("admin.noPermission")} />}
-    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <ReviewTable rows={rows} canManage={hasPermission("admin.review")} onApprove={approve} onReject={setSelected} />}
+    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <ReviewTable rows={rows} kind={active} canManage={hasPermission("admin.review")} onApprove={approve} onReject={setSelected} />}
     {selected && <RejectReasonForm onSubmit={reject} />}
   </div>;
 }
@@ -197,7 +203,7 @@ function Shell() {
       <Menu theme="dark" mode="inline" selectedKeys={[selectedKey]} items={items} onClick={({ key }) => navigate(key)} />
     </Sider>
     <Layout>
-      <Header className="admin-header"><Typography.Title level={4}>{t("app.admin")} · {t("admin.operator")}</Typography.Title><LanguageSwitcher /></Header>
+      <Header className="admin-header"><Typography.Title level={4}>{t("app.admin")} · {t("admin.operator")}</Typography.Title><AdminLanguageSwitcher /></Header>
       <Content className="admin-content">
         <Routes>
           <Route path="/" element={<Overview />} />

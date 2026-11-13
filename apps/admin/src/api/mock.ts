@@ -10,8 +10,8 @@ const reviews: ReviewList = {
   ]
 };
 const orders: OrderRecord[] = [
-  { id: "DL-20261113-001", buyerKey: "admin.buyerOne", merchantKey: "admin.merchantOne", amountE4: "125000", status: "attention", createdAt: "2026-11-13 09:20", deliveryKey: "admin.deliveryPacking", phone: "*** 1234", suborders: [{ id: "SO-001", productKey: "admin.productOne", status: "attention" }] },
-  { id: "DL-20261112-006", buyerKey: "admin.buyerTwo", merchantKey: "admin.merchantTwo", amountE4: "86000", status: "normal", createdAt: "2026-11-12 16:40", deliveryKey: "admin.deliveryShipped", phone: "*** 8899", suborders: [{ id: "SO-006", productKey: "admin.productTwo", status: "normal" }] }
+  { id: "DL-20261113-001", buyerKey: "admin.buyerOne", merchantKey: "admin.merchantOne", amountE4: "125000", status: "attention", createdAt: "2026-11-13 09:20", deliveryKey: "admin.deliveryPending", phone: "****1234", suborders: [{ id: "SO-001", productKey: "admin.productOne", status: "attention" }] },
+  { id: "DL-20261112-006", buyerKey: "admin.buyerTwo", merchantKey: "admin.merchantTwo", amountE4: "86000", status: "normal", createdAt: "2026-11-12 16:40", deliveryKey: "admin.deliveryShipped", phone: "****8899", suborders: [{ id: "SO-006", productKey: "admin.productTwo", status: "normal" }] }
 ];
 const wait = () => new Promise((resolve) => setTimeout(resolve, 120));
 export const mockApi: AdminApi = {
