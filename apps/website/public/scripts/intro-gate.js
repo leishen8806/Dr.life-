@@ -1,5 +1,6 @@
 (function () {
   var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var compactViewport = window.matchMedia("(max-width: 700px)").matches;
   var seen = false;
 
   try {
@@ -8,7 +9,7 @@
     seen = false;
   }
 
-  if (reducedMotion || seen) return;
+  if (reducedMotion || compactViewport || seen) return;
 
   document.documentElement.classList.add("intro");
   try {
