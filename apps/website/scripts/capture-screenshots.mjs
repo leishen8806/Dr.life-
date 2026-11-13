@@ -85,11 +85,20 @@ try {
           const rect = heading?.getBoundingClientRect();
           return {
             headingVisible: Boolean(rect && rect.top >= 0 && rect.bottom <= window.innerHeight),
-            overflow: body.scrollWidth > window.innerWidth + 1
+            overflow: body.scrollWidth > window.innerWidth + 1,
+            chineseRuns: [...document.body.querySelectorAll("body *")]
+              .filter((element) => !["SCRIPT", "STYLE", "NOSCRIPT"].includes(element.tagName))
+              .flatMap((element) => [...element.childNodes]
+                .filter((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
+                .map((node) => node.textContent.trim()))
+              .filter((text) => /[\u4e00-\u9fff]{2,}/.test(text))
           };
         });
         if (!layout.headingVisible) throw new Error(`Homepage h1 is not visible at ${width}px (${language}, ${pageDefinition.name})`);
         if (layout.overflow) throw new Error(`Horizontal overflow at ${width}px (${language}, ${pageDefinition.name})`);
+        if (language !== "zh" && pageDefinition.name === "home" && layout.chineseRuns.length > 0) {
+          throw new Error(`Visible Chinese copy remains at ${width}px (${language}): ${layout.chineseRuns.slice(0, 5).join(" | ")}`);
+        }
         if (width === 1920 && language === "zh" && pageDefinition.name === "home") {
           const routeTitle = await page.locator("#route-title").textContent();
           if (!routeTitle?.includes("从中国工厂") || !routeTitle.includes("到柬埔寨消费者手中")) {

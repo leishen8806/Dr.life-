@@ -3,14 +3,21 @@ import fs from "node:fs";
 import path from "node:path";
 import Layout from "../components/Layout.astro";
 import "../styles/homepage-source.css";
+import { pageCopy } from "../i18n/page-copy";
 
 const sourcePath = path.resolve(process.cwd(), "src/data/homepage-source.html");
 const sourceBody = fs.readFileSync(sourcePath, "utf8");
+const homepageCopyJson = JSON.stringify({
+  zh: pageCopy.zh.home.homepageV2,
+  en: pageCopy.en.home.homepageV2,
+  km: pageCopy.km.home.homepageV2
+}).replace(/</g, "\\u003c");
 ---
 
 <Layout titleKey="home.title" descriptionKey="home.intro" homepageSource>
   <span id="about" hidden></span>
   <Fragment set:html={sourceBody} />
+  <script id="homepage-copy" type="application/json" set:html={homepageCopyJson}></script>
   <script src="/scripts/homepage-source.js" defer></script>
 </Layout>
 
