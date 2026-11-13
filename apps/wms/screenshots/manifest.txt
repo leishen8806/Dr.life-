@@ -1,2 +1,38 @@
-head=8b6dd17
+head=164db27
 matrix=3 languages (zh,en,km) x 2 widths (1440,1920) x 3 pages x 2 states (page,drawer) = 36
+inventory-1440-zh.png	/inventory
+inventory-1440-zh-drawer.png	/inventory drawer
+receiving-1440-zh.png	/receiving
+receiving-1440-zh-drawer.png	/receiving drawer
+dispatch-1440-zh.png	/dispatch
+dispatch-1440-zh-drawer.png	/dispatch drawer
+inventory-1440-en.png	/inventory
+inventory-1440-en-drawer.png	/inventory drawer
+receiving-1440-en.png	/receiving
+receiving-1440-en-drawer.png	/receiving drawer
+dispatch-1440-en.png	/dispatch
+dispatch-1440-en-drawer.png	/dispatch drawer
+inventory-1440-km.png	/inventory
+inventory-1440-km-drawer.png	/inventory drawer
+receiving-1440-km.png	/receiving
+receiving-1440-km-drawer.png	/receiving drawer
+dispatch-1440-km.png	/dispatch
+dispatch-1440-km-drawer.png	/dispatch drawer
+inventory-1920-zh.png	/inventory
+inventory-1920-zh-drawer.png	/inventory drawer
+receiving-1920-zh.png	/receiving
+receiving-1920-zh-drawer.png	/receiving drawer
+dispatch-1920-zh.png	/dispatch
+dispatch-1920-zh-drawer.png	/dispatch drawer
+inventory-1920-en.png	/inventory
+inventory-1920-en-drawer.png	/inventory drawer
+receiving-1920-en.png	/receiving
+receiving-1920-en-drawer.png	/receiving drawer
+dispatch-1920-en.png	/dispatch
+dispatch-1920-en-drawer.png	/dispatch drawer
+inventory-1920-km.png	/inventory
+inventory-1920-km-drawer.png	/inventory drawer
+receiving-1920-km.png	/receiving
+receiving-1920-km-drawer.png	/receiving drawer
+dispatch-1920-km.png	/dispatch
+dispatch-1920-km-drawer.png	/dispatch drawer
