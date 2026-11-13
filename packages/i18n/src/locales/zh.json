@@ -167,7 +167,7 @@
   "admin.buyer": "买家",
   "admin.merchant": "商家",
   "admin.amount": "金额",
-  "admin.currencySymbol": "៛",
+  "admin.currencySymbol": "$",
   "admin.orderStatus": "订单状态",
   "admin.createdAt": "下单时间",
   "admin.submittedAt": "提交时间",

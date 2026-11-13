@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { I18nProvider } from "@drlife/i18n";
+import { I18nProvider, t } from "@drlife/i18n";
 import { OrderPage, RejectReasonForm, ReviewTable } from "../src/main";
 import type { OrderRecord, ReviewRecord } from "../src/api/types";
 
@@ -22,7 +22,7 @@ const orders: OrderRecord[] = [{
   status: "normal",
   createdAt: "2026-11-13 09:20",
   deliveryKey: "admin.deliveryPacking",
-  phone: "*** 1234",
+  phone: "****1234",
   suborders: [{ id: "SO-001", productKey: "admin.productOne", status: "normal" }]
 }];
 
@@ -62,6 +62,11 @@ describe("admin review and order views", () => {
     await screen.findByText("DL-001");
     fireEvent.click(screen.getByText("DL-001"));
     expect(await screen.findByText("Order details")).toBeTruthy();
-    expect(screen.getByText("*** 1234")).toBeTruthy();
+    expect(screen.getByText("****1234")).toBeTruthy();
+  });
+
+  it("keeps the USD symbol for Chinese and Khmer admin money", () => {
+    expect(t("admin.currencySymbol", {}, "zh")).toBe("$");
+    expect(t("admin.currencySymbol", {}, "km")).toBe("$");
   });
 });

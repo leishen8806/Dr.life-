@@ -167,7 +167,7 @@
   "admin.buyer": "អ្នកទិញ",
   "admin.merchant": "ពាណិជ្ជករ",
   "admin.amount": "ចំនួនទឹកប្រាក់",
-  "admin.currencySymbol": "៛",
+  "admin.currencySymbol": "$",
   "admin.orderStatus": "ស្ថានភាពបញ្ជាទិញ",
   "admin.createdAt": "ពេលបង្កើត",
   "admin.submittedAt": "ពេលដាក់ស្នើ",
