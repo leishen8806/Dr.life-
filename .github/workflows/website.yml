@@ -84,6 +84,8 @@ jobs:
         run: pnpm --filter @drlife/website exec playwright install --with-deps chromium
       - name: Capture responsive language screenshots
         run: pnpm --filter @drlife/website exec node scripts/capture-screenshots.mjs
+      - name: Capture Mini App screenshot matrix
+        run: pnpm --filter @drlife/website capture:miniapp-screenshots
       - name: Summarize screenshot files
         if: always()
         run: |
@@ -94,6 +96,9 @@ jobs:
             echo
             echo '```text'
             test -f apps/website/screenshots/manifest.txt && cat apps/website/screenshots/manifest.txt || true
+            echo
+            echo 'Mini App matrix: buyer home/orders + merchant home × 2 widths × 2 themes × 3 languages = 36 screenshots.'
+            test -f apps/website/screenshots-miniapp/manifest.txt && cat apps/website/screenshots-miniapp/manifest.txt || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload screenshot evidence
@@ -103,6 +108,14 @@ jobs:
           name: website-screenshots
           path: apps/website/screenshots
           if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload Mini App screenshot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: miniapp-screenshots
+          path: apps/website/screenshots-miniapp
+          if-no-files-found: warn
           retention-days: 14
 
   deploy-production:

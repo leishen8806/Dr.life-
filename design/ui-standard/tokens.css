@@ -21,6 +21,8 @@
   --color-rule: #d8d0c1;         /* 分隔线（装饰用） */
   --color-border: #cfc2ab;       /* 卡片描边（装饰用） */
   --color-border-strong: #7d705a;/* 输入框、次按钮描边 4.33:1 on cream，满足非文本 3:1 */
+  --color-border-on-dark: rgb(255 255 255 / .16); /* 深色区块的细分隔线 */
+  --color-border-on-dark-muted: rgb(199 203 207 / .25); /* 深色区块的弱分隔线 */
 
   /* ── 颜色：功能（浅底 / 深底各一套，均 ≥ 4.5:1） ── */
   --color-success: #2c6e4a;  /* 5.47:1 on cream */

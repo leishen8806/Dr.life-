@@ -145,7 +145,7 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
     <main className="mini-shell">
       <AppHeader slogan={t("brand.slogan")} actions={<>
         <LanguageSwitcher />
-        <Button variant="secondary" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
+        <Button variant="secondary" className="merchant-orders-action" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
       </>} />
       {subordersOpen ? (
         selectedSuborder ? (
