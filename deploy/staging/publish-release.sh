@@ -11,11 +11,15 @@ releases="$site_root/releases"
 test -d "$incoming"; test -d "$releases"; test ! -e "$releases/$release_id"
 mv "$incoming" "$releases/$release_id"
 ln -sfn "releases/$release_id" "$site_root/.current.next"
-rm -f "$site_root/current"
-mv "$site_root/.current.next" "$site_root/current"
+if ! mv -Tf "$site_root/.current.next" "$site_root/current" 2>/dev/null; then
+  # BSD mv lacks -T; ln -hfs still replaces the symlink target without a
+  # window where current is absent, and the Linux path above stays atomic.
+  ln -hfs "$(readlink "$site_root/.current.next")" "$site_root/current"
+  rm -f "$site_root/.current.next"
+fi
 current_target=$(readlink -f "$site_root/current")
 kept=0
-for release_dir in $(ls -1dt "$releases"/*); do
+for release_dir in $(find "$releases" -mindepth 1 -maxdepth 1 -type d -print | sort -r); do
   test -d "$release_dir" || continue
   test "$(readlink -f "$release_dir")" = "$current_target" && continue
   if test "$kept" -lt 4; then

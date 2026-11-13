@@ -14,6 +14,8 @@ for candidate in $(find "$releases" -mindepth 1 -maxdepth 1 -type d -print | sor
 done
 test -n "$previous"
 ln -sfn "releases/$(basename "$previous")" "$site_root/.current.next"
-rm -f "$current"
-mv "$site_root/.current.next" "$current"
+if ! mv -Tf "$site_root/.current.next" "$current" 2>/dev/null; then
+  ln -hfs "$(readlink "$site_root/.current.next")" "$current"
+  rm -f "$site_root/.current.next"
+fi
 printf 'rolled back to %s\n' "$(readlink "$current")"

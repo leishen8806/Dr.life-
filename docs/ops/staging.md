@@ -54,28 +54,38 @@ credentials, or firewall data in the repository.
    TOTP (E-04); do not issue an admin account before E-04 is complete. The API
    and Mini App hosts must remain reachable by Telegram.
 5. The edge adds HSTS, `X-Content-Type-Options`, `Referrer-Policy`, and
-   `frame-ancestors 'none'` to all four hosts. The API admin-auth path has a
-   configurable nginx limit of 10 requests/minute per IP with a burst of 5 and
-   returns 429 when exceeded. Harden SSH with key-only authentication, no root
-   login, no password login, and fail2ban. If a fixed source IP is available,
+   `frame-ancestors 'none'` to all four hosts. Before starting the edge,
+   `harden-server.sh --apply --ssh-user=<owner-login-user>` generates
+   `STAGING_CLOUDFLARE_REAL_IP_CONFIG` from the current Cloudflare ranges;
+   nginx then uses `CF-Connecting-IP` and `$binary_remote_addr` is the real
+   client address. The API admin-auth path's explicit limit is in
+   `nginx/staging.conf` (`10r/m`, burst `5`); change both values there as one
+   reviewed configuration change. It returns 429 when exceeded. Harden SSH
+   with key-only authentication, no root login, no password login, and
+   fail2ban. If a fixed source IP is available,
    restrict SSH to it. The workflow uses `STAGING_SSH_HOST`, `STAGING_SSH_USER`,
    `STAGING_SSH_PRIVATE_KEY`, and `STAGING_SSH_KNOWN_HOSTS`; known_hosts is
    written and `StrictHostKeyChecking=yes` is required.
 6. Run `deploy/staging/harden-server.sh --dry-run` first. Only the owner runs
-   `--apply` on the server, after confirming a usable public-key SSH session;
+   `--apply --ssh-user=<owner-login-user>` on the server, after confirming a usable public-key SSH session;
    keep the current SSH connection open and verify a second login before
    closing the first. The script writes an isolated sshd drop-in, validates
    with `sshd -t` before restart, enables fail2ban, and checks the owner-managed
    Origin certificate and key are existing mode-600 files. To roll back, remove
    the drop-in after validating the restored config, reload sshd, and remove the
-   matching ufw rules (or restore the owner-recorded ufw status). Never commit
+   matching ufw rules (or restore the owner-recorded ufw status). The script
+   backs up `/etc/ufw/after.rules` and `after6.rules` under
+   `/var/backups/drlifeplus-staging-<timestamp>/` before reset. Never commit
    the generated rules or paths.
 7. Verify each host without recording real output or addresses:
    `curl -I https://test-api.<placeholder>` must return the API health status;
    `curl -I https://test-miniapp.<placeholder>` and
    `curl -I https://test-shop.<placeholder>` must return 200/3xx; the admin
    host must pass its own admin login/TOTP; SSH must connect only with the
-   owner-managed key and known_hosts entry.
+   owner-managed key and known_hosts entry. Confirm a request from a
+   non-Cloudflare source to the server IP on TCP 80/443 is refused (Docker
+   published ports are filtered by the generated `DOCKER-USER` rules, not
+   only UFW INPUT rules).
 
 ## Backup, restore, and operations
 

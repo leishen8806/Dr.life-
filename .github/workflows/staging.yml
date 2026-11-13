@@ -31,7 +31,7 @@ jobs:
           case "$RELEASE" in ''|*[!A-Za-z0-9-]*) echo "release must contain only letters, numbers, and hyphens" >&2; exit 64;; esac
           docker build -f backend/Dockerfile -t "drlife-api:$RELEASE" ./backend
       - name: Validate compose template
-        run: docker compose --env-file deploy/staging/env.example -f deploy/staging/compose.yaml config --quiet
+        run: STAGING_ENV_FILE=env.example docker compose --env-file deploy/staging/env.example -f deploy/staging/compose.yaml config --quiet
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -50,10 +50,13 @@ jobs:
         run: |
           set -eu
           test -n "$STAGING_SSH_HOST" -a -n "$STAGING_SSH_USER" -a -n "$STAGING_SSH_PRIVATE_KEY" -a -n "$STAGING_SSH_KNOWN_HOSTS"
+          case "$APP" in buyer|merchant|admin) ;; *) echo "app must be buyer, merchant, or admin" >&2; exit 64;; esac
+          case "$RELEASE" in ''|*[!A-Za-z0-9-]*) echo "release must contain only letters, numbers, and hyphens" >&2; exit 64;; esac
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$STAGING_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/known_hosts"
           printf '%s\n' "$STAGING_SSH_PRIVATE_KEY" > "$HOME/.ssh/staging_key"
           chmod 600 "$HOME/.ssh/staging_key"
           ssh -i "$HOME/.ssh/staging_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
-            "$STAGING_SSH_USER@$STAGING_SSH_HOST" "APP='$APP' RELEASE='$RELEASE' /usr/local/sbin/drlifeplus-staging-publish \"\$APP\" \"\$RELEASE\""
+            "$STAGING_SSH_USER@$STAGING_SSH_HOST" \
+            "/usr/local/sbin/drlifeplus-staging-publish '$APP' '$RELEASE'"
