@@ -94,6 +94,11 @@ body {
 .drl-language-switcher .drl-button {
   padding-inline: var(--drl-space-2);
 }
+.drl-language-switcher .drl-button[aria-pressed="true"] {
+  color: var(--accent-on-fill);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+}
 
 .drl-loading {
   display: inline-flex;

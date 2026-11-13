@@ -46,6 +46,14 @@ try {
     const background = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
     const expectedBackground = item.theme === "dark" ? "rgb(17, 18, 16)" : "rgb(246, 242, 233)";
     if (background !== expectedBackground) throw new Error(`Theme background mismatch for ${app}-${item.theme}-${item.language}: ${background}`);
+    const selectedLanguage = await page.locator(".drl-language-switcher .drl-button[aria-pressed='true']").count();
+    if (selectedLanguage !== 1) throw new Error(`Selected language is not unique for ${app}-${item.theme}-${item.language}`);
+    if (item.theme === "dark") {
+      const selectedBackground = await page.locator(".drl-language-switcher .drl-button[aria-pressed='true']").evaluate((node) => getComputedStyle(node).backgroundColor);
+      if (selectedBackground === "rgba(0, 0, 0, 0)" || selectedBackground === background) {
+        throw new Error(`Selected language is not visibly highlighted for ${app}-${item.theme}-${item.language}: ${selectedBackground}`);
+      }
+    }
     if (item.theme === "dark") {
       const contrastChecks = await page.locator(".drl-language-switcher .drl-button:not([aria-pressed='true']), .drl-status-tag--neutral").evaluateAll((nodes) => nodes.map((node) => {
         const style = getComputedStyle(node);
@@ -56,6 +64,31 @@ try {
         const ratio = contrast(item.text, item.background);
         if (ratio < 4.5) throw new Error(`Dark contrast ${ratio.toFixed(2)}:1 for ${app}-${item.language} ${item.label}`);
       }
+    }
+    if (app === "buyer" && item.theme === "light") {
+      const contrastChecks = await page.locator(".buyer-orders-action, .buyer-cart-action").evaluateAll((nodes) => nodes.map((node) => {
+        const style = getComputedStyle(node);
+        return { text: style.color, background: style.backgroundColor, label: node.textContent?.trim() ?? node.className };
+      }));
+      if (!contrastChecks.length) throw new Error(`Buyer light header actions missing for ${item.language}`);
+      for (const check of contrastChecks) {
+        const ratio = contrast(check.text, check.background);
+        if (ratio < 4.5) throw new Error(`Buyer light action contrast ${ratio.toFixed(2)}:1 for ${item.language} ${check.label}`);
+      }
+    }
+    if (app === "merchant") {
+      const layout = await page.evaluate(() => {
+        const intersects = (a, b) => a && b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        const overflow = document.documentElement.scrollWidth > window.innerWidth + 1;
+        const items = [...document.querySelectorAll(".merchant-order-item")];
+        const badgeOverlap = items.some((item) => intersects(item.querySelector(".drl-status-tag")?.getBoundingClientRect(), item.querySelector(".drl-list-item__content")?.getBoundingClientRect()));
+        const brand = document.querySelector(".drl-app-header__brand")?.getBoundingClientRect();
+        const actionsOverlap = [...document.querySelectorAll(".drl-app-header__actions button")].some((button) => intersects(brand, button.getBoundingClientRect()));
+        return { overflow, badgeOverlap, actionsOverlap };
+      });
+      if (layout.overflow) throw new Error(`Merchant page overflows at 430px for ${item.theme}-${item.language}`);
+      if (layout.badgeOverlap) throw new Error(`Merchant order status overlaps order summary for ${item.theme}-${item.language}`);
+      if (layout.actionsOverlap) throw new Error(`Merchant header actions overlap brand for ${item.theme}-${item.language}`);
     }
     if (app === "buyer") {
       await page.locator(".buyer-page").waitFor({ state: "visible" });

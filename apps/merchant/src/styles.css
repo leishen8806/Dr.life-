@@ -10,6 +10,13 @@
 .mini-shell .drl-button {
   white-space: nowrap;
 }
+.mini-shell .drl-app-header {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.mini-shell .drl-app-header__actions {
+  width: 100%;
+}
 h1 {
   margin: 6px 0 16px;
 }
@@ -138,6 +145,22 @@ footer {
   width: 100%;
   text-align: start;
 }
+
+.merchant-order-item .drl-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  width: 100%;
+}
+
+.merchant-order-item .drl-list-item__content,
+.merchant-order-item .drl-list-item__trailing {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.merchant-order-item .drl-list-item__trailing { justify-self: start; }
+.merchant-order-item .drl-status-tag { display: block; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
 
 .merchant-order-item .drl-list-item__content > strong {
   min-width: 0;
