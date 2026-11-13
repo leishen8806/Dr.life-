@@ -15,6 +15,8 @@
   "common.retry": "重试",
   "common.success": "操作成功",
   "common.failure": "操作失败",
+  "common.invalidAmount": "金额无效",
+  "common.currencyUsd": "$",
   "validation.required": "此项为必填项",
   "validation.invalidFormat": "请输入有效内容",
   "validation.tooShort": "输入内容过短",

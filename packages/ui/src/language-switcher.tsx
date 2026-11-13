@@ -5,6 +5,7 @@ import {
   type TranslationKey,
   useI18n
 } from "@drlife/i18n";
+import { Button } from "./foundation";
 
 /** Display order of the three supported languages; shared with the first-run chooser. */
 export const languages: Language[] = ["zh", "en", "km"];
@@ -31,14 +32,14 @@ export function LanguageSwitcherView({
       aria-label={translate("language.select")}
     >
       {languages.map((item) => (
-        <button
+        <Button
           key={item}
-          type="button"
+          variant="secondary"
           onClick={() => onSelect(item)}
-          aria-pressed={language === item}
+          ariaPressed={language === item}
         >
           {translate(languageKeys[item])}
-        </button>
+        </Button>
       ))}
     </div>
   );

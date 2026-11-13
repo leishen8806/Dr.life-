@@ -337,7 +337,7 @@
   border: 1px solid var(--drl-color-border);
   border-radius: var(--drl-radius);
   padding: 0 var(--drl-space-2);
-  color: inherit;
+  color: var(--drl-color-text);
   background: var(--drl-color-surface);
   font: inherit;
 }
@@ -350,7 +350,7 @@
   padding: 0 var(--drl-space-2);
   border: 1px solid var(--drl-color-border);
   border-radius: var(--drl-radius);
-  color: inherit;
+  color: var(--drl-color-text);
   background: var(--drl-color-surface);
   font: inherit;
 }
