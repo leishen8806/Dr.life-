@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { adapters, maskSensitive } from "./api";
-import { assignTask, canSubmitAdjustment, inventoryRowClass, packTask, receiveRecord } from "./view-model";
+import { adapters, buildCsv, maskSensitive } from "./api";
+import { assignTask, canAdjust, canSubmitAdjustment, inventoryRowClass, packTask, receiveRecord } from "./view-model";
 
 describe("WMS adapters", () => {
   it("keeps phone exports masked", () => expect(maskSensitive("0123456789")).toBe("******6789"));
@@ -25,5 +25,14 @@ describe("WMS adapters", () => {
     const task = { id: "p", reference: "PK", items: 1, deliveryMethod: "zto" as const, driver: "", phone: "", status: "ready" as const };
     expect(packTask(task).status).toBe("packed");
     expect(assignTask(packTask(task), "Sokha").status).toBe("dispatched");
+  });
+  it("disables adjustment without the adjustment permission", () => {
+    expect(canAdjust(["wms.inventory.read"], true)).toBe(false);
+    expect(canAdjust(["wms.inventory.adjust"], true)).toBe(true);
+  });
+  it("builds masked and escaped CSV content", () => {
+    const csv = buildCsv([{ phone: "0123456789", note: 'a, "quoted" value' }]);
+    expect(csv).toContain('"******6789"');
+    expect(csv).toContain('"a, ""quoted"" value"');
   });
 });

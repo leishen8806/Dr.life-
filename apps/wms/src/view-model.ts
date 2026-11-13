@@ -1,5 +1,9 @@
 import type { PickTask, Receiving } from "./api";
 
+export function canAdjust(permissions: string[], selected: boolean) {
+  return permissions.includes("wms.inventory.adjust") && selected;
+}
+
 export function inventoryRowClass(quantity: number, locationTotal: number) {
   return quantity !== locationTotal ? "row-mismatch" : "";
 }
