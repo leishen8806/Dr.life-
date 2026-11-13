@@ -145,7 +145,7 @@ dialog .actions{margin-top:15px}
 .copy-status{min-height:22px;color:#514022;margin:8px 0 0}
 @media(max-width:960px){.brand-name{display:none}.hero-inner{min-height:620px}.split-intro{grid-template-columns:1fr;gap:10px}.panel-list li{grid-template-columns:1fr;gap:3px}.partner-grid{grid-template-columns:repeat(2,1fr)}.partner:nth-child(2){border-right:0}.partner:nth-child(-n+2){border-bottom:1px solid #cfc2ab}.partner:nth-child(3){padding-left:0}.market .container{gap:28px}}
 @media(min-width:961px) and (max-width:1280px){[data-lang="km"] .topbar .container{gap:16px}[data-lang="km"] .nav{gap:10px}[data-lang="km"] .nav>a{font-size:13px}}
-@media(max-width:960px){
+@media(max-width:700px){
   html{scroll-padding-top:64px}
   .topbar .container{min-height:63px}
   .brand img{width:65px}.brand-name{display:inline-block;font-size:12px}
@@ -270,3 +270,23 @@ body[data-lang="km"] .demo-tag,
 body[data-lang="km"] .app-card strong,
 body[data-lang="km"] .app-card figcaption span { font-size: 13px; }
 .bronze, .text-link, .nav-cta, .partner a { color: var(--color-bronze, var(--bronze)); }
+
+/* B11 parity fixes for the frozen 1440/390 dispatcher renders. */
+.values article{background:transparent;border:0;border-top:1px solid var(--rule);padding:13px 0 0}
+.access-section,.access-section .app-card{background:var(--dark)}
+@media(max-width:520px){
+  .hero .actions{flex-wrap:nowrap;gap:8px}
+  .hero .actions .button{flex:1 1 0;min-width:0;padding-inline:9px;gap:8px;font-size:12px}
+  .business-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .business-grid .panel{min-width:0}
+  .business-grid .panel figure{aspect-ratio:1.25}
+  .business-grid .panel-copy{padding:12px 9px}
+  .business-grid .panel .eyebrow{white-space:nowrap;letter-spacing:.03em;font-size:12px;gap:5px}
+  .business-grid .panel .eyebrow::before{width:12px}
+  .business-grid .panel h3{font-size:20px}
+  .business-grid .panel p,.business-grid .panel-list{font-size:12px}
+  .business-grid .panel-list li{grid-template-columns:1fr;gap:2px;padding:5px 0}
+  .access-section .app-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+  .access-section .app-card{display:block;text-align:center;padding:7px 4px}
+  .access-section .app-card img{width:min(96px,100%);margin:0 auto 7px}
+}
