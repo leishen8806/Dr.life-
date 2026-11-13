@@ -98,6 +98,7 @@ try {
             const businessContainer = document.querySelector("#business > .container");
             const routeContainer = document.querySelector(".route .container");
             const steps = document.querySelector(".route .steps");
+            const channelList = document.querySelector(".channel-list");
             const skip = document.querySelector(".skip");
             const rounded = (value) => Math.round(value * 10) / 10;
             return {
@@ -110,6 +111,7 @@ try {
               accessColumns: getComputedStyle(accessGrid).gridTemplateColumns.split(" ").length,
               accessTopRows: new Set(accessCards.map((item) => Math.round(item.getBoundingClientRect().top))).size,
               accessLeftDelta: rounded((accessGrid?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0)),
+              channelMarginTop: Number.parseFloat(getComputedStyle(channelList).marginTop),
               stepsRatio: (steps?.getBoundingClientRect().width ?? 0) / (routeContainer?.getBoundingClientRect().width ?? 1),
               stepColumns: getComputedStyle(steps).gridTemplateColumns.split(" ").length,
               skipVisible: skip ? getComputedStyle(skip).clipPath !== "inset(50%)" : true
@@ -123,6 +125,7 @@ try {
           if (!partnerGridIsPacked || geometry.partnerBackground !== "rgba(0, 0, 0, 0)") throw new Error(`Partner grid has an empty slot: ${geometry.partnerColumns} columns / ${geometry.partnerTopRows} rows / ${geometry.partnerBackground}`);
           if (Math.abs(geometry.accessLeftDelta) > 2) throw new Error(`Access grid is not aligned: ${geometry.accessLeftDelta}px`);
           if (geometry.accessColumns !== 3 || geometry.accessTopRows !== 1) throw new Error(`Access grid has an empty slot: ${geometry.accessColumns} columns / ${geometry.accessTopRows} rows`);
+          if (geometry.channelMarginTop < 24) throw new Error(`Official channels lack vertical separation: ${geometry.channelMarginTop}px`);
           if (geometry.stepsRatio < 0.98 || geometry.stepColumns !== 4) throw new Error(`Route steps use too little width: ${geometry.stepsRatio} / ${geometry.stepColumns} columns`);
           if (geometry.skipVisible) throw new Error("Skip link is visible before focus");
         }
@@ -141,15 +144,20 @@ try {
             const language = document.querySelector(".header-actions .languages");
             const shop = document.querySelector(".header-actions .shop-link");
             const partnerContainer = document.querySelector(".section.partners > .container");
+            const accessContainer = document.querySelector(".access-section > .container");
             const businessContainer = document.querySelector("#business > .container");
+            const channelItems = [...document.querySelectorAll(".channel-list span")];
             return {
               sections,
               partnerLeftDelta: (partnerContainer?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0),
+              accessLeftDelta: (partnerContainer?.getBoundingClientRect().left ?? 0) - (accessContainer?.getBoundingClientRect().left ?? 0),
               partnerGap: (apps?.getBoundingClientRect().top ?? 0) - (partnerGrid?.getBoundingClientRect().bottom ?? 0),
               navOverlap: navItems.some((item) => {
                 const rect = item.getBoundingClientRect();
                 return overlap(rect, language?.getBoundingClientRect()) || overlap(rect, shop?.getBoundingClientRect());
-              })
+              }),
+              navFontSizes: navItems.map((item) => Number.parseFloat(getComputedStyle(item).fontSize)),
+              channelItems
             };
           });
           for (const section of homepageGeometry.sections) {
@@ -160,6 +168,18 @@ try {
           }
           if ([1280, 1440, 1920].includes(width) && homepageGeometry.navOverlap) {
             throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);
+          }
+          if (homepageGeometry.navFontSizes.length > 0) {
+            const minimumNavFontSize = language === "km" ? 13 : 12;
+            if (homepageGeometry.navFontSizes.some((size) => size < minimumNavFontSize)) {
+              throw new Error(`Header navigation font is below ${minimumNavFontSize}px at ${width}px (${language}): ${homepageGeometry.navFontSizes.join(",")}`);
+            }
+          }
+          if ([1440, 1920].includes(width) && Math.abs(homepageGeometry.accessLeftDelta) > 2) {
+            throw new Error(`Partners and app sections are not aligned at ${width}px (${language}): ${homepageGeometry.accessLeftDelta}px`);
+          }
+          if (homepageGeometry.channelItems.some((item, index, items) => index > 0 && item.top === items[index - 1].top && item.left - items[index - 1].right < 12)) {
+            throw new Error(`Official channel items lack visible separation at ${width}px (${language})`);
           }
           if ([1440, 1920].includes(width) && homepageGeometry.partnerGap < 64) {
             throw new Error(`Partner cards touch the app section at ${width}px (${language}): ${homepageGeometry.partnerGap}px gap`);

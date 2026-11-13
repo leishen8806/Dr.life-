@@ -110,7 +110,7 @@ a:focus-visible {
   padding: var(--space-5) var(--gutter);
   display: flex;
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-4);
   position: relative;
   z-index: 3;
 }
@@ -129,13 +129,13 @@ a:focus-visible {
 .main-nav {
   display: flex;
   flex: 1;
-  gap: clamp(6px, .55vw, 10px);
+  gap: clamp(4px, .35vw, 6px);
   min-width: 0;
   flex-wrap: nowrap;
 }
-.main-nav a { white-space: nowrap; font-size: calc(var(--fs-small) - var(--space-1)); }
-[data-lang="km"] .main-nav { gap: clamp(6px, .55vw, 10px); }
-[data-lang="km"] .main-nav a { font-size: calc(var(--fs-small) - var(--space-1)); }
+.main-nav a { white-space: nowrap; font-size: var(--fs-small); }
+[data-lang="km"] .main-nav { gap: clamp(4px, .35vw, 6px); }
+[data-lang="km"] .main-nav a { font-size: var(--fs-body); }
 .footer-links a,
 .main-nav a {
   text-decoration: none;
@@ -279,6 +279,8 @@ a:focus-visible {
 .access-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--color-border-strong); }
 .access-card { background: var(--color-dark-2); color: var(--color-on-dark); }
 .access-card p { color: var(--color-on-dark-muted); }
+.channel-list { margin-top: var(--space-6); }
+.channel-list span { display: inline-block; margin-inline-end: var(--space-5); }
 @media (max-width: 800px) {
   .hero-index .container, .steps, .values, .partner-grid, .access-grid { grid-template-columns: 1fr; }
   .hero-index a, .hero-index a:first-child { border-right: 0; border-bottom: 1px solid var(--color-border-on-dark-muted); padding: var(--space-3) 0; }
@@ -294,6 +296,11 @@ a:focus-visible {
 }
 @media (min-width: 521px) and (max-width: 800px) {
   .section.partners > .container { width: calc(100% - 64px - 2 * var(--gutter)); }
+}
+@media (min-width: 901px) and (max-width: 1440px) {
+  .main-nav,
+  .shop-link { display: none; }
+  .mobile-menu { display: block; margin-left: auto; position: relative; }
 }
 @media (min-width: 1200px) {
   .partner-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -371,12 +378,15 @@ a:focus-visible {
 #business {
   max-width: none;
 }
+.access-section { padding-inline: 0; }
 .section#business > .container { max-width: 1280px; margin-inline: auto; }
 .market > .container,
 .route > .container,
 .access-section > .container {
+  width: min(calc(100% - 2 * var(--gutter)), var(--container));
   max-width: 1280px;
   margin-inline: auto;
+  padding-inline: 0;
 }
 .section--dark {
   max-width: none;
