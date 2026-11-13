@@ -297,11 +297,6 @@ a:focus-visible {
 @media (min-width: 521px) and (max-width: 800px) {
   .section.partners > .container { width: calc(100% - 64px - 2 * var(--gutter)); }
 }
-@media (min-width: 901px) and (max-width: 1440px) {
-  .main-nav,
-  .shop-link { display: none; }
-  .mobile-menu { display: block; margin-left: auto; position: relative; }
-}
 @media (min-width: 1200px) {
   .partner-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .route .steps { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -1072,6 +1067,11 @@ a:focus-visible {
     margin-left: auto;
     position: relative;
   }
+}
+@media (min-width: 901px) and (max-width: 1440px) {
+  .main-nav,
+  .shop-link { display: none; }
+  .mobile-menu { display: block; margin-left: auto; position: relative; }
 }
 @media (max-width: 520px) {
   /* Legacy selector retained for static acceptance checks; orbit layout is no longer used. */

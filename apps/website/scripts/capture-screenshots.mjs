@@ -171,6 +171,23 @@ try {
           if ([1280, 1440, 1920].includes(width) && homepageGeometry.navOverlap) {
             throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);
           }
+          if ([1280, 1440].includes(width)) {
+            const menuButton = page.locator(".mobile-menu summary");
+            const menuButtonBox = await menuButton.boundingBox();
+            if (!menuButtonBox || menuButtonBox.width <= 0 || menuButtonBox.height <= 0 || menuButtonBox.left < 0 || menuButtonBox.right > width) {
+              throw new Error(`Desktop menu button is not visible in the viewport at ${width}px (${language})`);
+            }
+            await menuButton.click();
+            const appLink = page.locator(".mobile-menu[open] nav a[href='#apps']");
+            if (!(await appLink.isVisible())) throw new Error(`Desktop menu lacks a visible App entry at ${width}px (${language})`);
+          }
+          if (width >= 1441) {
+            const desktopNav = page.locator(".main-nav a").first();
+            const shopLink = page.locator(".shop-link");
+            if (!(await desktopNav.isVisible()) || !(await shopLink.isVisible())) {
+              throw new Error(`Desktop navigation or App entry is hidden at ${width}px (${language})`);
+            }
+          }
           if (homepageGeometry.navFontSizes.length > 0) {
             const minimumNavFontSize = language === "km" ? 13 : 12;
             if (homepageGeometry.navFontSizes.some((size) => size < minimumNavFontSize)) {
