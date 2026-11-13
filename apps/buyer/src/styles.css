@@ -340,6 +340,7 @@
   color: inherit;
   background: var(--drl-color-surface);
   font: inherit;
+  white-space: pre;
 }
 
 .buyer-cart-action {
@@ -353,6 +354,7 @@
   color: inherit;
   background: var(--drl-color-surface);
   font: inherit;
+  white-space: pre;
 }
 
 .buyer-order-list {

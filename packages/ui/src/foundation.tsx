@@ -198,7 +198,7 @@ export function EmptyState({
   return (
     <section className="drl-state" role="status">
       <p>{title}</p>
-      {actionLabel && onAction && <button type="button" onClick={onAction}>{actionLabel}</button>}
+      {actionLabel && onAction && <Button variant="secondary" onClick={onAction}>{actionLabel}</Button>}
     </section>
   );
 }

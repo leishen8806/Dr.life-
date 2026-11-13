@@ -7,6 +7,9 @@
   max-width: 520px;
   margin: 0 auto;
 }
+.mini-shell .drl-button {
+  white-space: nowrap;
+}
 h1 {
   margin: 6px 0 16px;
 }
