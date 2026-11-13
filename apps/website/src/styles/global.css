@@ -56,7 +56,7 @@
 .values { gap: var(--grid-gap); }
 .values article { border-top-color: var(--color-rule); }
 .values article > span, .partner small { color: var(--accent-text); font-size: var(--fs-caption); }
-.partner-grid { gap: var(--grid-gap); border: 0; }
+.partner-grid { gap: var(--grid-gap); border: 0; background: transparent; }
 .partner-grid .partner { border: 1px solid var(--color-border); background: var(--surface); }
 .partner .text-link { color: var(--accent-text); }
 .access-card { background: var(--color-dark-2); color: var(--color-on-dark); border: 1px solid var(--color-border-on-dark); }
@@ -255,13 +255,20 @@ a:focus-visible {
 .steps p { color: var(--color-on-dark-muted); }
 .culture .intro, .partners .intro { max-width: 720px; }
 .values, .partner-grid, .access-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-1); margin-top: var(--space-8); background: var(--color-border); }
+.partner-grid { background: transparent; }
 .values article, .partner-grid .partner, .access-card { padding: var(--space-6); background: var(--surface); }
 .values article h3, .partner h3, .access-card h3 { font-family: var(--font-serif); }
 .partner-grid { grid-template-columns: repeat(2, 1fr); }
 .partner-grid { width: 100%; }
-.section.partners { display: block; }
+.section.partners {
+  display: block;
+  width: auto;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-inline: 48px;
+}
 .partner small, .demo-tag { color: var(--accent-text); letter-spacing: var(--track-eyebrow); }
-.access-grid { grid-template-columns: repeat(2, 1fr); background: var(--color-border-strong); }
+.access-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--color-border-strong); }
 .access-card { background: var(--color-dark-2); color: var(--color-on-dark); }
 .access-card p { color: var(--color-on-dark-muted); }
 @media (max-width: 800px) {
@@ -275,8 +282,8 @@ a:focus-visible {
   .steps li { border-left: 0; border-top: 1px solid var(--color-border-on-dark); }
 }
 @media (min-width: 1200px) {
-  .partner-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .steps { width: 100%; }
+  .partner-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .route .steps { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .hero h1 {
   font-size: var(--fs-display);

@@ -90,20 +90,40 @@ try {
         if (width === 1920 && pageDefinition.name === "home") {
           const geometry = await page.evaluate(() => {
             const navItems = [...document.querySelectorAll(".site-header .main-nav a")];
+            const partnerContainer = document.querySelector(".section.partners > .container");
+            const partnerGrid = document.querySelector(".partner-grid");
             const partnerCards = [...document.querySelectorAll(".partner-grid .partner")];
-            const container = document.querySelector(".route .container");
+            const accessGrid = document.querySelector(".access-grid");
+            const accessCards = [...document.querySelectorAll(".access-grid .access-card")];
+            const businessContainer = document.querySelector("#business > .container");
+            const routeContainer = document.querySelector(".route .container");
             const steps = document.querySelector(".route .steps");
             const skip = document.querySelector(".skip");
+            const rounded = (value) => Math.round(value * 10) / 10;
             return {
               navTops: navItems.map((item) => Math.round(item.getBoundingClientRect().top)),
               partnerMinWidth: Math.min(...partnerCards.map((item) => item.getBoundingClientRect().width)),
-              stepsRatio: (steps?.getBoundingClientRect().width ?? 0) / (container?.getBoundingClientRect().width ?? 1),
+              partnerLeftDelta: rounded((partnerContainer?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0)),
+              partnerColumns: getComputedStyle(partnerGrid).gridTemplateColumns.split(" ").length,
+              partnerTopRows: new Set(partnerCards.map((item) => Math.round(item.getBoundingClientRect().top))).size,
+              partnerBackground: getComputedStyle(partnerGrid).backgroundColor,
+              accessColumns: getComputedStyle(accessGrid).gridTemplateColumns.split(" ").length,
+              accessTopRows: new Set(accessCards.map((item) => Math.round(item.getBoundingClientRect().top))).size,
+              accessLeftDelta: rounded((accessGrid?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0)),
+              stepsRatio: (steps?.getBoundingClientRect().width ?? 0) / (routeContainer?.getBoundingClientRect().width ?? 1),
+              stepColumns: getComputedStyle(steps).gridTemplateColumns.split(" ").length,
               skipVisible: skip ? getComputedStyle(skip).clipPath !== "inset(50%)" : true
             };
           });
           if (new Set(geometry.navTops).size !== 1) throw new Error("Header navigation wrapped at 1920px");
           if (geometry.partnerMinWidth < 260) throw new Error(`Partner cards are too narrow: ${geometry.partnerMinWidth}px`);
-          if (geometry.stepsRatio < 0.8) throw new Error(`Route steps use too little width: ${geometry.stepsRatio}`);
+          if (Math.abs(geometry.partnerLeftDelta) > 2) throw new Error(`Partner section is not aligned: ${geometry.partnerLeftDelta}px`);
+          const partnerGridIsPacked = (geometry.partnerColumns === 5 && geometry.partnerTopRows === 1)
+            || (geometry.partnerColumns === 3 && geometry.partnerTopRows === 2);
+          if (!partnerGridIsPacked || geometry.partnerBackground !== "rgba(0, 0, 0, 0)") throw new Error(`Partner grid has an empty slot: ${geometry.partnerColumns} columns / ${geometry.partnerTopRows} rows / ${geometry.partnerBackground}`);
+          if (Math.abs(geometry.accessLeftDelta) > 2) throw new Error(`Access grid is not aligned: ${geometry.accessLeftDelta}px`);
+          if (geometry.accessColumns !== 3 || geometry.accessTopRows !== 1) throw new Error(`Access grid has an empty slot: ${geometry.accessColumns} columns / ${geometry.accessTopRows} rows`);
+          if (geometry.stepsRatio < 0.98 || geometry.stepColumns !== 4) throw new Error(`Route steps use too little width: ${geometry.stepsRatio} / ${geometry.stepColumns} columns`);
           if (geometry.skipVisible) throw new Error("Skip link is visible before focus");
         }
         await page.waitForTimeout(150);
