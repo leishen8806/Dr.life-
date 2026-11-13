@@ -144,6 +144,7 @@ dialog textarea{display:block;width:100%;min-height:130px;resize:vertical;paddin
 dialog .actions{margin-top:15px}
 .copy-status{min-height:22px;color:#514022;margin:8px 0 0}
 @media(max-width:960px){.brand-name{display:none}.hero-inner{min-height:620px}.split-intro{grid-template-columns:1fr;gap:10px}.panel-list li{grid-template-columns:1fr;gap:3px}.partner-grid{grid-template-columns:repeat(2,1fr)}.partner:nth-child(2){border-right:0}.partner:nth-child(-n+2){border-bottom:1px solid #cfc2ab}.partner:nth-child(3){padding-left:0}.market .container{gap:28px}}
+@media(min-width:961px) and (max-width:1280px){[data-lang="km"] .topbar .container{gap:16px}[data-lang="km"] .nav{gap:10px}[data-lang="km"] .nav>a{font-size:13px}}
 @media(max-width:960px){
   html{scroll-padding-top:64px}
   .topbar .container{min-height:63px}

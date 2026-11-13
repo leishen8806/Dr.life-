@@ -40,6 +40,8 @@ const translations={
 };
 const language=new URLSearchParams(location.search).get('lang')||document.body.dataset.lang||'zh';
 const dictionary=translations[language];
+document.documentElement.lang=language==='zh'?'zh-CN':language==='km'?'km-KH':'en';
+document.body.dataset.lang=language;
 if(dictionary){
   const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
   const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
