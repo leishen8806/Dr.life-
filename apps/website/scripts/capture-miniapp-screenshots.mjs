@@ -16,7 +16,8 @@ const launchParams = (theme, language) => {
   const data = encodeURIComponent(`user=${encodeURIComponent(JSON.stringify({ id: 1, language_code: language }))}`);
   const themeParams = encodeURIComponent(JSON.stringify({
     bg_color: theme === "dark" ? "#111315" : "#f4f6f8",
-    text_color: theme === "dark" ? "#f4f6f8" : "#111315"
+    text_color: theme === "dark" ? "#f4f6f8" : "#111315",
+    color_scheme: theme
   }));
   return `?tgWebAppPlatform=tdesktop&tgWebAppVersion=7.0&tgWebAppData=${data}&tgWebAppThemeParams=${themeParams}`;
 };
@@ -75,11 +76,14 @@ async function installMockApi(page, language, app) {
       return;
     }
     if (path === "/v1/public/categories" && request.method() === "GET") {
-      await route.fulfill(json({ items: [], total: 0, page: 1, page_size: 100 }));
+      await route.fulfill(json({ items: [{ public_id: "01EVIDENCECATEGORY", code: "building", name: { zh: "建材", en: "Building materials", km: "សម្ភារៈសំណង់" }, enabled: true, sort: 1 }], total: 1, page: 1, page_size: 100 }));
       return;
     }
     if (path === "/v1/public/products" && request.method() === "GET") {
-      await route.fulfill(json({ items: [], total: 0, page: 1, page_size: 20 }));
+      await route.fulfill(json({ items: [
+        { public_id: "01EVIDENCEPRODUCT1", category_code: "building", name: { zh: "瓷砖样品", en: "Tile sample", km: "គំរូក្បឿង" }, spec: { zh: "600×600 mm", en: "600×600 mm", km: "600×600 មម" }, unit: "m²", origin: "cn", lead_days: 14, status: "on", source: "manual", tiers: [{ min_qty: 1, unit_price_e4: 125000 }], skus: [], updated_at: "2026-01-01T00:00:00Z" },
+        { public_id: "01EVIDENCEPRODUCT2", category_code: "building", name: { zh: "室内门", en: "Interior door", km: "ទ្វារខាងក្នុង" }, spec: { zh: "实木复合", en: "Engineered wood", km: "ឈើផ្សំ" }, unit: "piece", origin: "cn", lead_days: 21, status: "on", source: "manual", tiers: [{ min_qty: 1, unit_price_e4: 890000 }], skus: [], updated_at: "2026-01-01T00:00:00Z" }
+      ], total: 2, page: 1, page_size: 20 }));
       return;
     }
     if (path === "/v1/buyer/orders" && request.method() === "GET") {
@@ -121,6 +125,11 @@ try {
         const url = `http://127.0.0.1:${port}/${launchParams(item.theme, item.language)}`;
         await page.goto(url, { waitUntil: "networkidle" });
         await waitForBusinessPage(page, app);
+        const bodyBackground = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
+        const expectedBackground = item.theme === "dark" ? "rgb(17, 18, 16)" : "rgb(246, 242, 233)";
+        if (bodyBackground !== expectedBackground) {
+          throw new Error(`Theme background mismatch for ${app}-${item.theme}-${item.language}: ${bodyBackground}`);
+        }
         const targets = app === "buyer" ? [
           { name: "home" },
           { name: "orders", open: async () => {

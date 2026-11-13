@@ -87,6 +87,25 @@ try {
             throw new Error(`Route title is not semantically split at ${width}px: ${routeTitle ?? "missing"}`);
           }
         }
+        if (width === 1920 && pageDefinition.name === "home") {
+          const geometry = await page.evaluate(() => {
+            const navItems = [...document.querySelectorAll(".site-header .main-nav a")];
+            const partnerCards = [...document.querySelectorAll(".partner-grid .partner")];
+            const container = document.querySelector(".route .container");
+            const steps = document.querySelector(".route .steps");
+            const skip = document.querySelector(".skip");
+            return {
+              navTops: navItems.map((item) => Math.round(item.getBoundingClientRect().top)),
+              partnerMinWidth: Math.min(...partnerCards.map((item) => item.getBoundingClientRect().width)),
+              stepsRatio: (steps?.getBoundingClientRect().width ?? 0) / (container?.getBoundingClientRect().width ?? 1),
+              skipVisible: skip ? getComputedStyle(skip).clipPath !== "inset(50%)" : true
+            };
+          });
+          if (new Set(geometry.navTops).size !== 1) throw new Error("Header navigation wrapped at 1920px");
+          if (geometry.partnerMinWidth < 260) throw new Error(`Partner cards are too narrow: ${geometry.partnerMinWidth}px`);
+          if (geometry.stepsRatio < 0.8) throw new Error(`Route steps use too little width: ${geometry.stepsRatio}`);
+          if (geometry.skipVisible) throw new Error("Skip link is visible before focus");
+        }
         await page.waitForTimeout(150);
         const relative = posix.join(String(width), language, `${pageDefinition.name}.png`);
         await mkdir(join(output, String(width), language), { recursive: true });
