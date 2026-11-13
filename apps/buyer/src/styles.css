@@ -334,12 +334,8 @@
 
 .buyer-orders-action {
   min-height: 40px;
-  border: 1px solid var(--drl-color-border);
-  border-radius: var(--drl-radius);
   padding: 0 var(--drl-space-2);
-  color: inherit;
-  background: var(--drl-color-surface);
-  font: inherit;
+  white-space: pre;
 }
 
 .buyer-cart-action {
@@ -348,11 +344,7 @@
   gap: var(--drl-space-1);
   min-height: 40px;
   padding: 0 var(--drl-space-2);
-  border: 1px solid var(--drl-color-border);
-  border-radius: var(--drl-radius);
-  color: inherit;
-  background: var(--drl-color-surface);
-  font: inherit;
+  white-space: pre;
 }
 
 .buyer-order-list {

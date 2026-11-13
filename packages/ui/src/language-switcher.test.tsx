@@ -14,7 +14,7 @@ describe("LanguageSwitcherView", () => {
     const buttons = Children.toArray(view.props.children).filter(
       isValidElement
     ) as ReactElement<{
-      "aria-pressed": boolean;
+      ariaPressed: boolean;
       onClick: () => void;
       children: string;
     }>[];
@@ -24,7 +24,7 @@ describe("LanguageSwitcherView", () => {
       "language.en",
       "language.km"
     ]);
-    expect(buttons[1]!.props["aria-pressed"]).toBe(true);
+    expect(buttons[1]!.props.ariaPressed).toBe(true);
     buttons[2]!.props.onClick();
     expect(onSelect).toHaveBeenCalledWith("km" satisfies Language);
   });

@@ -11,15 +11,17 @@ import {
   getTelegramEnvironment,
   applyMiniAppTheme,
   mountTelegramTheme,
+  watchTelegramTheme,
   StartupGate
 } from "@drlife/ui";
 import "@drlife/ui/styles.css";
 import "./styles.css";
 import { BuyerApp } from "./app";
 
-const environment = getTelegramEnvironment();
 mountTelegramTheme();
+const environment = getTelegramEnvironment();
 applyMiniAppTheme(environment.colorScheme);
+watchTelegramTheme(applyMiniAppTheme);
 
 const initialLanguage = resolveLanguage(
   readLanguagePreference(),
