@@ -7,7 +7,7 @@
 :root{--dark:#171817;--black:#111210;--cream:#f6f2e9;--sand:#eee8dc;--ink:#24241f;--muted:#5d5c52;--gold:#d6b97e;--bronze:#80612e;--rule:#d8d0c1;--serif:DRSerif,"Noto Serif CJK SC",SimSun,serif;--sans:DRSans,"Noto Sans CJK SC","PingFang SC","Microsoft YaHei",sans-serif;--content:1260px;--pad:clamp(20px,5.6vw,90px)}
 *,*::before,*::after{box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:88px}
-body{margin:0;color:var(--ink);background:var(--cream);font-family:var(--sans);font-size:16px;line-height:1.82}
+body{margin:0;overflow-x:clip;color:var(--ink);background:var(--cream);font-family:var(--sans);font-size:16px;line-height:1.82}
 body:has(dialog[open]){overflow:hidden}
 img{display:block;max-width:100%}
 a{color:inherit;text-decoration:none}
