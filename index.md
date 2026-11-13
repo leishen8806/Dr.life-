@@ -1,6 +1,6 @@
 # PR #233 screenshot evidence
 
-Generated from the local capture scripts for PR head `e90182d` (`#233 修复官网导航与官方渠道视觉验收`).
+Generated from the local capture scripts for PR head `8dde12f` (`#233 稳定导航字号与可见项断言`).
 
 All 72 evidence files in this branch are WebP and are below 300 KB each.
 
@@ -18,6 +18,6 @@ The remaining 36 files are the buyer home and order-list plus merchant home matr
 
 ## Acceptance evidence
 
-- Website screenshot evidence: PASS — 36 current-head captures for `e90182d` at 360/390/768/1280/1440/1920 × zh/en/km × home/merchant.
+- Website screenshot evidence: PASS — 36 current-head captures for `8dde12f` at 360/390/768/1280/1440/1920 × zh/en/km × home/merchant.
 - Mini App screenshot evidence: PASS — 36 captures retained from the immediately preceding `ed2f87d` head; this rework changes only website CSS and website screenshot assertions, not Mini App code.
 - Local verification: PASS — website 50/50 tests, build, website screenshot capture 36/36, typography/channel-spacing/container-alignment/nav-action assertions, and `git diff --check`.
