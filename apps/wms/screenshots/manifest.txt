@@ -1,4 +1,6 @@
 head=164db27
+evidence=5d2b364
+capture=drawer waits for 600ms and asserts a non-empty value before each drawer screenshot
 matrix=3 languages (zh,en,km) x 2 widths (1440,1920) x 3 pages x 2 states (page,drawer) = 36
 inventory-1440-zh.png	/inventory
 inventory-1440-zh-drawer.png	/inventory drawer
