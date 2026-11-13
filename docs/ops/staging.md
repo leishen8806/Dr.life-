@@ -39,6 +39,11 @@ health, worker logs, Redis disk/AOF health, and PostgreSQL backup freshness.
 Do not paste credentials, tunnel tokens, customer data, or server addresses in
 logs or issues. Escalate incidents to `leishen8806`.
 
+For the E-09 test-environment acceptance record, use
+[`test-env-acceptance.md`](./test-env-acceptance.md). The repository template
+provides `smoke.sh` and `restore-drill.sh`; both require explicit environment
+variables and must be run only with approved test-environment values.
+
 ## Workflow
 
 `.github/workflows/staging.yml` is manual, uses the `staging` protected
