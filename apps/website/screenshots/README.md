@@ -1,6 +1,12 @@
 # PR #249 visual evidence
 
-Website head: `cad7a7f`; evidence refresh: `pending`
+Website head: `0546bc52a3b554068f9bff989f66363cdf658e42`; evidence refresh: `generated from this head`
+
+Full-page height check (static capture, Chinese): 1440px original `6998`,
+implementation `6985` (0.19% difference); 390px original `9387`,
+implementation `9483` (1.02% difference). Both are within the 5% acceptance
+threshold. The capture command was
+`pnpm --config.engine-strict=false --filter @drlife/website capture:screenshots`.
 
 The generated matrix contains the six responsive widths in `manifest.txt` for
 Chinese, English, and Khmer, plus section crops for the required 390px and
