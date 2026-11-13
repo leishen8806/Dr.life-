@@ -72,7 +72,10 @@ export function SuborderDetailView({ order, language, translate, onBack }: { ord
       <p>{order.shipping_address.phone}</p><p>{order.shipping_address.address_text}</p>
     </Card>
     <Card><h2>{translate("order.merchant.itemsTitle")}</h2>
-      {order.items.map((item) => <div className="merchant-order-line" key={item.sku_public_id}><span>{item.sku_public_id} · {item.quantity} × {formatPriceE4(item.unit_price_e4, language, translate)}</span><strong>{formatPriceE4(item.line_total_e4, language, translate)}</strong></div>)}
+      {order.items.map((item) => <div className="merchant-order-line" key={item.sku_public_id}>
+        <span className="merchant-order-line__description"><span>{item.sku_public_id}</span><span aria-hidden="true">·</span><span>{item.quantity} ×</span><span>{formatPriceE4(item.unit_price_e4, language, translate)}</span></span>
+        <strong>{formatPriceE4(item.line_total_e4, language, translate)}</strong>
+      </div>)}
       <p className="merchant-order-total"><span>{translate("order.merchant.total")}</span><strong>{formatPriceE4(order.payable_amount_e4, language, translate)}</strong></p>
     </Card>
   </>;

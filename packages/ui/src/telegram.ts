@@ -21,6 +21,14 @@ export function resolveMiniAppColorScheme(isDark: boolean): "light" | "dark" {
   return isDark ? "dark" : "light";
 }
 
+function isDarkThemeColor(value: string | undefined): boolean {
+  if (!value || !/^#[0-9a-f]{6}$/i.test(value)) return false;
+  const red = Number.parseInt(value.slice(1, 3), 16);
+  const green = Number.parseInt(value.slice(3, 5), 16);
+  const blue = Number.parseInt(value.slice(5, 7), 16);
+  return (red * 299 + green * 587 + blue * 114) / 1000 < 128;
+}
+
 let initialized = false;
 
 export function getTelegramEnvironment(): TelegramEnvironment {
@@ -35,15 +43,29 @@ export function getTelegramEnvironment(): TelegramEnvironment {
       initData: retrieveRawInitData() ?? "",
       languageCode: launch.tgWebAppData?.user?.languageCode,
       backgroundColor: launch.tgWebAppThemeParams.bgColor ?? "#ffffff",
-      colorScheme: resolveMiniAppColorScheme(miniApp.isDark())
+      colorScheme: isDarkThemeColor(launch.tgWebAppThemeParams.bgColor)
+        ? "dark"
+        : resolveMiniAppColorScheme(miniApp.isDark())
     };
   } catch {
+    let backgroundColor = "#f4f6f8";
+    let colorScheme: "light" | "dark" = "light";
+    if (typeof window !== "undefined") {
+      try {
+        const raw = new URLSearchParams(window.location.search).get("tgWebAppThemeParams");
+        const parsed = raw ? JSON.parse(raw) as { bg_color?: string } : undefined;
+        backgroundColor = parsed?.bg_color ?? backgroundColor;
+        colorScheme = isDarkThemeColor(backgroundColor) ? "dark" : "light";
+      } catch {
+        // Browser-only launch parameter parsing is best-effort in local evidence runs.
+      }
+    }
     return {
       isTelegram: false,
       initData: "dev_mock_init_data",
       languageCode: "en",
-      backgroundColor: "#f4f6f8",
-      colorScheme: "light"
+      backgroundColor,
+      colorScheme
     };
   }
 }
