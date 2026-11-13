@@ -69,6 +69,8 @@ function ReviewPage() {
     setLoading(true); setError(false);
     api.listReviews().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
   };
+  // The adapter call is an external synchronization; the initial loading state is intentional.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(reload, []);
   const rows = active === "merchant" ? data.merchants : data.products;
   const approve = (row: ReviewRecord) => { api.approveReview(active, row.id).then(reload); };
@@ -101,6 +103,7 @@ function OrderPage() {
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<OrderRecord>();
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     api.listOrders({ query, status }).then(setRows).catch(() => setError(true)).finally(() => setLoading(false));
   }, [query, status]);
