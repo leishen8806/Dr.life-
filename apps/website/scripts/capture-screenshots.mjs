@@ -158,6 +158,10 @@ try {
             const accessContainer = document.querySelector(".access-section > .container");
             const businessContainer = document.querySelector("#business > .container");
             const channelItems = [...document.querySelectorAll(".channel-list span")];
+            const heroButtons = [...document.querySelectorAll(".hero .actions .button")];
+            const values = document.querySelector(".values");
+            const accessSection = document.querySelector(".access-section");
+            const accessGrid = document.querySelector(".access-grid");
             return {
               sections,
               partnerLeftDelta: (partnerContainer?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0),
@@ -168,7 +172,11 @@ try {
                 return overlap(rect, language?.getBoundingClientRect()) || overlap(rect, shop?.getBoundingClientRect());
               }),
               navFontSizes: navItems.map((item) => Number.parseFloat(getComputedStyle(item).fontSize)),
-              channelItems
+              channelItems,
+              heroButtonTops: heroButtons.map((item) => Math.round(item.getBoundingClientRect().top)),
+              valuesBackground: values ? getComputedStyle(values).backgroundColor : "",
+              accessBackground: accessSection ? getComputedStyle(accessSection).backgroundColor : "",
+              accessGridBackground: accessGrid ? getComputedStyle(accessGrid).backgroundColor : ""
             };
           });
           for (const section of homepageGeometry.sections) {
@@ -205,6 +213,20 @@ try {
           }
           if (homepageGeometry.channelItems.some((item, index, items) => index > 0 && item.top === items[index - 1].top && item.left - items[index - 1].right < 12)) {
             throw new Error(`Official channel items lack visible separation at ${width}px (${language})`);
+          }
+          if (width === 390) {
+            if (new Set(homepageGeometry.heroButtonTops).size !== 1) {
+              throw new Error(`Hero actions are not on one row at ${width}px (${language}): ${homepageGeometry.heroButtonTops.join(",")}`);
+            }
+            if (homepageGeometry.valuesBackground !== "rgba(0, 0, 0, 0)") {
+              throw new Error(`Culture values container has a filled background at ${width}px (${language}): ${homepageGeometry.valuesBackground}`);
+            }
+            if (homepageGeometry.accessGridBackground !== "rgba(0, 0, 0, 0)") {
+              throw new Error(`App cards wrapper has a filled background at ${width}px (${language}): ${homepageGeometry.accessGridBackground}`);
+            }
+            if (!["rgb(32, 33, 31)", "rgb(23, 24, 23)"].includes(homepageGeometry.accessBackground)) {
+              throw new Error(`App section is not dark at ${width}px (${language}): ${homepageGeometry.accessBackground}`);
+            }
           }
           if ([1440, 1920].includes(width) && homepageGeometry.partnerGap < 64) {
             throw new Error(`Partner cards touch the app section at ${width}px (${language}): ${homepageGeometry.partnerGap}px gap`);

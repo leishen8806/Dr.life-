@@ -307,6 +307,7 @@ body.homepage-source-page.homepage-source-page .business-grid .panel-copy {
 }
 body.homepage-source-page.homepage-source-page .steps { grid-template-columns: repeat(4, 1fr); }
 body.homepage-source-page.homepage-source-page .values { gap: 14px; }
+body.homepage-source-page.homepage-source-page .values { background: transparent; }
 body.homepage-source-page.homepage-source-page .partner-grid { gap: 12px; }
 body.homepage-source-page.homepage-source-page .partner-grid .partner {
   padding: clamp(15px, 2vw, 24px);
@@ -333,6 +334,7 @@ body.homepage-source-page.homepage-source-page .hero-index a { padding: 10px 15p
 body.homepage-source-page.homepage-source-page .values article { background: transparent; }
 body.homepage-source-page.homepage-source-page .partner-grid,
 body.homepage-source-page.homepage-source-page .access-grid { margin-top: 0; }
+body.homepage-source-page.homepage-source-page .access-grid { background: transparent; }
 body.homepage-source-page.homepage-source-page .section.partners { padding-block: clamp(60px, 8vw, 122px); }
 body.homepage-source-page.homepage-source-page .section.partners > .container {
   width: min(calc(100% - 2 * var(--pad)), var(--content));
@@ -348,6 +350,13 @@ body.homepage-source-page.homepage-source-page[data-lang="km"] .app-card figcapt
   font-size: 13px;
 }
 @media (max-width: 680px) {
+  body.homepage-source-page.homepage-source-page .hero .actions {
+    flex-wrap: nowrap;
+  }
+  body.homepage-source-page.homepage-source-page .hero .actions .button {
+    width: auto;
+    flex: 1 1 0;
+  }
   body.homepage-source-page.homepage-source-page .hero h1 {
     margin-top: 21px;
     font-size: clamp(54px, 13.5vw, 83px);
