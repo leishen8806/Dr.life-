@@ -7,10 +7,10 @@
   "common.edit": "[TODO-KM-REVIEW] កែប្រែ",
   "common.search": "[TODO-KM-REVIEW] ស្វែងរក",
   "common.refresh": "[TODO-KM-REVIEW] ផ្ទុកឡើងវិញ",
-  "common.submit": "[TODO-KM-REVIEW] បញ្ជូន",
+  "common.submit": "បញ្ជូន",
   "common.close": "[TODO-KM-REVIEW] បិទ",
   "common.loading": "កំពុងផ្ទុក",
-  "common.empty": "[TODO-KM-REVIEW] គ្មានទិន្នន័យ",
+  "common.empty": "គ្មានទិន្នន័យ",
   "common.networkError": "បញ្ហាបណ្ដាញ",
   "common.retry": "ព្យាយាមម្ដងទៀត",
   "common.success": "[TODO-KM-REVIEW] ប្រតិបត្តិការបានជោគជ័យ",
@@ -32,7 +32,7 @@
   "role.driver": "[TODO-KM-REVIEW] អ្នកបើកបរ",
   "role.wms": "[TODO-KM-REVIEW] ឃ្លាំង និងដឹកជញ្ជូន",
   "role.admin": "[TODO-KM-REVIEW] អ្នកគ្រប់គ្រងវេទិកា",
-  "language.select": "[TODO-KM-REVIEW] ជ្រើសរើសភាសា",
+  "language.select": "ជ្រើសរើសភាសា",
   "language.zh": "中文",
   "language.en": "English",
   "language.km": "ខ្មែរ",
@@ -134,7 +134,7 @@
   "app.merchant": "[TODO-KM-REVIEW] Merchant",
   "app.driver": "[TODO-KM-REVIEW] Driver",
   "app.admin": "[TODO-KM-REVIEW] Platform Admin",
-  "app.wms": "[TODO-KM-REVIEW] Warehouse Admin"
+  "app.wms": "អ្នកគ្រប់គ្រងឃ្លាំង"
 ,"error.1007": "[TODO-KM-REVIEW] Request is too large."
 ,"error.1008": "[TODO-KM-REVIEW] Request format is not supported."
 ,"error.1009": "[TODO-KM-REVIEW] This action conflicts with an earlier request."
