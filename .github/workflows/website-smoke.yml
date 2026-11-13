@@ -9,6 +9,49 @@ permissions:
   contents: read
 
 jobs:
+  local-preview:
+    name: Local preview mobile Lighthouse gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Enable pnpm
+        run: corepack enable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build website
+        run: pnpm --filter @drlife/website build
+      - name: Install Chromium
+        run: pnpm --filter @drlife/website exec playwright install --with-deps chromium
+      - name: Start local preview
+        run: |
+          pnpm --filter @drlife/website exec astro preview --host 127.0.0.1 --port 4321 > /tmp/astro-preview.log 2>&1 &
+          echo $! > /tmp/astro-preview.pid
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:4321/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/astro-preview.log
+          exit 1
+      - name: Run local mobile Lighthouse
+        run: >-
+          npx --yes lighthouse@12.6.0 "http://127.0.0.1:4321/?lang=zh" --output=json
+          --output-path=/tmp/local-lighthouse.json --preset=mobile
+      - name: Check local Lighthouse thresholds
+        run: pnpm --filter @drlife/website exec node scripts/check-lighthouse.mjs /tmp/local-lighthouse.json
+      - name: Upload local preview evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-local-preview-lighthouse
+          path: /tmp/local-lighthouse.json
+          if-no-files-found: warn
+          retention-days: 14
   guard:
     name: Check public URL configuration
     runs-on: ubuntu-latest
