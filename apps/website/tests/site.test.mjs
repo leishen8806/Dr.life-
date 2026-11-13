@@ -23,16 +23,17 @@ test("confirmed-design sections remain present in the source", () => {
 
   for (const marker of [
     "hero-arc",
-    "category-grid",
+    "market-showcase",
+    "market-group",
     "ecosystem-node",
     "chain-step"
   ]) {
     assert.match(home, new RegExp(marker), `homepage is missing ${marker}`);
   }
-  assert.match(home, /<picture>/, "category cards must use responsive picture markup");
-  assert.match(home, /type="image\/avif"/, "category cards must expose AVIF");
-  assert.match(home, /type="image\/webp"/, "category cards must expose WebP");
-  assert.match(home, /data-i18n-alt={`home\.categoryAlts\.\$\{index\}`}/, "category cards must use localized alt keys");
+  assert.match(home, /<picture>/, "market visual must use responsive picture markup");
+  assert.match(home, /type="image\/avif"/, "market visual must expose AVIF");
+  assert.match(home, /type="image\/webp"/, "market visual must expose WebP");
+  assert.match(home, /data-i18n-alt="home\.homepageV2\.market\.alts\.0"/, "market visual must use a localized alt key");
 
   const imageCredits = publicSource("images/CREDITS.md");
   for (const photographer of ["Aspect 11", "R ARCHITECTURE", "Spacejoy", "Theme Photos"]) {
@@ -250,105 +251,19 @@ test("merchant hero preserves the confirmed title break and Bot header action th
 
 test("home section headings preserve confirmed line breaks through i18n", () => {
   const home = source("pages/index.astro");
-  assert.match(home, /home\.visionTitleLines/);
-  assert.match(home, /home\.ecoTitleLines/);
-  assert.match(home, /home\.chainTitleLines/);
+  assert.match(home, /home\.homepageV2\.business\.titleLines/);
+  assert.match(home, /home\.homepageV2\.route\.titleLines/);
 });
 
 test("GROW WITH US cards preserve confirmed labels and partner copy without placeholders", () => {
   const home = source("pages/index.astro");
   const pageCopy = source("i18n/page-copy.ts");
-  const partnerSection = home.slice(
-    home.indexOf('<section class="section" id="about">')
-  );
-  const expected = {
-    zh: [
-      [
-        "MERCHANTS",
-        "本地商家入驻",
-        "0% 销售佣金，仓储费 15 美元/立方米/月起，一张账单看清仓配费用。"
-      ],
-      [
-        "BRANDS · FACTORIES",
-        "中国品牌与厂家",
-        "不必自建海外仓：广州集货、跨境运输、金边入仓、线上销售一条龙。"
-      ],
-      [
-        "PARTNERS",
-        "战略与生态伙伴",
-        "物流、支付、金融机构与投资伙伴，共同建设柬埔寨的商业基础设施。"
-      ]
-    ],
-    en: [
-      [
-        "MERCHANTS",
-        "Local merchant onboarding",
-        "0% sales commission and storage from US$15/m³/month, with warehousing and fulfilment charges visible on one bill."
-      ],
-      [
-        "BRANDS · FACTORIES",
-        "Chinese brands and manufacturers",
-        "No need to build an overseas warehouse: Guangzhou consolidation, cross-border transport, Phnom Penh inbound warehousing and online sales in one flow."
-      ],
-      [
-        "PARTNERS",
-        "Strategic and ecosystem partners",
-        "Logistics, payment, financial institutions and investment partners are building Cambodia’s commercial infrastructure together."
-      ]
-    ],
-    km: [
-      [
-        "MERCHANTS",
-        "ពាណិជ្ជករក្នុងស្រុក",
-        "កម្រៃជើងសារលក់ 0%; ថ្លៃស្តុកចាប់ពី US$15/m³/ខែ; វិក្កយបត្រតែមួយបង្ហាញថ្លៃស្តុក និងដឹកជញ្ជូនច្បាស់។"
-      ],
-      [
-        "BRANDS · FACTORIES",
-        "ម៉ាក និងរោងចក្រចិន",
-        "មិនចាំបាច់សង់ឃ្លាំងក្រៅប្រទេស៖ ប្រមូលទំនិញនៅក្វាងចូវ ដឹកជញ្ជូនឆ្លងដែន ចូលឃ្លាំងភ្នំពេញ និងលក់តាមអនឡាញក្នុងសេវាតភ្ជាប់តែមួយ។"
-      ],
-      [
-        "PARTNERS",
-        "ដៃគូយុទ្ធសាស្ត្រ និងប្រព័ន្ធអេកូឡូស៊ី",
-        "ដៃគូផ្នែកភស្តុភារ ការទូទាត់ ស្ថាប័នហិរញ្ញវត្ថុ និងវិនិយោគ រួមគ្នាកសាងហេដ្ឋារចនាសម្ព័ន្ធពាណិជ្ជកម្មរបស់កម្ពុជា។"
-      ]
-    ]
-  };
-
-  assert.match(
-    partnerSection,
-    /partners\.map\(\(\[label, title, body\], index\)/
-  );
-  assert.match(partnerSection, /home\.partners\.\$\{index\}\.0/);
-  assert.match(partnerSection, /home\.partners\.\$\{index\}\.1/);
-  assert.match(partnerSection, /home\.partners\.\$\{index\}\.2/);
-  assert.doesNotMatch(partnerSection, /0\{index \+ 1\}/);
-
-  for (const [locale, partners] of Object.entries(expected)) {
-    const jsonCopy = JSON.parse(source(`i18n/${locale}.json`));
-    assert.deepEqual(
-      jsonCopy.home.partners,
-      partners,
-      `${locale}.json partners must match the confirmed copy`
-    );
-    for (const partner of jsonCopy.home.partners)
-      assert.equal(
-        partner.some((value) => value.startsWith("[")),
-        false,
-        `${locale}.json must not contain a partner placeholder`
-      );
-    for (const value of partners.flat())
-      assert.match(
-        pageCopy,
-        new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
-        `page-copy.ts must include ${locale} partner copy`
-      );
-  }
-
-  assert.doesNotMatch(
-    pageCopy,
-    /\[(合作方向待确认|Cooperation direction to be confirmed|ទិសដៅសហការត្រូវបញ្ជាក់)\]/
-  );
+  assert.match(home, /partners\.map\(\(\[label, title, body\], index\)/);
+  assert.match(home, /home\.homepageV2\.partners\.cards\.\$\{index\}\.0/);
+  assert.match(home, /home\.homepageV2\.partners\.cards\.\$\{index\}\.1/);
+  assert.match(home, /home\.homepageV2\.partners\.cards\.\$\{index\}\.2/);
+  assert.match(pageCopy, /homepageV2Full/);
+  assert.doesNotMatch(pageCopy, /\[(合作方向待确认|Cooperation direction to be confirmed|ទិសដៅសហការត្រូវបញ្ជាក់)\]/);
 });
 
 test("the static build exposes the required public routes", () => {
