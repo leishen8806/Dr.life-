@@ -197,6 +197,7 @@
   "admin.buyer": "Buyer",
   "admin.merchant": "Merchant",
   "admin.amount": "Amount",
+  "admin.currencySymbol": "$",
   "admin.orderStatus": "Order status",
   "admin.createdAt": "Created at",
   "admin.submittedAt": "Submitted at",
