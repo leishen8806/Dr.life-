@@ -10,6 +10,15 @@ const output = fileURLToPath(new URL("../screenshots/", import.meta.url));
 const widths = [360, 390, 768, 1280, 1440, 1920];
 const languages = ["zh", "en", "km"];
 const pages = [{ name: "home", path: "/" }, { name: "merchant", path: "/merchant/" }];
+const sectionShots = [
+  ["header", ".topbar"],
+  ["hero", ".hero"],
+  ["business", "#business"],
+  ["route", ".route"],
+  ["apps", ".access-section"],
+  ["partners", ".partners"],
+  ["footer", ".footer"]
+];
 const contentTypes = {
   ".css": "text/css", ".html": "text/html; charset=utf-8", ".ico": "image/x-icon",
   ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml",
@@ -206,6 +215,15 @@ try {
         await mkdir(join(output, String(width), language), { recursive: true });
         await page.screenshot({ path: join(output, relative), fullPage: true });
         manifest.push(`${relative}\t${url.pathname}?lang=${language}`);
+        if (pageDefinition.name === "home" && [390, 1440].includes(width)) {
+          for (const [section, selector] of sectionShots) {
+            const sectionNode = page.locator(selector);
+            const sectionRelative = posix.join("sections", String(width), language, `${section}.png`);
+            await mkdir(join(output, "sections", String(width), language), { recursive: true });
+            await sectionNode.screenshot({ path: join(output, sectionRelative) });
+            manifest.push(`${sectionRelative}\t${url.pathname}?lang=${language}#${section}`);
+          }
+        }
         await context.close();
       }
     }
@@ -216,6 +234,6 @@ try {
 }
 
 await writeFile(join(output, "manifest.txt"), `${manifest.join("\n")}\n`, "utf8");
-const expected = widths.length * languages.length * pages.length;
+const expected = widths.length * languages.length * pages.length + 2 * languages.length * sectionShots.length;
 if (manifest.length !== expected) throw new Error(`Expected ${expected} screenshots, captured ${manifest.length}`);
 console.log(`Captured ${manifest.length} screenshots in ${output}`);

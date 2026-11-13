@@ -51,7 +51,7 @@ jobs:
       - name: Run Lighthouse acceptance gate
         run: >-
           npx --yes lighthouse@12.6.0 "$WEBSITE_PUBLIC_URL" --output=json
-          --output-path=/tmp/lighthouse.json --chrome-flags="--headless --no-sandbox"
+          --output-path=/tmp/lighthouse.json --preset=mobile
       - name: Check Lighthouse thresholds
         run: pnpm --filter @drlife/website exec node scripts/check-lighthouse.mjs /tmp/lighthouse.json
       - name: Upload smoke evidence

@@ -35,10 +35,12 @@ document.querySelector('#copy-inquiry').addEventListener('click',async()=>{
 const translations={
   en:{
     '跳至主要内容':'Skip to main content','菜单':'Menu','四大版块':'Four businesses','DR智慧建材城':'DR Smart Materials City','一仓入柬':'One warehouse into Cambodia','关于DR':'About DR','App 下载':'Download the app','合作咨询':'Work with DR','立足金边，连接全球供应链与柬埔寨生活。':'Rooted in Phnom Penh, connecting global supply chains with life in Cambodia.','探索四大版块':'Explore four businesses','洽谈合作':'Discuss a partnership','从选材到交付，':'From material selection to delivery,','每一步都有 DR。':'DR is with you at every step.','消费者与装修团队':'Buyers & projects','中国品牌与工厂':'Brands & factories','本地商户与服务伙伴':'Local merchants','平台及仓配客户':'Fulfillment clients','金融服务只与持牌机构合作，尚未开放。':'Financial services will work only with licensed institutions and are not yet available.','准备金融咨询资料':'Prepare a finance enquiry','选材，先看实物。':'See materials in person before choosing.','准备看样及采购需求':'Prepare a showroom and purchasing enquiry','准备供应商入柬资料':'Prepare supplier information','相信生活有更多可能！':'Believe in more possibilities for life!','与 DR.LIFE+ 一起成长':'Grow with DR.LIFE+','下载 App，关注 DR':'Download the apps and follow DR','准备咨询资料':'Prepare enquiry details','关闭':'Close','复制咨询模板':'Copy enquiry template'},
+  // [TODO-KM-REVIEW] Native-speaker review remains required before final publication.
   km:{
     '跳至主要内容':'រំលងទៅមាតិកាសំខាន់','菜单':'ម៉ឺនុយ','四大版块':'អាជីវកម្ម ៤ ផ្នែក','DR智慧建材城':'មជ្ឈមណ្ឌលសម្ភារៈសំណង់ DR','一仓入柬':'ឃ្លាំងមួយចូលកម្ពុជា','关于DR':'អំពី DR','App 下载':'ទាញយកកម្មវិធី','合作咨询':'ពិភាក្សាកិច្ចសហការ','立足金边，连接全球供应链与柬埔寨生活。':'មានមូលដ្ឋាននៅភ្នំពេញ និងភ្ជាប់ខ្សែសង្វាក់ផ្គត់ផ្គង់ជាមួយជីវិតនៅកម្ពុជា។','探索四大版块':'ស្វែងរកអាជីវកម្ម ៤ ផ្នែក','洽谈合作':'ពិភាក្សាកិច្ចសហការ','金融服务只与持牌机构合作，尚未开放。':'សេវាហិរញ្ញវត្ថុ នឹងសហការតែជាមួយស្ថាប័នមានអាជ្ញាប័ណ្ណ ហើយមិនទាន់បើកដំណើរការទេ។','准备金融咨询资料':'រៀបចំព័ត៌មានសម្រាប់សំណួរហិរញ្ញវត្ថុ','选材，先看实物。':'ជ្រើសរើសសម្ភារៈ ដោយមើលវត្ថុពិតជាមុន។','准备看样及采购需求':'រៀបចំព័ត៌មានសម្រាប់មើលគំរូ និងទិញ','准备供应商入柬资料':'រៀបចំព័ត៌មានអ្នកផ្គត់ផ្គង់','相信生活有更多可能！':'ជឿថាជីវិតមានលទ្ធភាពច្រើនជាងនេះ!','与 DR.LIFE+ 一起成长':'រីកចម្រើនជាមួយ DR.LIFE+','下载 App，关注 DR':'ទាញយកកម្មវិធី និងតាមដាន DR','准备咨询资料':'រៀបចំព័ត៌មានសម្រាប់សំណួរ','关闭':'បិទ','复制咨询模板':'ចម្លងគំរូសំណួរ'}
 };
-const language=new URLSearchParams(location.search).get('lang')||document.body.dataset.lang||'zh';
+const requestedLanguage=new URLSearchParams(location.search).get('lang');
+const language=['zh','en','km'].includes(requestedLanguage)?requestedLanguage:(document.body.dataset.lang||'zh');
 const dictionary=translations[language];
 document.documentElement.lang=language==='zh'?'zh-CN':language==='km'?'km-KH':'en';
 document.body.dataset.lang=language;
