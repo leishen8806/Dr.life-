@@ -1,6 +1,6 @@
 # PR #249 visual evidence
 
-Head: `33e7fa6` (evidence refresh commit follows)
+Website head: `6f72e55`; evidence refresh: `e855d54`
 
 The generated matrix contains the six responsive widths in `manifest.txt` for
 Chinese, English, and Khmer, plus section crops for the required 390px and
