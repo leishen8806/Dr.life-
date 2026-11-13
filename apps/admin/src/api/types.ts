@@ -13,6 +13,6 @@ export interface AdminApi {
   listReviews(): Promise<ReviewList>;
   approveReview(kind: "merchant" | "product", id: string): Promise<void>;
   rejectReview(kind: "merchant" | "product", id: string, reason: string): Promise<void>;
-  listOrders(filters?: { query?: string; status?: RecordStatus }): Promise<OrderRecord[]>;
+  listOrders(filters?: { query?: string; status?: RecordStatus; from?: string; to?: string }): Promise<OrderRecord[]>;
   getOrder(id: string): Promise<OrderRecord | undefined>;
 }

@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Alert, Button, Drawer, Empty, Input, Layout, Menu, Modal, Result, Select, Skeleton, Space, Table, Tabs, Typography } from "antd";
+import { Alert, Button, DatePicker, Drawer, Empty, Input, Layout, Menu, Result, Select, Skeleton, Space, Table, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { I18nProvider, readLanguagePreference, resolveLanguage, useI18n, type TranslationKey } from "@drlife/i18n";
@@ -13,6 +13,8 @@ import "./styles.css";
 
 const { Header, Sider, Content } = Layout;
 const canUseMockWorkspace = import.meta.env.DEV;
+const permissions: string[] = canUseMockWorkspace ? ["admin.review", "admin.orders", "admin.merchants", "admin.products"] : [];
+const hasPermission = (permission: string) => permissions.includes(permission);
 
 function keyText(t: (key: TranslationKey) => string, key: string) {
   return t(key as TranslationKey);
@@ -32,28 +34,51 @@ function StatusCell({ status }: { status: string }) {
 
 function Overview() {
   const { t } = useI18n();
+  const [counts, setCounts] = useState({ merchants: 0, orders: 0, review: 0 });
+  useEffect(() => {
+    if (!canUseMockWorkspace) return;
+    Promise.all([api.listReviews(), api.listOrders()]).then(([reviews, orders]) => {
+      setCounts({ merchants: reviews.merchants.length, orders: orders.length, review: reviews.merchants.length + reviews.products.length });
+    });
+  }, []);
   return <div className="admin-page">
     <Typography.Title level={2}>{t("admin.overview")}</Typography.Title>
     {canUseMockWorkspace && <div className="admin-cards" aria-label={t("admin.overview")}>
-      <article className="admin-card"><strong>{t("admin.merchants")}</strong><span>2</span></article>
-      <article className="admin-card"><strong>{t("admin.orders")}</strong><span>2</span></article>
-      <article className="admin-card"><strong>{t("admin.review")}</strong><span>3</span></article>
+      <article className="admin-card"><strong>{t("admin.merchants")}</strong><span>{counts.merchants}</span></article>
+      <article className="admin-card"><strong>{t("admin.orders")}</strong><span>{counts.orders}</span></article>
+      <article className="admin-card"><strong>{t("admin.review")}</strong><span>{counts.review}</span></article>
     </div>}
   </div>;
 }
 
-function ReviewTable({ rows, onApprove, onReject }: { rows: ReviewRecord[]; onApprove: (row: ReviewRecord) => void; onReject: (row: ReviewRecord) => void }) {
+export function ReviewTable({ rows, canManage, onApprove, onReject }: { rows: ReviewRecord[]; canManage: boolean; onApprove: (row: ReviewRecord) => void; onReject: (row: ReviewRecord) => void }) {
   const { t } = useI18n();
   const columns: ColumnsType<ReviewRecord> = [
-    { title: t("admin.merchants"), dataIndex: "nameKey", render: (value: string) => keyText(t, value) },
+    { title: t("admin.review"), dataIndex: "nameKey", render: (value: string) => keyText(t, value) },
     { title: t("admin.status"), dataIndex: "status", render: (value: string) => <StatusCell status={value} /> },
     { title: t("admin.createdAt"), dataIndex: "createdAt" },
     { title: t("admin.details"), key: "actions", render: (_value, row) => <Space wrap>
-      <Button type="primary" size="small" disabled={row.status !== "pending"} onClick={() => onApprove(row)}>{t("admin.approve")}</Button>
-      <Button danger size="small" disabled={row.status !== "pending"} onClick={() => onReject(row)}>{t("admin.reject")}</Button>
+      <Tooltip title={!canManage ? t("admin.noPermission") : undefined}><span><Button type="primary" size="small" disabled={!canManage || row.status !== "pending"} onClick={() => onApprove(row)}>{t("admin.approve")}</Button></span></Tooltip>
+      <Tooltip title={!canManage ? t("admin.noPermission") : undefined}><span><Button danger size="small" disabled={!canManage || row.status !== "pending"} onClick={() => onReject(row)}>{t("admin.reject")}</Button></span></Tooltip>
     </Space> }
   ];
   return <Table rowKey="id" columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} locale={{ emptyText: <Empty description={t("admin.empty")} /> }} />;
+}
+
+export function RejectReasonForm({ onSubmit }: { onSubmit: (reason: string) => void }) {
+  const { t } = useI18n();
+  const [reason, setReason] = useState("");
+  const [reasonError, setReasonError] = useState(false);
+  const submit = () => {
+    if (!reason.trim()) { setReasonError(true); return; }
+    onSubmit(reason.trim());
+  };
+  return <div className="admin-reject-dialog" role="dialog" aria-label={t("admin.reject")}>
+    <Typography.Title level={4}>{t("admin.reject")}</Typography.Title>
+    <Input.TextArea rows={4} value={reason} status={reasonError ? "error" : undefined} onChange={(event) => { setReason(event.target.value); setReasonError(false); }} placeholder={t("admin.rejectReason")} aria-label={t("admin.rejectReason")} />
+    {reasonError && <div className="admin-form-error" role="alert">{t("admin.rejectRequired")}</div>}
+    <Button type="primary" onClick={submit}>{t("admin.reject")}</Button>
+  </div>;
 }
 
 function ReviewPage() {
@@ -63,50 +88,54 @@ function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<ReviewRecord>();
-  const [reason, setReason] = useState("");
-  const [reasonError, setReasonError] = useState(false);
+  const [actionError, setActionError] = useState(false);
   const reload = () => {
-    setLoading(true); setError(false);
+    setLoading(true); setError(false); setActionError(false);
     api.listReviews().then(setData).catch(() => setError(true)).finally(() => setLoading(false));
   };
   // The adapter call is an external synchronization; the initial loading state is intentional.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(reload, []);
   const rows = active === "merchant" ? data.merchants : data.products;
-  const approve = (row: ReviewRecord) => { api.approveReview(active, row.id).then(reload); };
-  const reject = () => {
-    if (!selected || !reason.trim()) { setReasonError(true); return; }
-    api.rejectReview(active, selected.id, reason.trim()).then(() => {
-      setSelected(undefined); setReason(""); setReasonError(false); reload();
-    });
+  const approve = (row: ReviewRecord) => { api.approveReview(active, row.id).then(reload).catch(() => setActionError(true)); };
+  const reject = (reason: string) => {
+    if (!selected) return;
+    api.rejectReview(active, selected.id, reason).then(() => {
+      setSelected(undefined); reload();
+    }).catch(() => setActionError(true));
   };
   return <div className="admin-page">
     <Typography.Title level={2}>{t("admin.review")}</Typography.Title>
-    <Tabs activeKey={active} onChange={(value) => setActive(value as "merchant" | "product")} items={[
-      { key: "merchant", label: t("admin.reviewMerchant"), children: null },
-      { key: "product", label: t("admin.reviewProduct"), children: null }
-    ]} />
-    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <ReviewTable rows={rows} onApprove={approve} onReject={setSelected} />}
-    <Modal open={Boolean(selected)} title={t("admin.reject")} okText={t("admin.reject")} onCancel={() => { setSelected(undefined); setReason(""); setReasonError(false); }} onOk={reject}>
-      <Input.TextArea rows={4} value={reason} status={reasonError ? "error" : undefined} onChange={(event) => { setReason(event.target.value); setReasonError(false); }} placeholder={t("admin.rejectReason")} aria-label={t("admin.rejectReason")} />
-      {reasonError && <div className="admin-form-error" role="alert">{t("admin.rejectRequired")}</div>}
-    </Modal>
+    <div className="admin-tabs" role="tablist">
+      <Button type={active === "merchant" ? "primary" : "default"} role="tab" aria-selected={active === "merchant"} onClick={() => setActive("merchant")}>{t("admin.reviewMerchant")}</Button>
+      <Button type={active === "product" ? "primary" : "default"} role="tab" aria-selected={active === "product"} onClick={() => setActive("product")}>{t("admin.reviewProduct")}</Button>
+    </div>
+    {actionError && <Alert type="error" showIcon message={t("admin.error")} />}
+    {!hasPermission("admin.review") && <Alert type="warning" showIcon message={t("admin.noPermission")} />}
+    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <ReviewTable rows={rows} canManage={hasPermission("admin.review")} onApprove={approve} onReject={setSelected} />}
+    {selected && <RejectReasonForm onSubmit={reject} />}
   </div>;
 }
 
-function OrderPage() {
+export function OrderPage() {
   const { t } = useI18n();
   const [rows, setRows] = useState<OrderRecord[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<RecordStatus>();
+  const [dateRange, setDateRange] = useState<[string, string]>(["", ""]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<OrderRecord>();
+  const reload = () => {
+    setLoading(true); setError(false);
+    api.listOrders({ query, status, from: dateRange[0] || undefined, to: dateRange[1] || undefined }).then(setRows).catch(() => setError(true)).finally(() => setLoading(false));
+  };
   useEffect(() => {
+    // Filters synchronize the view with the adapter and intentionally refresh loading state.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
-    api.listOrders({ query, status }).then(setRows).catch(() => setError(true)).finally(() => setLoading(false));
-  }, [query, status]);
+    reload();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, status, dateRange]);
   const columns: ColumnsType<OrderRecord> = [
     { title: t("admin.orderNo"), dataIndex: "id" },
     { title: t("admin.buyer"), dataIndex: "buyerKey", render: (value: string) => keyText(t, value) },
@@ -123,12 +152,16 @@ function OrderPage() {
       <Select allowClear value={status} onChange={setStatus} placeholder={t("admin.status")} options={[
         { value: "normal", label: t("admin.normal") }, { value: "attention", label: t("admin.attention") }, { value: "exception", label: t("admin.exception") }
       ]} />
+      <DatePicker.RangePicker onChange={(_, dateStrings) => setDateRange(dateStrings as [string, string])} aria-label={t("admin.date")} />
     </Space>
-    {error ? <Alert type="error" showIcon message={t("admin.error")} /> : <Table rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} onRow={(row) => ({ onClick: () => setSelected(row), className: "admin-clickable-row" })} locale={{ emptyText: <Empty description={t("admin.noResults")} /> }} />}
+    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <Table rowKey="id" columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} onRow={(row) => ({ onClick: () => setSelected(row), className: "admin-clickable-row" })} locale={{ emptyText: <Empty description={t("admin.noResults")} /> }} />}
     <Drawer open={Boolean(selected)} title={t("admin.orderDetail")} onClose={() => setSelected(undefined)} width={440}>
       {selected && <div className="order-detail">
         <Typography.Paragraph><strong>{t("admin.orderNo")}:</strong> {selected.id}</Typography.Paragraph>
         <Typography.Paragraph><strong>{t("admin.buyer")}:</strong> {keyText(t, selected.buyerKey)}</Typography.Paragraph>
+        <Typography.Paragraph><strong>{t("admin.merchant")}:</strong> {keyText(t, selected.merchantKey)}</Typography.Paragraph>
+        <Typography.Paragraph><strong>{t("admin.amount")}:</strong> <Money value={selected.amountE4} /></Typography.Paragraph>
+        <Typography.Paragraph><strong>{t("admin.createdAt")}:</strong> {selected.createdAt}</Typography.Paragraph>
         <Typography.Paragraph><strong>{t("admin.phone")}:</strong> {selected.phone}</Typography.Paragraph>
         <Typography.Title level={4}>{t("admin.suborders")}</Typography.Title>
         <ul>{selected.suborders.map((item) => <li key={item.id}>{item.id} · {keyText(t, item.productKey)} · <StatusCell status={item.status} /></li>)}</ul>
@@ -147,13 +180,15 @@ function Shell() {
   const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
+  if (!canUseMockWorkspace) return <ProductionPlaceholder />;
   const items = [
     { key: "/", label: <Link to="/">{t("admin.overview")}</Link> },
     { key: "accounts", label: t("admin.accounts"), children: [
-      { key: "/orders", label: <Link to="/orders">{t("admin.orders")}</Link> },
-      { key: "/merchants", label: <span>{t("admin.merchants")}</span>, disabled: true }
+      ...(hasPermission("admin.orders") ? [{ key: "/orders", label: <Link to="/orders">{t("admin.orders")}</Link> }] : []),
+      ...(hasPermission("admin.merchants") ? [{ key: "/merchants", label: <span>{t("admin.merchants")}</span>, disabled: true }] : []),
+      ...(hasPermission("admin.products") ? [{ key: "/products", label: <span>{t("admin.products")}</span>, disabled: true }] : [])
     ] },
-    { key: "operations", label: t("admin.operations"), children: [{ key: "/review", label: <Link to="/review">{t("admin.review")}</Link> }] }
+    { key: "operations", label: t("admin.operations"), children: hasPermission("admin.review") ? [{ key: "/review", label: <Link to="/review">{t("admin.review")}</Link> }] : [] }
   ];
   const selectedKey = location.pathname === "/" ? "/" : location.pathname;
   return <Layout className="admin-shell">
@@ -175,10 +210,13 @@ function Shell() {
   </Layout>;
 }
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <I18nProvider initialLanguage={resolveLanguage(readLanguagePreference(), undefined)}>
-      <BrowserRouter><Shell /></BrowserRouter>
-    </I18nProvider>
-  </StrictMode>
-);
+const root = document.getElementById("root");
+if (root) {
+  createRoot(root).render(
+    <StrictMode>
+      <I18nProvider initialLanguage={resolveLanguage(readLanguagePreference(), undefined)}>
+        <BrowserRouter><Shell /></BrowserRouter>
+      </I18nProvider>
+    </StrictMode>
+  );
+}
