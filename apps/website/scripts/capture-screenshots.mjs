@@ -81,6 +81,12 @@ try {
         });
         if (!layout.headingVisible) throw new Error(`Homepage h1 is not visible at ${width}px (${language}, ${pageDefinition.name})`);
         if (layout.overflow) throw new Error(`Horizontal overflow at ${width}px (${language}, ${pageDefinition.name})`);
+        if (width === 1920 && language === "zh" && pageDefinition.name === "home") {
+          const routeTitle = await page.locator("#route-title").textContent();
+          if (!routeTitle?.includes("从中国工厂") || !routeTitle.includes("到柬埔寨消费者手中")) {
+            throw new Error(`Route title is not semantically split at ${width}px: ${routeTitle ?? "missing"}`);
+          }
+        }
         await page.waitForTimeout(150);
         const relative = posix.join(String(width), language, `${pageDefinition.name}.png`);
         await mkdir(join(output, String(width), language), { recursive: true });

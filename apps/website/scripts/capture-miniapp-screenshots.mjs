@@ -41,6 +41,70 @@ const waitFor = async (port) => {
   throw new Error(`Mini App dev server did not start on ${port}`);
 };
 
+const json = (data) => ({
+  status: 200,
+  contentType: "application/json",
+  body: JSON.stringify({ data })
+});
+
+async function installMockApi(page, language, app) {
+  await page.route("**/v1/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+    if (path === "/v1/public/auth/telegram" && request.method() === "POST") {
+      await route.fulfill(json({
+        access_token: "evidence-access-token",
+        refresh_token: "evidence-refresh-token",
+        account: {
+          public_id: `01EVIDENCE${app.toUpperCase()}`,
+          role: app,
+          lang: language,
+          status: "active",
+          needs_language: false
+        }
+      }));
+      return;
+    }
+    if (path === "/v1/public/auth/refresh" && request.method() === "POST") {
+      await route.fulfill(json({ access_token: "evidence-access-token", refresh_token: "evidence-refresh-token" }));
+      return;
+    }
+    if (path.endsWith("/me/consents") && request.method() === "GET") {
+      await route.fulfill(json({ items: [] }));
+      return;
+    }
+    if (path === "/v1/public/categories" && request.method() === "GET") {
+      await route.fulfill(json({ items: [], total: 0, page: 1, page_size: 100 }));
+      return;
+    }
+    if (path === "/v1/public/products" && request.method() === "GET") {
+      await route.fulfill(json({ items: [], total: 0, page: 1, page_size: 20 }));
+      return;
+    }
+    if (path === "/v1/buyer/orders" && request.method() === "GET") {
+      await route.fulfill(json({ items: [], next_cursor: null }));
+      return;
+    }
+    if (path === "/v1/merchant/products" && request.method() === "GET") {
+      await route.fulfill(json({ items: [] }));
+      return;
+    }
+    if (path === "/v1/merchant/suborders" && request.method() === "GET") {
+      await route.fulfill(json({ items: [], next_cursor: null }));
+      return;
+    }
+    await route.continue();
+  });
+}
+
+async function waitForBusinessPage(page, app) {
+  const splash = page.locator(".drl-splash__skip");
+  if (await splash.count()) await splash.click();
+  await page.locator(".drl-splash").waitFor({ state: "detached", timeout: 10_000 }).catch(() => undefined);
+  await page.locator(app === "buyer" ? ".buyer-page" : ".mini-shell").waitFor({ state: "visible", timeout: 10_000 });
+}
+
 await mkdir(output, { recursive: true });
 const servers = [start("buyer", 5173), start("merchant", 5174)];
 try {
@@ -52,13 +116,31 @@ try {
       const port = app === "buyer" ? 5173 : 5174;
       for (const item of matrix) {
         const page = await browser.newPage({ viewport: { width: item.width, height: 900 }, colorScheme: item.theme });
+        await page.addInitScript((language) => localStorage.setItem("drlife_lang", language), item.language);
+        await installMockApi(page, item.language, app);
         const url = `http://127.0.0.1:${port}/${launchParams(item.theme, item.language)}`;
         await page.goto(url, { waitUntil: "networkidle" });
-        const title = await page.title();
-        if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
-        const name = `${app}-${item.width}-${item.theme}-${item.language}.png`;
-        await page.screenshot({ path: join(output, name), fullPage: true });
-        manifest.push(`${name}\t${title || "untitled"}`);
+        await waitForBusinessPage(page, app);
+        const targets = app === "buyer" ? [
+          { name: "home" },
+          { name: "orders", open: async () => {
+            await page.locator(".buyer-orders-action").click();
+            await page.locator(".buyer-order-list, .drl-state").first().waitFor({ state: "visible", timeout: 5_000 });
+          } }
+        ] : [{ name: "home" }];
+        for (const target of targets) {
+          if (target.open) await target.open();
+          const title = await page.title();
+          if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
+          const headingSelector = app === "buyer"
+            ? (target.name === "orders" ? ".drl-state p, .buyer-order-list" : ".buyer-section__title")
+            : "h1";
+          const pageHeading = await page.locator(headingSelector).first().textContent();
+          if (!pageHeading?.trim()) throw new Error(`missing business page heading for ${app}-${target.name}-${item.language}`);
+          const name = `${app}-${target.name}-${item.width}-${item.theme}-${item.language}.png`;
+          await page.screenshot({ path: join(output, name), fullPage: true });
+          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}`);
+        }
         await page.close();
       }
     }

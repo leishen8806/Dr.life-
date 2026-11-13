@@ -97,7 +97,7 @@ jobs:
             echo '```text'
             test -f apps/website/screenshots/manifest.txt && cat apps/website/screenshots/manifest.txt || true
             echo
-            echo 'Mini App matrix: buyer/merchant × 2 widths × 2 themes × 3 languages = 24 screenshots.'
+            echo 'Mini App matrix: buyer home/orders + merchant home × 2 widths × 2 themes × 3 languages = 36 screenshots.'
             test -f apps/website/screenshots-miniapp/manifest.txt && cat apps/website/screenshots-miniapp/manifest.txt || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

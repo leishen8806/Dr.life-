@@ -23,16 +23,17 @@ test("confirmed-design sections remain present in the source", () => {
 
   for (const marker of [
     "hero-arc",
-    "category-grid",
+    "market-showcase",
+    "market-group",
     "ecosystem-node",
     "chain-step"
   ]) {
     assert.match(home, new RegExp(marker), `homepage is missing ${marker}`);
   }
-  assert.match(home, /<picture>/, "category cards must use responsive picture markup");
-  assert.match(home, /type="image\/avif"/, "category cards must expose AVIF");
-  assert.match(home, /type="image\/webp"/, "category cards must expose WebP");
-  assert.match(home, /data-i18n-alt={`home\.categoryAlts\.\$\{index\}`}/, "category cards must use localized alt keys");
+  assert.match(home, /<picture>/, "market visual must use responsive picture markup");
+  assert.match(home, /type="image\/avif"/, "market visual must expose AVIF");
+  assert.match(home, /type="image\/webp"/, "market visual must expose WebP");
+  assert.match(home, /data-i18n-alt="home\.homepageV2\.market\.alts\.0"/, "market visual must use a localized alt key");
 
   const imageCredits = publicSource("images/CREDITS.md");
   for (const photographer of ["Aspect 11", "R ARCHITECTURE", "Spacejoy", "Theme Photos"]) {
