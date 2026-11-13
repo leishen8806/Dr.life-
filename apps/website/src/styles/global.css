@@ -133,7 +133,7 @@ a:focus-visible {
   min-width: 0;
   flex-wrap: nowrap;
 }
-.main-nav a { white-space: nowrap; font-size: var(--fs-small); }
+.main-nav a { white-space: nowrap; font-size: var(--fs-eyebrow); }
 [data-lang="km"] .main-nav { gap: clamp(4px, .35vw, 6px); }
 [data-lang="km"] .main-nav a { font-size: var(--fs-body); }
 .footer-links a,

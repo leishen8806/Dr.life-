@@ -89,7 +89,8 @@ try {
         }
         if (width === 1920 && pageDefinition.name === "home") {
           const geometry = await page.evaluate(() => {
-            const navItems = [...document.querySelectorAll(".site-header .main-nav a")];
+            const navItems = [...document.querySelectorAll(".site-header .main-nav a")]
+              .filter((item) => getComputedStyle(item).display !== "none" && item.getBoundingClientRect().width > 0);
             const partnerContainer = document.querySelector(".section.partners > .container");
             const partnerGrid = document.querySelector(".partner-grid");
             const partnerCards = [...document.querySelectorAll(".partner-grid .partner")];
@@ -140,7 +141,8 @@ try {
             });
             const partnerGrid = document.querySelector(".partner-grid");
             const apps = document.querySelector("#apps");
-            const navItems = [...document.querySelectorAll(".site-header .main-nav a")];
+            const navItems = [...document.querySelectorAll(".site-header .main-nav a")]
+              .filter((item) => getComputedStyle(item).display !== "none" && item.getBoundingClientRect().width > 0);
             const language = document.querySelector(".header-actions .languages");
             const shop = document.querySelector(".header-actions .shop-link");
             const partnerContainer = document.querySelector(".section.partners > .container");
