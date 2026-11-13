@@ -11,17 +11,12 @@ command -v curl >/dev/null 2>&1 || die "curl is required"
 
 normalise_url() { printf '%s' "${1%/}"; }
 
-check_url() {
-  local label="$1" url="$2" body attempt
-  body="$(mktemp)"
-  trap 'rm -f "$body"' RETURN
+request_200() {
+  local label="$1" url="$2" body="$3" attempt status
   for ((attempt = 1; attempt <= 3; attempt++)); do
-    if curl --fail --silent --show-error --location --max-time 10 --output "$body" "$url"; then
-      if grep -Eq "id=[\"'](app|root)[\"']|<main([[:space:]>])" "$body"; then
-        printf 'PASS: %s %s\n' "$label" "$url"
-        return 0
-      fi
-      die "$label returned no app root"
+    if status="$(curl --silent --show-error --location --max-time 10 \
+      --output "$body" --write-out '%{http_code}' "$url")" && [[ "$status" == "200" ]]; then
+      return 0
     fi
     sleep 1
   done
@@ -30,10 +25,23 @@ check_url() {
 
 api_base="$(normalise_url "$SMOKE_API_BASE_URL")"
 api_body="$(mktemp)"
-trap 'rm -f "$api_body"' EXIT
-curl --fail --silent --show-error --location --max-time 10 --output "$api_body" "${api_base}/healthz" || die "API health check failed"
+request_200 "API health" "${api_base}/healthz" "$api_body"
+rm -f "$api_body"
 printf 'PASS: API %s/healthz returned HTTP 200\n' "$api_base"
-check_url "buyer" "$(normalise_url "$SMOKE_BUYER_URL")"
-check_url "merchant" "$(normalise_url "$SMOKE_MERCHANT_URL")"
-check_url "shop" "$(normalise_url "$SMOKE_SHOP_URL")"
+
+check_frontend() {
+  local label="$1" url="$2" body
+  body="$(mktemp)"
+  request_200 "$label" "$url" "$body"
+  if ! grep -Eq "id=[\"'](app|root)[\"']" "$body"; then
+    rm -f "$body"
+    die "$label returned no app root"
+  fi
+  rm -f "$body"
+  printf 'PASS: %s %s\n' "$label" "$url"
+}
+
+check_frontend "buyer" "$(normalise_url "$SMOKE_BUYER_URL")"
+check_frontend "merchant" "$(normalise_url "$SMOKE_MERCHANT_URL")"
+check_frontend "shop" "$(normalise_url "$SMOKE_SHOP_URL")"
 printf 'PASS: staging smoke checks complete\n'
