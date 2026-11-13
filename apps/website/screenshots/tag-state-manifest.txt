@@ -1,4 +1,4 @@
-# Business entrypoint evidence refreshed for head 42a6be2
+# Business entrypoint evidence refreshed for head 1b20c3d
 # Each row is a 390px or 1440px panel crop in zh/en/km.
 sections/390/zh/business-tag-01.png
 sections/390/zh/business-tag-02.png
