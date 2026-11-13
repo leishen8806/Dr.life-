@@ -9,7 +9,8 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:production": "node scripts/check-production.mjs"
   },
   "dependencies": {
     "@drlife/i18n": "workspace:*",
