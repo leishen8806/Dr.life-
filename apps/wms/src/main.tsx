@@ -1,105 +1,28 @@
-import { StrictMode } from "react";
+import { StrictMode, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Button, Layout, Menu, Result, Typography } from "antd";
-import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
-import {
-  I18nProvider,
-  readLanguagePreference,
-  resolveLanguage,
-  useI18n
-} from "@drlife/i18n";
+import { Alert, Button, Card, Drawer, Empty, Form, Input, InputNumber, Layout, Menu, Result, Select, Skeleton, Space, Table, Tag, Typography } from "antd";
+import type { MenuProps, TableColumnsType } from "antd";
+import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { I18nProvider, readLanguagePreference, resolveLanguage, useI18n } from "@drlife/i18n";
 import { LanguageSwitcher } from "@drlife/ui";
+import { adapters, type Inventory, type Receiving, type PickTask } from "./api";
 import "antd/dist/reset.css";
 import "@drlife/ui/styles.css";
 import "./styles.css";
 
 const { Header, Sider, Content } = Layout;
 
-function Placeholder() {
-  const { t } = useI18n();
-  return <Typography.Title level={2}>{t("shell.content")}</Typography.Title>;
-}
+function ProductionGate() { const { t } = useI18n(); return <Result status="info" title={t("wms.loginUnavailable")} subTitle={t("wms.loginUnavailableHint")} />; }
+function DetailDrawer({ record, onClose }: { record: Inventory | Receiving | PickTask | null; onClose: () => void }) { const { t } = useI18n(); return <Drawer title={t("wms.detail")} open={Boolean(record)} onClose={onClose} width={460}>{record ? <Space direction="vertical" size="middle" className="detail-stack">{Object.entries(record).map(([key, value]) => <Typography.Paragraph key={key} className="detail-row"><strong>{key}</strong><span>{String(value)}</span></Typography.Paragraph>)}</Space> : null}</Drawer>; }
 
-function Forbidden() {
-  const { t } = useI18n();
-  return (
-    <Result
-      status="403"
-      title="403"
-      subTitle={t("shell.forbidden")}
-      extra={
-        <Button type="primary">
-          <Link to="/">{t("common.back")}</Link>
-        </Button>
-      }
-    />
-  );
-}
+function ModalForm({ record, form, onCancel, onSubmit }: { record: Inventory | null; form: ReturnType<typeof Form.useForm<{ quantity: number; reason: string }>>[0]; onCancel: () => void; onSubmit: (values: { quantity: number; reason: string }) => Promise<void> }) { const { t } = useI18n(); return <Drawer title={t("wms.adjust")} open={Boolean(record)} onClose={onCancel} width={420}><Form form={form} layout="vertical" onFinish={onSubmit}><Form.Item label={t("wms.quantity")} name="quantity" rules={[{ required: true }, { type: "number", min: 0 }]}><InputNumber precision={0} min={0} className="full-width" /></Form.Item><Form.Item label={t("wms.reason")} name="reason" rules={[{ required: true }]}><Input.TextArea /></Form.Item><Button type="primary" htmlType="submit">{t("common.submit")}</Button></Form></Drawer>; }
 
-function NotFound() {
-  const { t } = useI18n();
-  return (
-    <Result
-      status="404"
-      title="404"
-      subTitle={t("shell.notFound")}
-      extra={
-        <Button type="primary">
-          <Link to="/">{t("common.back")}</Link>
-        </Button>
-      }
-    />
-  );
-}
+function InventoryPage() { const { t } = useI18n(); const [records, setRecords] = useState<Inventory[] | null>(null); const [selected, setSelected] = useState<Inventory | null>(null); const [adjusting, setAdjusting] = useState<Inventory | null>(null); const [query, setQuery] = useState(""); const [zone, setZone] = useState<string>(); const [form] = Form.useForm<{ quantity: number; reason: string }>(); useMemo(() => { void adapters.inventory.list().then(setRecords); }, []); if (!records) return <Skeleton active />; const visible = records.filter((item) => (!query || item.product.toLowerCase().includes(query.toLowerCase())) && (!zone || item.zone === zone)); const columns: TableColumnsType<Inventory> = [{ title: t("wms.product"), dataIndex: "product" }, { title: t("wms.zone"), dataIndex: "zone" }, { title: t("wms.location"), dataIndex: "location" }, { title: t("wms.quantity"), dataIndex: "quantity" }, { title: t("wms.available"), dataIndex: "available" }, { title: t("wms.status"), render: (_, row) => row.quantity !== row.locationTotal ? <Tag color="error">{t("wms.mismatch")}</Tag> : <Tag color="success">{t("wms.ok")}</Tag> }]; return <Space direction="vertical" size="large" className="page-stack"><div className="page-heading"><div><Typography.Title level={2}>{t("wms.inventory")}</Typography.Title><Typography.Text>{t("wms.inventoryHint")}</Typography.Text></div><Button onClick={() => adapters.exportCsv(visible, "inventory")}>{t("wms.export")}</Button></div><Card><Space wrap><Input allowClear placeholder={t("wms.searchProduct")} value={query} onChange={(e) => setQuery(e.target.value)} /><Select allowClear placeholder={t("wms.filterZone")} value={zone} onChange={setZone} options={[...new Set(records.map((item) => item.zone))].map((value) => ({ value, label: value }))} /></Space></Card><Table rowKey="id" columns={columns} dataSource={visible} rowClassName={(row) => row.quantity !== row.locationTotal ? "row-mismatch" : ""} onRow={(row) => ({ onClick: () => setSelected(row) })} pagination={{ pageSize: 8 }} locale={{ emptyText: <Empty description={t("common.empty")} /> }} />{visible.some((item) => item.quantity !== item.locationTotal) ? <Alert type="warning" showIcon message={t("wms.mismatchHint")} /> : null}<Button disabled={!selected} onClick={() => selected && setAdjusting(selected)}>{t("wms.adjust")}</Button><ModalForm record={adjusting} form={form} onCancel={() => setAdjusting(null)} onSubmit={async (values) => { if (adjusting) { await adapters.inventory.adjust(adjusting.id, values.quantity, values.reason); setRecords(await adapters.inventory.list()); setAdjusting(null); } }} /><DetailDrawer record={selected} onClose={() => setSelected(null)} /></Space>; }
 
-function App() {
-  const { t } = useI18n();
-  return (
-    <Layout className="admin-shell">
-      <Sider breakpoint="lg" collapsedWidth="0" className="admin-sider">
-        <div className="brand">Dr.life+</div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          items={[
-            {
-              key: "placeholder",
-              label: <Link to="/">{t("shell.menu")}</Link>
-            },
-            {
-              key: "forbidden",
-              label: <Link to="/403">{t("shell.forbidden")}</Link>
-            }
-          ]}
-        />
-      </Sider>
-      <Layout>
-        <Header className="admin-header">
-          <Typography.Title level={4}>
-            {t("app.wms")} · {t("shell.header")}
-          </Typography.Title>
-          <LanguageSwitcher />
-        </Header>
-        <Content className="admin-content">
-          <Routes>
-            <Route path="/" element={<Placeholder />} />
-            <Route path="/403" element={<Forbidden />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Content>
-      </Layout>
-    </Layout>
-  );
-}
+function ReceivingPage() { const { t } = useI18n(); const [records, setRecords] = useState<Receiving[] | null>(null); const [selected, setSelected] = useState<Receiving | null>(null); useMemo(() => { void adapters.receiving.list().then(setRecords); }, []); if (!records) return <Skeleton active />; const columns: TableColumnsType<Receiving> = [{ title: t("wms.reference"), dataIndex: "reference" }, { title: t("wms.scheduled"), dataIndex: "scheduled" }, { title: t("wms.measured"), dataIndex: "measured" }, { title: t("wms.status"), render: (_, row) => <Tag color={row.status === "pending-confirmation" ? "warning" : "success"}>{row.status === "pending-confirmation" ? t("wms.needsMerchantConfirm") : t("wms.ready")}</Tag> }, { title: t("wms.putaway"), dataIndex: "recommendedLocation" }]; return <Space direction="vertical" size="large" className="page-stack"><div className="page-heading"><div><Typography.Title level={2}>{t("wms.receiving")}</Typography.Title><Typography.Text>{t("wms.receivingHint")}</Typography.Text></div><Button onClick={() => adapters.exportCsv(records, "receiving")}>{t("wms.export")}</Button></div><Table rowKey="id" columns={columns} dataSource={records} onRow={(row) => ({ onClick: () => setSelected(row) })} pagination={{ pageSize: 8 }} /><DetailDrawer record={selected} onClose={() => setSelected(null)} /></Space>; }
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <I18nProvider
-      initialLanguage={resolveLanguage(readLanguagePreference(), undefined)}
-    >
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </I18nProvider>
-  </StrictMode>
-);
+function DispatchPage() { const { t } = useI18n(); const [records, setRecords] = useState<PickTask[] | null>(null); const [selected, setSelected] = useState<PickTask | null>(null); useMemo(() => { void adapters.dispatch.list().then(setRecords); }, []); if (!records) return <Skeleton active />; const columns: TableColumnsType<PickTask> = [{ title: t("wms.pickTask"), dataIndex: "reference" }, { title: t("wms.items"), dataIndex: "items" }, { title: t("wms.deliveryMethod"), dataIndex: "deliveryMethod" }, { title: t("wms.driver"), dataIndex: "driver" }, { title: t("wms.status"), dataIndex: "status" }]; return <Space direction="vertical" size="large" className="page-stack"><div className="page-heading"><div><Typography.Title level={2}>{t("wms.dispatch")}</Typography.Title><Typography.Text>{t("wms.dispatchHint")}</Typography.Text></div><Button onClick={() => adapters.exportCsv(records, "dispatch")}>{t("wms.export")}</Button></div><Table rowKey="id" columns={columns} dataSource={records} onRow={(row) => ({ onClick: () => setSelected(row) })} pagination={{ pageSize: 8 }} /><DetailDrawer record={selected} onClose={() => setSelected(null)} /></Space>; }
+
+function Shell() { const { t } = useI18n(); const location = useLocation(); const navigate = useNavigate(); const [permissions] = useState<string[]>(import.meta.env.DEV ? ["wms.inventory.read", "wms.inventory.adjust", "wms.receiving.read", "wms.dispatch.read"] : []); const menu: MenuProps["items"] = [{ key: "inventory", label: t("wms.inventory") }, { key: "receiving", label: t("wms.receiving") }, { key: "dispatch", label: t("wms.dispatch") }].filter((item) => permissions.some((permission) => permission.startsWith(`wms.${item?.key}`))); const current = location.pathname.slice(1) || "inventory"; return <Layout className="wms-shell"><Sider breakpoint="lg" collapsedWidth="0"><div className="brand">Dr.life+</div><Menu theme="dark" selectedKeys={[current]} items={menu} onClick={({ key }) => navigate(`/${key}`)} /></Sider><Layout><Header className="wms-header"><Typography.Title level={4}>{t("app.wms")}</Typography.Title><LanguageSwitcher /></Header><Content className="wms-content">{current === "inventory" ? <InventoryPage /> : current === "receiving" ? <ReceivingPage /> : current === "dispatch" ? <DispatchPage /> : <Result status="404" title="404" extra={<Button><Link to="/">{t("common.back")}</Link></Button>} />}</Content></Layout></Layout>; }
+function App() { return import.meta.env.PROD ? <ProductionGate /> : <Shell />; }
+createRoot(document.getElementById("root")!).render(<StrictMode><I18nProvider initialLanguage={resolveLanguage(readLanguagePreference(), undefined)}><BrowserRouter><Routes><Route path="*" element={<App />} /></Routes></BrowserRouter></I18nProvider></StrictMode>);

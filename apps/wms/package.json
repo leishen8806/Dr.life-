@@ -8,7 +8,8 @@
     "prebuild": "pnpm --filter @drlife/i18n i18n:check",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest run"
   },
   "dependencies": {
     "@drlife/i18n": "workspace:*",
