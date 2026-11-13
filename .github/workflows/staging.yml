@@ -32,6 +32,8 @@ jobs:
           docker build -f backend/Dockerfile -t "drlife-api:$RELEASE" ./backend
       - name: Validate compose template
         run: STAGING_ENV_FILE=env.example docker compose --env-file deploy/staging/env.example -f deploy/staging/compose.yaml config --quiet
+      - name: Validate nginx staging config
+        run: ./deploy/staging/test-nginx-config.sh
   deploy:
     needs: build
     runs-on: ubuntu-latest
