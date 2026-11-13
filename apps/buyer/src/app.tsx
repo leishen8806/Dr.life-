@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type TranslationKey, useI18n } from "@drlife/i18n";
-import { LanguageSwitcher, useBackButton } from "@drlife/ui";
+import { Button, LanguageSwitcher, useBackButton } from "@drlife/ui";
 import {
   type BuyerApiClient,
   type BuyerOrderPage,
@@ -460,12 +460,12 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const actions = (
     <>
       <LanguageSwitcher />
-      <button type="button" className="buyer-orders-action" onClick={openOrders}>
+      <Button variant="secondary" className="buyer-orders-action" onClick={openOrders}>
         {t("order.pageTitle")}
-      </button>
-      <button type="button" className="buyer-cart-action" onClick={openCart}>
+      </Button>
+      <Button variant="secondary" className="buyer-cart-action" onClick={openCart}>
         {t("mall.cart")} <span aria-label={t("mall.cartCount", { count: cartCount(cart) })}>{cartCount(cart)}</span>
-      </button>
+      </Button>
     </>
   );
   const knownCategories = categories.status === "ready" ? categories.value : [];

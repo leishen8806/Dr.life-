@@ -14,6 +14,7 @@ export {
   Loading,
   Money,
   ProductCard,
+  formatMoneyE4,
   Skeleton,
   StatusTag,
   Stepper,
@@ -41,6 +42,7 @@ export type {
 export {
   getTelegramEnvironment,
   mountTelegramTheme,
+  watchTelegramTheme,
   applyMiniAppTheme,
   resolveMiniAppColorScheme,
   useBackButton,

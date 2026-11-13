@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ isDark: vi.fn() }));
+const mocks = vi.hoisted(() => ({ isDark: Object.assign(vi.fn(), { sub: vi.fn() }) }));
 
 vi.mock("@telegram-apps/sdk", () => ({
   backButton: { mount: { isAvailable: () => false } },
@@ -15,7 +15,7 @@ vi.mock("@telegram-apps/sdk", () => ({
   themeParams: { mountSync: { isAvailable: () => false } }
 }));
 
-import { getTelegramEnvironment, resolveMiniAppColorScheme } from "./telegram";
+import { getTelegramEnvironment, resolveMiniAppColorScheme, watchTelegramTheme } from "./telegram";
 
 describe("Telegram theme mapping", () => {
   it("maps the SDK miniApp dark signal to the document theme contract", () => {
@@ -27,5 +27,16 @@ describe("Telegram theme mapping", () => {
 
     mocks.isDark.mockReturnValueOnce(false);
     expect(getTelegramEnvironment().colorScheme).toBe("light");
+  });
+
+  it("subscribes to Telegram dark-mode changes after initialization", () => {
+    const listener = vi.fn();
+    const stop = vi.fn();
+    mocks.isDark.sub.mockImplementationOnce((callback: (value: boolean) => void) => {
+      callback(true);
+      return stop;
+    });
+    expect(watchTelegramTheme(listener)).toBe(stop);
+    expect(listener).toHaveBeenCalledWith("dark");
   });
 });
