@@ -7,6 +7,7 @@ import type { Category, Product } from "./types";
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 const category: Category = {
@@ -384,7 +385,9 @@ describe("loadBuyerOrders", () => {
     expect(warning).toHaveBeenCalledWith("[buyer] malformed order", "01JORDER");
   });
 
-  it("maps unknown server statuses to the localized processing fallback", async () => {
+  it("maps unknown server statuses to the localized processing fallback in production", async () => {
+    vi.stubEnv("DEV", false);
+    vi.stubEnv("MODE", "production");
     const unknown = {
       ...apiOrder,
       payment_status: "awaiting_review",
@@ -395,6 +398,27 @@ describe("loadBuyerOrders", () => {
     await expect(loadBuyerOrders(client(transport))).resolves.toMatchObject({
       items: [{ paymentStatus: "unknown", subOrders: [{ status: "unknown" }] }]
     });
+  });
+
+  it("fails explicitly for an unknown order status in development", async () => {
+    const unknown = {
+      ...apiOrder,
+      suborders: [{ ...apiOrder.suborders[0], status: "queued" }]
+    };
+    const { transport } = recordingFetch(() => success({ items: [unknown], next_cursor: null }));
+
+    await expect(loadBuyerOrders(client(transport))).rejects.toThrow(
+      "[buyer] unknown order status: queued"
+    );
+  });
+
+  it("fails explicitly for an unknown payment status in development", async () => {
+    const unknown = { ...apiOrder, payment_status: "awaiting_review" };
+    const { transport } = recordingFetch(() => success({ items: [unknown], next_cursor: null }));
+
+    await expect(loadBuyerOrders(client(transport))).rejects.toThrow(
+      "[buyer] unknown payment status: awaiting_review"
+    );
   });
 
   it("loads one detail and preserves a server error code", async () => {
