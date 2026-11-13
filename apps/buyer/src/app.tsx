@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type TranslationKey, useI18n } from "@drlife/i18n";
 import { Button, LanguageSwitcher, useBackButton } from "@drlife/ui";
 import {
@@ -39,47 +39,52 @@ const featuredPageSize = 6;
 
 /** Loads one list and exposes the retry the error state offers. */
 function useLoaded<T>(
+  key: unknown,
   load: (signal: AbortSignal) => Promise<T>,
   enabled = true
 ): [Resource<T>, () => void] {
-  const [resource, setResource] = useState<Resource<T>>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
-  const wasEnabled = useRef(enabled);
+  const keyedLoad = useMemo(() => load, [key]);
+  const [loaded, setLoaded] = useState<{
+    key: unknown;
+    load: typeof load;
+    enabled: boolean;
+    attempt: number;
+    resource: Resource<T>;
+  }>({
+    key: "",
+    load: keyedLoad,
+    enabled: false,
+    attempt: -1,
+    resource: { status: "loading" }
+  });
+  const requestMatches = loaded.key === key && loaded.load === keyedLoad && loaded.enabled === enabled && loaded.attempt === attempt;
+  const resource = requestMatches
+    ? loaded.resource
+    : { status: "loading" as const };
 
   useEffect(() => {
     if (!enabled) {
-      wasEnabled.current = false;
+      // The keyed resource must not expose the previous activation after a
+      // route leaves the page; the next enabled render then starts loading.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoaded({ key, load: keyedLoad, enabled, attempt, resource: { status: "loading" } });
       return;
     }
-    if (!wasEnabled.current) {
-      setResource({ status: "loading" });
-      wasEnabled.current = true;
-    }
     const controller = new AbortController();
-    load(controller.signal).then(
+    keyedLoad(controller.signal).then(
       (value) => {
-        if (!controller.signal.aborted) setResource({ status: "ready", value });
+        if (!controller.signal.aborted) setLoaded({ key, load: keyedLoad, enabled, attempt, resource: { status: "ready", value } });
       },
       (error: unknown) => {
         if (!controller.signal.aborted)
-          setResource({ status: "error", messageKey: errorMessageKey(error) });
+          setLoaded({ key, load: keyedLoad, enabled, attempt, resource: { status: "error", messageKey: errorMessageKey(error) } });
       }
     );
     return () => controller.abort();
-  }, [enabled, load, attempt]);
-
-  useLayoutEffect(() => {
-    if (enabled) {
-      // Layout phase clears stale rows before paint; the effect below owns the
-      // abortable request and enabled-transition bookkeeping. Keep these phases
-      // separate so a route re-entry cannot paint the previous page.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setResource({ status: "loading" });
-    }
-  }, [enabled]);
+  }, [attempt, enabled, key, keyedLoad]);
 
   const retry = useCallback(() => {
-    setResource({ status: "loading" });
     setAttempt((value) => value + 1);
   }, []);
   return [resource, retry];
@@ -110,7 +115,10 @@ export function useProductFeed(client: BuyerApiClient, code?: string, language?:
       loadProducts(client, { category: code }, signal).then(firstFeed),
     [client, code, language]
   );
-  const [first, retryFirst] = useLoaded(loader);
+  const [first, retryFirst] = useLoaded(
+    language === undefined ? client : `${code ?? ""}:${language}`,
+    loader
+  );
   const [more, setMore] = useState<MorePages>();
   const current = more?.loader === loader ? more : undefined;
 
@@ -157,6 +165,7 @@ export function useProductFeed(client: BuyerApiClient, code?: string, language?:
 }
 
 interface MoreOrders {
+  baseItems: readonly BuyerOrder[];
   language: string;
   items: BuyerOrder[];
   nextCursor: string | null;
@@ -166,51 +175,36 @@ interface MoreOrders {
 
 /** Orders are paged independently from the first response and reset on language changes. */
 export function useOrderFeed(client: BuyerApiClient, language: string, enabled = true) {
-  const [readyLanguage, setReadyLanguage] = useState<string>();
   const loadOrders = useCallback(
-    (signal: AbortSignal) =>
-      loadBuyerOrders(client, undefined, signal).then((page) => {
-        if (!signal.aborted) setReadyLanguage(language);
-        return page;
-      }),
+    (signal: AbortSignal) => loadBuyerOrders(client, undefined, signal),
     [client, language]
   );
-  const [orders, retryOrders] = useLoaded(loadOrders, enabled);
+  const [orders, retryOrders] = useLoaded(language, loadOrders, enabled);
   const [moreOrders, setMoreOrders] = useState<MoreOrders>();
   const moreOrdersRequest = useRef<AbortController | undefined>(undefined);
 
-  useLayoutEffect(() => {
-    if (enabled) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setMoreOrders(undefined);
-    }
-  }, [enabled]);
-
-  // This reset intentionally synchronizes the continuation cache with the
-  // language-keyed first-page loader.
-  useEffect(() => {
-    moreOrdersRequest.current?.abort();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMoreOrders(undefined);
-    // The first page is reloaded by useLoaded when the language-keyed loader changes.
-  }, [language]);
-  useEffect(() => () => moreOrdersRequest.current?.abort(), []);
+  // The language key above hides stale continuation rows immediately; this
+  // cleanup only aborts the old page request when the key changes or unmounts.
+  useEffect(() => () => moreOrdersRequest.current?.abort(), [language]);
 
   const loadMore = useCallback(() => {
-    const current = moreOrders?.language === language ? moreOrders : undefined;
+    const current = orders.status === "ready" && moreOrders?.baseItems === orders.value.items && moreOrders.language === language
+      ? moreOrders
+      : undefined;
     // The old first page remains visible while the language-keyed request is in flight.
-    if (orders.status !== "ready" || readyLanguage !== language || current?.loading) return;
+    if (orders.status !== "ready" || current?.loading) return;
     const currentItems = current?.items ?? orders.value.items;
     const cursor = current?.nextCursor ?? orders.value.nextCursor;
     if (!cursor) return;
     moreOrdersRequest.current?.abort();
     const controller = new AbortController();
     moreOrdersRequest.current = controller;
-    setMoreOrders({ language, items: currentItems, nextCursor: cursor, loading: true });
+    setMoreOrders({ baseItems: orders.value.items, language, items: currentItems, nextCursor: cursor, loading: true });
     loadBuyerOrders(client, cursor, controller.signal).then(
       (page: BuyerOrderPage) => {
         if (controller.signal.aborted) return;
         setMoreOrders({
+          baseItems: orders.value.items,
           language,
           items: [
             ...currentItems,
@@ -227,6 +221,7 @@ export function useOrderFeed(client: BuyerApiClient, language: string, enabled =
       (error: unknown) => {
         if (controller.signal.aborted) return;
         setMoreOrders({
+          baseItems: orders.value.items,
           language,
           items: currentItems,
           nextCursor: cursor,
@@ -235,19 +230,21 @@ export function useOrderFeed(client: BuyerApiClient, language: string, enabled =
         });
       }
     );
-  }, [client, language, moreOrders, orders, readyLanguage]);
+  }, [client, language, moreOrders, orders]);
 
   const retry = useCallback(() => {
     moreOrdersRequest.current?.abort();
     setMoreOrders(undefined);
     retryOrders();
   }, [retryOrders]);
-  const current = moreOrders?.language === language ? moreOrders : undefined;
-  const resource = orders.status === "ready" && readyLanguage === language
+  const current = orders.status === "ready" && moreOrders?.baseItems === orders.value.items && moreOrders.language === language
+    ? moreOrders
+    : undefined;
+  const resource = useMemo<Resource<BuyerOrder[]>>(() => orders.status === "ready"
     ? { status: "ready" as const, value: current?.items ?? orders.value.items }
-    : orders.status === "ready" ? { status: "loading" as const }
-    : orders.status === "error" ? { status: "error" as const, messageKey: orders.messageKey, previous: orders.previous?.items }
-    : orders;
+    : orders.status === "error"
+      ? { status: "error" as const, messageKey: orders.messageKey, previous: orders.previous?.items }
+      : orders, [current, orders]);
   return {
     resource,
     retry,
@@ -364,13 +361,13 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     (signal: AbortSignal) => loadCategories(client, signal),
     [client, language]
   );
-  const [categories, retryCategories] = useLoaded(loadAllCategories);
+  const [categories, retryCategories] = useLoaded(`categories:${language}`, loadAllCategories);
   const loadFeatured = useCallback(
     async (signal: AbortSignal) =>
       (await loadProducts(client, { pageSize: featuredPageSize }, signal)).items,
     [client, language]
   );
-  const [featured, retryFeatured] = useLoaded(loadFeatured);
+  const [featured, retryFeatured] = useLoaded(`featured:${language}`, loadFeatured);
 
   const openCategory = useCallback(
     (code?: string) => push({ name: "category", code }),
