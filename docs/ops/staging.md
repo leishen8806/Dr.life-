@@ -50,19 +50,32 @@ credentials, or firewall data in the repository.
    host ports: 80 redirects to 443, and 443 routes by hostname to `api:8080`,
    `buyer:80`, `merchant:80`, and `admin:80`. All other services stay internal.
 4. Restrict the server firewall to TCP 80/443 from the published Cloudflare IP
-   ranges. Protect `test-admin` with Cloudflare Access for the owner and the
-   大旺 account; the API and Mini App hosts must remain reachable by Telegram.
-5. Harden SSH with key-only authentication, no root login, no password login,
-   and fail2ban. If a fixed source IP is available, restrict SSH to it. The
-   workflow uses `STAGING_SSH_HOST`, `STAGING_SSH_USER`,
+   ranges. `test-admin` is protected by its own administrator account plus
+   TOTP (E-04); do not issue an admin account before E-04 is complete. The API
+   and Mini App hosts must remain reachable by Telegram.
+5. The edge adds HSTS, `X-Content-Type-Options`, `Referrer-Policy`, and
+   `frame-ancestors 'none'` to all four hosts. The API admin-auth path has a
+   configurable nginx limit of 10 requests/minute per IP with a burst of 5 and
+   returns 429 when exceeded. Harden SSH with key-only authentication, no root
+   login, no password login, and fail2ban. If a fixed source IP is available,
+   restrict SSH to it. The workflow uses `STAGING_SSH_HOST`, `STAGING_SSH_USER`,
    `STAGING_SSH_PRIVATE_KEY`, and `STAGING_SSH_KNOWN_HOSTS`; known_hosts is
    written and `StrictHostKeyChecking=yes` is required.
-6. Verify each host without recording real output or addresses:
+6. Run `deploy/staging/harden-server.sh --dry-run` first. Only the owner runs
+   `--apply` on the server, after confirming a usable public-key SSH session;
+   keep the current SSH connection open and verify a second login before
+   closing the first. The script writes an isolated sshd drop-in, validates
+   with `sshd -t` before restart, enables fail2ban, and checks the owner-managed
+   Origin certificate and key are existing mode-600 files. To roll back, remove
+   the drop-in after validating the restored config, reload sshd, and remove the
+   matching ufw rules (or restore the owner-recorded ufw status). Never commit
+   the generated rules or paths.
+7. Verify each host without recording real output or addresses:
    `curl -I https://test-api.<placeholder>` must return the API health status;
    `curl -I https://test-miniapp.<placeholder>` and
    `curl -I https://test-shop.<placeholder>` must return 200/3xx; the admin
-   host must first pass Access; SSH must connect only with the owner-managed
-   key and known_hosts entry.
+   host must pass its own admin login/TOTP; SSH must connect only with the
+   owner-managed key and known_hosts entry.
 
 ## Backup, restore, and operations
 
@@ -76,4 +89,4 @@ logs or issues. Escalate incidents to `leishen8806`.
 
 `.github/workflows/staging.yml` is manual, uses the `staging` protected
 environment, and references only Environment Secrets. It is a template: the
-owner supplies the actual Tunnel SSH action and policy after review.
+owner supplies the direct SSH host policy after review.
