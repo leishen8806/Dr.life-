@@ -43,7 +43,9 @@ jobs:
       - name: Run local mobile Lighthouse
         run: >-
           npx --yes lighthouse@12.6.0 "http://127.0.0.1:4321/?lang=zh" --output=json
-          --output-path=/tmp/local-lighthouse.json --preset=mobile
+          --output-path=/tmp/local-lighthouse.json --form-factor=mobile
+          --screenEmulation.mobile --screenEmulation.width=360
+          --screenEmulation.height=640 --screenEmulation.deviceScaleFactor=2
       - name: Check local Lighthouse thresholds
         run: pnpm --filter @drlife/website exec node scripts/check-lighthouse.mjs /tmp/local-lighthouse.json
       - name: Upload local preview evidence
@@ -96,7 +98,9 @@ jobs:
       - name: Run Lighthouse acceptance gate
         run: >-
           npx --yes lighthouse@12.6.0 "$WEBSITE_PUBLIC_URL" --output=json
-          --output-path=/tmp/lighthouse.json --preset=mobile
+          --output-path=/tmp/lighthouse.json --form-factor=mobile
+          --screenEmulation.mobile --screenEmulation.width=360
+          --screenEmulation.height=640 --screenEmulation.deviceScaleFactor=2
       - name: Check Lighthouse thresholds
         run: pnpm --filter @drlife/website exec node scripts/check-lighthouse.mjs /tmp/lighthouse.json
       - name: Upload smoke evidence
