@@ -6,13 +6,9 @@ import "../styles/homepage-source.css";
 
 const sourcePath = path.resolve(process.cwd(), "src/data/homepage-source.html");
 const sourceBody = fs.readFileSync(sourcePath, "utf8");
-const heroImage = "/images/source-2-894517c7d5.webp";
 ---
 
 <Layout titleKey="home.title" descriptionKey="home.intro">
-  <Fragment slot="head">
-    <link rel="preload" as="image" href={heroImage} type="image/webp" fetchpriority="high" />
-  </Fragment>
   <span id="about" hidden></span>
   <Fragment set:html={sourceBody} />
   <script src="/scripts/homepage-source.js" defer></script>
