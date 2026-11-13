@@ -1,6 +1,6 @@
 # PR #249 visual evidence
 
-Website head: `1b20c3d`; evidence refresh: `a7076cf`
+Website head: `506ba36`; evidence refresh: pending
 
 Full-page height check (static capture, Chinese): 1440px original `6998`,
 implementation `6993` (0.07% difference); 390px original `9387`,
@@ -24,7 +24,10 @@ The required per-section original|new composites for the Chinese 390px and
 `comparisons/sections/<width>/zh/<section>-original-new.png` for header, hero,
 business, route, apps, partners, and footer.
 The capture script validates the same geometry and overflow assertions used by
-CI before writing the images.
+CI before writing the images. The mobile CTA capture also verifies that the
+English actions may wrap without horizontal overflow, while the Chinese 390px
+actions remain on one row; the gold CTA arrow is explicitly rendered with a
+contrasting ink color.
 
 Production Lighthouse is intentionally not claimed here: the repository's
 `WEBSITE_PUBLIC_URL` secret is an external release condition. When configured,
