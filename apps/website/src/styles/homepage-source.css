@@ -315,7 +315,7 @@ body.homepage-source-page.homepage-source-page .access-section {
   padding-block: clamp(45px, 6.4vw, 90px);
 }
 body.homepage-source-page.homepage-source-page .section-title { margin: 0; }
-body.homepage-source-page.homepage-source-page .eyebrow { font-size: 11px; }
+body.homepage-source-page.homepage-source-page .eyebrow { font-size: 12px; }
 body.homepage-source-page.homepage-source-page .lead { font-size: 16px; line-height: 1.82; }
 body.homepage-source-page.homepage-source-page .panel p,
 body.homepage-source-page.homepage-source-page .market p { font-size: 15px; line-height: normal; }
@@ -336,6 +336,16 @@ body.homepage-source-page.homepage-source-page .access-grid { margin-top: 0; }
 body.homepage-source-page.homepage-source-page .section.partners { padding-block: clamp(60px, 8vw, 122px); }
 body.homepage-source-page.homepage-source-page .section.partners > .container {
   width: min(calc(100% - 2 * var(--pad)), var(--content));
+}
+body.homepage-source-page.homepage-source-page[data-lang="km"] .eyebrow,
+body.homepage-source-page.homepage-source-page[data-lang="km"] .hero-caption,
+body.homepage-source-page.homepage-source-page[data-lang="km"] .photo-caption,
+body.homepage-source-page.homepage-source-page[data-lang="km"] .partner small,
+body.homepage-source-page.homepage-source-page[data-lang="km"] .footer .small,
+body.homepage-source-page.homepage-source-page[data-lang="km"] .demo-tag,
+body.homepage-source-page.homepage-source-page[data-lang="km"] .app-card strong,
+body.homepage-source-page.homepage-source-page[data-lang="km"] .app-card figcaption span {
+  font-size: 13px;
 }
 @media (max-width: 680px) {
   body.homepage-source-page.homepage-source-page .hero h1 {
