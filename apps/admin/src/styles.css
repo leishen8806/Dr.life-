@@ -34,3 +34,49 @@
   border-radius: var(--drl-radius);
   background: #fff;
 }
+.admin-page {
+  display: grid;
+  gap: 24px;
+}
+.admin-page > .ant-typography {
+  margin: 0;
+}
+.admin-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.admin-card {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fbfdff;
+}
+.admin-card span {
+  font-size: 28px;
+  font-weight: 700;
+}
+.admin-filters {
+  align-items: stretch;
+}
+.admin-clickable-row {
+  cursor: pointer;
+}
+.admin-form-error {
+  margin-top: 8px;
+  color: #b42318;
+}
+.order-detail ul {
+  padding-inline-start: 20px;
+}
+@media (max-width: 760px) {
+  .admin-content {
+    margin: 12px;
+    padding: 16px;
+  }
+  .admin-cards {
+    grid-template-columns: 1fr;
+  }
+}

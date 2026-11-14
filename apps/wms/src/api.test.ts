@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { t } from "@drlife/i18n";
 import { adapters, buildCsv, maskSensitive } from "./api";
 import { assignTask, canAdjust, canSubmitAdjustment, inventoryRowClass, packTask, receiveRecord } from "./view-model";
 
@@ -25,6 +26,16 @@ describe("WMS adapters", () => {
     const task = { id: "p", reference: "PK", items: 1, deliveryMethod: "zto" as const, driver: "", phone: "", status: "ready" as const };
     expect(packTask(task).status).toBe("packed");
     expect(assignTask(packTask(task), "Sokha").status).toBe("dispatched");
+  });
+  it("translates receiving and dispatch enum values in every supported language", () => {
+    for (const language of ["zh", "en", "km"] as const) {
+      expect(t("wms.needsMerchantConfirm", {}, language)).not.toBe("pending-confirmation");
+      expect(t("wms.status.ready", {}, language)).not.toBe("ready");
+      expect(t("wms.status.packed", {}, language)).not.toBe("packed");
+      expect(t("wms.status.dispatched", {}, language)).not.toBe("dispatched");
+      expect(t("wms.zto", {}, language)).not.toBe("zto");
+      expect(t("wms.inhouse", {}, language)).not.toBe("inhouse");
+    }
   });
   it("disables adjustment without the adjustment permission", () => {
     expect(canAdjust(["wms.inventory.read"], true)).toBe(false);

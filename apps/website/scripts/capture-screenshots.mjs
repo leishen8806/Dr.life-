@@ -10,6 +10,15 @@ const output = fileURLToPath(new URL("../screenshots/", import.meta.url));
 const widths = [360, 390, 768, 1280, 1440, 1920];
 const languages = ["zh", "en", "km"];
 const pages = [{ name: "home", path: "/" }, { name: "merchant", path: "/merchant/" }];
+const sectionShots = [
+  ["header", ".topbar"],
+  ["hero", ".hero"],
+  ["business", "#business"],
+  ["route", ".route"],
+  ["apps", ".access-section"],
+  ["partners", ".partners"],
+  ["footer", ".footer"]
+];
 const contentTypes = {
   ".css": "text/css", ".html": "text/html; charset=utf-8", ".ico": "image/x-icon",
   ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml",
@@ -76,11 +85,20 @@ try {
           const rect = heading?.getBoundingClientRect();
           return {
             headingVisible: Boolean(rect && rect.top >= 0 && rect.bottom <= window.innerHeight),
-            overflow: body.scrollWidth > window.innerWidth + 1
+            overflow: body.scrollWidth > window.innerWidth + 1,
+            chineseRuns: [...document.body.querySelectorAll("body *")]
+              .filter((element) => !["SCRIPT", "STYLE", "NOSCRIPT"].includes(element.tagName))
+              .flatMap((element) => [...element.childNodes]
+                .filter((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())
+                .map((node) => node.textContent.trim()))
+              .filter((text) => /[\u4e00-\u9fff]{2,}/.test(text))
           };
         });
         if (!layout.headingVisible) throw new Error(`Homepage h1 is not visible at ${width}px (${language}, ${pageDefinition.name})`);
         if (layout.overflow) throw new Error(`Horizontal overflow at ${width}px (${language}, ${pageDefinition.name})`);
+        if (language !== "zh" && pageDefinition.name === "home" && layout.chineseRuns.length > 0) {
+          throw new Error(`Visible Chinese copy remains at ${width}px (${language}): ${layout.chineseRuns.slice(0, 5).join(" | ")}`);
+        }
         if (width === 1920 && language === "zh" && pageDefinition.name === "home") {
           const routeTitle = await page.locator("#route-title").textContent();
           if (!routeTitle?.includes("从中国工厂") || !routeTitle.includes("到柬埔寨消费者手中")) {
@@ -89,13 +107,13 @@ try {
         }
         if (width === 1920 && pageDefinition.name === "home") {
           const geometry = await page.evaluate(() => {
-            const navItems = [...document.querySelectorAll(".site-header .main-nav a")]
+            const navItems = [...document.querySelectorAll(".topbar .nav > a:not(.nav-cta)")]
               .filter((item) => getComputedStyle(item).display !== "none" && item.getBoundingClientRect().width > 0);
             const partnerContainer = document.querySelector(".section.partners > .container");
             const partnerGrid = document.querySelector(".partner-grid");
             const partnerCards = [...document.querySelectorAll(".partner-grid .partner")];
-            const accessGrid = document.querySelector(".access-grid");
-            const accessCards = [...document.querySelectorAll(".access-grid .access-card")];
+            const accessGrid = document.querySelector(".app-grid");
+            const accessCards = [...document.querySelectorAll(".app-grid .app-card")];
             const businessContainer = document.querySelector("#business > .container");
             const routeContainer = document.querySelector(".route .container");
             const steps = document.querySelector(".route .steps");
@@ -141,7 +159,7 @@ try {
             });
             const partnerGrid = document.querySelector(".partner-grid");
             const apps = document.querySelector("#apps");
-            const navItems = [...document.querySelectorAll(".site-header .main-nav a")]
+            const navItems = [...document.querySelectorAll(".topbar .nav a")]
               .filter((item) => getComputedStyle(item).display !== "none" && item.getBoundingClientRect().width > 0);
             const language = document.querySelector(".header-actions .languages");
             const shop = document.querySelector(".header-actions .shop-link");
@@ -149,6 +167,10 @@ try {
             const accessContainer = document.querySelector(".access-section > .container");
             const businessContainer = document.querySelector("#business > .container");
             const channelItems = [...document.querySelectorAll(".channel-list span")];
+            const heroButtons = [...document.querySelectorAll(".hero .actions .button")];
+            const values = document.querySelector(".values");
+            const accessSection = document.querySelector(".access-section");
+            const accessGrid = document.querySelector(".access-grid");
             return {
               sections,
               partnerLeftDelta: (partnerContainer?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0),
@@ -159,7 +181,12 @@ try {
                 return overlap(rect, language?.getBoundingClientRect()) || overlap(rect, shop?.getBoundingClientRect());
               }),
               navFontSizes: navItems.map((item) => Number.parseFloat(getComputedStyle(item).fontSize)),
-              channelItems
+              channelItems,
+              heroButtonTops: heroButtons.map((item) => Math.round(item.getBoundingClientRect().top)),
+              heroButtonRights: heroButtons.map((item) => Math.round(item.getBoundingClientRect().right)),
+              valuesBackground: values ? getComputedStyle(values).backgroundColor : "",
+              accessBackground: accessSection ? getComputedStyle(accessSection).backgroundColor : "",
+              accessGridBackground: accessGrid ? getComputedStyle(accessGrid).backgroundColor : ""
             };
           });
           for (const section of homepageGeometry.sections) {
@@ -168,23 +195,23 @@ try {
           if ([360, 390, 768].includes(width) && Math.abs(homepageGeometry.partnerLeftDelta) > 2) {
             throw new Error(`Partner left edge is not aligned at ${width}px (${language}): ${homepageGeometry.partnerLeftDelta}px`);
           }
+          if ([360, 390, 768].includes(width) && homepageGeometry.heroButtonRights.some((right) => right > width)) {
+            throw new Error(`Hero button exceeds viewport at ${width}px (${language}): ${homepageGeometry.heroButtonRights.join(",")}`);
+          }
           if ([1280, 1440, 1920].includes(width) && homepageGeometry.navOverlap) {
             throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);
           }
           if ([1280, 1440].includes(width)) {
-            const menuButton = page.locator(".mobile-menu summary");
-            const menuButtonBox = await menuButton.boundingBox();
-            if (!menuButtonBox || menuButtonBox.width <= 0 || menuButtonBox.height <= 0 || menuButtonBox.left < 0 || menuButtonBox.right > width) {
-              throw new Error(`Desktop menu button is not visible in the viewport at ${width}px (${language})`);
+            const navLink = page.locator(".nav a").first();
+            const appLink = page.locator(".nav-apps");
+            if (!(await navLink.isVisible()) || !(await appLink.isVisible())) {
+              throw new Error(`Desktop navigation or App entry is hidden at ${width}px (${language})`);
             }
-            await menuButton.click();
-            const appLink = page.locator(".mobile-menu[open] nav a[href='#apps']");
-            if (!(await appLink.isVisible())) throw new Error(`Desktop menu lacks a visible App entry at ${width}px (${language})`);
           }
           if (width >= 1441) {
-            const desktopNav = page.locator(".main-nav a").first();
-            const shopLink = page.locator(".shop-link");
-            if (!(await desktopNav.isVisible()) || !(await shopLink.isVisible())) {
+            const desktopNav = page.locator(".nav a").first();
+            const appLink = page.locator(".nav-apps");
+            if (!(await desktopNav.isVisible()) || !(await appLink.isVisible())) {
               throw new Error(`Desktop navigation or App entry is hidden at ${width}px (${language})`);
             }
           }
@@ -200,6 +227,20 @@ try {
           if (homepageGeometry.channelItems.some((item, index, items) => index > 0 && item.top === items[index - 1].top && item.left - items[index - 1].right < 12)) {
             throw new Error(`Official channel items lack visible separation at ${width}px (${language})`);
           }
+          if (width === 390 && language === "zh") {
+            if (new Set(homepageGeometry.heroButtonTops).size !== 1) {
+              throw new Error(`Hero actions are not on one row at ${width}px (${language}): ${homepageGeometry.heroButtonTops.join(",")}`);
+            }
+            if (homepageGeometry.valuesBackground !== "rgba(0, 0, 0, 0)") {
+              throw new Error(`Culture values container has a filled background at ${width}px (${language}): ${homepageGeometry.valuesBackground}`);
+            }
+            if (homepageGeometry.accessGridBackground !== "rgba(0, 0, 0, 0)") {
+              throw new Error(`App cards wrapper has a filled background at ${width}px (${language}): ${homepageGeometry.accessGridBackground}`);
+            }
+            if (!["rgb(32, 33, 31)", "rgb(23, 24, 23)"].includes(homepageGeometry.accessBackground)) {
+              throw new Error(`App section is not dark at ${width}px (${language}): ${homepageGeometry.accessBackground}`);
+            }
+          }
           if ([1440, 1920].includes(width) && homepageGeometry.partnerGap < 64) {
             throw new Error(`Partner cards touch the app section at ${width}px (${language}): ${homepageGeometry.partnerGap}px gap`);
           }
@@ -209,6 +250,15 @@ try {
         await mkdir(join(output, String(width), language), { recursive: true });
         await page.screenshot({ path: join(output, relative), fullPage: true });
         manifest.push(`${relative}\t${url.pathname}?lang=${language}`);
+        if (pageDefinition.name === "home" && [390, 1440].includes(width)) {
+          for (const [section, selector] of sectionShots) {
+            const sectionNode = page.locator(selector);
+            const sectionRelative = posix.join("sections", String(width), language, `${section}.png`);
+            await mkdir(join(output, "sections", String(width), language), { recursive: true });
+            await sectionNode.screenshot({ path: join(output, sectionRelative) });
+            manifest.push(`${sectionRelative}\t${url.pathname}?lang=${language}#${section}`);
+          }
+        }
         await context.close();
       }
     }
@@ -219,6 +269,6 @@ try {
 }
 
 await writeFile(join(output, "manifest.txt"), `${manifest.join("\n")}\n`, "utf8");
-const expected = widths.length * languages.length * pages.length;
+const expected = widths.length * languages.length * pages.length + 2 * languages.length * sectionShots.length;
 if (manifest.length !== expected) throw new Error(`Expected ${expected} screenshots, captured ${manifest.length}`);
 console.log(`Captured ${manifest.length} screenshots in ${output}`);
