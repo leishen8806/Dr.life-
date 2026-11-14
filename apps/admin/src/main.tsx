@@ -7,6 +7,7 @@ import { applyDocumentLanguage, I18nProvider, readLanguagePreference, resolveLan
 import { Money, StatusTag } from "@drlife/ui";
 import { api } from "./api";
 import type { OrderRecord, RecordStatus, ReviewRecord } from "./api/types";
+import { AgreementsPage, IntegrationsPage } from "./policy-pages";
 import "antd/dist/reset.css";
 import "@drlife/ui/styles.css";
 import "./styles.css";
@@ -202,7 +203,8 @@ function Shell() {
       ...(hasPermission("admin.merchants") ? [{ key: "/merchants", label: <span>{t("admin.merchants")}</span>, disabled: true }] : []),
       ...(hasPermission("admin.products") ? [{ key: "/products", label: <span>{t("admin.products")}</span>, disabled: true }] : [])
     ] },
-    { key: "operations", label: t("admin.operations"), children: hasPermission("admin.review") ? [{ key: "/review", label: <Link to="/review">{t("admin.review")}</Link> }] : [] }
+    { key: "operations", label: t("admin.operations"), children: hasPermission("admin.review") ? [{ key: "/review", label: <Link to="/review">{t("admin.review")}</Link> }] : [] },
+    { key: "system", label: t("admin.system"), children: [{ key: "/policies", label: <Link to="/policies">{t("admin.policies")}</Link> }, { key: "/integrations", label: <Link to="/integrations">{t("admin.integrations")}</Link> }] }
   ];
   const selectedKey = location.pathname === "/" ? "/" : location.pathname;
   return <Layout className="admin-shell">
@@ -217,6 +219,8 @@ function Shell() {
           <Route path="/" element={<Overview />} />
           <Route path="/review" element={canUseMockWorkspace ? <ReviewPage /> : <ProductionPlaceholder />} />
           <Route path="/orders" element={canUseMockWorkspace ? <OrderPage /> : <ProductionPlaceholder />} />
+          <Route path="/policies" element={canUseMockWorkspace ? <AgreementsPage /> : <ProductionPlaceholder />} />
+          <Route path="/integrations" element={canUseMockWorkspace ? <IntegrationsPage /> : <ProductionPlaceholder />} />
           <Route path="*" element={<Result status="404" title={t("shell.notFound")} />} />
         </Routes>
       </Content>
