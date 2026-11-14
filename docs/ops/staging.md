@@ -48,8 +48,12 @@ credentials, or firewall data in the repository.
    Origin certificate and key files are mounted through
    `STAGING_ORIGIN_CERT_PATH` and `STAGING_ORIGIN_KEY_PATH`; they never enter
    Git or the image.
-3. Start the `edge` service in `compose.yaml`. It is the only service exposing
-   host ports: 80 redirects to 443, and 443 routes by hostname to `api:8080`,
+3. Keep the existing host nginx on 80/443 for the official website. Install the
+   reviewed `nginx/host-proxy.conf.example` as a separate host configuration
+   for the four test names, and start the `edge` service in `compose.yaml` with
+   loopback-only ports (`127.0.0.1:18080:80` and `127.0.0.1:18443:443`). The
+   host nginx terminates the Origin certificate and proxies the test names to
+   the edge HTTPS listener; edge still routes by hostname to `api:8080`,
    `buyer:80`, `merchant:80`, and `admin:80`. All other services stay internal.
 4. Restrict the server firewall to TCP 80/443 from the published Cloudflare IP
    ranges. `test-admin` is protected by its own administrator account plus
@@ -96,6 +100,14 @@ once per week in the approved environment. Check `docker compose ps`, API
 health, worker logs, Redis disk/AOF health, and PostgreSQL backup freshness.
 Do not paste credentials, tunnel tokens, customer data, or server addresses in
 logs or issues. Escalate incidents to `leishen8806`.
+
+For E-09.4, first run `deploy/staging/restore-drill.sh --dry-run` with
+`SOURCE_DATABASE_URL` and `RESTORE_DATABASE_URL` set to an approved test
+environment. Then rerun without `--dry-run`: the script takes a custom-format
+`pg_dump`, recreates only the `drlife_restore_drill_*` target, restores it,
+compares every non-system schema/table row count, and drops the temporary
+database from an exit trap. A mismatch or cleanup failure is FAIL; credentials
+remain in environment variables and are never printed.
 
 For the E-09 test-environment acceptance record, use
 [`test-env-acceptance.md`](./test-env-acceptance.md). The repository template

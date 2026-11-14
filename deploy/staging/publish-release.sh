@@ -11,10 +11,17 @@ releases="$site_root/releases"
 test -d "$incoming"; test -d "$releases"; test ! -e "$releases/$release_id"
 mv "$incoming" "$releases/$release_id"
 ln -sfn "releases/$release_id" "$site_root/.current.next"
+if [ -d "$site_root/current" ] && [ ! -L "$site_root/current" ]; then
+  # Some bootstrap images create an empty directory instead of the documented
+  # symlink. Remove only that safe-to-replace state; never hide real content.
+  test -z "$(find "$site_root/current" -mindepth 1 -print -quit)"
+  rmdir "$site_root/current"
+fi
 if ! mv -Tf "$site_root/.current.next" "$site_root/current" 2>/dev/null; then
-  # BSD mv lacks -T; ln -hfs still replaces the symlink target without a
-  # window where current is absent, and the Linux path above stays atomic.
-  ln -hfs "$(readlink "$site_root/.current.next")" "$site_root/current"
+  # Keep a portable fallback for hosts whose mv lacks -T; current must already
+  # be a symlink here, so ln cannot hide a directory or existing content.
+  test -L "$site_root/current"
+  ln -sfn "$(readlink "$site_root/.current.next")" "$site_root/current"
   rm -f "$site_root/.current.next"
 fi
 current_target=$(readlink -f "$site_root/current")
