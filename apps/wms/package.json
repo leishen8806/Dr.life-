@@ -8,7 +8,9 @@
     "prebuild": "pnpm --filter @drlife/i18n i18n:check",
     "build": "tsc -b && vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:production": "node scripts/check-production.mjs"
   },
   "dependencies": {
     "@drlife/i18n": "workspace:*",
@@ -19,6 +21,8 @@
     "react-router-dom": "7.11.0"
   },
   "devDependencies": {
+    "@testing-library/react": "16.3.3",
+    "jsdom": "29.1.1",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.1.2",

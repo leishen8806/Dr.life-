@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck source=deploy/staging/sshd-policy-check.sh
 set -euo pipefail
 
 mode=dry-run
@@ -18,6 +19,8 @@ cert_path=${STAGING_ORIGIN_CERT_PATH:-/srv/drlifeplus-staging/certs/cloudflare-o
 key_path=${STAGING_ORIGIN_KEY_PATH:-/srv/drlifeplus-staging/certs/cloudflare-origin.key}
 real_ip_config=${STAGING_CLOUDFLARE_REAL_IP_CONFIG:-/srv/drlifeplus-staging/nginx/cloudflare-real-ip.conf}
 sshd_dropin=/etc/ssh/sshd_config.d/00-drlifeplus-staging.conf
+script_dir=$(cd -- "$(dirname "$0")" && pwd)
+source "$script_dir/sshd-policy-check.sh"
 plan() { printf '[%s] %s\n' "$mode" "$*"; }
 
 if [[ $mode == dry-run ]]; then
@@ -74,7 +77,7 @@ install -m 644 "$tmpdir/cloudflare-real-ip.conf" "$real_ip_config"
 install -d -m 755 /etc/ssh/sshd_config.d
 old_dropin="$tmpdir/old-dropin"
 if [[ -f $sshd_dropin ]]; then cp -p "$sshd_dropin" "$old_dropin"; fi
-restore_dropin() { if [[ -f $old_dropin ]]; then cp -p "$old_dropin" "$sshd_dropin"; else rm -f "$sshd_dropin"; fi; }
+restore_dropin() { restore_sshd_dropin "$sshd_dropin" "$old_dropin"; }
 printf '%s\n' 'PasswordAuthentication no' 'PermitRootLogin no' 'KbdInteractiveAuthentication no' > "$sshd_dropin"
 if ! sshd -t; then
   restore_dropin
@@ -82,10 +85,11 @@ if ! sshd -t; then
   exit 1
 fi
 chmod 600 "$sshd_dropin"
-sshd_effective=$(sshd -T -C "user=$ssh_user,host=localhost,addr=127.0.0.1")
-for expected in 'passwordauthentication no' 'permitrootlogin no' 'kbdinteractiveauthentication no'; do
-  grep -Fxq "$expected" <<< "$sshd_effective" || { restore_dropin; printf 'sshd effective config missing: %s\n' "$expected" >&2; exit 1; }
-done
+if ! validate_sshd_policy "$ssh_user"; then
+  restore_dropin
+  printf '%s\n' 'sshd effective config validation failed; daemon was not restarted' >&2
+  exit 1
+fi
 install_docker_user_rules() {
   local file=$1 ranges=$2 marker_begin='# BEGIN DRLIFE DOCKER-USER' marker_end='# END DRLIFE DOCKER-USER'
   local payload updated

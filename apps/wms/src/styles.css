@@ -1,36 +1,13 @@
-#root,
-.admin-shell {
-  min-height: 100vh;
-}
-.admin-sider {
-  min-height: 100vh;
-}
-.brand {
-  height: 64px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-size: 20px;
-  font-weight: 700;
-}
-.admin-header {
-  height: auto;
-  min-height: 64px;
-  padding: 12px 24px;
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-.admin-header h4 {
-  margin: 0;
-}
-.admin-content {
-  margin: 24px;
-  padding: 24px;
-  min-height: 320px;
-  border-radius: var(--drl-radius);
-  background: #fff;
-}
+#root, .wms-shell { min-height: 100vh; }
+.brand { height: 64px; display: grid; place-items: center; color: #fff; font-size: 20px; font-weight: 700; }
+.wms-header { min-height: 64px; padding: 12px 24px; background: #fff; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.wms-header h4, .page-heading h2 { margin: 0; }
+.wms-content { margin: 24px; padding: 24px; min-height: 320px; border-radius: var(--drl-radius); background: #fff; }
+.page-stack { display: flex; width: 100%; }
+.page-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; width: 100%; }
+.row-mismatch td { background: #fff1f0 !important; }
+.detail-stack, .detail-row { width: 100%; }
+.detail-row { display: flex; justify-content: space-between; gap: 16px; margin: 0; }
+.detail-row strong { color: #595959; }
+.full-width { width: 100%; }
+@media (max-width: 768px) { .wms-content { margin: 12px; padding: 12px; } .page-heading { align-items: flex-start; flex-direction: column; } .ant-table { font-size: 12px; } }
