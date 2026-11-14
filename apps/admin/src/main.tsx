@@ -125,7 +125,7 @@ function ReviewPage() {
 }
 
 export function OrderPage() {
-  const { language, t } = useI18n();
+  const { t } = useI18n();
   const [rows, setRows] = useState<OrderRecord[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<RecordStatus>();
