@@ -1,8 +1,10 @@
 ---
-import { locales } from "../i18n";
+import { locales, type Locale } from "../i18n";
+const { lang = "zh" } = Astro.props as { lang?: Locale };
 ---
-<script define:vars={{ locales }}>
-  const language = new URLSearchParams(window.location.search).get("lang");
+<script define:vars={{ locales, lang }}>
+  const queryLanguage = new URLSearchParams(window.location.search).get("lang");
+  const language = queryLanguage || lang;
   const copy = locales[language] || locales.zh;
   document.documentElement.lang = language === "zh" || !language ? "zh-CN" : language;
   document.body.dataset.lang = language || "zh";
@@ -10,4 +12,9 @@ import { locales } from "../i18n";
   document.querySelectorAll("[data-i18n]").forEach((node) => { node.textContent = read(node.dataset.i18n); });
   document.querySelectorAll("[data-i18n-alt]").forEach((node) => { node.setAttribute("alt", read(node.dataset.i18nAlt)); });
   document.querySelectorAll("[data-language]").forEach((node) => { if (node.dataset.language === (language || "zh")) node.setAttribute("aria-current", "true"); });
+  if (queryLanguage) {
+    const route = window.location.pathname.replace(/^\/(en|km)(?=\/|$)/, "") || "/";
+    const destination = language === "zh" ? route : `/${language}${route === "/" ? "/" : route}`;
+    window.history.replaceState({}, "", destination);
+  }
 </script>

@@ -272,6 +272,27 @@ test("the static build exposes the required public routes", () => {
   }
 });
 
+test("static locale pages publish the approved SEO metadata without a query string", () => {
+  const html = (route) => readFileSync(join(dist, route || "index.html", route ? "index.html" : ""), "utf8");
+  const pages = [
+    ["", "zh-CN", "zh_CN", "DR.LIFE+ 生活家｜金边建材家居与中柬跨境物流平台 - DR集团"],
+    ["en", "en", "en_US", "DR.LIFE+ | Building Materials &amp; Home Platform in Phnom Penh, Cambodia - DR Group"],
+    ["km", "km", "km_KH", "DR.LIFE+ | វេទិកាសម្ភារៈសំណង់ និងគ្រឿងសង្ហារិមនៅភ្នំពេញ - DR Group"]
+  ];
+  for (const [route, lang, locale, title] of pages) {
+    const source = html(route);
+    assert.match(source, new RegExp(`<html lang="${lang}"`));
+    assert.ok(source.includes(`<title>${title}</title>`), `${route || "zh"} title changed`);
+    assert.ok(source.includes(`property="og:locale" content="${locale}"`), `${route || "zh"} locale changed`);
+    assert.match(source, /name="keywords" content="[^"]+/);
+    assert.doesNotMatch(source, /\?lang=/);
+  }
+  for (const route of ["merchant", "en/merchant", "km/merchant"]) {
+    assert.match(html(route), /name="keywords" content="[^"]+/);
+    assert.match(html(route), /property="og:image" content="https:\/\/drlifeplus\.com\/og-image\.jpg"/);
+  }
+});
+
 test("the static build contains no prohibited claims and every internal link resolves", () => {
   const prohibited = [
     "24h 仓配无忧",

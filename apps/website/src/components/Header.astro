@@ -1,23 +1,25 @@
 ---
 import { EXTERNAL_LINKS } from "../constants";
 import { locales, read } from "../i18n";
+import type { Locale } from "../i18n";
 import BrandWordmark from "./BrandWordmark.astro";
-const { dark = false } = Astro.props;
-const copy = locales.zh;
-const isMerchant = Astro.url.pathname.startsWith("/merchant");
+const { dark = false, lang = "zh" } = Astro.props as { dark?: boolean; lang?: Locale };
+const copy = locales[lang];
+const base = lang === "zh" ? "" : `/${lang}`;
+const isMerchant = Astro.url.pathname.endsWith("/merchant") || Astro.url.pathname.includes("/merchant/");
 const links = isMerchant
   ? [["/", "merchant.nav.0"], ["#join", "merchant.nav.1"], ["#fees", "merchant.nav.2"], ["/contact", "merchant.nav.3"]]
-  : [["#business", "home.homepageV2.homepageNav.0"], ["#market", "home.homepageV2.homepageNav.1"], ["#route", "home.homepageV2.homepageNav.2"], ["#culture", "home.homepageV2.homepageNav.3"], ["#apps", "home.homepageV2.homepageNav.4"], ["/contact", "home.homepageV2.homepageNav.5"]];
-const action = isMerchant ? { href: EXTERNAL_LINKS.merchantBot, label: "merchant.headerAction" } : { href: "/#apps", label: "home.homepageV2.homepageNav.4" };
+  : [["#business", "home.homepageV2.homepageNav.0"], ["#market", "home.homepageV2.homepageNav.1"], ["#route", "home.homepageV2.homepageNav.2"], ["#culture", "home.homepageV2.homepageNav.3"], ["#apps", "home.homepageV2.homepageNav.4"], [`${base}/contact`, "home.homepageV2.homepageNav.5"]];
+const action = isMerchant ? { href: EXTERNAL_LINKS.merchantBot, label: "merchant.headerAction" } : { href: `${base}/#apps`, label: "home.homepageV2.homepageNav.4" };
 ---
 <header class:list={["site-header", { "site-header--dark": dark }]}>
-  <BrandWordmark class="brand" href="/" />
+  <BrandWordmark class="brand" href={`${base}/`} />
   <nav aria-label={read(copy, "nav.about")} class="main-nav">
     {links.map(([href, label]) => <a href={href} data-i18n={label}>{read(copy, label)}</a>)}
   </nav>
   <div class="header-actions">
     <div class="languages" aria-label="Language">
-      <a href="?lang=zh" data-language="zh">中文</a><a href="?lang=en" data-language="en">EN</a><a href="?lang=km" data-language="km">ខ្មែរ</a>
+      <a href={`${isMerchant ? `${base}/merchant/` : `${base}/`}`} data-language="zh">中文</a><a href={`${isMerchant ? "/en/merchant/" : "/en/"}`} data-language="en">EN</a><a href={`${isMerchant ? "/km/merchant/" : "/km/"}`} data-language="km">ខ្មែរ</a>
     </div>
     <a class="shop-link" href={action.href} data-i18n={action.label}>{read(copy, action.label)}</a>
   </div>
@@ -26,7 +28,7 @@ const action = isMerchant ? { href: EXTERNAL_LINKS.merchantBot, label: "merchant
     <nav aria-label={read(copy, "nav.about")}>
       {links.map(([href, label]) => <a href={href} data-i18n={label}>{read(copy, label)}</a>)}
       <div class="mobile-menu-languages" aria-label="Language">
-        <a href="?lang=zh" data-language="zh">中文</a><a href="?lang=en" data-language="en">EN</a><a href="?lang=km" data-language="km">ខ្មែរ</a>
+        <a href={`${isMerchant ? `${base}/merchant/` : `${base}/`}`} data-language="zh">中文</a><a href={`${isMerchant ? "/en/merchant/" : "/en/"}`} data-language="en">EN</a><a href={`${isMerchant ? "/km/merchant/" : "/km/"}`} data-language="km">ខ្មែរ</a>
       </div>
     </nav>
   </details>

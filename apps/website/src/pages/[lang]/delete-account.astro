@@ -1,0 +1,6 @@
+---
+import Footer from "../../components/Footer.astro"; import Header from "../../components/Header.astro"; import Layout from "../../components/Layout.astro"; import Localizer from "../../components/Localizer.astro"; import { locales, type Locale } from "../../i18n";
+export function getStaticPaths() { return ["en", "km"].map((lang) => ({ params: { lang }, props: { lang } })); }
+const { lang } = Astro.props as { lang: Locale }; const copy = locales[lang];
+---
+<Layout titleKey="deleteAccount.title" descriptionKey="deleteAccount.intro" lang={lang}><Header lang={lang} /><main class="legal-page"><p class="draft">{copy.legal.draft}</p><h1>{copy.deleteAccount.title}</h1><p>{copy.deleteAccount.intro}</p><ol class="legal-content">{copy.deleteAccount.steps.map((step) => <li>{step}</li>)}</ol></main><Footer lang={lang} /><Localizer lang={lang} /></Layout>
