@@ -67,7 +67,7 @@ func (w *Worker) RecoverUnknown(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	if intent.Status != StatusUnknown && intent.Status != StatusWaiting && intent.Status != StatusReview {
+	if intent.Status != StatusUnknown && intent.Status != StatusWaiting && intent.Status != StatusReview && intent.Status != StatusInvalidated {
 		return nil
 	}
 	order, err := w.client.Query(ctx, intent)
@@ -78,6 +78,12 @@ func (w *Worker) RecoverUnknown(ctx context.Context, id int64) error {
 		}
 		if errors.Is(err, ErrChannelMissing) && intent.Status == StatusUnknown && intent.LastCreateSentAt != nil && w.now().Sub(*intent.LastCreateSentAt) >= w.recoveryWindow {
 			return w.store.RecordChannelResult(ctx, id, intent.Status, ChannelResult{Status: StatusClosed, ChannelStatus: "NOT_FOUND"})
+		}
+		if errors.Is(err, ErrChannelMissing) && intent.Status == StatusUnknown && intent.ExpiresAt != nil && !intent.ExpiresAt.After(w.now()) {
+			return w.store.RecordChannelResult(ctx, id, intent.Status, ChannelResult{Status: StatusClosed, ChannelStatus: "NOT_FOUND"})
+		}
+		if errors.Is(err, ErrChannelMissing) && intent.Status == StatusInvalidated {
+			return w.store.RecordChannelResult(ctx, id, intent.Status, ChannelResult{Status: StatusInvalidated, ChannelStatus: "NOT_FOUND"})
 		}
 		return err
 	}
@@ -91,6 +97,12 @@ func (w *Worker) recordValidated(ctx context.Context, intent Intent, order Chann
 	}
 	if intent.Status == StatusReview && status != StatusSuccess {
 		return ErrInvalidChannel
+	}
+	if intent.Status == StatusInvalidated && status != StatusSuccess {
+		if status == StatusClosed {
+			return w.store.RecordChannelResult(ctx, intent.ID, intent.Status, ChannelResult{Status: StatusClosed, ChannelStatus: order.Status})
+		}
+		return w.store.RecordChannelResult(ctx, intent.ID, intent.Status, ChannelResult{Status: StatusInvalidated, ChannelStatus: order.Status})
 	}
 	return w.store.RecordChannelResult(ctx, intent.ID, intent.Status, ChannelResult{
 		Status: status, ChannelStatus: order.Status, TransactionID: order.TransactionID, PaymentURL: order.PaymentURL, CreateSent: createSent,

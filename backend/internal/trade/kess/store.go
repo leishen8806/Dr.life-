@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -13,6 +14,7 @@ import (
 
 type db interface {
 	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+	Query(context.Context, string, ...any) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
@@ -55,14 +57,42 @@ func (s *PgStore) CreateIntent(ctx context.Context, source ReceivableSnapshot) (
 func (s *PgStore) Intent(ctx context.Context, id int64) (Intent, error) {
 	var intent Intent
 	err := s.db.QueryRow(ctx, `
-		SELECT id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at, expires_at, COALESCE(payment_url,'')
+		SELECT id, company_id, channel, trade_no, source_ref, attempt_no, amount_e4, currency, seller_code, status, create_attempts, created_at, create_sent_at, expires_at, COALESCE(payment_url,''), COALESCE(channel_transaction_id,'')
 		FROM trade.kess_payment_intent WHERE id = $1`, id).Scan(
-		&intent.ID, &intent.CompanyID, &intent.Channel, &intent.TradeNo, &intent.SourceRef, &intent.AttemptNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt, &intent.ExpiresAt, &intent.PaymentURL,
+		&intent.ID, &intent.CompanyID, &intent.Channel, &intent.TradeNo, &intent.SourceRef, &intent.AttemptNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status, &intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt, &intent.ExpiresAt, &intent.PaymentURL, &intent.ChannelTransactionID,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Intent{}, ErrNotFound
 	}
 	return intent, err
+}
+
+// ListDue atomically leases payment intents for one maintenance pass. Updating
+// last_checked_at is the cross-worker claim and makes duplicate scans harmless.
+func (s *PgStore) ListDue(ctx context.Context, now time.Time, limit int) ([]Intent, error) {
+	if limit < 1 {
+		return nil, nil
+	}
+	rows, err := s.db.Query(ctx, `SELECT id, company_id, channel, trade_no, source_ref,
+		attempt_no, amount_e4, currency, seller_code, status, create_attempts, created_at,
+		create_sent_at, expires_at, payment_url, channel_transaction_id
+		FROM trade.claim_due_kess_payment_intents($1, $2)`, now, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var intents []Intent
+	for rows.Next() {
+		var intent Intent
+		if err := rows.Scan(&intent.ID, &intent.CompanyID, &intent.Channel, &intent.TradeNo, &intent.SourceRef,
+			&intent.AttemptNo, &intent.AmountE4, &intent.Currency, &intent.ExpectedSellerCode, &intent.Status,
+			&intent.CreateAttempts, &intent.CreatedAt, &intent.LastCreateSentAt, &intent.ExpiresAt,
+			&intent.PaymentURL, &intent.ChannelTransactionID); err != nil {
+			return nil, err
+		}
+		intents = append(intents, intent)
+	}
+	return intents, rows.Err()
 }
 
 func (s *PgStore) ClaimPending(ctx context.Context, id int64) (Intent, bool, error) {

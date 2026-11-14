@@ -13,14 +13,15 @@ const ChannelKESS = "kess"
 type Status string
 
 const (
-	StatusPending Status = "PENDING"
-	StatusWaiting Status = "WAITING"
-	StatusSuccess Status = "SUCCESS"
-	StatusFailed  Status = "FAILED"
-	StatusClosed  Status = "CLOSED"
-	StatusUnknown Status = "UNKNOWN"
-	StatusReview  Status = "REVIEW"
-	StatusRefund  Status = "REFUND"
+	StatusPending     Status = "PENDING"
+	StatusWaiting     Status = "WAITING"
+	StatusSuccess     Status = "SUCCESS"
+	StatusFailed      Status = "FAILED"
+	StatusClosed      Status = "CLOSED"
+	StatusUnknown     Status = "UNKNOWN"
+	StatusReview      Status = "REVIEW"
+	StatusInvalidated Status = "INVALIDATED"
+	StatusRefund      Status = "REFUND"
 )
 
 var (
@@ -34,21 +35,22 @@ var (
 // Intent is the server-created receivable snapshot. AmountE4 is USD in 0.0001
 // units and must be a whole cent before it crosses the KESS boundary.
 type Intent struct {
-	ID                 int64
-	CompanyID          int64
-	Channel            string
-	TradeNo            string
-	SourceRef          string
-	AttemptNo          int
-	AmountE4           int64
-	Currency           string
-	ExpectedSellerCode string
-	Status             Status
-	CreateAttempts     int
-	CreatedAt          time.Time
-	LastCreateSentAt   *time.Time
-	ExpiresAt          *time.Time
-	PaymentURL         string
+	ID                   int64
+	CompanyID            int64
+	Channel              string
+	TradeNo              string
+	SourceRef            string
+	AttemptNo            int
+	AmountE4             int64
+	Currency             string
+	ExpectedSellerCode   string
+	Status               Status
+	CreateAttempts       int
+	CreatedAt            time.Time
+	LastCreateSentAt     *time.Time
+	ExpiresAt            *time.Time
+	PaymentURL           string
+	ChannelTransactionID string
 }
 
 // ReceivableSnapshot is produced by the server-side order total calculation.
