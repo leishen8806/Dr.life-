@@ -28,7 +28,7 @@ export const mockApi: AdminApi = {
   async approveReview(kind, id) { await wait(); const item = reviews[kind === "merchant" ? "merchants" : "products"].find((entry) => entry.id === id); if (item) item.status = "approved"; },
   async rejectReview(kind, id) { await wait(); const item = reviews[kind === "merchant" ? "merchants" : "products"].find((entry) => entry.id === id); if (item) item.status = "rejected"; },
   async listOrders(filters = {}) { await wait(); return orders.filter((item) => (!filters.status || item.status === filters.status) && (!filters.query || (item.id + " " + item.buyerKey + " " + item.merchantKey).toLowerCase().includes(filters.query.toLowerCase())) && (!filters.from || item.createdAt.slice(0, 10) >= filters.from) && (!filters.to || item.createdAt.slice(0, 10) <= filters.to)); },
-  async getOrder(id) { await wait(); return orders.find((item) => item.id === id); }
+  async getOrder(id) { await wait(); return orders.find((item) => item.id === id); },
   async listAgreements() { await wait(); return structuredClone(agreements); },
   async saveAgreementDraft(id, language, value) { await wait(); const item = agreements.find((entry) => entry.id === id); if (!item) throw new Error("agreement_not_found"); item.languages[language] = value; return structuredClone(item); },
   async publishAgreement(id, input) { await wait(); const item = agreements.find((entry) => entry.id === id); if (!item) throw new Error("agreement_not_found"); if (!input.changeNote || !input.effectiveDate || Object.values(item.languages).some((value) => !value.trim())) throw new Error("agreement_incomplete"); item.state = "published"; item.effectiveDate = input.effectiveDate; item.version = `v${Number(item.version.slice(1)) + 1}`; return structuredClone(item); },
