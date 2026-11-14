@@ -57,14 +57,27 @@ const paymentStatuses = new Set<PaymentStatus>([
   "refunded"
 ]);
 
+export class UnknownBuyerStatusError extends Error {
+  constructor(kind: "order" | "payment", value: string) {
+    super(`[buyer] unknown ${kind} status: ${value}`);
+    this.name = "UnknownBuyerStatusError";
+  }
+}
+
+function strictBuyerContractChecks(): boolean {
+  return import.meta.env.DEV || import.meta.env.MODE === "test";
+}
+
 function mapOrderStatus(value: string): OrderStatus {
   if (orderStatuses.has(value as OrderStatus)) return value as OrderStatus;
+  if (strictBuyerContractChecks()) throw new UnknownBuyerStatusError("order", value);
   console.warn("[buyer] unknown order status", value);
   return "unknown";
 }
 
 function mapPaymentStatus(value: string): PaymentStatus {
   if (paymentStatuses.has(value as PaymentStatus)) return value as PaymentStatus;
+  if (strictBuyerContractChecks()) throw new UnknownBuyerStatusError("payment", value);
   console.warn("[buyer] unknown payment status", value);
   return "unknown";
 }

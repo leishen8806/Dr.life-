@@ -1,5 +1,5 @@
 import React, { type KeyboardEvent, type ReactNode } from "react";
-import type { Language } from "@drlife/i18n";
+import type { Language, TranslationKey } from "@drlife/i18n";
 
 export function AppHeader({
   brand = "Dr.life+",
@@ -276,8 +276,8 @@ export function FormField({ label, error, children }: { label: string; error?: s
   return <label className="drl-form-field"><span>{label}</span>{children}{error && <small className="drl-form-field__error" role="alert">{error}</small>}</label>;
 }
 
-function parseMoneyE4(value: bigint | string): bigint | undefined {
-  const text = typeof value === "bigint" ? value.toString() : value.trim();
+export function parseMoneyE4(value: bigint | string): bigint | undefined {
+  const text = typeof value === "bigint" ? value.toString() : value;
   if (!/^\d+$/.test(text)) return undefined;
   try {
     const amount = BigInt(text);
@@ -299,10 +299,33 @@ export function formatMoneyE4(
   return `${currencySymbol}${groupedWhole}.${cents.toString().padStart(2, "0")}`;
 }
 
+export function formatMoneyE4WithI18n(
+  value: bigint | string,
+  { language, translate }: { language: Language; translate: (key: TranslationKey) => string }
+): string {
+  return formatMoneyE4(value, {
+    language,
+    currencySymbol: translate("common.currencyUsd"),
+    invalidLabel: translate("common.invalidAmount")
+  });
+}
+
 export function Money({ value, invalidLabel, currencySymbol, language }: { value: bigint | string; invalidLabel: string; currencySymbol: string; language: Language }) {
   const amount = parseMoneyE4(value);
   if (amount === undefined) return <span className="drl-money drl-money--error" role="alert">{invalidLabel}</span>;
   return <span className="drl-money" data-e4={amount.toString()}>{formatMoneyE4(value, { invalidLabel, currencySymbol, language })}</span>;
+}
+
+export function MoneyWithI18n({
+  value,
+  language,
+  translate
+}: {
+  value: bigint | string;
+  language: Language;
+  translate: (key: TranslationKey) => string;
+}) {
+  return <Money value={value} language={language} currencySymbol={translate("common.currencyUsd")} invalidLabel={translate("common.invalidAmount")} />;
 }
 
 export function TieredPrice({ tiers, invalidLabel, currencySymbol, language }: { tiers: readonly { label: string; value: bigint | string }[]; invalidLabel: string; currencySymbol: string; language: Language }) {
@@ -315,15 +338,16 @@ export function ProductCard({ imageUrl, imageAlt, name, price, badge, onClick }:
 }
 
 export function Tabs({ tabs, activeId, onChange, ariaLabel }: { tabs: readonly { id: string; label: string }[]; activeId: string; onChange: (id: string) => void; ariaLabel: string }) {
+  const tabRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const offset = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : event.key === "Home" ? -index : event.key === "End" ? tabs.length - index - 1 : 0;
     if (!offset || tabs.length === 0) return;
     event.preventDefault();
     const nextIndex = (index + offset + tabs.length) % tabs.length;
     onChange(tabs[nextIndex]!.id);
-    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[role=tab]")[nextIndex]?.focus();
+    tabRefs.current[nextIndex]?.focus();
   };
-  return <div className="drl-tabs" role="tablist" aria-label={ariaLabel}>{tabs.map((tab, index) => <button key={tab.id} type="button" role="tab" aria-selected={tab.id === activeId} tabIndex={tab.id === activeId ? 0 : -1} onKeyDown={(event) => handleKeyDown(event, index)} onClick={() => onChange(tab.id)}>{tab.label}</button>)}</div>;
+  return <div className="drl-tabs" role="tablist" aria-label={ariaLabel}>{tabs.map((tab, index) => <button ref={(element) => { tabRefs.current[index] = element; }} key={tab.id} type="button" role="tab" aria-selected={tab.id === activeId} tabIndex={tab.id === activeId ? 0 : -1} onKeyDown={(event) => handleKeyDown(event, index)} onClick={() => onChange(tab.id)}>{tab.label}</button>)}</div>;
 }
 
 export function Toast({ children, role = "status" }: { children: ReactNode; role?: "status" | "alert" }) {

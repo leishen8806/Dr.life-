@@ -51,6 +51,29 @@ function client(transport: typeof globalThis.fetch, language: Language): BuyerAp
 }
 
 describe("useOrderFeed", () => {
+  it("keeps the ready resource reference across unrelated rerenders", async () => {
+    let requests = 0;
+    const transport: typeof globalThis.fetch = async () => {
+      requests += 1;
+      return page([order("ord_stable")], null);
+    };
+    const buyerClient = client(transport, "zh");
+    const { result, rerender } = renderHook(
+      ({ version }) => {
+        void version;
+        return useOrderFeed(buyerClient, "zh");
+      },
+      { initialProps: { version: 0 } }
+    );
+    await waitFor(() => expect(result.current.resource.status).toBe("ready"));
+    const resource = result.current.resource;
+
+    rerender({ version: 1 });
+
+    expect(result.current.resource).toBe(resource);
+    expect(requests).toBe(1);
+  });
+
   it("does not request orders until enabled", async () => {
     let requests = 0;
     const transport: typeof globalThis.fetch = async () => {
