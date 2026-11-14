@@ -76,6 +76,11 @@ try {
         url.searchParams.set("lang", language);
         const response = await page.goto(url.toString(), { waitUntil: "networkidle" });
         if (!response?.ok()) throw new Error(`Screenshot page failed: ${url} (${response?.status() ?? "no response"})`);
+        await page.evaluate(() => {
+          for (const image of document.images) image.loading = "eager";
+        });
+        await page.waitForFunction(() => [...document.images].every((image) => image.complete));
+        await page.evaluate(() => Promise.all([...document.images].map((image) => image.decode?.().catch(() => undefined))));
         if (failedResources.length > 0) {
           throw new Error(`Screenshot page loaded failed static resources: ${failedResources.join(", ")}`);
         }
@@ -201,11 +206,16 @@ try {
           if ([1280, 1440, 1920].includes(width) && homepageGeometry.navOverlap) {
             throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);
           }
-          if ([1280, 1440].includes(width)) {
+          if ([1440, 1920].includes(width)) {
             const navLink = page.locator(".nav a").first();
             const appLink = page.locator(".nav-apps");
             if (!(await navLink.isVisible()) || !(await appLink.isVisible())) {
               throw new Error(`Desktop navigation or App entry is hidden at ${width}px (${language})`);
+            }
+          } else if (width === 1280) {
+            const menuToggle = page.locator(".menu-toggle");
+            if (!(await menuToggle.isVisible())) {
+              throw new Error(`Compact navigation toggle is hidden at ${width}px (${language})`);
             }
           }
           if (width >= 1441) {
