@@ -1,4 +1,4 @@
-code-head	8e35e13
+code-head	9919241
 drawer-wait-ms	600
 enum-test	apps/wms/src/api.test.ts + apps/wms/src/detail-drawer.test.tsx (9/9 api; 6/6 render cases)
 inventory-1440-zh.png	1440	zh	inventory	list
