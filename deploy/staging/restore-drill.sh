@@ -100,7 +100,10 @@ cleanup() {
   rm -f "$DUMP_FILE" "${DUMP_FILE}.source-counts" "${DUMP_FILE}.restore-counts" "${DUMP_FILE}.comparison"
   if ! drop_restore_database >/dev/null 2>&1; then
     printf 'FAIL: temporary restore database cleanup failed\n' >&2
+    trap - EXIT
+    exit 1
   fi
+  printf 'PASS: temporary restore database cleanup complete\n'
 }
 trap cleanup EXIT
 
