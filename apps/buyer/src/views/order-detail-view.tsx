@@ -81,7 +81,7 @@ export function OrderDetailView({
                 <div className="buyer-order-line" key={line.publicId}>
                   <div>
                     <strong lang={language}>{localized(line.name, language) || t("order.itemFallback", { count: lineIndex + 1 })}</strong>
-                    <small>{line.quantity} {line.unit === "item" ? t("order.unit.item") : line.unit} × {formatPriceE4(line.unitPriceE4)}</small>
+                    <small>{line.unit === "item" ? t(line.quantity === 1 ? "order.unit.item.one" : "order.unit.item.other", { count: line.quantity }) : `${line.quantity} ${line.unit}`} × {formatPriceE4(line.unitPriceE4)}</small>
                   </div>
                   <strong>{formatPriceE4(line.totalE4)}</strong>
                 </div>

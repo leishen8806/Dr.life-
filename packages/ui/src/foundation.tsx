@@ -310,7 +310,28 @@ export function formatMoneyE4WithI18n(
   });
 }
 
-export function Money({ value, invalidLabel, currencySymbol, language }: { value: bigint | string; invalidLabel: string; currencySymbol: string; language: Language }) {
+type LegacyMoneyProps = {
+  value: bigint | string;
+  invalidLabel: string;
+  currencySymbol: string;
+  language: Language;
+};
+
+type LocalizedMoneyProps = {
+  value: bigint | string;
+  translate: (key: TranslationKey) => string;
+};
+
+function documentLanguage(): Language {
+  if (typeof document === "undefined") return "en";
+  const value = document.documentElement.lang.toLowerCase().split(/[-_]/)[0];
+  return value === "zh" || value === "km" ? value : "en";
+}
+
+export function Money(props: LegacyMoneyProps | LocalizedMoneyProps) {
+  const { value, invalidLabel, currencySymbol, language } = "translate" in props
+    ? { value: props.value, invalidLabel: props.translate("common.invalidAmount"), currencySymbol: props.translate("common.currencyUsd"), language: documentLanguage() }
+    : props;
   const amount = parseMoneyE4(value);
   if (amount === undefined) return <span className="drl-money drl-money--error" role="alert">{invalidLabel}</span>;
   return <span className="drl-money" data-e4={amount.toString()}>{formatMoneyE4(value, { invalidLabel, currencySymbol, language })}</span>;
@@ -325,7 +346,7 @@ export function MoneyWithI18n({
   language: Language;
   translate: (key: TranslationKey) => string;
 }) {
-  return <Money value={value} language={language} currencySymbol={translate("common.currencyUsd")} invalidLabel={translate("common.invalidAmount")} />;
+  return <Money value={value} translate={translate} />;
 }
 
 export function TieredPrice({ tiers, invalidLabel, currencySymbol, language }: { tiers: readonly { label: string; value: bigint | string }[]; invalidLabel: string; currencySymbol: string; language: Language }) {

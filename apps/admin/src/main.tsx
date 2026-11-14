@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState, type ComponentType } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Alert, Button, DatePicker, Drawer, Empty, Input, Layout, Menu, Result, Segmented, Select, Skeleton, Space, Table, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -13,14 +13,6 @@ import "@drlife/ui/styles.css";
 import "./styles.css";
 
 const { Header, Sider, Content } = Layout;
-// The shared Money API gained locale-aware formatting on main after this branch
-// was cut. Keep the admin call site compatible with both workspace snapshots.
-const AdminMoney = Money as unknown as ComponentType<{
-  value: string | bigint;
-  invalidLabel: string;
-  currencySymbol: string;
-  language: Language;
-}>;
 const canUseMockWorkspace = import.meta.env.DEV;
 const permissions: string[] = canUseMockWorkspace ? ["admin.review", "admin.orders", "admin.merchants", "admin.products", "admin.agreement.publish", "admin.integration.manage"] : [];
 const hasPermission = (permission: string) => permissions.includes(permission);
@@ -155,7 +147,7 @@ export function OrderPage() {
     { title: t("admin.orderNo"), dataIndex: "id" },
     { title: t("admin.buyer"), dataIndex: "buyerKey", render: (value: string) => keyText(t, value) },
     { title: t("admin.merchant"), dataIndex: "merchantKey", render: (value: string) => keyText(t, value) },
-    { title: t("admin.amount"), dataIndex: "amountE4", align: "right", render: (value: string) => <AdminMoney value={value} invalidLabel={t("admin.error")} currencySymbol={t("admin.currencySymbol")} language={language} /> },
+    { title: t("admin.amount"), dataIndex: "amountE4", align: "right", render: (value: string) => <Money value={value} translate={t} /> },
     { title: t("admin.orderStatus"), dataIndex: "status", render: (value: string) => <StatusCell status={value} /> },
     { title: t("admin.createdAt"), dataIndex: "createdAt" },
     { title: t("admin.delivery"), dataIndex: "deliveryKey", render: (value: string) => keyText(t, value) }
@@ -175,7 +167,7 @@ export function OrderPage() {
         <Typography.Paragraph><strong>{t("admin.orderNo")}:</strong> {selected.id}</Typography.Paragraph>
         <Typography.Paragraph><strong>{t("admin.buyer")}:</strong> {keyText(t, selected.buyerKey)}</Typography.Paragraph>
         <Typography.Paragraph><strong>{t("admin.merchant")}:</strong> {keyText(t, selected.merchantKey)}</Typography.Paragraph>
-        <Typography.Paragraph><strong>{t("admin.amount")}:</strong> <AdminMoney value={selected.amountE4} invalidLabel={t("admin.error")} currencySymbol={t("admin.currencySymbol")} language={language} /></Typography.Paragraph>
+        <Typography.Paragraph><strong>{t("admin.amount")}:</strong> <Money value={selected.amountE4} translate={t} /></Typography.Paragraph>
         <Typography.Paragraph><strong>{t("admin.createdAt")}:</strong> {selected.createdAt}</Typography.Paragraph>
         <Typography.Paragraph><strong>{t("admin.phone")}:</strong> {selected.phone}</Typography.Paragraph>
         <Typography.Title level={4}>{t("admin.suborders")}</Typography.Title>
