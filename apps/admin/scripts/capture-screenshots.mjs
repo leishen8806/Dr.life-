@@ -51,5 +51,6 @@ try {
   await browser.close();
   server.kill("SIGTERM");
 }
-await writeFile(new URL("../screenshots/manifest.txt", import.meta.url), manifest.join("\n") + "\n");
+const evidenceHead = process.env.EVIDENCE_HEAD;
+await writeFile(new URL("../screenshots/manifest.txt", import.meta.url), `${evidenceHead ? `head=${evidenceHead}\n` : ""}${manifest.join("\n")}\n`);
 console.log("Captured " + manifest.length + " admin screenshots");

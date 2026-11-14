@@ -278,7 +278,8 @@ try {
   await new Promise((resolve) => server.close(resolve));
 }
 
-await writeFile(join(output, "manifest.txt"), `${manifest.join("\n")}\n`, "utf8");
+const evidenceHead = process.env.EVIDENCE_HEAD;
+await writeFile(join(output, "manifest.txt"), `${evidenceHead ? `head=${evidenceHead}\n` : ""}${manifest.join("\n")}\n`, "utf8");
 const expected = widths.length * languages.length * pages.length + 2 * languages.length * sectionShots.length;
 if (manifest.length !== expected) throw new Error(`Expected ${expected} screenshots, captured ${manifest.length}`);
 console.log(`Captured ${manifest.length} screenshots in ${output}`);
