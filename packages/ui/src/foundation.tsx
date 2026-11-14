@@ -320,6 +320,7 @@ type LegacyMoneyProps = {
 type LocalizedMoneyProps = {
   value: bigint | string;
   translate: (key: TranslationKey) => string;
+  language?: Language;
 };
 
 function documentLanguage(): Language {
@@ -330,7 +331,7 @@ function documentLanguage(): Language {
 
 export function Money(props: LegacyMoneyProps | LocalizedMoneyProps) {
   const { value, invalidLabel, currencySymbol, language } = "translate" in props
-    ? { value: props.value, invalidLabel: props.translate("common.invalidAmount"), currencySymbol: props.translate("common.currencyUsd"), language: documentLanguage() }
+    ? { value: props.value, invalidLabel: props.translate("common.invalidAmount"), currencySymbol: props.translate("common.currencyUsd"), language: props.language ?? documentLanguage() }
     : props;
   const amount = parseMoneyE4(value);
   if (amount === undefined) return <span className="drl-money drl-money--error" role="alert">{invalidLabel}</span>;
@@ -346,7 +347,7 @@ export function MoneyWithI18n({
   language: Language;
   translate: (key: TranslationKey) => string;
 }) {
-  return <Money value={value} translate={translate} />;
+  return <Money value={value} language={language} translate={translate} />;
 }
 
 export function TieredPrice({ tiers, invalidLabel, currencySymbol, language }: { tiers: readonly { label: string; value: bigint | string }[]; invalidLabel: string; currencySymbol: string; language: Language }) {
