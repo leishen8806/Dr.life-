@@ -113,14 +113,9 @@ export function OrderDetailView({
             </>}
           </Card>
         ))}
-        <Card>
-          <p className="buyer-order-total"><span>{t("order.goods")}</span><strong>{formatPriceE4(order.value.goodsAmountE4)}</strong></p>
-          <p className="buyer-order-total"><span>{t("order.shipping")}</span><strong>{paymentQuoteUnavailable
-            ? t("order.shippingPending")
-            : formatPriceE4(order.value.shippingAmountE4)}</strong></p>
-          <p className="buyer-order-total"><span>{t("order.total")}</span><strong>{paymentQuoteUnavailable ? t("order.shippingPending") : formatPriceE4(order.value.totalE4)}</strong></p>
-          {canPay(order.value) && !paymentQuoteUnavailable && onPay && <Button className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</Button>}
-        </Card>
+        {canPay(order.value) && !paymentQuoteUnavailable && onPay && (
+          <Card><Button className="buyer-cart-primary" onClick={onPay}>{t("payment.payNow")}</Button></Card>
+        )}
         </>}
       </main>
     </div>

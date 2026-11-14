@@ -27,6 +27,7 @@ export interface AgreementVersionRecord {
   version: string;
   publishedAt: string;
   changeNote: string;
+  changeNoteKey: "admin.changeNoteUpdated" | "admin.changeNoteInitial";
   effectiveDate: string;
 }
 export interface IntegrationRecord {

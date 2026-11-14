@@ -327,6 +327,12 @@ body {
   background: #3b3b37;
 }
 
+[data-surface="miniapp"][data-color-scheme="dark"] .drl-status-tag--success,
+[data-surface="miniapp"][data-color-scheme="dark"] .drl-status-tag--warning,
+[data-surface="miniapp"][data-color-scheme="dark"] .drl-status-tag--danger {
+  color: var(--color-on-dark);
+}
+
 .drl-overlay {
   position: fixed;
   inset: 0;

@@ -31,7 +31,7 @@ export function AgreementsPage({ canManage = true }: { canManage?: boolean }) {
     <Typography.Title level={2}>{t("admin.policies")}</Typography.Title>
     {!canManage && <Alert type="warning" showIcon message={t("admin.noPermission")} />}
     <Table rowKey="id" dataSource={rows} pagination={false} columns={[
-      { title: t("admin.integrationName"), dataIndex: "kind", render: (kind: AgreementRecord["kind"]) => kind === "privacy" ? t("admin.policyPrivacy") : t("admin.policyTerms") },
+      { title: t("admin.agreementName"), dataIndex: "kind", render: (kind: AgreementRecord["kind"]) => kind === "privacy" ? t("admin.policyPrivacy") : t("admin.policyTerms") },
       { title: t("admin.version"), dataIndex: "version" }, { title: t("admin.effectiveDate"), dataIndex: "effectiveDate" },
       { title: t("admin.coverage"), key: "coverage", render: (_: unknown, row: AgreementRecord) => `${row.consented}/${row.required}` },
       { title: t("admin.preview"), key: "preview", render: (_: unknown, row: AgreementRecord) => <Button onClick={() => setSelected(row)}>{t("admin.preview")}</Button> }
@@ -48,7 +48,7 @@ export function AgreementsPage({ canManage = true }: { canManage?: boolean }) {
       <Table rowKey="id" size="small" pagination={false} dataSource={history} columns={[
         { title: t("admin.version"), dataIndex: "version" },
         { title: t("admin.effectiveDate"), dataIndex: "effectiveDate" },
-        { title: t("admin.changeNote"), dataIndex: "changeNote" },
+        { title: t("admin.changeNote"), key: "changeNote", render: (_: unknown, row: AgreementVersionRecord) => t(row.changeNoteKey) },
         { title: t("admin.publishedAt"), dataIndex: "publishedAt" }
       ]} />
     </Space>}

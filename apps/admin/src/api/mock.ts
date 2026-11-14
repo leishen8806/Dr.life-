@@ -18,8 +18,8 @@ const agreements: AgreementRecord[] = [
   { id: "terms-v2", kind: "terms", version: "v2", effectiveDate: "2026-10-15", state: "draft", consented: 0, required: 140, languages: { zh: "", en: "", km: "" } }
 ];
 const agreementVersions: AgreementVersionRecord[] = [
-  { id: "privacy-v3-history", agreementId: "privacy-v3", version: "v3", publishedAt: "2026-11-01 08:00", changeNote: "定期更新", effectiveDate: "2026-11-01" },
-  { id: "privacy-v2-history", agreementId: "privacy-v3", version: "v2", publishedAt: "2026-09-01 08:00", changeNote: "初始版本", effectiveDate: "2026-09-01" }
+  { id: "privacy-v3-history", agreementId: "privacy-v3", version: "v3", publishedAt: "2026-11-01 08:00", changeNote: "定期更新", changeNoteKey: "admin.changeNoteUpdated", effectiveDate: "2026-11-01" },
+  { id: "privacy-v2-history", agreementId: "privacy-v3", version: "v2", publishedAt: "2026-09-01 08:00", changeNote: "初始版本", changeNoteKey: "admin.changeNoteInitial", effectiveDate: "2026-09-01" }
 ];
 const integrations: IntegrationRecord[] = [
   { id: "maps", name: "Maps", environment: "test", endpoint: "https://maps.example.invalid", secretLast4: "4821", enabled: false },
