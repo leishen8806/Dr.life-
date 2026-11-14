@@ -1,12 +1,15 @@
 ---
 import { locales, read } from "../i18n";
+import type { Locale } from "../i18n";
 import BrandWordmark from "./BrandWordmark.astro";
-const copy = locales.zh;
+const { lang = "zh" } = Astro.props as { lang?: Locale };
+const copy = locales[lang];
+const base = lang === "zh" ? "" : `/${lang}`;
 ---
 <footer class="site-footer">
-  <div><BrandWordmark class="brand" href="/" /><p data-i18n="brand.tagline">{read(copy, "brand.tagline")}</p><p class="khmer" data-i18n="brand.welcome">{read(copy, "brand.welcome")}</p></div>
-  <nav class="footer-links footer-links--home" aria-label={read(copy, "home.homepageV2.homepageNav.3")}><a href="/#business" data-i18n="home.homepageV2.homepageNav.0">{read(copy, "home.homepageV2.homepageNav.0")}</a><a href="/#market" data-i18n="home.homepageV2.homepageNav.1">{read(copy, "home.homepageV2.homepageNav.1")}</a><a href="/#route" data-i18n="home.homepageV2.homepageNav.2">{read(copy, "home.homepageV2.homepageNav.2")}</a><a href="/#culture" data-i18n="home.homepageV2.homepageNav.3">{read(copy, "home.homepageV2.homepageNav.3")}</a><a href="/#apps" data-i18n="home.homepageV2.homepageNav.4">{read(copy, "home.homepageV2.homepageNav.4")}</a><a href="/contact" data-i18n="home.homepageV2.homepageNav.5">{read(copy, "home.homepageV2.homepageNav.5")}</a></nav>
-  <div class="footer-links"><a href="/privacy" data-i18n="legal.privacy">{read(copy, "legal.privacy")}</a><a href="/terms" data-i18n="legal.terms">{read(copy, "legal.terms")}</a><a href="/delete-account" data-i18n="legal.delete">{read(copy, "legal.delete")}</a><a href="/contact" data-i18n="legal.contact">{read(copy, "legal.contact")}</a></div>
+  <div><BrandWordmark class="brand" href={`${base}/`} /><p data-i18n="brand.tagline">{read(copy, "brand.tagline")}</p><p class="khmer" data-i18n="brand.welcome">{read(copy, "brand.welcome")}</p></div>
+  <nav class="footer-links footer-links--home" aria-label={read(copy, "home.homepageV2.homepageNav.3")}><a href={`${base}/#business`} data-i18n="home.homepageV2.homepageNav.0">{read(copy, "home.homepageV2.homepageNav.0")}</a><a href={`${base}/#market`} data-i18n="home.homepageV2.homepageNav.1">{read(copy, "home.homepageV2.homepageNav.1")}</a><a href={`${base}/#route`} data-i18n="home.homepageV2.homepageNav.2">{read(copy, "home.homepageV2.homepageNav.2")}</a><a href={`${base}/#culture`} data-i18n="home.homepageV2.homepageNav.3">{read(copy, "home.homepageV2.homepageNav.3")}</a><a href={`${base}/#apps`} data-i18n="home.homepageV2.homepageNav.4">{read(copy, "home.homepageV2.homepageNav.4")}</a><a href={`${base}/contact`} data-i18n="home.homepageV2.homepageNav.5">{read(copy, "home.homepageV2.homepageNav.5")}</a></nav>
+  <div class="footer-links"><a href={`${base}/privacy`} data-i18n="legal.privacy">{read(copy, "legal.privacy")}</a><a href={`${base}/terms`} data-i18n="legal.terms">{read(copy, "legal.terms")}</a><a href={`${base}/delete-account`} data-i18n="legal.delete">{read(copy, "legal.delete")}</a><a href={`${base}/contact`} data-i18n="legal.contact">{read(copy, "legal.contact")}</a></div>
   <p class="official" data-i18n="brand.official">{read(copy, "brand.official")}</p>
   <p data-i18n="footer.copyright">{read(copy, "footer.copyright")}</p>
 </footer>

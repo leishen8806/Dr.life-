@@ -1,0 +1,18 @@
+---
+import Footer from "../../components/Footer.astro";
+import Header from "../../components/Header.astro";
+import Layout from "../../components/Layout.astro";
+import Localizer from "../../components/Localizer.astro";
+import { EXTERNAL_LINKS } from "../../constants";
+import { locales, type Locale } from "../../i18n";
+export function getStaticPaths() { return ["en", "km"].map((lang) => ({ params: { lang }, props: { lang } })); }
+const { lang } = Astro.props as { lang: Locale };
+const copy = locales[lang]; const fees = copy.merchant.fees; const faqs = copy.merchant.faqs;
+---
+<Layout titleKey="merchant.title" descriptionKey="merchant.intro" lang={lang} seoPage="merchant"><Header lang={lang} /><main>
+  <section class="merchant-hero" id="join"><div class="merchant-hero__inner"><div><p class="eyebrow" data-i18n="merchant.eyebrow">{copy.merchant.eyebrow}</p><h1 class="section-title"><span>{copy.merchant.titleLines[0]}</span><br /><span>{copy.merchant.titleLines[1]}</span></h1><p class="hero-copy">{copy.merchant.intro}</p></div><div class="merchant-stats"><div><strong>0%</strong><span>{copy.merchant.fees[0][0]}</span></div><div><strong>0</strong><span>{copy.merchant.fees[1][0]}</span></div></div></div></section>
+  <section class="merchant-section"><h2 class="section-title">{copy.merchant.stepsTitle}</h2><ol class="steps">{copy.merchant.steps.map(([title, body], index) => <li class="step"><strong>0{index + 1}</strong><h3>{title}</h3><p>{body}</p></li>)}</ol></section>
+  <section class="merchant-section" id="fees"><h2 class="section-title">{copy.merchant.feesTitle}</h2><p class="section-copy">{copy.merchant.feesIntro}</p><div class="merchant-fee-table"><table><thead><tr>{copy.merchant.feeHeaders.map((header) => <th>{header}</th>)}</tr></thead><tbody>{fees.map(([title, fee, body]) => <tr><th>{title}</th><td>{fee}</td><td>{body}</td></tr>)}</tbody></table></div></section>
+  <section class="merchant-faq"><div>{faqs.map(([title, body]) => <article><h3>{title}</h3><p>{body}</p></article>)}</div></section>
+  <section class="merchant-cta"><div><h2>{copy.merchant.ctaTitle}</h2><p>{copy.merchant.ctaIntro}</p></div><div class="button-row"><a class="button button--dark" href={EXTERNAL_LINKS.merchantBot}>{copy.merchant.cta}</a><a class="button" href={`/${lang}/contact`}>{copy.merchant.contactCta}</a></div></section>
+</main><Footer lang={lang} /><Localizer lang={lang} /></Layout>
