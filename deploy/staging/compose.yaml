@@ -30,6 +30,7 @@ services:
       REDIS_URL: redis://:${REDIS_STATE_PASSWORD:?set REDIS_STATE_PASSWORD}@redis-state:6379/0
       QUEUE_REDIS_URL: redis://:${REDIS_QUEUE_PASSWORD:?set REDIS_QUEUE_PASSWORD}@redis-queue:6379/0
       CACHE_REDIS_URL: redis://:${REDIS_CACHE_PASSWORD:?set REDIS_CACHE_PASSWORD}@redis-cache:6379/0
+      DATABASE_URL: ${WORKER_DATABASE_URL:?set WORKER_DATABASE_URL}
     entrypoint: [/worker]
     depends_on: [postgres, redis-state, redis-queue]
     volumes: [../../backend/migrations:/migrations:ro]
