@@ -13,7 +13,7 @@ describe("foundation DOM acceptance", () => {
       expect(view.container.textContent).toBe(expected);
       view.unmount();
     }
-    for (const value of ["12501", "-10000", "", "abc"]) {
+    for (const value of ["12501", "-10000", "", "abc", " 12500", "12500 "]) {
       const invalid = render(<Money value={value} {...moneyProps} />);
       expect(invalid.container.querySelector('[role="alert"]')?.textContent).toBe("Invalid amount");
       expect(invalid.container.querySelector("[data-e4]")).toBeNull();
@@ -30,6 +30,10 @@ describe("foundation DOM acceptance", () => {
     expect(tabs[0]?.getAttribute("tabindex")).toBe("0");
     expect(tabs[1]?.getAttribute("tabindex")).toBe("-1");
     fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
+    expect(change).toHaveBeenCalledWith("b");
+    fireEvent.keyDown(tabs[0]!, { key: "Home" });
+    fireEvent.keyDown(tabs[0]!, { key: "End" });
+    fireEvent.keyDown(tabs[0]!, { key: "ArrowLeft" });
     expect(change).toHaveBeenCalledWith("b");
     const toast = render(<Toast role="alert">Failed</Toast>);
     expect(toast.container.querySelector('[role="alert"]')?.getAttribute("aria-live")).toBeNull();

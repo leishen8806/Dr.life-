@@ -1,15 +1,11 @@
-import { Button, Card, EmptyState, ErrorState, ListItem, Loading, StatusTag, formatMoneyE4 } from "@drlife/ui";
+import { Button, Card, EmptyState, ErrorState, ListItem, Loading, StatusTag, formatMoneyE4WithI18n } from "@drlife/ui";
 import type { Language, TranslationKey } from "@drlife/i18n";
 import { suborderStatuses, type MerchantSuborder, type SuborderStatus } from "./suborders";
 
 export type Translate = (key: TranslationKey) => string;
 
 function formatPriceE4(value: number, language: Language, translate: Translate): string {
-  return formatMoneyE4(String(value), {
-    language,
-    currencySymbol: translate("common.currencyUsd"),
-    invalidLabel: translate("common.invalidAmount")
-  });
+  return formatMoneyE4WithI18n(String(value), { language, translate });
 }
 
 function statusKey(status: SuborderStatus): TranslationKey {

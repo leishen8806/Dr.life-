@@ -121,7 +121,8 @@ export function watchTelegramTheme(onChange: (colorScheme: "light" | "dark") => 
     sub?: (listener: (current: boolean) => void) => () => void;
   };
   if (typeof signal.sub !== "function") return () => undefined;
-  return signal.sub((current) => onChange(resolveMiniAppColorScheme(current)));
+  const cleanup = signal.sub((current) => onChange(resolveMiniAppColorScheme(current)));
+  return typeof cleanup === "function" ? cleanup : () => undefined;
 }
 
 export function applyMiniAppTheme(colorScheme: "light" | "dark") {
