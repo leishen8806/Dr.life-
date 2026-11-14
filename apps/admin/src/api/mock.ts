@@ -1,4 +1,4 @@
-import type { AdminApi, AgreementRecord, IntegrationCallRecord, IntegrationRecord, OrderRecord, ReviewList } from "./types";
+import type { AdminApi, AgreementRecord, AgreementVersionRecord, IntegrationCallRecord, IntegrationRecord, OrderRecord, ReviewList } from "./types";
 
 const reviews: ReviewList = {
   merchants: [
@@ -17,6 +17,10 @@ const agreements: AgreementRecord[] = [
   { id: "privacy-v3", kind: "privacy", version: "v3", effectiveDate: "2026-11-01", state: "published", consented: 128, required: 140, languages: { zh: "示例条款（模拟数据，非正式法律文本）", en: "Example terms (mock data, not formal legal text)", km: "គំរូលក្ខខណ្ឌ (ទិន្នន័យសាកល្បង មិនមែនអត្ថបទច្បាប់ផ្លូវការ)" } },
   { id: "terms-v2", kind: "terms", version: "v2", effectiveDate: "2026-10-15", state: "draft", consented: 0, required: 140, languages: { zh: "", en: "", km: "" } }
 ];
+const agreementVersions: AgreementVersionRecord[] = [
+  { id: "privacy-v3-history", agreementId: "privacy-v3", version: "v3", publishedAt: "2026-11-01 08:00", changeNote: "定期更新", effectiveDate: "2026-11-01" },
+  { id: "privacy-v2-history", agreementId: "privacy-v3", version: "v2", publishedAt: "2026-09-01 08:00", changeNote: "初始版本", effectiveDate: "2026-09-01" }
+];
 const integrations: IntegrationRecord[] = [
   { id: "maps", name: "Maps", environment: "test", endpoint: "https://maps.example.invalid", secretLast4: "4821", enabled: false },
   { id: "telegram", name: "Telegram", environment: "test", endpoint: "https://telegram.example.invalid", secretLast4: "1190", lastTest: { ok: true, latencyMs: 96, testedAt: "2026-11-14 05:00" }, enabled: true }
@@ -30,6 +34,7 @@ export const mockApi: AdminApi = {
   async listOrders(filters = {}) { await wait(); return orders.filter((item) => (!filters.status || item.status === filters.status) && (!filters.query || (item.id + " " + item.buyerKey + " " + item.merchantKey).toLowerCase().includes(filters.query.toLowerCase())) && (!filters.from || item.createdAt.slice(0, 10) >= filters.from) && (!filters.to || item.createdAt.slice(0, 10) <= filters.to)); },
   async getOrder(id) { await wait(); return orders.find((item) => item.id === id); },
   async listAgreements() { await wait(); return structuredClone(agreements); },
+  async listAgreementVersions(id) { await wait(); return structuredClone(agreementVersions.filter((entry) => entry.agreementId === id)); },
   async saveAgreementDraft(id, language, value) { await wait(); const item = agreements.find((entry) => entry.id === id); if (!item) throw new Error("agreement_not_found"); item.languages[language] = value; return structuredClone(item); },
   async publishAgreement(id, input) { await wait(); const item = agreements.find((entry) => entry.id === id); if (!item) throw new Error("agreement_not_found"); if (!input.changeNote || !input.effectiveDate || Object.values(item.languages).some((value) => !value.trim())) throw new Error("agreement_incomplete"); item.state = "published"; item.effectiveDate = input.effectiveDate; item.version = `v${Number(item.version.slice(1)) + 1}`; return structuredClone(item); },
   async listIntegrations() { await wait(); return structuredClone(integrations); },

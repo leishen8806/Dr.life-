@@ -367,4 +367,9 @@
 ,"admin.testEnv": "Test"
 ,"admin.productionEnv": "Production"
 ,"admin.auditServer": "Audit logs are recorded by the server."
+,"admin.versionHistory": "Version history"
+,"admin.publishedAt": "Published at"
+,"admin.callHistory": "Call history"
+,"admin.occurredAt": "Occurred at"
+,"admin.latency": "Latency"
 }

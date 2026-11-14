@@ -9,6 +9,7 @@ async function getApi(): Promise<AdminApi> {
     async listOrders() { return []; },
     async getOrder() { return undefined; },
     async listAgreements() { return []; },
+    async listAgreementVersions() { return []; },
     async saveAgreementDraft() { throw new Error("backend_field_mapping_pending"); },
     async publishAgreement() { throw new Error("backend_field_mapping_pending"); },
     async listIntegrations() { return []; },
@@ -25,6 +26,7 @@ export const api = {
   listOrders: (filters?: Parameters<AdminApi["listOrders"]>[0]) => getApi().then((client) => client.listOrders(filters)),
   getOrder: (id: string) => getApi().then((client) => client.getOrder(id))
   ,listAgreements: () => getApi().then((client) => client.listAgreements())
+  ,listAgreementVersions: (id: string) => getApi().then((client) => client.listAgreementVersions(id))
   ,saveAgreementDraft: (id: string, language: "zh" | "en" | "km", value: string) => getApi().then((client) => client.saveAgreementDraft(id, language, value))
   ,publishAgreement: (id: string, input: { changeNote: string; effectiveDate: string }) => getApi().then((client) => client.publishAgreement(id, input))
   ,listIntegrations: () => getApi().then((client) => client.listIntegrations())

@@ -21,6 +21,14 @@ export interface AgreementRecord {
   required: number;
   languages: { zh: string; en: string; km: string };
 }
+export interface AgreementVersionRecord {
+  id: string;
+  agreementId: string;
+  version: string;
+  publishedAt: string;
+  changeNote: string;
+  effectiveDate: string;
+}
 export interface IntegrationRecord {
   id: string;
   name: string;
@@ -45,6 +53,7 @@ export interface AdminApi {
   listOrders(filters?: { query?: string; status?: RecordStatus; from?: string; to?: string }): Promise<OrderRecord[]>;
   getOrder(id: string): Promise<OrderRecord | undefined>;
   listAgreements(): Promise<AgreementRecord[]>;
+  listAgreementVersions(id: string): Promise<AgreementVersionRecord[]>;
   saveAgreementDraft(id: string, language: keyof AgreementRecord["languages"], value: string): Promise<AgreementRecord>;
   publishAgreement(id: string, input: { changeNote: string; effectiveDate: string }): Promise<AgreementRecord>;
   listIntegrations(): Promise<IntegrationRecord[]>;

@@ -367,4 +367,9 @@
 ,"admin.testEnv": "សាកល្បង"
 ,"admin.productionEnv": "ផលិតកម្ម"
 ,"admin.auditServer": "កំណត់ហេតុសវនកម្មត្រូវបានកត់ត្រាដោយម៉ាស៊ីនមេ។"
+,"admin.versionHistory": "ប្រវត្តិកំណែ"
+,"admin.publishedAt": "ពេលផ្សព្វផ្សាយ"
+,"admin.callHistory": "ប្រវត្តិការហៅ"
+,"admin.occurredAt": "ពេលកើតឡើង"
+,"admin.latency": "ភាពយឺត"
 }

@@ -22,7 +22,7 @@ const AdminMoney = Money as unknown as ComponentType<{
   language: Language;
 }>;
 const canUseMockWorkspace = import.meta.env.DEV;
-const permissions: string[] = canUseMockWorkspace ? ["admin.review", "admin.orders", "admin.merchants", "admin.products"] : [];
+const permissions: string[] = canUseMockWorkspace ? ["admin.review", "admin.orders", "admin.merchants", "admin.products", "admin.agreement.publish", "admin.integration.manage"] : [];
 const hasPermission = (permission: string) => permissions.includes(permission);
 
 function keyText(t: (key: TranslationKey) => string, key: string) {
@@ -219,8 +219,8 @@ function Shell() {
           <Route path="/" element={<Overview />} />
           <Route path="/review" element={canUseMockWorkspace ? <ReviewPage /> : <ProductionPlaceholder />} />
           <Route path="/orders" element={canUseMockWorkspace ? <OrderPage /> : <ProductionPlaceholder />} />
-          <Route path="/policies" element={canUseMockWorkspace ? <AgreementsPage /> : <ProductionPlaceholder />} />
-          <Route path="/integrations" element={canUseMockWorkspace ? <IntegrationsPage /> : <ProductionPlaceholder />} />
+          <Route path="/policies" element={canUseMockWorkspace ? <AgreementsPage canManage={hasPermission("admin.agreement.publish")} /> : <ProductionPlaceholder />} />
+          <Route path="/integrations" element={canUseMockWorkspace ? <IntegrationsPage canManage={hasPermission("admin.integration.manage")} /> : <ProductionPlaceholder />} />
           <Route path="*" element={<Result status="404" title={t("shell.notFound")} />} />
         </Routes>
       </Content>
