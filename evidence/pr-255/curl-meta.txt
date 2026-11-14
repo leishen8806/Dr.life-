@@ -1,0 +1,42 @@
+# Local static build metadata captured from apps/website/dist on 2026-11-14.
+# Routes: /, /en/, /km/, /merchant/
+
+GET /
+<html lang="zh-CN">
+title: DR.LIFE+ 生活家｜金边建材家居与中柬跨境物流平台 - DR集团
+description: DR.LIFE+ 是柬埔寨金边建材家居与跨境物流一站式平台，连接中国供应链、柬埔寨商家与消费者。
+keywords: 柬埔寨建材,金边家居,跨境物流,中国供应链,DR.LIFE+
+canonical: https://drlifeplus.com/
+hreflang: zh-CN=/, en=/en/, km=/km/, x-default=/
+og: locale=zh_CN image=https://drlifeplus.com/og-image.jpg
+twitter: card=summary_large_image
+
+GET /en/
+<html lang="en">
+title: DR.LIFE+ | Building Materials &amp; Home Platform in Phnom Penh, Cambodia - DR Group
+description: DR.LIFE+ connects China supply chains, Cambodian merchants, and consumers through a one-stop building materials and home platform in Phnom Penh.
+keywords: Cambodia building materials,Phnom Penh home, cross-border logistics,China supply chain,DR.LIFE+
+canonical: https://drlifeplus.com/en/
+hreflang: zh-CN=/, en=/en/, km=/km/, x-default=/
+og: locale=en_US image=https://drlifeplus.com/og-image.jpg
+twitter: card=summary_large_image
+
+GET /km/
+<html lang="km">
+title: DR.LIFE+ | វេទិកាសម្ភារៈសំណង់ និងគេហដ្ឋាននៅភ្នំពេញ - DR Group
+description: DR.LIFE+ ជាវេទិកាតែមួយសម្រាប់សម្ភារៈសំណង់ គេហដ្ឋាន និងដឹកជញ្ជូនឆ្លងដែននៅភ្នំពេញ។
+keywords: សម្ភារៈសំណង់កម្ពុជា,គេហដ្ឋានភ្នំពេញ,ដឹកជញ្ជូនឆ្លងដែន,DR.LIFE+
+canonical: https://drlifeplus.com/km/
+hreflang: zh-CN=/, en=/en/, km=/km/, x-default=/
+og: locale=km_KH image=https://drlifeplus.com/og-image.jpg
+twitter: card=summary_large_image
+
+GET /merchant/
+<html lang="zh-CN">
+title: 商家入驻 DR.LIFE+｜金边线上建材店 0% 平台佣金 - DR集团
+description: 入驻 DR.LIFE+，让金边建材家居商家在线获客、管理订单并连接中国供应链，平台不收交易佣金。
+keywords: 商家入驻,金边建材店,柬埔寨家居商家,0%平台佣金,DR.LIFE+
+canonical: https://drlifeplus.com/merchant/
+hreflang: zh-CN=/merchant/, en=/en/merchant/, km=/km/merchant/, x-default=/merchant/
+og: locale=zh_CN image=https://drlifeplus.com/og-image.jpg
+twitter: card=summary_large_image
