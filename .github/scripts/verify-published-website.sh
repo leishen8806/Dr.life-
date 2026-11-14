@@ -2,6 +2,7 @@
 set -euo pipefail
 
 origin="${WEBSITE_ORIGIN:?set WEBSITE_ORIGIN}"
+expected_build_hash="${WEBSITE_BUILD_HASH:?set WEBSITE_BUILD_HASH}"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
@@ -46,3 +47,19 @@ check_page "/" "DR.LIFE+ 生活家｜金边建材家居与中柬跨境物流平�
 check_page "/en/" "DR.LIFE+ | Building Materials & Home Platform in Phnom Penh, Cambodia - DR Group"
 check_page "/km/" "DR.LIFE+ | វេទិកាសម្ភារៈសំណង់ និងគ្រឿងសង្ហារិមនៅភ្នំពេញ - DR Group"
 check_page "/merchant/" "商家入驻 DR.LIFE+｜金边线上建材店 0% 平台佣金 - DR集团"
+
+build_hash_url="${origin}/build-hash.txt"
+build_hash_body="$tmp_dir/build-hash.txt"
+build_hash_status="$(curl --silent --show-error --location --retry 5 --retry-delay 5 --retry-max-time 110 \
+  --connect-timeout 10 --max-time 120 -H 'Cache-Control: no-cache' \
+  -o "$build_hash_body" -w '%{http_code}' "$build_hash_url")"
+if [ "$build_hash_status" != 200 ]; then
+  echo "::error::${build_hash_url}: HTTP status ${build_hash_status}, expected 200"
+  exit 1
+fi
+actual_build_hash="$(tr -d '[:space:]' < "$build_hash_body")"
+if [ "$actual_build_hash" != "$expected_build_hash" ]; then
+  echo "::error::${build_hash_url}: published build hash does not match the approved artifact"
+  exit 1
+fi
+printf 'PASS %s: build hash matches approved artifact\n' "$build_hash_url"

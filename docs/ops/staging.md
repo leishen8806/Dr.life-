@@ -101,6 +101,14 @@ health, worker logs, Redis disk/AOF health, and PostgreSQL backup freshness.
 Do not paste credentials, tunnel tokens, customer data, or server addresses in
 logs or issues. Escalate incidents to `leishen8806`.
 
+For E-09.4, first run `deploy/staging/restore-drill.sh --dry-run` with
+`SOURCE_DATABASE_URL` and `RESTORE_DATABASE_URL` set to an approved test
+environment. Then rerun without `--dry-run`: the script takes a custom-format
+`pg_dump`, recreates only the `drlife_restore_drill_*` target, restores it,
+compares every non-system schema/table row count, and drops the temporary
+database from an exit trap. A mismatch or cleanup failure is FAIL; credentials
+remain in environment variables and are never printed.
+
 For the E-09 test-environment acceptance record, use
 [`test-env-acceptance.md`](./test-env-acceptance.md). The repository template
 provides `smoke.sh` and `restore-drill.sh`; both require explicit environment
