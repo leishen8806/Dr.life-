@@ -100,6 +100,17 @@
 - 样式里不出现写死的色值和字号（tokens.css 除外）；新增颜色或字号先改本标准。
 - Lighthouse 手机 ≥ 80、LCP ≤ 2.5 秒；可访问性检查无对比度、焦点、alt 问题。
 
+### U-01/U-02 当前覆盖矩阵
+
+基础组件共 11 个，统一从 `design/ui-standard/tokens.css` 取颜色、字号、间距和交互变量：
+`Button`（primary/secondary/danger + hover/focus/disabled）、`AppHeader`（默认/带操作区）、
+`BottomNavigation`（默认/当前项/徽标）、`Card`、`ListItem`（静态/可点击/带尾部）、
+`Stepper`（当前/已完成/未完成）、`StatusTag`（neutral/success/warning/danger）、
+`BottomSheet`（关闭/打开/键盘 Escape）、`Loading`（spinner/skeleton）、
+`LanguageSwitcher`（zh/en/km + 当前项）、`StartupGate`（加载/就绪/错误）。
+亮暗主题由 Telegram `bg_color` 与 `miniApp.isDark()` 映射到 `[data-color-scheme]`，高棉语通过
+`:lang(km)` 覆盖字体、字距与行高；三端 Mini App 的应用层样式不得新增字面量色值。
+
 ## 10. 落地顺序
 1. 官网：批次卡 #222（首页 v2 + 全站统一，含原 #212）。
 2. Mini App：本标准合并后派批次卡，合并 #189（设计变量）、#205（基础组件）、#211（已有草稿），把 `packages/ui/src/styles.css` 换成本标准变量。
