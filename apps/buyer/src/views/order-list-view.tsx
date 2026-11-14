@@ -77,7 +77,7 @@ export function OrderListView({
             ) : (
               <Button variant="text" className="buyer-order-card" key={item.publicId} onClick={() => onOpen(item)}>
                 <span className="buyer-order-card__header">
-                  <strong>{t("order.detailTitle")}</strong>
+                  <strong>{formatOrderDateTime(item.createdAt, language)}</strong>
                   <span className="buyer-order-status">{statusSummary(item.subOrders, t)}</span>
                 </span>
                 <span className="buyer-order-card__merchant">
