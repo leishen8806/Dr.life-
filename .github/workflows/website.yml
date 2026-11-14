@@ -197,6 +197,11 @@ jobs:
         with:
           name: website-dist-hash
           path: .
+      - name: Normalize deployment hash for the next comparison
+        run: |
+          set -euo pipefail
+          mkdir -p .website-cache
+          cp website-dist-hash.txt .website-cache/dist.sha256
       - name: Atomically publish approved artifact to VPS
         env:
           WEBSITE_DEPLOY_HOST: ${{ secrets.WEBSITE_DEPLOY_HOST }}
@@ -227,5 +232,5 @@ jobs:
       - name: Record successful deployment hash
         uses: actions/cache/save@v4
         with:
-          path: website-dist-hash.txt
+          path: .website-cache
           key: website-dist-hash-main-${{ github.run_id }}
