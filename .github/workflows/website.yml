@@ -51,7 +51,7 @@ jobs:
       - name: Build three-language static site
         run: pnpm --filter @drlife/website build
       - name: Upload static artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-dist
           path: apps/website/dist
@@ -76,7 +76,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Download static artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: website-dist
           path: apps/website/dist
@@ -103,7 +103,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload screenshot evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-screenshots
           path: apps/website/screenshots
@@ -111,7 +111,7 @@ jobs:
           retention-days: 14
       - name: Upload Mini App screenshot evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: miniapp-screenshots
           path: apps/website/screenshots-miniapp
@@ -152,7 +152,7 @@ jobs:
             exit 1
           fi
       - name: Download approved build artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: website-dist
           path: website-dist
