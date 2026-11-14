@@ -22,7 +22,9 @@ from `env.example` in the approved staging environment; `.env` is ignored.
 5. Start the stack. The API health check is `/healthz`; worker and routefitmock
    are separate processes. The migration connection uses the owner-managed
    PostgreSQL migration credential in `.env`; application URLs use roles created
-   by `db-bootstrap`.
+   by `db-bootstrap`. In the test environment, the worker uses the dedicated
+   `app_ledger` database role via `WORKER_DATABASE_URL`; the production design
+   remains pending owner approval.
 
 ## Release and rollback
 
