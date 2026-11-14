@@ -295,7 +295,7 @@ test("static locale pages publish the approved SEO metadata without a query stri
 
 test("static locale pages keep the Chinese language switch on the canonical Chinese route", () => {
   const html = (route) => readFileSync(join(dist, route, "index.html"), "utf8");
-  assert.match(html("en"), /<a href="\/" data-language="zh">中文<\/a>/);
+  assert.match(html("en"), /<a href="\/" aria-label="中文" data-language="zh">ZH<\/a>/);
   assert.match(html("km/merchant"), /<a href="\/merchant\/" data-language="zh">中文<\/a>/);
 });
 

@@ -27,7 +27,7 @@ h1,h2{font-family:var(--serif);font-weight:700}
 .skip{position:fixed;top:10px;left:12px;z-index:20;background:var(--cream);padding:8px 14px;transform:translateY(-180%)}
 .skip:focus{transform:translateY(0)}
 .topbar{background:var(--black);color:#f6f1e5;position:sticky;top:0;z-index:10;border-bottom:1px solid #ffffff20}
-.topbar .container{min-height:76px;display:flex;align-items:center;gap:clamp(15px,3vw,42px)}
+.topbar .container{min-height:76px;display:flex;align-items:center;gap:clamp(15px,3vw,42px);position:relative}
 .brand{display:inline-flex;align-items:center;gap:14px;flex-shrink:0}
 .brand img{width:76px;height:auto}
 .brand-name{font-size:14px;line-height:1.25;letter-spacing:.1em;display:inline-block;border-left:1px solid #fff3;padding-left:14px}
@@ -35,6 +35,9 @@ h1,h2{font-family:var(--serif);font-weight:700}
 .nav>a{color:#e8e3d9;font-size:14px;white-space:nowrap}
 .nav>a:hover,.nav>a:focus-visible{color:var(--gold)}
 .nav .nav-cta{border:1px solid #d6b97e80;color:var(--gold);padding:8px 15px}
+.language-switch{position:absolute;right:0;display:flex;align-items:center;gap:8px;font-size:12px;line-height:1}
+.language-switch a{color:#e8e3d9;white-space:nowrap}
+.language-switch a:hover,.language-switch a:focus-visible{color:var(--gold)}
 .menu-toggle{display:none;border:1px solid #fff5;color:#fff;background:none;padding:5px 12px;margin-left:auto}
 .hero{position:relative;isolation:isolate;color:#fffbf3;background:var(--dark);overflow:hidden}
 .hero-photo,.hero::after{position:absolute;inset:0;width:100%;height:100%;z-index:-2}
@@ -143,6 +146,7 @@ dialog .actions{margin-top:15px}
 .copy-status{min-height:22px;color:#514022;margin:8px 0 0}
 @media(max-width:960px){.brand-name{display:none}.hero-inner{min-height:620px}.split-intro{grid-template-columns:1fr;gap:10px}.panel-list li{grid-template-columns:1fr;gap:3px}.partner-grid{grid-template-columns:repeat(2,1fr)}.partner:nth-child(2){border-right:0}.partner:nth-child(-n+2){border-bottom:1px solid #cfc2ab}.partner:nth-child(3){padding-left:0}.market .container{gap:28px}}
 @media(min-width:961px) and (max-width:1280px){.topbar .container{gap:16px}.nav{gap:10px}.nav>a{font-size:13px}}
+@media(min-width:1281px) and (max-width:1600px){.nav{gap:clamp(8px,1.2vw,16px)}.nav>a{font-size:13px}}
 @media(max-width:700px){
   html{scroll-padding-top:64px}
   .topbar .container{min-height:63px}
