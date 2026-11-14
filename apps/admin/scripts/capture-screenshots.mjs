@@ -5,10 +5,12 @@ import { chromium } from "../../website/node_modules/playwright/index.mjs";
 const pages = [
   { name: "overview", path: "/" },
   { name: "review", path: "/review" },
-  { name: "orders", path: "/orders" }
+  { name: "orders", path: "/orders" },
+  { name: "policies", path: "/policies" },
+  { name: "integrations", path: "/integrations" }
 ];
 const widths = [1440, 1920];
-const languages = ["zh", "km"];
+const languages = ["zh", "en", "km"];
 
 function waitForServer(url) {
   return new Promise((resolve, reject) => {
