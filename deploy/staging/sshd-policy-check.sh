@@ -7,15 +7,24 @@ validate_sshd_policy() {
   local ssh_user=$1
   local sshd_bin=${SSHD_BIN:-sshd}
   local -a ports=()
-  local port effective expected
+  local port effective expected port_output
 
+  # `sshd -T` normally provides the effective Port lines. Some valid configs
+  # containing Match LocalPort refuse the context-free query; in that case
+  # use explicit Port directives and OpenSSH's default of 22 as the safe
+  # fallback, then still validate every discovered port with lport supplied.
+  port_output=$("$sshd_bin" -T 2>/dev/null || true)
   while IFS= read -r port; do
     [[ -n $port ]] && ports+=("$port")
-  done < <("$sshd_bin" -T | awk '$1 == "port" { print $2 }' | sort -nu)
+  done < <(printf '%s\n' "$port_output" | awk '$1 == "port" { print $2 }' | sort -nu)
 
   if ((${#ports[@]} == 0)); then
-    printf '%s\n' 'sshd effective config did not report a listening port' >&2
-    return 1
+    while IFS= read -r port; do
+      [[ -n $port ]] && ports+=("$port")
+    done < <(awk '$1 == "Port" { print $2 }' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null | sort -nu)
+  fi
+  if ((${#ports[@]} == 0)); then
+    ports+=(22)
   fi
 
   for port in "${ports[@]}"; do

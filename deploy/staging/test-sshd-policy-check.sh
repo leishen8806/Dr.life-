@@ -23,6 +23,9 @@ if [[ ${2:-} == -C ]]; then
     printf '%s\n' 'passwordauthentication no' 'permitrootlogin no' 'kbdinteractiveauthentication no'
   fi
 else
+  if [[ ${FAKE_SSHD_NO_PORTS:-} == 1 ]]; then
+    exit 0
+  fi
   printf '%s\n' 'port 22' 'port 2222'
 fi
 FAKE_SSHD
@@ -34,6 +37,13 @@ validate_sshd_policy deploy
 test "$(wc -l < "$FAKE_SSHD_LOG")" -eq 2
 grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=22' "$FAKE_SSHD_LOG"
 grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2222' "$FAKE_SSHD_LOG"
+
+: > "$FAKE_SSHD_LOG"
+export FAKE_SSHD_NO_PORTS=1
+validate_sshd_policy deploy
+test "$(wc -l < "$FAKE_SSHD_LOG")" -eq 1
+grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=22' "$FAKE_SSHD_LOG"
+unset FAKE_SSHD_NO_PORTS
 
 dropin="$root/00-drlifeplus-staging.conf"
 previous="$root/previous.conf"
