@@ -43,7 +43,7 @@ const localizedHref = (locale: "en" | "km") => `${SITE_URL}/${locale}${pagePath 
     <meta property="og:image" content={image} />
     <meta name="twitter:card" content="summary_large_image" />
     {seoPage === "home" && <script type="application/ld+json" set:html={JSON.stringify({ "@context": "https://schema.org", "@type": "Organization", name: "DR集团 / DR Group", brand: { "@type": "Brand", name: "DR.LIFE+" }, url: canonical, logo: image, areaServed: "Phnom Penh, Cambodia" })} />}
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32" type="image/x-icon" />
     <link rel="alternate icon" href="/favicon.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     <slot name="head" />

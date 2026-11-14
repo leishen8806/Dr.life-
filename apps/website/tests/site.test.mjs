@@ -81,8 +81,8 @@ test("release output includes a localized, non-indexable 404 page with site icon
   );
   assert.match(
     html,
-    /rel="icon" href="\/favicon\.svg"/,
-    "404 page must link the SVG favicon"
+    /rel="icon" href="\/favicon\.ico"[^>]*sizes="16x16 32x32"/,
+    "404 page must link the multi-size ICO favicon"
   );
   assert.match(
     html,
@@ -90,7 +90,7 @@ test("release output includes a localized, non-indexable 404 page with site icon
     "404 page must link the Apple touch icon"
   );
 
-  for (const asset of ["favicon.svg", "favicon.ico", "apple-touch-icon.png"]) {
+  for (const asset of ["favicon.ico", "favicon.png", "apple-touch-icon.png"]) {
     assert.ok(existsSync(join(dist, asset)), `dist must publish ${asset}`);
   }
 
@@ -100,8 +100,8 @@ test("release output includes a localized, non-indexable 404 page with site icon
     const document = readFileSync(join(dist, file), "utf8");
     assert.match(
       document,
-      /rel="icon" href="\/favicon\.svg"/,
-      `${file} must link the SVG favicon`
+      /rel="icon" href="\/favicon\.ico"[^>]*sizes="16x16 32x32"/,
+      `${file} must link the multi-size ICO favicon`
     );
     assert.match(
       document,
