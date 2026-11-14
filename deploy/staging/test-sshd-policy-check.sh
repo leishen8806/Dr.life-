@@ -58,11 +58,19 @@ config="$root/sshd_config"
 cat > "$config" <<'CONFIG'
 port 2201
 ListenAddress 127.0.0.1:2202
+ListenAddress [::1]:2205
 Match LocalPort 2203,2204
 CONFIG
 : > "$FAKE_SSHD_LOG"
 export SSHD_CONFIG="$config"
 export FAKE_SSHD_NO_PORTS=1
+unset FAKE_SSHD_FAIL_PORT
+validate_sshd_policy deploy
+grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2201' "$FAKE_SSHD_LOG"
+grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2202' "$FAKE_SSHD_LOG"
+grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2205' "$FAKE_SSHD_LOG"
+grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2203' "$FAKE_SSHD_LOG"
+: > "$FAKE_SSHD_LOG"
 export FAKE_SSHD_FAIL_PORT=2203
 if validate_sshd_policy deploy; then
   printf '%s\n' 'expected config-derived LocalPort policy to fail' >&2

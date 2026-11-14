@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2094
 set -euo pipefail
 
 # Validate the effective SSH policy for every port reported by sshd. A
 # Match LocalPort block makes lport mandatory in sshd -T -C.
 collect_config_ports() {
-  # shellcheck disable=SC2094
   local file=$1 line directive value ports_spec include
   [[ -r $file ]] || return 0
   while IFS= read -r line || [[ -n $line ]]; do
