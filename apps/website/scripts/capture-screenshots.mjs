@@ -72,8 +72,14 @@ try {
             failedResources.push(`${resourceResponse.status()} ${resourceResponse.url()}`);
           }
         });
-        const url = new URL(pageDefinition.path, origin);
-        url.searchParams.set("lang", language);
+        // Use the statically generated locale route for localized homepage evidence.
+        // The root route is intentionally the Chinese default; adding ?lang=en/km
+        // cannot change Astro's already-built HTML.
+        const path = pageDefinition.name === "home" && language !== "zh"
+          ? `/${language}/`
+          : pageDefinition.path;
+        const url = new URL(path, origin);
+        if (pageDefinition.name !== "home" || language === "zh") url.searchParams.set("lang", language);
         const response = await page.goto(url.toString(), { waitUntil: "networkidle" });
         if (!response?.ok()) throw new Error(`Screenshot page failed: ${url} (${response?.status() ?? "no response"})`);
         await page.evaluate(() => {
