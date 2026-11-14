@@ -293,6 +293,12 @@ test("static locale pages publish the approved SEO metadata without a query stri
   }
 });
 
+test("static locale pages keep the Chinese language switch on the canonical Chinese route", () => {
+  const html = (route) => readFileSync(join(dist, route, "index.html"), "utf8");
+  assert.match(html("en"), /<a href="\/" data-language="zh">中文<\/a>/);
+  assert.match(html("km/merchant"), /<a href="\/merchant\/" data-language="zh">中文<\/a>/);
+});
+
 test("the static build contains no prohibited claims and every internal link resolves", () => {
   const prohibited = [
     "24h 仓配无忧",
