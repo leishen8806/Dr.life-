@@ -68,6 +68,7 @@ export function IntegrationsPage({ canManage = true }: { canManage?: boolean }) 
   const enable = async (row: IntegrationRecord) => { await api.enableIntegration(row.id); refresh(); };
   return <div className="admin-page">
     <Typography.Title level={2}>{t("admin.integrations")}</Typography.Title>
+    {!canManage && <Alert type="warning" showIcon message={t("admin.noPermission")} />}
     <Table rowKey="id" dataSource={rows} pagination={false} columns={[
       { title: t("admin.integrationName"), dataIndex: "name" }, { title: t("admin.environment"), dataIndex: "environment" },
       { title: t("admin.endpoint"), dataIndex: "endpoint" }, { title: t("admin.secretLast4"), dataIndex: "secretLast4", render: (value: string) => `••••${value}` },

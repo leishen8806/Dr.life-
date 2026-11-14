@@ -1,5 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { createElement } from "react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { I18nProvider } from "@drlife/i18n";
 import { mockApi } from "../src/api/mock";
+import { IntegrationsPage } from "../src/policy-pages";
 
 describe("agreement and integration adapters", () => {
   beforeEach(async () => {
@@ -8,6 +12,7 @@ describe("agreement and integration adapters", () => {
     await mockApi.saveAgreementDraft(rows[1].id, "en", "Example terms (mock data, not formal legal text)");
     await mockApi.saveAgreementDraft(rows[1].id, "km", "គំរូលក្ខខណ្ឌ (ទិន្នន័យសាកល្បង មិនមែនអត្ថបទច្បាប់ផ្លូវការ)");
   });
+  afterEach(() => cleanup());
 
   it("requires all three language drafts, change note, and effective date before publish", async () => {
     const rows = await mockApi.listAgreements();
@@ -32,5 +37,11 @@ describe("agreement and integration adapters", () => {
     const calls = await mockApi.listIntegrationCalls("telegram");
     expect(calls[0]).toMatchObject({ ok: true, latencyMs: 96 });
     expect(JSON.stringify(calls)).not.toContain("secret");
+  });
+
+  it("disables integration mutations when the operator lacks permission", async () => {
+    render(createElement(I18nProvider, { initialLanguage: "en" }, createElement(IntegrationsPage, { canManage: false })));
+    expect(await screen.findByText("Integration management")).toBeTruthy();
+    expect(screen.getByText("You do not have permission for this action")).toBeTruthy();
   });
 });
