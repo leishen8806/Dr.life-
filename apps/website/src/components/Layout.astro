@@ -4,7 +4,7 @@ import { getLocale, locales, read } from "../i18n";
 import LoadingIntro from "./LoadingIntro.astro";
 import "../styles/global.css";
 
-const { titleKey, descriptionKey, robots } = Astro.props;
+const { titleKey, descriptionKey, robots, homepageSource = false } = Astro.props;
 const lang = getLocale(Astro.url.searchParams.get("lang"));
 const copy = locales[lang];
 const title = `${read(copy, titleKey)} | DR.LIFE+`;
@@ -32,11 +32,21 @@ const canonical = new URL(Astro.url.pathname, SITE_URL).href;
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="alternate icon" href="/favicon.ico" sizes="32x32" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <slot name="head" />
     <link rel="preload" href="/fonts/inter-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/noto-sans-khmer-ijwCs5roRME5LLRxjsRb-gssOenAyendxrgV2c-Zw-9vR1kFeg.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="/fonts/fonts.css" />
+    <script is:inline>
+      window.addEventListener("load", () => {
+        if (document.body.classList.contains("homepage-source-page")) return;
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "/fonts/fonts.css";
+        document.head.append(link);
+      }, { once: true });
+    </script>
+    <noscript><link rel="stylesheet" href="/fonts/fonts.css" /></noscript>
   </head>
-  <body data-lang={lang}>
+  <body data-lang={lang} class:list={{ "homepage-source-page": homepageSource }}>
     <LoadingIntro />
     <slot />
   </body>
