@@ -111,6 +111,12 @@ test("release output includes a localized, non-indexable 404 page with site icon
   }
 });
 
+test("favicon PNG dimensions match the declared 32px alternate icon", () => {
+  const icon = readFileSync(fileURLToPath(new URL("../public/favicon.png", import.meta.url)));
+  assert.equal(icon.readUInt32BE(16), 32, "favicon.png width must be 32px");
+  assert.equal(icon.readUInt32BE(20), 32, "favicon.png height must be 32px");
+});
+
 test("404 copy is complete in Chinese, English and Khmer without placeholders", () => {
   const copy = source("i18n/not-found-copy.ts");
   const notFound = source("pages/404.astro");
