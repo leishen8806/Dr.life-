@@ -81,8 +81,8 @@ test("release output includes a localized, non-indexable 404 page with site icon
   );
   assert.match(
     html,
-    /rel="icon" href="\/favicon\.svg"/,
-    "404 page must link the SVG favicon"
+    /rel="icon" href="\/favicon\.ico"[^>]*sizes="16x16 32x32"/,
+    "404 page must link the multi-size ICO favicon"
   );
   assert.match(
     html,
@@ -90,7 +90,7 @@ test("release output includes a localized, non-indexable 404 page with site icon
     "404 page must link the Apple touch icon"
   );
 
-  for (const asset of ["favicon.svg", "favicon.ico", "apple-touch-icon.png"]) {
+  for (const asset of ["favicon.ico", "favicon.png", "apple-touch-icon.png"]) {
     assert.ok(existsSync(join(dist, asset)), `dist must publish ${asset}`);
   }
 
@@ -100,8 +100,8 @@ test("release output includes a localized, non-indexable 404 page with site icon
     const document = readFileSync(join(dist, file), "utf8");
     assert.match(
       document,
-      /rel="icon" href="\/favicon\.svg"/,
-      `${file} must link the SVG favicon`
+      /rel="icon" href="\/favicon\.ico"[^>]*sizes="16x16 32x32"/,
+      `${file} must link the multi-size ICO favicon`
     );
     assert.match(
       document,
@@ -109,6 +109,12 @@ test("release output includes a localized, non-indexable 404 page with site icon
       `${file} must link the Apple touch icon`
     );
   }
+});
+
+test("favicon PNG dimensions match the declared 32px alternate icon", () => {
+  const icon = readFileSync(fileURLToPath(new URL("../public/favicon.png", import.meta.url)));
+  assert.equal(icon.readUInt32BE(16), 32, "favicon.png width must be 32px");
+  assert.equal(icon.readUInt32BE(20), 32, "favicon.png height must be 32px");
 });
 
 test("404 copy is complete in Chinese, English and Khmer without placeholders", () => {
@@ -270,6 +276,33 @@ test("the static build exposes the required public routes", () => {
   for (const page of ["index.html", "privacy/index.html", "terms/index.html"]) {
     assert.equal(existsSync(join(dist, page)), true, `${page} is missing`);
   }
+});
+
+test("static locale pages publish the approved SEO metadata without a query string", () => {
+  const html = (route) => readFileSync(join(dist, route || "index.html", route ? "index.html" : ""), "utf8");
+  const pages = [
+    ["", "zh-CN", "zh_CN", "DR.LIFE+ 生活家｜金边建材家居与中柬跨境物流平台 - DR集团"],
+    ["en", "en", "en_US", "DR.LIFE+ | Building Materials &amp; Home Platform in Phnom Penh, Cambodia - DR Group"],
+    ["km", "km", "km_KH", "DR.LIFE+ | វេទិកាសម្ភារៈសំណង់ និងគ្រឿងសង្ហារិមនៅភ្នំពេញ - DR Group"]
+  ];
+  for (const [route, lang, locale, title] of pages) {
+    const source = html(route);
+    assert.match(source, new RegExp(`<html lang="${lang}"`));
+    assert.ok(source.includes(`<title>${title}</title>`), `${route || "zh"} title changed`);
+    assert.ok(source.includes(`property="og:locale" content="${locale}"`), `${route || "zh"} locale changed`);
+    assert.match(source, /name="keywords" content="[^"]+/);
+    assert.doesNotMatch(source, /\?lang=/);
+  }
+  for (const route of ["merchant", "en/merchant", "km/merchant"]) {
+    assert.match(html(route), /name="keywords" content="[^"]+/);
+    assert.match(html(route), /property="og:image" content="https:\/\/drlifeplus\.com\/og-image\.jpg"/);
+  }
+});
+
+test("static locale pages keep the Chinese language switch on the canonical Chinese route", () => {
+  const html = (route) => readFileSync(join(dist, route, "index.html"), "utf8");
+  assert.match(html("en"), /<a href="\/" aria-label="中文" data-language="zh">ZH<\/a>/);
+  assert.match(html("km/merchant"), /<a href="\/merchant\/" data-language="zh">中文<\/a>/);
 });
 
 test("the static build contains no prohibited claims and every internal link resolves", () => {

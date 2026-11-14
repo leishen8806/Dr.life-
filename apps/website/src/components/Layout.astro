@@ -1,15 +1,22 @@
 ---
 import { SITE_URL } from "../constants";
 import { getLocale, locales, read } from "../i18n";
+import { localeMeta, seoFor, type SeoPage } from "../seo";
 import LoadingIntro from "./LoadingIntro.astro";
 import "../styles/global.css";
 
-const { titleKey, descriptionKey, robots, homepageSource = false } = Astro.props;
-const lang = getLocale(Astro.url.searchParams.get("lang"));
+const { titleKey, descriptionKey, robots, homepageSource = false, lang: requestedLang, seoPage } = Astro.props as { titleKey: string; descriptionKey: string; robots?: string; homepageSource?: boolean; lang?: string; seoPage?: SeoPage };
+const lang = getLocale(requestedLang ?? Astro.url.searchParams.get("lang"));
 const copy = locales[lang];
-const title = `${read(copy, titleKey)} | DR.LIFE+`;
-const description = read(copy, descriptionKey);
-const canonical = new URL(Astro.url.pathname, SITE_URL).href;
+const seo = seoPage ? seoFor(seoPage, lang) : undefined;
+const title = seo?.title ?? `${read(copy, titleKey)} | DR.LIFE+`;
+const description = seo?.description ?? read(copy, descriptionKey);
+const prefix = lang === "zh" ? "" : `/${lang}`;
+const pathname = Astro.url.pathname.replace(/^\/(en|km)(?=\/|$)/, "") || "/";
+const canonical = new URL(`${prefix}${pathname === "/" ? "/" : pathname}`, SITE_URL).href;
+const pagePath = pathname === "/" ? "" : pathname;
+const image = new URL("/og-image.jpg", SITE_URL).href;
+const localizedHref = (locale: "en" | "km") => `${SITE_URL}/${locale}${pagePath || "/"}`;
 ---
 <!doctype html>
 <html lang={lang === "zh" ? "zh-CN" : lang}>
@@ -19,18 +26,25 @@ const canonical = new URL(Astro.url.pathname, SITE_URL).href;
     <script is:inline src="/scripts/intro-gate.js"></script>
     <title>{title}</title>
     <meta name="description" content={description} />
+    {seo && <meta name="keywords" content={seo.keywords} />}
     {robots && <meta name="robots" content={robots} />}
     <link rel="canonical" href={canonical} />
-    <link rel="alternate" hreflang="zh" href={`${canonical}?lang=zh`} />
-    <link rel="alternate" hreflang="en" href={`${canonical}?lang=en`} />
-    <link rel="alternate" hreflang="km" href={`${canonical}?lang=km`} />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="alternate" hreflang="zh-CN" href={`${SITE_URL}${pagePath || "/"}`} />
+    <link rel="alternate" hreflang="en" href={localizedHref("en")} />
+    <link rel="alternate" hreflang="km" href={localizedHref("km")} />
+    <link rel="alternate" hreflang="x-default" href={`${SITE_URL}${pagePath || "/"}`} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="DR.LIFE+" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="alternate icon" href="/favicon.ico" sizes="32x32" />
+    <meta property="og:locale" content={localeMeta[lang]} />
+    <meta property="og:image" content={image} />
+    <meta name="twitter:card" content="summary_large_image" />
+    {seoPage === "home" && <script type="application/ld+json" set:html={JSON.stringify({ "@context": "https://schema.org", "@type": "Organization", name: "DR集团 / DR Group", brand: { "@type": "Brand", name: "DR.LIFE+" }, url: canonical, logo: image, areaServed: "Phnom Penh, Cambodia" })} />}
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32" type="image/x-icon" />
+    <link rel="alternate icon" href="/favicon.png" sizes="32x32" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     <slot name="head" />
     <link rel="preload" href="/fonts/inter-UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2" as="font" type="font/woff2" crossorigin />

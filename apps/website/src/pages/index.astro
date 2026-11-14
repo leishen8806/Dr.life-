@@ -14,7 +14,7 @@ const homepageCopyJson = JSON.stringify({
 }).replace(/</g, "\\u003c");
 ---
 
-<Layout titleKey="home.title" descriptionKey="home.intro" homepageSource>
+<Layout titleKey="home.title" descriptionKey="home.intro" seoPage="home" homepageSource>
   <span id="about" hidden></span>
   <Fragment set:html={sourceBody} />
   <script id="homepage-copy" type="application/json" set:html={homepageCopyJson}></script>
