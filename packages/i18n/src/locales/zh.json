@@ -78,6 +78,8 @@
   "order.shipping": "运费",
   "order.shippingPending": "待报价",
   "order.items": "{count} 项商品",
+  "order.items.one": "{count} 项商品",
+  "order.items.other": "{count} 项商品",
   "order.itemsTitle": "商品明细",
   "order.merchant": "商家",
   "order.createdAt": "创建时间",
@@ -115,6 +117,8 @@
   "order.quoteExpires": "运费报价有效期至",
   "order.quoteExpired": "运费报价已过期",
   "order.unit.item": "件",
+  "order.unit.item.one": "{count} 件",
+  "order.unit.item.other": "{count} 件",
   "shell.currentLanguage": "当前语言：{language}",
   "shell.developmentMode": "开发模式",
   "shell.telegramMode": "Telegram Mini App 模式",
@@ -340,6 +344,38 @@
 ,"startup.throttledTitle": "登录已暂停"
 ,"startup.blockedTitle": "账号不可用"
 ,"startup.signInAgain": "重新登录"
+,"admin.policies": "协议与政策"
+,"admin.system": "系统"
+,"admin.integrations": "集成管理"
+,"admin.policyPrivacy": "隐私政策"
+,"admin.policyTerms": "用户协议"
+,"admin.version": "版本"
+,"admin.effectiveDate": "生效日期"
+,"admin.coverage": "同意覆盖率"
+,"admin.draft": "草稿"
+,"admin.published": "已发布"
+,"admin.saveDraft": "保存草稿"
+,"admin.preview": "预览"
+,"admin.publishVersion": "发布新版本"
+,"admin.changeNote": "变更说明"
+,"admin.publishConfirm": "发布后用户将被要求重新同意。"
+,"admin.integrationName": "集成项"
+,"admin.environment": "环境"
+,"admin.endpoint": "地址"
+,"admin.secretLast4": "密钥末 4 位"
+,"admin.lastTest": "最近测试"
+,"admin.testConnection": "测试连接"
+,"admin.enable": "启用"
+,"admin.notTested": "请先完成一次成功的连接测试。"
+,"admin.test": "测试"
+,"admin.testEnv": "测试"
+,"admin.productionEnv": "生产"
+,"admin.auditServer": "审计日志由服务端记录。"
+,"admin.versionHistory": "历史版本"
+,"admin.publishedAt": "发布时间"
+,"admin.callHistory": "调用记录"
+,"admin.occurredAt": "发生时间"
+,"admin.latency": "延迟"
  ,"wms.loginUnavailable": "仓储登录未开放"
  ,"wms.loginUnavailableHint": "登录后才能查看仓储数据。"
  ,"wms.inventory": "库存"
@@ -397,4 +433,9 @@
  ,"wms.inbound": "在途进货"
  ,"wms.interfaces": "接口状态"
  ,"wms.notFound": "页面未找到"
+,"admin.versionHistory": "历史版本"
+,"admin.publishedAt": "发布时间"
+,"admin.callHistory": "调用记录"
+,"admin.occurredAt": "发生时间"
+,"admin.latency": "延迟"
 }

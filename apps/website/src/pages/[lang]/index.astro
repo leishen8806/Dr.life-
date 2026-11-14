@@ -11,11 +11,61 @@ export function getStaticPaths() {
 }
 const { lang } = Astro.props as { lang: Locale };
 const sourceBody = fs.readFileSync(path.resolve(process.cwd(), "src/data/homepage-source.html"), "utf8");
+const sourceScript = fs.readFileSync(path.resolve(process.cwd(), "public/scripts/homepage-source.js"), "utf8");
+const translationMatch = sourceScript.match(/const translations=(\{[\s\S]*?\});\nconst requestedLanguage/);
+if (!translationMatch) throw new Error("homepage-source translations are missing");
+const sourceTranslations = Function(`"use strict"; return (${translationMatch[1]});`)() as Record<Locale, Record<string, string>>;
+const extraTranslationMatch = sourceScript.match(/const extraTranslations=(\{[\s\S]*?\});\nif\(dictionary\)/);
+if (!extraTranslationMatch) throw new Error("homepage-source extra translations are missing");
+const extraTranslations = Function(`"use strict"; return (${extraTranslationMatch[1]});`)() as Record<Locale, Record<string, string>>;
 const homepageCopyJson = JSON.stringify({ zh: pageCopy.zh.home.homepageV2, en: pageCopy.en.home.homepageV2, km: pageCopy.km.home.homepageV2 }).replace(/</g, "\\u003c");
+const flatten = (value: unknown, prefix: string[] = [], result: Record<string, string> = {}) => {
+  if (typeof value === "string") result[prefix.join(".")] = value;
+  else if (Array.isArray(value)) value.forEach((item, index) => flatten(item, [...prefix, String(index)], result));
+  else if (value && typeof value === "object") Object.entries(value).forEach(([key, item]) => flatten(item, [...prefix, key], result));
+  return result;
+};
+const sourceCopy = flatten(pageCopy.zh.home.homepageV2);
+const targetCopy = flatten(pageCopy[lang].home.homepageV2);
+const homepageTranslations = Object.entries(sourceCopy).reduce<Record<string, string>>((translations, [key, sourceText]) => {
+  const localizedText = targetCopy[key];
+  if (localizedText && localizedText !== sourceText) translations[sourceText] = localizedText;
+  return translations;
+}, {});
+const accessibilityTranslations: Record<Locale, Record<string, string>> = {
+  zh: {},
+  en: {
+    首页: "Home", 主导航: "Main navigation", "金边建材家居展厅的建筑概念图": "Phnom Penh building-materials and home showroom concept",
+    业务快速入口: "Business quick links", "顾问与顾客在家居展厅查看材质样本": "Adviser and customer viewing material samples in a home showroom",
+    建材装修平台: "Building materials and renovation platform", "装载集装箱的跨境货运车辆": "Cross-border freight vehicle carrying a container",
+    仓配人员在货架与输送设备旁处理货物: "Fulfilment staff processing goods beside warehouse shelves and conveyors",
+    商户在桌面准备经营资料并查看手机: "Merchant preparing business documents and checking a phone",
+    "顾问与客户在建材展厅查看石材样品": "Adviser and customer viewing stone samples in a materials showroom",
+    建材城规划品类: "Showroom categories", 建议准备的资料: "Suggested information", 移动服务: "Mobile services", 二维码: "QR code",
+    账号: "account", 返回DR集团首页: "Return to DR Group home", 页脚导航: "Footer navigation", 可复制的咨询模板: "Copyable enquiry template"
+  },
+  km: {
+    首页: "ទំព័រដើម", 主导航: "ការរុករកចម្បង", "金边建材家居展厅的建筑概念图": "គំរូបន្ទប់តាំងបង្ហាញសម្ភារៈសំណង់ និងគេហដ្ឋាននៅភ្នំពេញ",
+    业务快速入口: "តំណអាជីវកម្មរហ័ស", "顾问与顾客在家居展厅查看材质样本": "អ្នកប្រឹក្សា និងអតិថិជនមើលគំរូសម្ភារៈក្នុងបន្ទប់តាំងបង្ហាញ",
+    建材装修平台: "វេទិកាសម្ភារៈសំណង់ និងជួសជុល", "装载集装箱的跨境货运车辆": "រថយន្តដឹកទំនិញឆ្លងដែនផ្ទុកកុងតឺន័រ",
+    仓配人员在货架与输送设备旁处理货物: "បុគ្គលិកឃ្លាំងកំពុងរៀបចំទំនិញក្បែរធ្នើ និងឧបករណ៍ដឹកជញ្ជូន",
+    商户在桌面准备经营资料并查看手机: "ពាណិជ្ជករកំពុងរៀបចំព័ត៌មានអាជីវកម្ម និងមើលទូរស័ព្ទ",
+    "顾问与客户在建材展厅查看石材样品": "អ្នកប្រឹក្សា និងអតិថិជនមើលគំរូថ្មក្នុងបន្ទប់តាំងបង្ហាញ",
+    建材城规划品类: "ប្រភេទទំនិញក្នុងផែនការបន្ទប់តាំងបង្ហាញ", 建议准备的资料: "ព័ត៌មានដែលគួររៀបចំ", 移动服务: "សេវាចល័ត", 二维码: "QR កូដ",
+    账号: "គណនី", 返回DR集团首页: "ត្រឡប់ទៅទំព័រដើមក្រុម DR", 页脚导航: "ការរុករកបាតទំព័រ", 可复制的咨询模板: "គំរូសំណួរដែលអាចចម្លង"
+  }
+};
+const localizedSourceTranslations = { ...sourceTranslations[lang], ...extraTranslations[lang], ...homepageTranslations, ...accessibilityTranslations[lang] };
+const localizedSourceBody = Object.keys(localizedSourceTranslations)
+  .sort((left, right) => right.length - left.length)
+  .reduce((html, sourceText) => {
+    const localizedText = localizedSourceTranslations[sourceText];
+    return localizedText && localizedText !== sourceText ? html.split(sourceText).join(localizedText) : html;
+  }, sourceBody);
 ---
 <Layout titleKey="home.title" descriptionKey="home.intro" lang={lang} seoPage="home" homepageSource>
   <span id="about" hidden></span>
-  <Fragment set:html={sourceBody} />
+  <Fragment set:html={localizedSourceBody} />
   <script id="homepage-copy" type="application/json" set:html={homepageCopyJson}></script>
   <script src="/scripts/homepage-source.js" defer></script>
 </Layout>

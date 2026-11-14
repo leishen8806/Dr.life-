@@ -108,6 +108,8 @@
   "order.shipping": "Shipping",
   "order.shippingPending": "Quote pending",
   "order.items": "{count} item(s)",
+  "order.items.one": "{count} item",
+  "order.items.other": "{count} items",
   "order.itemsTitle": "Items",
   "order.merchant": "Merchant",
   "order.createdAt": "Created",
@@ -145,6 +147,8 @@
   "order.quoteExpires": "Shipping quote expires",
   "order.quoteExpired": "Shipping quote expired",
   "order.unit.item": "item",
+  "order.unit.item.one": "{count} item",
+  "order.unit.item.other": "{count} items",
   "shell.currentLanguage": "Current language: {language}",
   "shell.developmentMode": "Development mode",
   "shell.telegramMode": "Telegram Mini App mode",
@@ -340,6 +344,38 @@
 ,"startup.throttledTitle": "Sign-in paused"
 ,"startup.blockedTitle": "Account unavailable"
 ,"startup.signInAgain": "Sign in again"
+,"admin.policies": "Agreements & policies"
+,"admin.system": "System"
+,"admin.integrations": "Integration management"
+,"admin.policyPrivacy": "Privacy policy"
+,"admin.policyTerms": "Terms of use"
+,"admin.version": "Version"
+,"admin.effectiveDate": "Effective date"
+,"admin.coverage": "Consent coverage"
+,"admin.draft": "Draft"
+,"admin.published": "Published"
+,"admin.saveDraft": "Save draft"
+,"admin.preview": "Preview"
+,"admin.publishVersion": "Publish new version"
+,"admin.changeNote": "Change note"
+,"admin.publishConfirm": "Users will be asked to agree again after publishing."
+,"admin.integrationName": "Integration"
+,"admin.environment": "Environment"
+,"admin.endpoint": "Endpoint"
+,"admin.secretLast4": "Secret last 4"
+,"admin.lastTest": "Last connection test"
+,"admin.testConnection": "Test connection"
+,"admin.enable": "Enable"
+,"admin.notTested": "Run a successful connection test before enabling."
+,"admin.test": "Test"
+,"admin.testEnv": "Test"
+,"admin.productionEnv": "Production"
+,"admin.auditServer": "Audit logs are recorded by the server."
+,"admin.versionHistory": "Version history"
+,"admin.publishedAt": "Published at"
+,"admin.callHistory": "Call history"
+,"admin.occurredAt": "Occurred at"
+,"admin.latency": "Latency"
  ,"wms.loginUnavailable": "Warehouse login is not open"
  ,"wms.loginUnavailableHint": "Sign-in is required before warehouse data can be shown."
  ,"wms.inventory": "Inventory"
@@ -397,4 +433,9 @@
  ,"wms.inbound": "Inbound orders"
  ,"wms.interfaces": "Interface status"
  ,"wms.notFound": "Page not found"
+,"admin.versionHistory": "Version history"
+,"admin.publishedAt": "Published at"
+,"admin.callHistory": "Call history"
+,"admin.occurredAt": "Occurred at"
+,"admin.latency": "Latency"
 }

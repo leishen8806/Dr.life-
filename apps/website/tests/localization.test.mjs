@@ -55,6 +55,24 @@ test("English entries for the localized content contain no Chinese characters", 
   }
 });
 
+test("localized homepage pages translate the source HTML at build time", () => {
+  const localizedPage = readFileSync(fileURLToPath(new URL("../src/pages/[lang]/index.astro", import.meta.url)), "utf8");
+
+  assert.match(localizedPage, /homepage-source\.js/);
+  assert.match(localizedPage, /const localizedSourceBody/);
+  assert.match(localizedPage, /set:html=\{localizedSourceBody\}/);
+  assert.match(localizedPage, /sourceScript\.match\(\/const translations=/);
+  assert.doesNotMatch(localizedPage, /<Localizer/);
+});
+
+test("built English and Khmer homepages contain no untranslated body copy", () => {
+  for (const locale of ["en", "km"]) {
+    const html = readFileSync(fileURLToPath(new URL(`../dist/${locale}/index.html`, import.meta.url)), "utf8");
+    const body = html.replace(/<script[\s\S]*?<\/script>/gi, "").replaceAll("中文", "");
+    assert.doesNotMatch(body, cjk, `${locale} homepage contains untranslated Chinese body copy`);
+  }
+});
+
 test("mobile English headings and supporting copy have a wrapping safeguard", () => {
   assert.match(
     styles,

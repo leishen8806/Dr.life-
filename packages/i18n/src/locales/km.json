@@ -78,6 +78,8 @@
   "order.shipping": "[TODO-KM-REVIEW] ថ្លៃដឹកជញ្ជូន",
   "order.shippingPending": "[TODO-KM-REVIEW] រង់ចាំតម្លៃដឹកជញ្ជូន",
   "order.items": "[TODO-KM-REVIEW] ទំនិញ {count} មុខ",
+  "order.items.one": "[TODO-KM-REVIEW] ទំនិញ {count} មុខ",
+  "order.items.other": "[TODO-KM-REVIEW] ទំនិញ {count} មុខ",
   "order.itemsTitle": "[TODO-KM-REVIEW] ព័ត៌មានទំនិញ",
   "order.merchant": "[TODO-KM-REVIEW] អ្នកលក់",
   "order.createdAt": "[TODO-KM-REVIEW] បានបង្កើត",
@@ -115,6 +117,8 @@
   "order.quoteExpires": "[TODO-KM-REVIEW] សុពលភាពតម្លៃដឹកជញ្ជូនដល់",
   "order.quoteExpired": "[TODO-KM-REVIEW] តម្លៃដឹកជញ្ជូនបានផុតកំណត់",
   "order.unit.item": "[TODO-KM-REVIEW] ដុំ",
+  "order.unit.item.one": "[TODO-KM-REVIEW] {count} ដុំ",
+  "order.unit.item.other": "[TODO-KM-REVIEW] {count} ដុំ",
   "shell.currentLanguage": "ភាសាបច្ចុប្បន្ន៖ {language}",
   "shell.developmentMode": "របៀបអភិវឌ្ឍន៍",
   "shell.telegramMode": "[TODO-KM-REVIEW] Telegram Mini App mode",
@@ -340,6 +344,38 @@
 ,"startup.throttledTitle": "[TODO-KM-REVIEW] Sign-in paused"
 ,"startup.blockedTitle": "[TODO-KM-REVIEW] Account unavailable"
 ,"startup.signInAgain": "[TODO-KM-REVIEW] Sign in again"
+,"admin.policies": "កិច្ចព្រមព្រៀង និងគោលការណ៍"
+,"admin.system": "ប្រព័ន្ធ"
+,"admin.integrations": "ការគ្រប់គ្រងការភ្ជាប់"
+,"admin.policyPrivacy": "គោលការណ៍ឯកជនភាព"
+,"admin.policyTerms": "លក្ខខណ្ឌប្រើប្រាស់"
+,"admin.version": "កំណែ"
+,"admin.effectiveDate": "កាលបរិច្ឆេទមានប្រសិទ្ធភាព"
+,"admin.coverage": "អត្រាយល់ព្រម"
+,"admin.draft": "សេចក្តីព្រាង"
+,"admin.published": "បានផ្សព្វផ្សាយ"
+,"admin.saveDraft": "រក្សាទុកសេចក្តីព្រាង"
+,"admin.preview": "មើលជាមុន"
+,"admin.publishVersion": "ផ្សព្វផ្សាយកំណែថ្មី"
+,"admin.changeNote": "កំណត់ត្រាការផ្លាស់ប្តូរ"
+,"admin.publishConfirm": "បន្ទាប់ពីផ្សព្វផ្សាយ អ្នកប្រើនឹងត្រូវយល់ព្រមម្ដងទៀត។"
+,"admin.integrationName": "ការភ្ជាប់"
+,"admin.environment": "បរិស្ថាន"
+,"admin.endpoint": "អាសយដ្ឋាន"
+,"admin.secretLast4": "៤ ខ្ទង់ចុងក្រោយនៃសោ"
+,"admin.lastTest": "ការសាកល្បងចុងក្រោយ"
+,"admin.testConnection": "សាកល្បងការភ្ជាប់"
+,"admin.enable": "បើកប្រើ"
+,"admin.notTested": "សូមសាកល្បងការភ្ជាប់ដោយជោគជ័យជាមុន។"
+,"admin.test": "សាកល្បង"
+,"admin.testEnv": "សាកល្បង"
+,"admin.productionEnv": "ផលិតកម្ម"
+,"admin.auditServer": "កំណត់ហេតុសវនកម្មត្រូវបានកត់ត្រាដោយម៉ាស៊ីនមេ។"
+,"admin.versionHistory": "ប្រវត្តិកំណែ"
+,"admin.publishedAt": "ពេលផ្សព្វផ្សាយ"
+,"admin.callHistory": "ប្រវត្តិការហៅ"
+,"admin.occurredAt": "ពេលកើតឡើង"
+,"admin.latency": "ភាពយឺត"
  ,"wms.loginUnavailable": "ការចូលប្រើឃ្លាំងមិនទាន់បើក"
  ,"wms.loginUnavailableHint": "ត្រូវចូលគណនីសិន ទើបអាចមើលទិន្នន័យឃ្លាំងបាន។"
  ,"wms.inventory": "ស្តុកទំនិញ"
@@ -397,4 +433,9 @@
  ,"wms.inbound": "ទំនិញកំពុងចូល"
  ,"wms.interfaces": "ស្ថានភាព API"
  ,"wms.notFound": "រកមិនឃើញទំព័រ"
+,"admin.versionHistory": "ប្រវត្តិកំណែ"
+,"admin.publishedAt": "ពេលផ្សព្វផ្សាយ"
+,"admin.callHistory": "ប្រវត្តិការហៅ"
+,"admin.occurredAt": "ពេលកើតឡើង"
+,"admin.latency": "ភាពយឺត"
 }

@@ -21,6 +21,10 @@ describe("foundation DOM acceptance", () => {
     }
     const tiered = render(<TieredPrice tiers={[{ label: "1–9", value: "12500" }]} {...moneyProps} />);
     expect(tiered.container.textContent).toContain("$1.25");
+
+    document.documentElement.lang = "en";
+    const localized = render(<Money value="12500" translate={(key) => key === "common.currencyUsd" ? "$" : "Invalid amount"} />);
+    expect(localized.container.textContent).toBe("$1.25");
   });
 
   it("keeps tabs keyboard navigable and alerts out of aria-live", () => {
@@ -35,6 +39,10 @@ describe("foundation DOM acceptance", () => {
     fireEvent.keyDown(tabs[0]!, { key: "End" });
     fireEvent.keyDown(tabs[0]!, { key: "ArrowLeft" });
     expect(change).toHaveBeenCalledWith("b");
+    fireEvent.keyDown(tabs[0]!, { key: "End" });
+    expect(change).toHaveBeenCalledWith("b");
+    fireEvent.keyDown(tabs[1]!, { key: "Home" });
+    expect(change).toHaveBeenCalledWith("a");
     const toast = render(<Toast role="alert">Failed</Toast>);
     expect(toast.container.querySelector('[role="alert"]')?.getAttribute("aria-live")).toBeNull();
   });
