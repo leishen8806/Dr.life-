@@ -1,31 +1,31 @@
-head=3d79a1cbd611a86235cd95ab76797d4a19d1392e
-1440/zh/overview.png
-1440/zh/review.png
-1440/zh/orders.png
-1440/zh/policies.png
-1440/zh/integrations.png
-1440/en/overview.png
-1440/en/review.png
-1440/en/orders.png
-1440/en/policies.png
-1440/en/integrations.png
-1440/km/overview.png
-1440/km/review.png
-1440/km/orders.png
-1440/km/policies.png
-1440/km/integrations.png
-1920/zh/overview.png
-1920/zh/review.png
-1920/zh/orders.png
-1920/zh/policies.png
-1920/zh/integrations.png
-1920/en/overview.png
-1920/en/review.png
-1920/en/orders.png
-1920/en/policies.png
-1920/en/integrations.png
-1920/km/overview.png
-1920/km/review.png
-1920/km/orders.png
-1920/km/policies.png
-1920/km/integrations.png
+head=cb9f9ec71f0193c148e2a8bb73deaab72f6f628e
+1440/en/integrations.png 94ec05ab73c4c01b8e59c6bbbb8b720364b4327154e6281b61d48ab672c7c8eb
+1440/en/orders.png de1015c3fabbd260518ad698cdc00af3eb8a334ed1a7a6cd8ec8c4e220108987
+1440/en/overview.png 4c3cb120bb342f4320bccf15703233d22095311f8b36eb35c6d40b436027da28
+1440/en/policies.png a1ddf977857b795dd18bcfa769d7403345cb5b5c6bd13e7f89572ed7f802d7f5
+1440/en/review.png 58046b5db46804d2dda781bfed209794245c656659b087f61f98d71443deaa8a
+1440/km/integrations.png 5b573398e45045af970dcc95fde35e6eaea2f3d9a6e75fc1b85c3e1d9fe5c577
+1440/km/orders.png 137f04a11c859efcb2d03d47ddcef7ae0bfff6bede47517be60a067e4c127d96
+1440/km/overview.png 87dc63e6c379f3c6a7264450d5e7ad80a7cc83995fa7d219d6464deebaba53a3
+1440/km/policies.png 56e101db97277b9a408a3f77462d405d1fc60767daa970b37ecd0d1beb02da2f
+1440/km/review.png 193c4ce7c5b109320fc947fea4028c7b3b1cb74e1fd0df011ae0fc52d882ee59
+1440/zh/integrations.png 6c33a9f83ae6690a1b9d07fd5b1ad5b15379c54f49705895f5a244286b7994ad
+1440/zh/orders.png 41007c83a377e5f45e5458847ce1b65bc2d252681b52d91cbc939ff8713be161
+1440/zh/overview.png df989c60082c1c1f27db8c50b68b8c8b1c9283bdb8b21088c9ffa55df3fe1c11
+1440/zh/policies.png 8e39bc9e35bc648a26470c81ce378f56649c3f735e19fd8d210458f8d18382ce
+1440/zh/review.png a5abf333158714d24bb7d31c2cd1425fde9af54c1ff4f0c2e484d8b2ff797389
+1920/en/integrations.png 7e9903aa3b9d6017c8c1af39c3a6879067144c738397ba6acd274e3663c26745
+1920/en/orders.png d46f74c6fa23f963f1d1ee02ea9d69aa395a02cd4be5e8eac2a21cf6d92d36e3
+1920/en/overview.png d88ad87fbdeb7a9d12247ae64ae3d67b098d6fe02944289033ce6e0eed4c44f5
+1920/en/policies.png 66125e1ad6064627f5280f380ca192631c61a15dabd4a2d8d19d27492ce8dc60
+1920/en/review.png a6043dfd62dbe866b5919890d4b22094df29b6387ce0ff813a482a2c2c3e8f10
+1920/km/integrations.png 90733f7233e2486f2bb2a310657ac4002b95c5866a31d1529437f026f0d1d1d1
+1920/km/orders.png b365682ba8850ad610766a5d00be530d6976d95a67ee0392c19333802d565a9c
+1920/km/overview.png 5d54ccb6699d0579f0999f72838f4823f2bc6c78974e5c5b26e85ec05bbf9534
+1920/km/policies.png 134f4dbafdd95260704ba1b04b28f7a768fe52abcf23093d37d9dc625c4e8800
+1920/km/review.png eceb625e9febb994119670b160fe7ff383ce8b59c84632f161c3b3bde5ccd66e
+1920/zh/integrations.png fbd6bd1b7dd1c657c4f08546cf05a7c2c23ef761cc46c469173441ef5bdbb5ba
+1920/zh/orders.png ef7cd08f64cc7d2bb053ee2c77d3140164d997eb4a8da1e39987823d46a3d2d9
+1920/zh/overview.png c10b872acb77dabc4d934962feaff6421476c5b9f3343bd13fe8aeee828bff8d
+1920/zh/policies.png c0161000cc4386ce942e8bf9784eaa3ab8f76aba6cbebebc875720e946f2bdf6
+1920/zh/review.png 6058d641c22655eed4b57bf28787bb25aeb2190dce15d9e53a9e4487f0162d44
