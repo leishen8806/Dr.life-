@@ -93,6 +93,10 @@ jobs:
         run: backend/scripts/check-secrets.sh
       - name: Check README document index
         run: python3 backend/scripts/check-doc-index.py
+      - name: Run staging deployment script tests
+        run: |
+          bash deploy/staging/test-release-scripts.sh
+          bash deploy/staging/test-sshd-policy-check.sh
 
   backend-tests:
     needs: changes
