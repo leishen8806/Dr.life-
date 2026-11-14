@@ -25,4 +25,12 @@ describe("agreement and integration adapters", () => {
     await mockApi.testIntegration(updated.id);
     expect((await mockApi.enableIntegration(updated.id)).enabled).toBe(true);
   });
+
+  it("exposes version and integration call history without secrets", async () => {
+    const versions = await mockApi.listAgreementVersions("privacy-v3");
+    expect(versions.map((item) => item.version)).toEqual(["v3", "v2"]);
+    const calls = await mockApi.listIntegrationCalls("telegram");
+    expect(calls[0]).toMatchObject({ ok: true, latencyMs: 96 });
+    expect(JSON.stringify(calls)).not.toContain("secret");
+  });
 });
