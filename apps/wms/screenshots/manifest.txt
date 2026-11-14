@@ -1,5 +1,6 @@
-code-head	0b63159
+code-head	8e35e13
 drawer-wait-ms	600
+enum-test	apps/wms/src/api.test.ts (9/9)
 inventory-1440-zh.png	1440	zh	inventory	page
 inventory-1440-zh-drawer.png	1440	zh	inventory	drawer
 receiving-1440-zh.png	1440	zh	receiving	page
