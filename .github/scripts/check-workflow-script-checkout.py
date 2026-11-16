@@ -7,8 +7,9 @@ import sys
 
 WORKFLOW_DIR = Path(".github/workflows")
 SCRIPT_REF = re.compile(
-    r"(?<![A-Za-z0-9_.-])((?:\./)?(?:\.github|backend|deploy)/[A-Za-z0-9_./-]+\.(?:sh|py|mjs|js))(?![A-Za-z0-9_.-])"
+    r"(?<![A-Za-z0-9_.-])((?:\./)?(?:\.github|apps/website|backend|deploy|loadtest)/[A-Za-z0-9_./-]+\.(?:sh|py|mjs|js))(?![A-Za-z0-9_.-])"
 )
+WEBSITE_EXEC_REF = re.compile(r"--filter\s+@drlife/website\s+exec\s+node\s+([A-Za-z0-9_./-]+\.(?:mjs|js))")
 JOB_HEADER = re.compile(r"^  ([A-Za-z0-9_-]+):\s*$")
 
 
@@ -46,6 +47,7 @@ def main():
         for job, lines in iter_jobs(text):
             job_text = "\n".join(lines)
             refs = {match.group(1).removeprefix("./") for match in SCRIPT_REF.finditer(job_text)}
+            refs.update(f"apps/website/{match.group(1)}" for match in WEBSITE_EXEC_REF.finditer(job_text))
             if not refs:
                 continue
             checkout_lines = [index for index, line in enumerate(lines) if re.search(r"uses:\s*actions/checkout@", line)]

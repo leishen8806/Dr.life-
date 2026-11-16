@@ -65,6 +65,14 @@ class WorkflowCheckoutTest(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("PASS", output)
 
+    def test_package_exec_node_and_loadtest_scripts_are_checked(self):
+        result, output = self.run_checker(
+            """jobs:\n  test:\n    steps:\n      - uses: actions/checkout@v7\n      - run: pnpm --filter @drlife/website exec node scripts/capture-screenshots.mjs\n      - run: grafana/k6 run loadtest/scenarios/smoke.js\n""",
+            ("apps/website/scripts/capture-screenshots.mjs", "loadtest/scenarios/smoke.js"),
+        )
+        self.assertEqual(result, 0)
+        self.assertIn("PASS", output)
+
 
 if __name__ == "__main__":
     unittest.main()
