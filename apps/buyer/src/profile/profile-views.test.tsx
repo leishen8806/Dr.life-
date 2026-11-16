@@ -21,4 +21,11 @@ describe("buyer V4 profile views", () => {
     const markup = renderToStaticMarkup(<BuyerWalletView entries={{ status: "ready", value: entries }} language="en" t={translateFor("en")} onBack={noOp} onRetry={noOp} />);
     expect(markup).toContain(translate("wallet.empty", {}, "en"));
   });
+
+  it("renders top-up and withdrawal as disabled coming-soon controls", () => {
+    const markup = renderToStaticMarkup(<BuyerWalletView entries={{ status: "ready", value: profile.entries }} language="en" t={translateFor("en")} onBack={noOp} onRetry={noOp} />);
+    expect(markup).toContain(`>${translate("wallet.topup", {}, "en")}<`);
+    expect(markup).toContain(`>${translate("wallet.withdrawal", {}, "en")}<`);
+    expect((markup.match(/disabled/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
 });
