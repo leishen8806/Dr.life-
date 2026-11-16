@@ -118,6 +118,8 @@ try {
         }
         if (width === 1920 && pageDefinition.name === "home") {
           const geometry = await page.evaluate(() => {
+            const mainNav = document.querySelector(".topbar .nav");
+            const mainNavBox = mainNav?.getBoundingClientRect();
             const navItems = [...document.querySelectorAll(".topbar .nav > a:not(.nav-cta)")]
               .filter((item) => getComputedStyle(item).display !== "none" && item.getBoundingClientRect().width > 0);
             const partnerContainer = document.querySelector(".section.partners > .container");
@@ -133,14 +135,17 @@ try {
             const rounded = (value) => Math.round(value * 10) / 10;
             return {
               navTops: navItems.map((item) => Math.round(item.getBoundingClientRect().top)),
+              navX: mainNavBox?.x ?? 0,
+              navWidth: mainNavBox?.width ?? 0,
+              navVisible: mainNav ? getComputedStyle(mainNav).visibility !== "hidden" && getComputedStyle(mainNav).display !== "none" : false,
               partnerMinWidth: Math.min(...partnerCards.map((item) => item.getBoundingClientRect().width)),
-              partnerLeftDelta: rounded((partnerContainer?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0)),
+              partnerLeftDelta: rounded((partnerContainer?.getBoundingClientRect().x ?? 0) - (businessContainer?.getBoundingClientRect().x ?? 0)),
               partnerColumns: getComputedStyle(partnerGrid).gridTemplateColumns.split(" ").length,
               partnerTopRows: new Set(partnerCards.map((item) => Math.round(item.getBoundingClientRect().top))).size,
               partnerBackground: getComputedStyle(partnerGrid).backgroundColor,
               accessColumns: getComputedStyle(accessGrid).gridTemplateColumns.split(" ").length,
               accessTopRows: new Set(accessCards.map((item) => Math.round(item.getBoundingClientRect().top))).size,
-              accessLeftDelta: rounded((accessGrid?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0)),
+              accessLeftDelta: rounded((accessGrid?.getBoundingClientRect().x ?? 0) - (businessContainer?.getBoundingClientRect().x ?? 0)),
               channelMarginTop: Number.parseFloat(getComputedStyle(channelList).marginTop),
               stepsRatio: (steps?.getBoundingClientRect().width ?? 0) / (routeContainer?.getBoundingClientRect().width ?? 1),
               stepColumns: getComputedStyle(steps).gridTemplateColumns.split(" ").length,
@@ -148,6 +153,7 @@ try {
             };
           });
           if (new Set(geometry.navTops).size !== 1) throw new Error("Header navigation wrapped at 1920px");
+          if (!geometry.navVisible || geometry.navWidth <= 0) throw new Error("Main navigation is not visible at 1920px");
           if (geometry.partnerMinWidth < 260) throw new Error(`Partner cards are too narrow: ${geometry.partnerMinWidth}px`);
           if (Math.abs(geometry.partnerLeftDelta) > 2) throw new Error(`Partner section is not aligned: ${geometry.partnerLeftDelta}px`);
           const partnerGridIsPacked = (geometry.partnerColumns === 5 && geometry.partnerTopRows === 1)
@@ -184,8 +190,8 @@ try {
             const accessGrid = document.querySelector(".access-grid");
             return {
               sections,
-              partnerLeftDelta: (partnerContainer?.getBoundingClientRect().left ?? 0) - (businessContainer?.getBoundingClientRect().left ?? 0),
-              accessLeftDelta: (partnerContainer?.getBoundingClientRect().left ?? 0) - (accessContainer?.getBoundingClientRect().left ?? 0),
+              partnerLeftDelta: (partnerContainer?.getBoundingClientRect().x ?? 0) - (businessContainer?.getBoundingClientRect().x ?? 0),
+              accessLeftDelta: (partnerContainer?.getBoundingClientRect().x ?? 0) - (accessContainer?.getBoundingClientRect().x ?? 0),
               partnerGap: (apps?.getBoundingClientRect().top ?? 0) - (partnerGrid?.getBoundingClientRect().bottom ?? 0),
               navOverlap: navItems.some((item) => {
                 const rect = item.getBoundingClientRect();
