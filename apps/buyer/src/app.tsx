@@ -438,7 +438,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   }, []);
   const orderDetail = useOrderDetail(client, route.name === "order" ? route.publicId : "", language);
   const loadProfile = useCallback(() => profileApi.loadProfile(language), [language, profileApi]);
-  const [profile] = useLoaded<BuyerProfile>(language, async () => loadProfile(), true);
+  const [profile, retryProfile] = useLoaded<BuyerProfile>(language, async () => loadProfile(), true);
 
   const addToCart = useCallback((product: Product) => {
     const result = addProduct(cart, product);
@@ -547,10 +547,10 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     );
 
   if (route.name === "wallet")
-    return <BuyerWalletView entries={profile.status === "ready" ? { status: "ready", value: profile.value.entries } : profile.status === "error" ? { status: "error", messageKey: profile.messageKey } : profile} language={language} t={t} onBack={back} />;
+    return <BuyerWalletView entries={profile.status === "ready" ? { status: "ready", value: profile.value.entries } : profile.status === "error" ? { status: "error", messageKey: profile.messageKey } : profile} language={language} t={t} onBack={back} onRetry={retryProfile} />;
 
   if (route.name === "profile")
-    return <BuyerProfileView profile={profile} language={language} t={t} onOpenWallet={openWallet} onOpenOrders={openOrders} />;
+    return <BuyerProfileView profile={profile} language={language} t={t} onOpenWallet={openWallet} onOpenOrders={openOrders} onRetry={retryProfile} />;
 
   if (route.name === "search")
     return (

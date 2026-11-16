@@ -16,6 +16,7 @@
   "common.success": "[TODO-KM-REVIEW] ប្រតិបត្តិការបានជោគជ័យ",
   "common.failure": "[TODO-KM-REVIEW] ប្រតិបត្តិការបរាជ័យ",
   "common.invalidAmount": "[TODO-KM-REVIEW] ចំនួនទឹកប្រាក់មិនត្រឹមត្រូវ",
+  "common.comingSoon": "នឹងមានឆាប់ៗនេះ",
   "common.currencyUsd": "$",
   "validation.required": "[TODO-KM-REVIEW] ត្រូវបំពេញចន្លោះនេះ",
   "validation.invalidFormat": "[TODO-KM-REVIEW] សូមបញ្ចូលតម្លៃត្រឹមត្រូវ",
@@ -457,6 +458,9 @@
 ,"wallet.typeLabel": "ប្រភេទ"
 ,"wallet.amount": "ចំនួនទឹកប្រាក់"
 ,"wallet.order": "ការបញ្ជាទិញពាក់ព័ន្ធ"
+,"wallet.time": "ពេលវេលា"
+,"wallet.topup": "បញ្ចូលប្រាក់"
+,"wallet.withdrawal": "ដកប្រាក់"
 ,"wallet.notLinked": "មិនបានភ្ជាប់"
 ,"wallet.filter.all": "ទាំងអស់"
 ,"wallet.filter.payment": "ការទូទាត់"
@@ -488,7 +492,20 @@
 ,"merchant.noDemands": "មិនមានសំណើទេ"
 ,"merchant.quantity": "បរិមាណ"
 ,"merchant.quoteSent": "បានដាក់សម្រង់ រង់ចាំពិនិត្យ"
-,"merchant.quoteAmount": "ចំនួនសម្រង់ (e4)"
+,"merchant.quoteAmount": "ចំនួនសម្រង់ (ដុល្លារ)"
+,"merchant.quoteValidity": "សុពលភាព (ថ្ងៃ)"
+,"merchant.quoteUnavailable": "ការដាក់សម្រង់នឹងមានឆាប់ៗនេះ។"
+,"merchant.inboundMethod": "វិធីសាស្ត្រចូលឃ្លាំង"
+,"merchant.inboundSelf": "ដឹកជញ្ជូនដោយខ្លួនឯង"
+,"merchant.inboundPickup": "ទៅយក"
+,"merchant.inboundChina": "ទិញពីចិន"
+,"merchant.inboundProduct": "ផលិតផល"
+,"merchant.inboundQuantity": "បរិមាណ"
+,"merchant.submitInbound": "ដាក់ការណាត់ចូលឃ្លាំង"
+,"merchant.inboundDone": "បានរក្សាទុកការណាត់ចូលឃ្លាំង"
+,"merchant.filter.awaitingPayment": "រង់ចាំបង់ប្រាក់"
+,"merchant.filter.awaitingShipment": "រង់ចាំដឹកជញ្ជូន"
+,"merchant.filter.inDelivery": "កំពុងដឹកជញ្ជូន"
 ,"merchant.deliveryDays": "ថ្ងៃដឹកជញ្ជូន"
 ,"merchant.note": "កំណត់ចំណាំ"
 ,"merchant.submitQuote": "ដាក់សម្រង់"

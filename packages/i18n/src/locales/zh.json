@@ -16,6 +16,7 @@
   "common.success": "操作成功",
   "common.failure": "操作失败",
   "common.invalidAmount": "金额无效",
+  "common.comingSoon": "即将推出",
   "common.currencyUsd": "$",
   "validation.required": "此项为必填项",
   "validation.invalidFormat": "请输入有效内容",
@@ -457,6 +458,9 @@
 ,"wallet.typeLabel": "类型"
 ,"wallet.amount": "金额"
 ,"wallet.order": "关联订单"
+,"wallet.time": "时间"
+,"wallet.topup": "充值"
+,"wallet.withdrawal": "提现"
 ,"wallet.notLinked": "未关联订单"
 ,"wallet.filter.all": "全部"
 ,"wallet.filter.payment": "付款"
@@ -488,7 +492,20 @@
 ,"merchant.noDemands": "暂无需求"
 ,"merchant.quantity": "数量"
 ,"merchant.quoteSent": "报价已提交，等待审核"
-,"merchant.quoteAmount": "报价金额（e4）"
+,"merchant.quoteAmount": "报价金额（美元）"
+,"merchant.quoteValidity": "有效期（天）"
+,"merchant.quoteUnavailable": "报价提交功能即将推出。"
+,"merchant.inboundMethod": "入库方式"
+,"merchant.inboundSelf": "自行送货"
+,"merchant.inboundPickup": "预约取货"
+,"merchant.inboundChina": "中国采购"
+,"merchant.inboundProduct": "商品"
+,"merchant.inboundQuantity": "数量"
+,"merchant.submitInbound": "提交入库预约"
+,"merchant.inboundDone": "入库预约已保存"
+,"merchant.filter.awaitingPayment": "待付款"
+,"merchant.filter.awaitingShipment": "待发货"
+,"merchant.filter.inDelivery": "配送中"
 ,"merchant.deliveryDays": "交期（天）"
 ,"merchant.note": "备注"
 ,"merchant.submitQuote": "提交报价"

@@ -10,15 +10,15 @@ const noOp = () => undefined;
 
 describe("buyer V4 profile views", () => {
   it.each(["zh", "en", "km"] as Language[])("renders profile and wallet in %s", (language) => {
-    const profileMarkup = renderToStaticMarkup(<BuyerProfileView profile={{ status: "ready", value: profile }} language={language} t={translateFor(language)} onOpenWallet={noOp} onOpenOrders={noOp} />);
-    const walletMarkup = renderToStaticMarkup(<BuyerWalletView entries={{ status: "ready", value: profile.entries }} language={language} t={translateFor(language)} onBack={noOp} />);
+    const profileMarkup = renderToStaticMarkup(<BuyerProfileView profile={{ status: "ready", value: profile }} language={language} t={translateFor(language)} onOpenWallet={noOp} onOpenOrders={noOp} onRetry={noOp} />);
+    const walletMarkup = renderToStaticMarkup(<BuyerWalletView entries={{ status: "ready", value: profile.entries }} language={language} t={translateFor(language)} onBack={noOp} onRetry={noOp} />);
     expect(profileMarkup).toContain(profile.displayName);
     expect(walletMarkup).toContain(translate("wallet.title", {}, language));
   });
 
   it("keeps a wallet with no entries in the empty state", () => {
     const entries: WalletEntry[] = [];
-    const markup = renderToStaticMarkup(<BuyerWalletView entries={{ status: "ready", value: entries }} language="en" t={translateFor("en")} onBack={noOp} />);
+    const markup = renderToStaticMarkup(<BuyerWalletView entries={{ status: "ready", value: entries }} language="en" t={translateFor("en")} onBack={noOp} onRetry={noOp} />);
     expect(markup).toContain(translate("wallet.empty", {}, "en"));
   });
 });

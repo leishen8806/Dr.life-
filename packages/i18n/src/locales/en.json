@@ -16,6 +16,7 @@
   "common.success": "Operation successful",
   "common.failure": "Operation failed",
   "common.invalidAmount": "Invalid amount",
+  "common.comingSoon": "Coming soon",
   "common.currencyUsd": "$",
   "validation.required": "This field is required",
   "validation.invalidFormat": "Enter a valid value",
@@ -457,6 +458,9 @@
 ,"wallet.typeLabel": "Type"
 ,"wallet.amount": "Amount"
 ,"wallet.order": "Related order"
+,"wallet.time": "Time"
+,"wallet.topup": "Top up"
+,"wallet.withdrawal": "Withdraw"
 ,"wallet.notLinked": "Not linked"
 ,"wallet.filter.all": "All"
 ,"wallet.filter.payment": "Payment"
@@ -488,7 +492,20 @@
 ,"merchant.noDemands": "No requests"
 ,"merchant.quantity": "Quantity"
 ,"merchant.quoteSent": "Quote submitted for review"
-,"merchant.quoteAmount": "Quote amount (e4)"
+,"merchant.quoteAmount": "Quote amount (USD)"
+,"merchant.quoteValidity": "Validity (days)"
+,"merchant.quoteUnavailable": "Quote submission is coming soon."
+,"merchant.inboundMethod": "Inbound method"
+,"merchant.inboundSelf": "Self delivery"
+,"merchant.inboundPickup": "Pickup"
+,"merchant.inboundChina": "China purchase"
+,"merchant.inboundProduct": "Product"
+,"merchant.inboundQuantity": "Quantity"
+,"merchant.submitInbound": "Submit inbound booking"
+,"merchant.inboundDone": "Inbound booking saved"
+,"merchant.filter.awaitingPayment": "Awaiting payment"
+,"merchant.filter.awaitingShipment": "Awaiting shipment"
+,"merchant.filter.inDelivery": "In delivery"
 ,"merchant.deliveryDays": "Delivery days"
 ,"merchant.note": "Note"
 ,"merchant.submitQuote": "Submit quote"
