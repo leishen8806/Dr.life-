@@ -10,7 +10,7 @@ function SignedMoney({ amountE4, language, t }: { amountE4: number; language: La
   return <span>{amountE4 < 0 ? "−" : "+"}<Money value={String(Math.abs(amountE4))} language={language} translate={t} /></span>;
 }
 
-export function BuyerProfileView({ profile, language, t, onOpenWallet, onOpenOrders }: {
+export function BuyerProfileView({ profile, language, t, onOpenWallet, onOpenOrders, onRetry }: {
   profile: Resource<BuyerProfile>;
   language: Language;
   t: Translate;
