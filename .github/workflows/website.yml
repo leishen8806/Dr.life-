@@ -57,7 +57,7 @@ jobs:
           dist_hash="$(find apps/website/dist -type f ! -name build-hash.txt -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')"
           printf '%s\n' "$dist_hash" > apps/website/dist/build-hash.txt
       - name: Restore last successful deployment hash
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .website-cache
           key: website-dist-hash-main-${{ github.run_id }}
@@ -82,14 +82,14 @@ jobs:
           fi
           printf 'Current website dist hash: %s\nPrevious successful deployment hash: %s\n' "$current_hash" "${previous_hash:-<none>}" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload static artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-dist
           path: apps/website/dist
           if-no-files-found: error
           retention-days: 14
       - name: Upload deployment hash
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-dist-hash
           path: website-dist-hash.txt
@@ -117,7 +117,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Download static artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: website-dist
           path: apps/website/dist
@@ -156,7 +156,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload screenshot evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-screenshots
           path: apps/website/screenshots
@@ -164,7 +164,7 @@ jobs:
           retention-days: 14
       - name: Upload Mini App screenshot evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: miniapp-screenshots
           path: apps/website/screenshots-miniapp
@@ -172,7 +172,7 @@ jobs:
           retention-days: 14
       - name: Upload admin screenshot evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: admin-screenshots
           path: apps/admin/screenshots
@@ -220,12 +220,12 @@ jobs:
             exit 1
           fi
       - name: Download approved build artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: website-dist
           path: website-dist
       - name: Download deployment hash
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: website-dist-hash
           path: .
@@ -271,7 +271,7 @@ jobs:
         run: test -s .website-cache/dist.sha256
 
       - name: Record successful deployment hash
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .website-cache
           key: website-dist-hash-main-${{ github.run_id }}
