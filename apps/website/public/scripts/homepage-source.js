@@ -1,4 +1,4 @@
-
+if (!window.__homepageInteractionLoaded) {
 const menu=document.querySelector('.menu-toggle'),nav=document.querySelector('#site-nav');
 function closeMenu(){nav.dataset.open='false';menu.setAttribute('aria-expanded','false')}
 menu.addEventListener('click',()=>{const open=nav.dataset.open!=='true';nav.dataset.open=String(open);menu.setAttribute('aria-expanded',String(open))});
@@ -28,6 +28,7 @@ document.querySelector('#copy-inquiry').addEventListener('click',async()=>{
   status.textContent=document.execCommand('copy')?'已复制咨询模板。':'已选中模板，请复制。';
  }
 });
+}
 
 // The source design stays structurally identical in every language.  Only text
 // nodes and accessible labels are translated here, so the layout cannot drift
