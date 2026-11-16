@@ -45,7 +45,7 @@ def main():
         text = workflow.read_text(encoding="utf-8")
         for job, lines in iter_jobs(text):
             job_text = "\n".join(lines)
-            refs = {match.group(1).lstrip("./") for match in SCRIPT_REF.finditer(job_text)}
+            refs = {match.group(1).removeprefix("./") for match in SCRIPT_REF.finditer(job_text)}
             if not refs:
                 continue
             has_checkout = bool(re.search(r"uses:\s*actions/checkout@", job_text))
