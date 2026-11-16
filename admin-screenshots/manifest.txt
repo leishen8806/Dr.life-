@@ -1,4 +1,4 @@
-head=da9c3fe3
+head=74f12c53
 1440/zh/overview.png
 1440/zh/review.png
 1440/zh/orders.png
