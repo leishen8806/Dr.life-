@@ -26,6 +26,47 @@ from `env.example` in the approved staging environment; `.env` is ignored.
    `app_ledger` database role via `WORKER_DATABASE_URL`; the production design
    remains pending owner approval.
 
+### Host nginx change procedure (方案 b)
+
+Keep the existing official-site server blocks unchanged. Before installing the
+four-name staging proxy, record a backup and the official-site baseline:
+
+```bash
+backup_dir="/var/backups/drlifeplus-nginx-$(date -u +%Y%m%dT%H%M%SZ)"
+sudo install -d -m 700 "$backup_dir"
+sudo cp -a /etc/nginx "$backup_dir/"
+curl --silent --show-error --location --max-time 10 -o /tmp/drlifeplus-baseline.html -w '%{http_code}\n' https://drlifeplus.com/
+curl --silent --show-error --location --max-time 10 -o /tmp/drlifeplus-www-baseline.html -w '%{http_code}\n' https://www.drlifeplus.com/
+```
+
+After reviewing the owner-managed certificate paths and generated
+`cloudflare-real-ip.conf`, install the separate host-proxy entry, validate, and
+reload (do not restart):
+
+```bash
+sudo install -m 644 deploy/staging/nginx/host-proxy.conf.example /etc/nginx/sites-enabled/drlifeplus-staging.conf
+sudo nginx -t
+sudo systemctl reload nginx
+curl --silent --show-error --location --max-time 10 -o /tmp/drlifeplus-after.html -w '%{http_code}\n' https://drlifeplus.com/
+curl --silent --show-error --location --max-time 10 -o /tmp/drlifeplus-www-after.html -w '%{http_code}\n' https://www.drlifeplus.com/
+```
+
+Compare the two official pages' status and `<title>` with the baseline before
+continuing. If validation, reload, or the baseline comparison fails, remove
+the new entry and restore the backup, then validate and reload again:
+
+```bash
+sudo rm -f /etc/nginx/sites-enabled/drlifeplus-staging.conf
+sudo cp -a "$backup_dir/nginx/." /etc/nginx/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+The template uses `proxy_ssl_verify off` only for the loopback hop from the
+host nginx to the staging edge. It is bounded to `127.0.0.1`, while the
+public-facing TLS certificate and Cloudflare Full (strict) validation remain
+on the host proxy; do not reuse this setting for an external upstream.
+
 ## Release and rollback
 
 Upload a built static release to `incoming/<release-id>` below the selected
@@ -48,8 +89,12 @@ credentials, or firewall data in the repository.
    Origin certificate and key files are mounted through
    `STAGING_ORIGIN_CERT_PATH` and `STAGING_ORIGIN_KEY_PATH`; they never enter
    Git or the image.
-3. Start the `edge` service in `compose.yaml`. It is the only service exposing
-   host ports: 80 redirects to 443, and 443 routes by hostname to `api:8080`,
+3. Keep the existing host nginx on 80/443 for the official website. Install the
+   reviewed `nginx/host-proxy.conf.example` as a separate host configuration
+   for the four test names, and start the `edge` service in `compose.yaml` with
+   loopback-only ports (`127.0.0.1:18080:80` and `127.0.0.1:18443:443`). The
+   host nginx terminates the Origin certificate and proxies the test names to
+   the edge HTTPS listener; edge still routes by hostname to `api:8080`,
    `buyer:80`, `merchant:80`, and `admin:80`. All other services stay internal.
 4. Restrict the server firewall to TCP 80/443 from the published Cloudflare IP
    ranges. `test-admin` is protected by its own administrator account plus
@@ -58,9 +103,10 @@ credentials, or firewall data in the repository.
 5. The edge adds HSTS, `X-Content-Type-Options`, `Referrer-Policy`, and
    `frame-ancestors 'none'` to all four hosts. Before starting the edge,
    `harden-server.sh --apply --ssh-user=<owner-login-user>` generates
-   `STAGING_CLOUDFLARE_REAL_IP_CONFIG` from the current Cloudflare ranges;
-   nginx then uses `CF-Connecting-IP` and `$binary_remote_addr` is the real
-   client address. The API admin-auth path's explicit limit is in
+   `STAGING_CLOUDFLARE_REAL_IP_CONFIG` from the current Cloudflare ranges and
+   exactly one staging edge Docker gateway address; both the host proxy and
+   edge include it. Nginx then uses `CF-Connecting-IP` and
+   `$binary_remote_addr` is the real client address. The API admin-auth path's explicit limit is in
    `nginx/staging.conf` (`10r/m`, burst `5`); change both values there as one
    reviewed configuration change. It returns 429 when exceeded. Harden SSH
    with key-only authentication, no root login, no password login, and
@@ -97,9 +143,21 @@ health, worker logs, Redis disk/AOF health, and PostgreSQL backup freshness.
 Do not paste credentials, tunnel tokens, customer data, or server addresses in
 logs or issues. Escalate incidents to `leishen8806`.
 
+For E-09.4, first run `deploy/staging/worker-healthcheck.sh` to confirm that
+the asynq v0.26 worker heartbeat exists in the `asynq:servers` ZSET and that
+its expiry score advances during the observation window. Then run
+`deploy/staging/restore-drill.sh --dry-run` with
+`SOURCE_DATABASE_URL` and `RESTORE_DATABASE_URL` set to an approved test
+environment. Then rerun without `--dry-run`: the script takes a custom-format
+`pg_dump`, recreates only the `drlife_restore_drill_*` target, restores it,
+compares every non-system schema/table row count, and drops the temporary
+database from an exit trap. A mismatch or cleanup failure is FAIL; credentials
+remain in environment variables and are never printed.
+
 For the E-09 test-environment acceptance record, use
 [`test-env-acceptance.md`](./test-env-acceptance.md). The repository template
-provides `smoke.sh` and `restore-drill.sh`; both require explicit environment
+provides `smoke.sh`, `worker-healthcheck.sh`, and `restore-drill.sh`; all
+require explicit environment
 variables and must be run only with approved test-environment values.
 
 ## Workflow

@@ -50,6 +50,37 @@ jobs:
         run: pnpm --filter @drlife/website test
       - name: Build three-language static site
         run: pnpm --filter @drlife/website build
+      - name: Stamp built content hash into the artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          dist_hash="$(find apps/website/dist -type f ! -name build-hash.txt -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')"
+          printf '%s\n' "$dist_hash" > apps/website/dist/build-hash.txt
+      - name: Restore last successful deployment hash
+        uses: actions/cache/restore@v4
+        with:
+          path: .website-cache
+          key: website-dist-hash-main-${{ github.run_id }}
+          restore-keys: |
+            website-dist-hash-main-
+      - name: Compare static output with last successful deployment
+        id: compare-dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .website-cache
+          current_hash="$(find apps/website/dist -type f ! -name build-hash.txt -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')"
+          previous_hash=""
+          if [ -f .website-cache/dist.sha256 ]; then
+            previous_hash="$(cat .website-cache/dist.sha256)"
+          fi
+          printf '%s\n' "$current_hash" > website-dist-hash.txt
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$current_hash" != "$previous_hash" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+          printf 'Current website dist hash: %s\nPrevious successful deployment hash: %s\n' "$current_hash" "${previous_hash:-<none>}" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload static artifact
         uses: actions/upload-artifact@v4
         with:
@@ -57,6 +88,16 @@ jobs:
           path: apps/website/dist
           if-no-files-found: error
           retention-days: 14
+      - name: Upload deployment hash
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-dist-hash
+          path: website-dist-hash.txt
+          if-no-files-found: error
+          retention-days: 14
+
+    outputs:
+      changed: ${{ steps.compare-dist.outputs.changed }}
 
   screenshots:
     name: Website screenshot evidence
@@ -122,7 +163,8 @@ jobs:
     name: Deploy production
     if: >-
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && needs.build.outputs.changed == 'true'))
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -156,6 +198,20 @@ jobs:
         with:
           name: website-dist
           path: website-dist
+      - name: Download deployment hash
+        uses: actions/download-artifact@v5
+        with:
+          name: website-dist-hash
+          path: .
+      - name: Read deployment hash
+        id: read_hash
+        shell: bash
+        run: echo "hash=$(cat website-dist-hash.txt)" >> "$GITHUB_OUTPUT"
+      - name: Normalize deployment hash for the next comparison
+        run: |
+          set -euo pipefail
+          mkdir -p .website-cache
+          cp website-dist-hash.txt .website-cache/dist.sha256
       - name: Atomically publish approved artifact to VPS
         env:
           WEBSITE_DEPLOY_HOST: ${{ secrets.WEBSITE_DEPLOY_HOST }}
@@ -178,3 +234,14 @@ jobs:
           rsync -a --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
             -e "$remote" website-dist/ "$target:/srv/drlifeplus/incoming/$release_id/"
           $remote "$target" "sudo /usr/local/sbin/drlifeplus-website-publish $release_id"
+      - name: Verify published website content
+        env:
+          WEBSITE_ORIGIN: https://drlifeplus.com
+          WEBSITE_BUILD_HASH: ${{ steps.read_hash.outputs.hash }}
+        run: bash .github/scripts/verify-published-website.sh
+
+      - name: Record successful deployment hash
+        uses: actions/cache/save@v4
+        with:
+          path: .website-cache
+          key: website-dist-hash-main-${{ github.run_id }}

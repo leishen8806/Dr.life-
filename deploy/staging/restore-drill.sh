@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# E-09.4: custom-format PostgreSQL backup, restore into a caller-supplied
+# drlife_restore_drill_* database, compare schema/table row counts, and always
+# drop the temporary database on exit. Credentials stay in the two URL env vars.
+
 readonly RESTORE_PREFIX="drlife_restore_drill_"
 dump_dir="${TMPDIR:-/tmp}"
 DUMP_FILE="${dump_dir}/${RESTORE_PREFIX}$(date -u +%Y%m%dT%H%M%SZ).dump"
@@ -96,7 +100,10 @@ cleanup() {
   rm -f "$DUMP_FILE" "${DUMP_FILE}.source-counts" "${DUMP_FILE}.restore-counts" "${DUMP_FILE}.comparison"
   if ! drop_restore_database >/dev/null 2>&1; then
     printf 'FAIL: temporary restore database cleanup failed\n' >&2
+    trap - EXIT
+    exit 1
   fi
+  printf 'PASS: temporary restore database cleanup complete\n'
 }
 trap cleanup EXIT
 
