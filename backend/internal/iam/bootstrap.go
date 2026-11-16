@@ -95,29 +95,65 @@ func (s *BootstrapService) RegisterBot(ctx context.Context, input BootstrapBotIn
 		return errors.New("iam: invalid bot bootstrap input")
 	}
 	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, bootstrapAdvisoryLock); err != nil { return err }
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, bootstrapAdvisoryLock); err != nil {
+		return err
+	}
 	var actorID int64
-	if err := tx.QueryRow(ctx, `SELECT id FROM iam.admin_user WHERE public_id=$1 AND role='super' AND status='active'`, input.Actor).Scan(&actorID); err != nil { return errors.New("iam: active super administrator is required") }
+	if err := tx.QueryRow(ctx, `SELECT id FROM iam.admin_user WHERE public_id=$1 AND role='super' AND status='active'`, input.Actor).Scan(&actorID); err != nil {
+		return errors.New("iam: active super administrator is required")
+	}
 	var maxPriority int
-	if err := tx.QueryRow(ctx, `SELECT coalesce(max(priority),-1) FROM iam.bot WHERE "end"=$1`, input.End).Scan(&maxPriority); err != nil { return err }
+	if err := tx.QueryRow(ctx, `SELECT coalesce(max(priority),-1) FROM iam.bot WHERE "end"=$1`, input.End).Scan(&maxPriority); err != nil {
+		return err
+	}
 	var primary bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM iam.bot WHERE "end"=$1 AND role_in_pool='primary')`, input.End).Scan(&primary); err != nil { return err }
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM iam.bot WHERE "end"=$1 AND role_in_pool='primary')`, input.End).Scan(&primary); err != nil {
+		return err
+	}
 	role, status := "standby", "standby"
-	if !primary { role, status = "primary", "active" }
-	publicID, err := ids.NewULID(); if err != nil { return err }
-	secret := make([]byte, 32); if _, err := rand.Read(secret); err != nil { return err }; defer wipe(secret)
+	if !primary {
+		role, status = "primary", "active"
+	}
+	publicID, err := ids.NewULID()
+	if err != nil {
+		return err
+	}
+	secret := make([]byte, 32)
+	if _, err := rand.Read(secret); err != nil {
+		return err
+	}
+	defer wipe(secret)
 	webhook := base64.RawURLEncoding.EncodeToString(secret)
 	placeholder := []byte{0}
 	var id int64
-	if err := tx.QueryRow(ctx, `INSERT INTO iam.bot(public_id,"end",username,role_in_pool,status,token_enc,token_last4,webhook_secret_enc,priority) VALUES($1,$2,$3,$4,$5,$6,$7,$6,$8) RETURNING id`, publicID, input.End, input.Username, role, status, placeholder, last4(input.Token), maxPriority+1).Scan(&id); err != nil { return err }
-	tokenEnc, err := s.Cipher.Encrypt(ctx, []byte(input.Token), fmt.Sprintf("bot_token:%d", id)); if err != nil { return err }
-	secretEnc, err := s.Cipher.Encrypt(ctx, []byte(webhook), fmt.Sprintf("bot_token:%d", id)); if err != nil { return err }
-	if _, err := tx.Exec(ctx, `UPDATE iam.bot SET token_enc=$1,webhook_secret_enc=$2 WHERE id=$3`, tokenEnc, secretEnc, id); err != nil { return err }
-	detail, _ := json.Marshal(struct { End, Username string }{input.End, input.Username})
-	if _, err := s.Audit.AppendTx(ctx, tx, platformaudit.Entry{ActorID: actorID, ActorRole: "admin", Action: platformaudit.ActionPermissionChanged, Target: "bot:" + publicID, Detail: detail, RequestID: "admininit:bot:" + publicID}); err != nil { return err }
+	if err := tx.QueryRow(ctx, `INSERT INTO iam.bot(public_id,"end",username,role_in_pool,status,token_enc,token_last4,webhook_secret_enc,priority) VALUES($1,$2,$3,$4,$5,$6,$7,$6,$8) RETURNING id`, publicID, input.End, input.Username, role, status, placeholder, last4(input.Token), maxPriority+1).Scan(&id); err != nil {
+		return err
+	}
+	tokenEnc, err := s.Cipher.Encrypt(ctx, []byte(input.Token), fmt.Sprintf("bot_token:%d", id))
+	if err != nil {
+		return err
+	}
+	secretEnc, err := s.Cipher.Encrypt(ctx, []byte(webhook), fmt.Sprintf("bot_token:%d", id))
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE iam.bot SET token_enc=$1,webhook_secret_enc=$2 WHERE id=$3`, tokenEnc, secretEnc, id); err != nil {
+		return err
+	}
+	detail, _ := json.Marshal(struct{ End, Username string }{input.End, input.Username})
+	if _, err := s.Audit.AppendTx(ctx, tx, platformaudit.Entry{ActorID: actorID, ActorRole: "admin", Action: platformaudit.ActionPermissionChanged, Target: "bot:" + publicID, Detail: detail, RequestID: "admininit:bot:" + publicID}); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
-func last4(value string) string { if len(value) <= 4 { return value }; return value[len(value)-4:] }
+func last4(value string) string {
+	if len(value) <= 4 {
+		return value
+	}
+	return value[len(value)-4:]
+}
