@@ -170,7 +170,7 @@ try {
           { name: "wallet", open: async () => {
             await page.locator(".buyer-profile-action").click();
             await page.locator(".profile-page").waitFor({ state: "visible", timeout: 5_000 });
-            await page.locator(".profile-stats button").first().click();
+            await page.locator(".profile-card-heading button").first().click();
             await page.locator(".wallet-page").waitFor({ state: "visible", timeout: 5_000 });
           }, profile: true },
           { name: "orders-list", open: async () => {
