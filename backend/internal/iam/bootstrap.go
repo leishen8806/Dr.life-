@@ -40,7 +40,7 @@ func (s *BootstrapService) CreateFirstSuper(ctx context.Context, username string
 		return BootstrapAdminResult{}, errors.New("iam: invalid bootstrap configuration")
 	}
 	input := AdminCreateInput{Name: username, Email: username + "@bootstrap.invalid", Role: RoleSuper}
-	prepared, err := s.prepareAdminCreate(ctx, input)
+	prepared, err := (&AdminManagementService{DB: s.DB, Cipher: s.Cipher}).prepareAdminCreate(ctx, input)
 	if err != nil {
 		return BootstrapAdminResult{}, err
 	}
