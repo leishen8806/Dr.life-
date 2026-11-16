@@ -44,6 +44,12 @@ func TestBootstrapIntegrationAtomicConcurrencyAndSecretBoundaries(t *testing.T) 
 	if err := goose.Up(database, filepath.Join(filepath.Dir(migrationFile), "..", "..", "migrations")); err != nil {
 		t.Fatal(err)
 	}
+	// Production owns the SECURITY DEFINER chain-head function with the
+	// dedicated audit role. The disposable migration user owns it by default,
+	// which makes current_user == session_user and trips the fail-closed guard.
+	if _, err := database.Exec(`ALTER FUNCTION audit.advance_chain_head(bytea,bigint,bytea) OWNER TO audit_writer`); err != nil {
+		t.Fatal(err)
+	}
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		t.Fatal(err)
