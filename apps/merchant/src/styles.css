@@ -1,6 +1,35 @@
 #root {
   min-height: 100vh;
 }
+
+.merchant-v4 { display: grid; gap: var(--drl-space-3); }
+.merchant-v4__hero { display: grid; gap: var(--drl-space-1); padding: var(--drl-space-4); border-radius: var(--drl-radius-lg); color: var(--drl-color-text-on-brand); background: var(--drl-color-brand); }
+.merchant-v4__hero p, .merchant-v4__hero h1, .merchant-v4__hero span { margin: 0; overflow-wrap: anywhere; }
+.merchant-v4__hero p { font-size: var(--drl-font-size-sm); opacity: .82; }
+.merchant-v4__tabs, .merchant-v4__filters { display: flex; flex-wrap: wrap; gap: var(--drl-space-2); }
+.merchant-v4__tabs button, .merchant-v4__filters button { min-height: 44px; }
+.merchant-v4__tabs button[aria-pressed="true"], .merchant-v4__filters button[aria-pressed="true"] { color: var(--drl-color-text-on-brand); background: var(--drl-color-brand); }
+.merchant-v4__section { display: grid; gap: var(--drl-space-3); }
+.merchant-v4__section h2 { margin: 0; }
+.merchant-v4__funds { display: grid; gap: var(--drl-space-1); margin-top: var(--drl-space-3); }
+.merchant-v4__funds .drl-money { font-size: var(--drl-font-size-xl); font-weight: 700; }
+.merchant-v4__funds small, .merchant-v4__funds span, .merchant-v4__warehouse span { color: var(--drl-color-text-muted); }
+.merchant-v4__entries, .merchant-v4__demand-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--drl-color-border); }
+.merchant-v4__entries button { min-height: 48px; border: 0; border-bottom: 1px solid var(--drl-color-border); text-align: start; }
+.merchant-v4__demand-list li { border-bottom: 1px solid var(--drl-color-border); }
+.merchant-v4__demand-list button { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 68px; border: 0; text-align: start; }
+.merchant-v4__demand-list button span { display: grid; gap: var(--drl-space-1); }
+.merchant-v4__demand-list small { color: var(--drl-color-text-muted); }
+.merchant-v4__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--drl-space-2); }
+.merchant-v4__metrics button { display: grid; gap: var(--drl-space-1); min-height: 72px; text-align: start; }
+.merchant-v4__metrics strong { font-size: var(--drl-font-size-xl); }
+.merchant-v4__quote { display: grid; gap: var(--drl-space-2); margin-top: var(--drl-space-3); }
+.merchant-v4__quote label { display: grid; gap: var(--drl-space-1); }
+.merchant-v4__quote input, .merchant-v4__quote textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: var(--drl-space-2); border: 1px solid var(--drl-color-border-strong); border-radius: var(--drl-radius-sm); color: var(--drl-color-text); background: var(--drl-color-surface); font: inherit; }
+.merchant-v4__quote textarea { min-height: 80px; resize: vertical; }
+.merchant-v4__quote p { margin: 0; color: var(--drl-color-danger); }
+.merchant-v4__warehouse { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--drl-space-2); }
+.merchant-v4__warehouse .drl-card { display: grid; gap: var(--drl-space-1); min-width: 0; }
 .mini-shell {
   min-height: 100vh;
   padding: 28px 20px;
