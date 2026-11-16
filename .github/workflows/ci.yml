@@ -74,6 +74,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+      - name: Check workflow scripts have checkout
+        run: python3 .github/scripts/check-workflow-script-checkout.py
       - uses: actions/setup-go@v7
         with:
           go-version-file: backend/go.mod
