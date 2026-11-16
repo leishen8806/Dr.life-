@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -44,13 +45,20 @@ func TestBootstrapIntegrationAtomicConcurrencyAndSecretBoundaries(t *testing.T) 
 	if err := goose.Up(database, filepath.Join(filepath.Dir(migrationFile), "..", "..", "migrations")); err != nil {
 		t.Fatal(err)
 	}
-	// Production owns the SECURITY DEFINER chain-head function with the
-	// dedicated audit role. The disposable migration user owns it by default,
-	// which makes current_user == session_user and trips the fail-closed guard.
-	if _, err := database.Exec(`GRANT UPDATE ON audit.chain_head TO audit_writer; ALTER FUNCTION audit.advance_chain_head(bytea,bigint,bytea) OWNER TO audit_writer`); err != nil {
+	// Run the service with the same least-privilege login shape used in
+	// production: iam_rw for IAM tables and audit_writer for append/function
+	// execution. The migration user remains the function owner, so the
+	// SECURITY DEFINER guard sees distinct current_user and session_user.
+	const login = "app_iam_bootstrap_test"
+	if _, err := database.Exec(`CREATE ROLE app_iam_bootstrap_test LOGIN PASSWORD 'test-only'; GRANT iam_rw TO app_iam_bootstrap_test; GRANT audit_writer TO app_iam_bootstrap_test`); err != nil {
 		t.Fatal(err)
 	}
-	pool, err := pgxpool.New(ctx, dsn)
+	loginURL, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loginURL.User = url.UserPassword(login, "test-only")
+	pool, err := pgxpool.New(ctx, loginURL.String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,6 +73,9 @@ func TestBootstrapIntegrationAtomicConcurrencyAndSecretBoundaries(t *testing.T) 
 		t.Fatal(err)
 	}
 	service := &BootstrapService{DB: pool, Cipher: envelope, Audit: &platformaudit.Store{DB: pool}}
+	if _, err := pool.Exec(ctx, `UPDATE audit.chain_head SET last_id=last_id WHERE singleton`); err == nil {
+		t.Fatal("bootstrap login can directly update audit chain head")
+	}
 
 	results := make(chan error, 2)
 	var group sync.WaitGroup

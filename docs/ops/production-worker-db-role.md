@@ -38,6 +38,19 @@ and be reviewed separately.
 5. Roll back by disabling the worker login or revoking its group membership;
    do not edit historical migrations in production.
 
+## `admininit` database account
+
+The owner-operated `admininit` command must use a disposable login with the
+minimum existing role memberships required by the bootstrap path: `iam_rw` for
+IAM reads/writes and `audit_writer` for audit inserts and the approved
+`SECURITY DEFINER` chain-head functions. The login must inherit those group
+roles and must not be the migration account, a superuser, or a database owner.
+Using the migration account makes `current_user` equal to `session_user` and
+causes the audit chain guard to reject the append. If a new login is needed,
+create it through the owner-controlled secret/deployment process using the
+placeholder pattern in `deploy/production/worker-grants.sql.example`; this PR
+does not add production SQL or credentials.
+
 ## Evidence boundary
 
 The integration tests intentionally create disposable logins such as

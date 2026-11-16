@@ -11,4 +11,6 @@ Owner-operated bootstrap utility for an empty IAM database. Run `super
 --end buyer|merchant --username <name> --actor <super public id>` with the bot
 token supplied as one line on standard input. It prints bootstrap credentials
 only for the direct `super` invocation; it never accepts passwords or tokens as
-command-line arguments.
+command-line arguments. In production, `IAM_DATABASE_URL` or `DATABASE_URL`
+must use an owner-created least-privilege login with `iam_rw` and
+`audit_writer` membership; never use the migration account or a superuser.
