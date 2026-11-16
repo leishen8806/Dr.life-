@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -73,6 +74,9 @@ func TestBootstrapIntegrationAtomicConcurrencyAndSecretBoundaries(t *testing.T) 
 	close(results)
 	var successes int
 	for callErr := range results {
+		if callErr != nil {
+			t.Logf("bootstrap call failed: %v", callErr)
+		}
 		if callErr == nil {
 			successes++
 		}
@@ -120,6 +124,24 @@ func TestBootstrapIntegrationAtomicConcurrencyAndSecretBoundaries(t *testing.T) 
 	}
 	if tokenLast4 != "1234" || string(tokenCipher) == "test-bot-token-1234" {
 		t.Fatalf("bot secret boundary last4=%q plaintext=%q", tokenLast4, tokenCipher)
+	}
+	var botID int64
+	var webhookCipher []byte
+	if err := pool.QueryRow(ctx, `SELECT id,webhook_secret_enc FROM iam.bot WHERE username=$1`, "bootstrap-buyer").Scan(&botID, &webhookCipher); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := envelope.Decrypt(ctx, webhookCipher, fmt.Sprintf("bot_token:%d", botID)); err == nil {
+		t.Fatal("webhook secret decrypted with token AAD")
+	}
+	if _, err := envelope.Decrypt(ctx, webhookCipher, fmt.Sprintf("bot_webhook_secret:%d", botID)); err != nil {
+		t.Fatalf("webhook secret did not decrypt with dedicated AAD: %v", err)
+	}
+	var actionRole string
+	if err := pool.QueryRow(ctx, `SELECT actor_role FROM audit.log WHERE target LIKE 'bot:%' ORDER BY id DESC LIMIT 1`).Scan(&actionRole); err != nil {
+		t.Fatal(err)
+	}
+	if actionRole != "system_bootstrap" {
+		t.Fatalf("bot registration audit actor_role=%q", actionRole)
 	}
 	if err := service.RegisterBot(ctx, BootstrapBotInput{End: "buyer", Username: "bootstrap-buyer", Actor: actorPublicID, Token: "test-bot-token-5678"}); err == nil {
 		t.Fatal("duplicate bot username succeeded")

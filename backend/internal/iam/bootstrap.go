@@ -137,7 +137,7 @@ func (s *BootstrapService) RegisterBot(ctx context.Context, input BootstrapBotIn
 	if err != nil {
 		return err
 	}
-	secretEnc, err := s.Cipher.Encrypt(ctx, []byte(webhook), fmt.Sprintf("bot_token:%d", id))
+	secretEnc, err := s.Cipher.Encrypt(ctx, []byte(webhook), fmt.Sprintf("bot_webhook_secret:%d", id))
 	if err != nil {
 		return err
 	}
@@ -145,7 +145,7 @@ func (s *BootstrapService) RegisterBot(ctx context.Context, input BootstrapBotIn
 		return err
 	}
 	detail, _ := json.Marshal(struct{ End, Username string }{input.End, input.Username})
-	if _, err := s.Audit.AppendTx(ctx, tx, platformaudit.Entry{ActorID: actorID, ActorRole: "admin", Action: platformaudit.ActionPermissionChanged, Target: "bot:" + publicID, Detail: detail, RequestID: "admininit:bot:" + publicID}); err != nil {
+	if _, err := s.Audit.AppendTx(ctx, tx, platformaudit.Entry{ActorID: actorID, ActorRole: "system_bootstrap", Action: platformaudit.ActionIntegrationChanged, Target: "bot:" + publicID, Detail: detail, RequestID: "admininit:bot:" + publicID}); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

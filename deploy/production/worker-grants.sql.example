@@ -6,7 +6,7 @@ BEGIN;
 
 -- The login and group names are placeholders, not real account names.
 CREATE ROLE "<WORKER_LOGIN_ROLE>" LOGIN PASSWORD '<WORKER_PASSWORD_PLACEHOLDER>'
-  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION;
+  NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT NOREPLICATION;
 CREATE ROLE "<WORKER_GROUP_ROLE>" NOLOGIN;
 GRANT "<WORKER_GROUP_ROLE>" TO "<WORKER_LOGIN_ROLE>";
 
@@ -23,6 +23,6 @@ COMMIT;
 
 -- Post-deploy checks (run against a disposable/test database first):
 -- SELECT current_user;
--- SELECT pg_has_role(current_user, '<REVIEWED_EXISTING_GROUP_ROLE>', 'member');
+-- SELECT pg_has_role(current_user, '<REVIEWED_EXISTING_GROUP_ROLE>', 'usage');
 -- Revoke/drop the placeholder login and group on rollback; never edit an
 -- already-applied migration in place.
