@@ -165,3 +165,5 @@ variables and must be run only with approved test-environment values.
 `.github/workflows/staging.yml` is manual, uses the `staging` protected
 environment, and references only Environment Secrets. It is a template: the
 owner supplies the direct SSH host policy after review.
+
+The production website verification step in `.github/workflows/website.yml` depends on the deploy job checking out `.github/scripts` with `persist-credentials: false`; keep this checkout immediately before the verifier whenever that step is moved or changed.
