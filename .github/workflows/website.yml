@@ -190,6 +190,12 @@ jobs:
     timeout-minutes: 15
     environment: website-production
     steps:
+      - name: Checkout repository scripts for deployment verification
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
       - name: Check required production deployment secrets
         env:
           WEBSITE_DEPLOY_HOST: ${{ secrets.WEBSITE_DEPLOY_HOST }}
@@ -254,17 +260,15 @@ jobs:
           rsync -a --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
             -e "$remote" website-dist/ "$target:/srv/drlifeplus/incoming/$release_id/"
           $remote "$target" "sudo /usr/local/sbin/drlifeplus-website-publish $release_id"
-      - name: Checkout repository scripts for deployment verification
-        uses: actions/checkout@v7
-        with:
-          sparse-checkout: .github/scripts
-          sparse-checkout-cone-mode: true
-          persist-credentials: false
       - name: Verify published website content
         env:
           WEBSITE_ORIGIN: https://drlifeplus.com
           WEBSITE_BUILD_HASH: ${{ steps.read_hash.outputs.hash }}
         run: bash .github/scripts/verify-published-website.sh
+
+      - name: Assert deployment hash cache input exists
+        shell: bash
+        run: test -s .website-cache/dist.sha256
 
       - name: Record successful deployment hash
         uses: actions/cache/save@v4
