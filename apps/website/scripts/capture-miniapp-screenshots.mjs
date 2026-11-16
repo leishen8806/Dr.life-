@@ -163,6 +163,16 @@ try {
         }
         const targets = app === "buyer" ? [
           { name: "home" },
+          { name: "profile", open: async () => {
+            await page.locator(".buyer-profile-action").click();
+            await page.locator(".profile-page").waitFor({ state: "visible", timeout: 5_000 });
+          } },
+          { name: "wallet", open: async () => {
+            await page.locator(".buyer-profile-action").click();
+            await page.locator(".profile-page").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".profile-stats button").first().click();
+            await page.locator(".wallet-page").waitFor({ state: "visible", timeout: 5_000 });
+          }, profile: true },
           { name: "orders-list", open: async () => {
             await page.locator(".buyer-orders-action").click();
             await page.locator(".buyer-order-list").waitFor({ state: "visible", timeout: 5_000 });
@@ -171,14 +181,36 @@ try {
             await page.locator(".buyer-order-card").first().click();
             await page.locator(".buyer-order-detail__heading").first().waitFor({ state: "visible", timeout: 5_000 });
           } }
-        ] : [{ name: "home" }];
+        ] : [
+          { name: "home" },
+          { name: "merchant-profile", open: async () => {
+            await page.getByRole("button", { name: /profile|workspace|我的|商家工作台|កន្លែងធ្វើការអ្នកលក់|โปรไฟล์/i }).last().click();
+            await page.locator(".merchant-v4").waitFor({ state: "visible", timeout: 5_000 });
+          } },
+          { name: "merchant-demands", open: async () => {
+            await page.getByRole("button", { name: /profile|workspace|我的|商家工作台|កន្លែងធ្វើការអ្នកលក់|โปรไฟล์/i }).last().click();
+            await page.locator(".merchant-v4").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".merchant-v4__tabs button").nth(1).click();
+            await page.locator(".merchant-v4__section").waitFor({ state: "visible", timeout: 5_000 });
+          }, profile: true },
+          { name: "merchant-warehouse", open: async () => {
+            await page.getByRole("button", { name: /profile|workspace|我的|商家工作台|កន្លែងធ្វើការអ្នកលក់|โปรไฟล์/i }).last().click();
+            await page.locator(".merchant-v4").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".merchant-v4__tabs button").nth(2).click();
+            await page.locator(".merchant-v4__warehouse").waitFor({ state: "visible", timeout: 5_000 });
+          }, profile: true }
+        ];
         for (const target of targets) {
+          if (target.profile) {
+            await page.goto(url, { waitUntil: "networkidle" });
+            await waitForBusinessPage(page, app);
+          }
           if (target.open) await target.open();
           const title = await page.title();
           if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
           const headingSelector = app === "buyer"
-            ? (target.name === "home" ? ".buyer-section__title" : ".buyer-order-list, .buyer-order-detail__heading")
-            : "h1";
+            ? (target.name === "home" ? ".buyer-section__title" : target.name === "profile" ? ".profile-hero h1" : target.name === "wallet" ? ".wallet-page h1" : ".buyer-order-list, .buyer-order-detail__heading")
+            : target.name === "home" ? "h1" : ".merchant-v4 h1, .merchant-v4__section h2";
           const pageHeading = await page.locator(headingSelector).first().textContent();
           if (!pageHeading?.trim()) throw new Error(`missing business page heading for ${app}-${target.name}-${item.language}`);
           const name = `${app}-${target.name}-${item.width}-${item.theme}-${item.language}.png`;
