@@ -126,7 +126,19 @@ jobs:
       - name: Capture responsive language screenshots
         run: pnpm --filter @drlife/website exec node scripts/capture-screenshots.mjs
       - name: Capture Mini App screenshot matrix
+        env:
+          EVIDENCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: pnpm --filter @drlife/website capture:miniapp-screenshots
+      - name: Capture admin responsive evidence
+        env:
+          EVIDENCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: pnpm --filter @drlife/admin capture:screenshots
+      - name: Bind screenshot manifests to current head
+        env:
+          EVIDENCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          printf 'head=%s\n' "$EVIDENCE_HEAD" | cat - apps/admin/screenshots/manifest.txt > /tmp/admin-manifest.txt
+          mv /tmp/admin-manifest.txt apps/admin/screenshots/manifest.txt
       - name: Summarize screenshot files
         if: always()
         run: |
@@ -138,7 +150,7 @@ jobs:
             echo '```text'
             test -f apps/website/screenshots/manifest.txt && cat apps/website/screenshots/manifest.txt || true
             echo
-            echo 'Mini App matrix: buyer home/orders + merchant home × 2 widths × 2 themes × 3 languages = 36 screenshots.'
+            echo 'Mini App matrix: buyer home/orders-list/orders-detail + merchant home × 2 widths × 2 themes × 3 languages = 54 screenshots.'
             test -f apps/website/screenshots-miniapp/manifest.txt && cat apps/website/screenshots-miniapp/manifest.txt || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -156,6 +168,14 @@ jobs:
         with:
           name: miniapp-screenshots
           path: apps/website/screenshots-miniapp
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload admin screenshot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-screenshots
+          path: apps/admin/screenshots
           if-no-files-found: warn
           retention-days: 14
 

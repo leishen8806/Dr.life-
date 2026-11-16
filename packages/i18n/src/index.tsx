@@ -83,10 +83,12 @@ export function t(
   params: Params = {},
   language: Language = "en"
 ): string {
-  return Object.entries(params).reduce(
+  const translated = Object.entries(params).reduce(
     (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
     locales[language][key]
   );
+  // Khmer review markers are source-only annotations; never expose them in a rendered Mini App.
+  return language === "km" ? translated.replace(/^\[TODO-KM-REVIEW\]\s*/, "") : translated;
 }
 
 export function plural<T>(count: number, one: T, other: T): T {

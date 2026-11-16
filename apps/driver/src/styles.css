@@ -22,19 +22,19 @@ h1 {
   font-size: 13px;
 }
 .mode.dev {
-  background: #fff3cd;
-  color: #714d00;
+  background: var(--drl-color-warning-soft);
+  color: var(--drl-color-warning);
 }
 .mode.telegram {
-  background: #d9f7e8;
-  color: #085b35;
+  background: var(--drl-color-success-soft);
+  color: var(--drl-color-success);
 }
 .card {
   margin-top: 18px;
   padding: 18px;
   border-radius: var(--drl-radius);
   background: var(--drl-color-surface);
-  box-shadow: 0 8px 30px rgb(22 35 66 / 8%);
+  box-shadow: var(--drl-shadow-card);
 }
 .languages {
   display: flex;
@@ -42,13 +42,15 @@ h1 {
   flex-wrap: wrap;
 }
 button {
-  border: 1px solid #d6dce7;
-  border-radius: 8px;
-  background: #fff;
-  padding: 8px 12px;
+  border: 1px solid var(--drl-color-border);
+  border-radius: var(--drl-radius-sm);
+  background: var(--drl-color-surface-raised);
+  padding: var(--drl-space-2) var(--drl-space-3);
+  color: var(--drl-color-text);
+  font: inherit;
 }
 button[aria-pressed="true"] {
-  color: #fff;
+  color: var(--drl-color-text-on-brand);
   background: var(--drl-color-brand);
   border-color: var(--drl-color-brand);
 }
@@ -60,8 +62,8 @@ button[aria-pressed="true"] {
 footer {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 18px;
-  color: #657089;
-  font-size: 13px;
+  gap: var(--drl-space-2) var(--drl-space-4);
+  margin-top: var(--drl-space-5);
+  color: var(--drl-color-text-muted);
+  font-size: var(--drl-font-size-sm);
 }

@@ -398,6 +398,11 @@
   font-size: var(--drl-font-size-sm);
 }
 
+[data-surface="miniapp"][data-color-scheme="dark"] .buyer-order-card__footer span,
+[data-surface="miniapp"][data-color-scheme="dark"] .buyer-order-status {
+  color: var(--accent-text);
+}
+
 .buyer-order-status {
   display: inline-block;
   border-radius: 999px;
@@ -406,6 +411,10 @@
   background: color-mix(in srgb, var(--drl-color-brand), transparent 86%);
   font-size: var(--drl-font-size-sm);
   overflow-wrap: anywhere;
+}
+
+[data-surface="miniapp"][data-color-scheme="dark"] .buyer-order-status {
+  background: color-mix(in srgb, var(--accent-text), transparent 78%);
 }
 
 .buyer-order-detail__heading .buyer-section__title {

@@ -56,7 +56,7 @@ describe("OrderDetailView quote expiry", () => {
     renderDetail(order("awaiting_payment", "2026-11-11T00:00:01Z"));
     expect(screen.getAllByText("Order details").length).toBeGreaterThan(0);
     expect(screen.getByText("Sub-order")).toBeTruthy();
-    expect(screen.getAllByText("$0.00").length).toBeGreaterThan(0);
+    expect(screen.getByText("Shipping: $0.00")).toBeTruthy();
     expect(screen.queryByText("ord_test")).toBeNull();
     expect(screen.queryByText("sub_test")).toBeNull();
     expect(screen.getByText(/Shipping quote expires/)).toBeTruthy();
@@ -81,7 +81,7 @@ describe("OrderDetailView quote expiry", () => {
 
     cleanup();
     renderDetail(order("awaiting_payment", ""), onPay);
-    expect(screen.getAllByText("Quote pending").length).toBeGreaterThan(0);
+    expect(screen.getByText("Shipping: Quote pending")).toBeTruthy();
     expect(screen.queryByText("Pay now")).toBeNull();
   });
 

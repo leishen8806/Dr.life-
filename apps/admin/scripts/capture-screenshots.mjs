@@ -5,10 +5,12 @@ import { chromium } from "../../website/node_modules/playwright/index.mjs";
 const pages = [
   { name: "overview", path: "/" },
   { name: "review", path: "/review" },
-  { name: "orders", path: "/orders" }
+  { name: "orders", path: "/orders" },
+  { name: "policies", path: "/policies" },
+  { name: "integrations", path: "/integrations" }
 ];
 const widths = [1440, 1920];
-const languages = ["zh", "km"];
+const languages = ["zh", "en", "km"];
 
 function waitForServer(url) {
   return new Promise((resolve, reject) => {
@@ -49,5 +51,6 @@ try {
   await browser.close();
   server.kill("SIGTERM");
 }
-await writeFile(new URL("../screenshots/manifest.txt", import.meta.url), manifest.join("\n") + "\n");
+const evidenceHead = process.env.EVIDENCE_HEAD;
+await writeFile(new URL("../screenshots/manifest.txt", import.meta.url), `${evidenceHead ? `head=${evidenceHead}\n` : ""}${manifest.join("\n")}\n`);
 console.log("Captured " + manifest.length + " admin screenshots");

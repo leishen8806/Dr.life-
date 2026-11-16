@@ -32,6 +32,10 @@ describe("i18n", () => {
     }
   });
 
+  it("does not render Khmer review markers", () => {
+    expect(t("order.pageTitle", {}, "km")).not.toContain("TODO-KM-REVIEW");
+  });
+
   it("selects explicit singular and plural keys", () => {
     expect(plural(1, "order.count.one", "order.count.other")).toBe(
       "order.count.one"

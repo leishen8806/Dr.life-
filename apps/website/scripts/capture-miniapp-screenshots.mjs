@@ -87,7 +87,38 @@ async function installMockApi(page, language, app) {
       return;
     }
     if (path === "/v1/buyer/orders" && request.method() === "GET") {
-      await route.fulfill(json({ items: [], next_cursor: null }));
+      await route.fulfill(json({ items: [{
+        public_id: "01EVIDENCEORDER",
+        payment_status: "succeeded",
+        summary_status: "paid",
+        goods_amount_e4: 190000,
+        shipping_amount_e4: 0,
+        payable_amount_e4: 190000,
+        created_at: "2026-11-14T09:00:00Z",
+        suborders: [{
+          public_id: "01EVIDENCESUBORDER",
+          merchant_public_id: "01EVIDENCEMERCHANT",
+          status: "paid",
+          items: [{ sku_public_id: "01EVIDENCESKU", quantity: 2, unit_price_e4: 95000, line_total_e4: 190000 }],
+          goods_amount_e4: 190000,
+          shipping_amount_e4: 0,
+          payable_amount_e4: 190000,
+          shipping_quote_expires_at: "2026-11-15T10:00:00Z"
+        }]
+      }], next_cursor: null }));
+      return;
+    }
+    if (path === "/v1/buyer/orders/01EVIDENCEORDER" && request.method() === "GET") {
+      await route.fulfill(json({
+        public_id: "01EVIDENCEORDER",
+        payment_status: "succeeded",
+        summary_status: "paid",
+        goods_amount_e4: 190000,
+        shipping_amount_e4: 0,
+        payable_amount_e4: 190000,
+        created_at: "2026-11-14T09:00:00Z",
+        suborders: [{ public_id: "01EVIDENCESUBORDER", merchant_public_id: "01EVIDENCEMERCHANT", status: "paid", items: [{ sku_public_id: "01EVIDENCESKU", quantity: 2, unit_price_e4: 95000, line_total_e4: 190000 }], goods_amount_e4: 190000, shipping_amount_e4: 0, payable_amount_e4: 190000, shipping_quote_expires_at: "2026-11-15T10:00:00Z" }]
+      }));
       return;
     }
     if (path === "/v1/merchant/products" && request.method() === "GET") {
@@ -132,9 +163,13 @@ try {
         }
         const targets = app === "buyer" ? [
           { name: "home" },
-          { name: "orders", open: async () => {
+          { name: "orders-list", open: async () => {
             await page.locator(".buyer-orders-action").click();
-            await page.locator(".buyer-order-list, .drl-state").first().waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".buyer-order-list").waitFor({ state: "visible", timeout: 5_000 });
+          } },
+          { name: "orders-detail", open: async () => {
+            await page.locator(".buyer-order-card").first().click();
+            await page.locator(".buyer-order-detail__heading").first().waitFor({ state: "visible", timeout: 5_000 });
           } }
         ] : [{ name: "home" }];
         for (const target of targets) {
@@ -142,7 +177,7 @@ try {
           const title = await page.title();
           if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
           const headingSelector = app === "buyer"
-            ? (target.name === "orders" ? ".drl-state p, .buyer-order-list" : ".buyer-section__title")
+            ? (target.name === "home" ? ".buyer-section__title" : ".buyer-order-list, .buyer-order-detail__heading")
             : "h1";
           const pageHeading = await page.locator(headingSelector).first().textContent();
           if (!pageHeading?.trim()) throw new Error(`missing business page heading for ${app}-${target.name}-${item.language}`);
@@ -154,6 +189,7 @@ try {
       }
     }
   } finally { await browser.close(); }
-  await writeFile(join(output, "manifest.txt"), `${manifest.join("\n")}\n`);
+  const head = process.env.EVIDENCE_HEAD;
+  await writeFile(join(output, "manifest.txt"), `${head ? `head=${head}\n` : ""}${manifest.join("\n")}\n`);
   console.log(`Captured ${manifest.length} Mini App screenshots in ${output}`);
 } finally { for (const { child } of servers) child.kill("SIGTERM"); }

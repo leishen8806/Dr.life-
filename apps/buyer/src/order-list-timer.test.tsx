@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { t as translate } from "@drlife/i18n";
 import type { BuyerOrder } from "./orders";
 import { OrderListView } from "./views/order-list-view";
+import { formatOrderDateTime } from "./order-date";
 
 afterEach(() => {
   cleanup();
@@ -59,6 +60,11 @@ describe("OrderListView quote timer", () => {
     expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
     rerender(view(value));
     expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses order creation time as the card title when the interaction spec has no title field", () => {
+    render(view(order("2026-11-14T00:00:10Z")));
+    expect(screen.getAllByText(formatOrderDateTime("2026-11-14T00:00:00Z", "en")).length).toBeGreaterThanOrEqual(2);
   });
 
   it("rebuilds the timer only when the nearest quote expiry changes", () => {

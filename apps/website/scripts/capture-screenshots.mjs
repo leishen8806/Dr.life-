@@ -72,8 +72,14 @@ try {
             failedResources.push(`${resourceResponse.status()} ${resourceResponse.url()}`);
           }
         });
-        const url = new URL(pageDefinition.path, origin);
-        url.searchParams.set("lang", language);
+        // Use the statically generated locale route for localized homepage evidence.
+        // The root route is intentionally the Chinese default; adding ?lang=en/km
+        // cannot change Astro's already-built HTML.
+        const path = pageDefinition.name === "home" && language !== "zh"
+          ? `/${language}/`
+          : pageDefinition.path;
+        const url = new URL(path, origin);
+        if (pageDefinition.name !== "home" || language === "zh") url.searchParams.set("lang", language);
         const response = await page.goto(url.toString(), { waitUntil: "networkidle" });
         if (!response?.ok()) throw new Error(`Screenshot page failed: ${url} (${response?.status() ?? "no response"})`);
         await page.evaluate(() => {
@@ -278,7 +284,8 @@ try {
   await new Promise((resolve) => server.close(resolve));
 }
 
-await writeFile(join(output, "manifest.txt"), `${manifest.join("\n")}\n`, "utf8");
+const evidenceHead = process.env.EVIDENCE_HEAD;
+await writeFile(join(output, "manifest.txt"), `${evidenceHead ? `head=${evidenceHead}\n` : ""}${manifest.join("\n")}\n`, "utf8");
 const expected = widths.length * languages.length * pages.length + 2 * languages.length * sectionShots.length;
 if (manifest.length !== expected) throw new Error(`Expected ${expected} screenshots, captured ${manifest.length}`);
 console.log(`Captured ${manifest.length} screenshots in ${output}`);

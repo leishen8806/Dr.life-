@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { t as translate } from "@drlife/i18n";
@@ -25,6 +26,13 @@ function text(markup: string): string[] {
 }
 
 describe("merchant sub-order views", () => {
+  it("keeps the back action 8–12px below the page header", () => {
+    const styles = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+    const start = styles.indexOf(".merchant-back");
+    const block = styles.slice(start, styles.indexOf("}", start));
+    expect(block).toContain("margin-bottom: var(--drl-space-2)");
+  });
+
   it("filters the interface-stub list by status", () => {
     const markup = renderToStaticMarkup(
       <SuborderListView language="en" translate={tr} orders={[order]} selected="shipped" onSelectStatus={() => undefined} onOpen={() => undefined} />
