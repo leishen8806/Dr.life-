@@ -1,0 +1,28 @@
+-- Example only. Owner-operated production deployment template.
+-- Replace every angle-bracket placeholder from the secret manager or release
+-- environment. Do not commit rendered credentials or execute this file as-is.
+
+BEGIN;
+
+-- The login and group names are placeholders, not real account names.
+CREATE ROLE "<WORKER_LOGIN_ROLE>" LOGIN PASSWORD '<WORKER_PASSWORD_PLACEHOLDER>'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION;
+CREATE ROLE "<WORKER_GROUP_ROLE>" NOLOGIN;
+GRANT "<WORKER_GROUP_ROLE>" TO "<WORKER_LOGIN_ROLE>";
+
+-- Grant only the already-reviewed capability group. Do not replace this with
+-- ops_rw or a database-owner grant. The owner must select the exact existing
+-- group (for example ops_file_worker or ledger_rw) for this worker.
+GRANT "<REVIEWED_EXISTING_GROUP_ROLE>" TO "<WORKER_GROUP_ROLE>";
+
+-- Keep the database and schema names explicit at deploy time; no server,
+-- database, password, or real account value belongs in this repository.
+GRANT CONNECT ON DATABASE "<DB_NAME>" TO "<WORKER_LOGIN_ROLE>";
+
+COMMIT;
+
+-- Post-deploy checks (run against a disposable/test database first):
+-- SELECT current_user;
+-- SELECT pg_has_role(current_user, '<REVIEWED_EXISTING_GROUP_ROLE>', 'member');
+-- Revoke/drop the placeholder login and group on rollback; never edit an
+-- already-applied migration in place.
