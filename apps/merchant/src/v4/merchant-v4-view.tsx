@@ -17,15 +17,31 @@ export function MerchantV4View({ api, language, t, onBack }: { api: MerchantV4Ap
   return <main className="mini-shell merchant-v4"><Button variant="secondary" onClick={onBack}>{t("common.back")}</Button><header className="merchant-v4__hero"><p>{t("merchant.profileLabel")}</p><h1>{profile.value.company}</h1><span>{profile.value.user}</span></header><nav className="merchant-v4__tabs" aria-label={t("merchant.sections")}><button type="button" aria-pressed={section === "profile"} onClick={() => setSection("profile")}>{t("nav.profile")}</button><button type="button" aria-pressed={section === "demands"} onClick={() => setSection("demands")}>{t("merchant.demands")}</button><button type="button" aria-pressed={section === "warehouse"} onClick={() => setSection("warehouse")}>{t("merchant.warehouse")}</button></nav>{section === "profile" ? <MerchantProfile profile={profile.value} hasFinance={hasFinance} language={language} t={t} onDemand={() => setSection("demands")} /> : section === "demands" ? <DemandBoard demands={profile.value.demands} api={api} language={language} t={t} /> : <WarehouseView warehouse={warehouse.value} t={t} />}</main>;
 }
 
-function MerchantProfile({ profile, hasFinance, language, t, onDemand }: { profile: MerchantV4Profile; hasFinance: boolean; language: Language; t: Translate; onDemand: () => void }) {
-  return <><Card><h2>{t("merchant.funds")}</h2><div className="merchant-v4__funds"><Money value={String(profile.availableE4)} language={language} translate={t} /><small>{t("merchant.available")}</small><span>{t("merchant.pending")}: <Money value={String(profile.pendingE4)} language={language} translate={t} /></span></div></Card><nav className="merchant-v4__entries"><button type="button" onClick={onDemand}>{t("merchant.demands")}</button>{hasFinance ? <button type="button" disabled>{t("merchant.finance")}</button> : null}<button type="button" disabled>{t("merchant.staff")}</button><button type="button" disabled>{t("merchant.help")}</button></nav></>;
+export function MerchantProfile({ profile, hasFinance, language, t, onDemand }: { profile: MerchantV4Profile; hasFinance: boolean; language: Language; t: Translate; onDemand: () => void }) {
+  return <>{hasFinance ? <Card><h2>{t("merchant.funds")}</h2><div className="merchant-v4__funds"><Money value={String(profile.availableE4)} language={language} translate={t} /><small>{t("merchant.available")}</small><span>{t("merchant.pending")}: <Money value={String(profile.pendingE4)} language={language} translate={t} /></span></div></Card> : null}<nav className="merchant-v4__entries"><button type="button" onClick={onDemand}>{t("merchant.demands")}</button>{hasFinance ? <button type="button" disabled>{t("merchant.finance")}</button> : null}<button type="button" disabled>{t("merchant.staff")}</button><button type="button" disabled>{t("merchant.help")}</button></nav></>;
+}
+
+const metricKeys = ["awaitingPayment", "awaitingShipment", "inDelivery", "needQuote"] as const;
+type MetricKey = (typeof metricKeys)[number];
+
+const metricStates: Partial<Record<MetricKey, MerchantDemand["state"]>> = {
+  awaitingPayment: "awaitingPayment",
+  awaitingShipment: "awaitingShipment",
+  inDelivery: "inDelivery",
+  needQuote: "open"
+};
+
+export function getDemandMetricCount(demands: MerchantDemand[], key: MetricKey): number | undefined {
+  const state = metricStates[key];
+  if (!state || !demands.some((demand) => demand.state === state)) return undefined;
+  return demands.filter((demand) => demand.state === state).length;
 }
 
 function DemandBoard({ demands, api, language, t }: { demands: MerchantDemand[]; api: MerchantV4Api; language: Language; t: Translate }) {
   const [filter, setFilter] = useState<"all" | MerchantDemand["state"]>("all");
   const [active, setActive] = useState<MerchantDemand>();
   const visible = useMemo(() => demands.filter((demand) => filter === "all" || demand.state === filter), [demands, filter]);
-  return <section className="merchant-v4__section"><h2>{t("merchant.demands")}</h2><div className="merchant-v4__metrics">{(["awaitingPayment", "awaitingShipment", "inDelivery", "needQuote"] as const).map((key, index) => <button type="button" key={key} onClick={() => setFilter(index === 3 ? "open" : "all")}><strong>{index + 1}</strong><span>{t(`merchant.metric.${key}` as TranslationKey)}</span></button>)}</div><div className="merchant-v4__filters">{(["all", "open", "quoted", "selected"] as const).map((value) => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{t(`merchant.filter.${value}` as TranslationKey)}</button>)}</div>{visible.length === 0 ? <EmptyState title={t("merchant.noDemands")} /> : <ul className="merchant-v4__demand-list">{visible.map((demand) => <li key={demand.id}><button type="button" onClick={() => setActive(demand)}><span><strong>{demand.title}</strong><small>{t("merchant.quantity")}: {demand.quantity}</small></span><Money value={String(demand.budgetE4)} language={language} translate={t} /></button></li>)}</ul>}{active ? <QuotePanel demand={active} api={api} t={t} onClose={() => setActive(undefined)} /> : null}</section>;
+  return <section className="merchant-v4__section"><h2>{t("merchant.demands")}</h2><div className="merchant-v4__metrics">{metricKeys.map((key) => { const count = getDemandMetricCount(demands, key); return count === undefined ? null : <button type="button" key={key} onClick={() => setFilter(metricStates[key] ?? "all")}><strong>{count}</strong><span>{t(`merchant.metric.${key}` as TranslationKey)}</span></button>; })}</div><div className="merchant-v4__filters">{(["all", "open", "quoted", "selected"] as const).map((value) => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{t(`merchant.filter.${value}` as TranslationKey)}</button>)}</div>{visible.length === 0 ? <EmptyState title={t("merchant.noDemands")} /> : <ul className="merchant-v4__demand-list">{visible.map((demand) => <li key={demand.id}><button type="button" onClick={() => setActive(demand)}><span><strong>{demand.title}</strong><small>{t("merchant.quantity")}: {demand.quantity}</small></span><Money value={String(demand.budgetE4)} language={language} translate={t} /></button></li>)}</ul>}{active ? <QuotePanel demand={active} api={api} t={t} onClose={() => setActive(undefined)} /> : null}</section>;
 }
 
 function QuotePanel({ demand, api, t, onClose }: { demand: MerchantDemand; api: MerchantV4Api; t: Translate; onClose: () => void }) {

@@ -1,6 +1,6 @@
 import type { Language } from "@drlife/i18n";
 
-export type DemandState = "open" | "quoted" | "selected";
+export type DemandState = "open" | "quoted" | "selected" | "awaitingPayment" | "awaitingShipment" | "inDelivery";
 export interface MerchantDemand { id: string; title: string; state: DemandState; quantity: number; budgetE4: number; createdAt: string; }
 export interface MerchantV4Profile { company: string; user: string; availableE4: number; pendingE4: number; permissions: string[]; demands: MerchantDemand[]; }
 export interface WarehouseSnapshot { rateE4PerCbm: number; volumeCbm: number; pieces: number; measuredCbm?: number; storageFeeE4: number; }
