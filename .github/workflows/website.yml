@@ -254,6 +254,12 @@ jobs:
           rsync -a --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r \
             -e "$remote" website-dist/ "$target:/srv/drlifeplus/incoming/$release_id/"
           $remote "$target" "sudo /usr/local/sbin/drlifeplus-website-publish $release_id"
+      - name: Checkout repository scripts for deployment verification
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
       - name: Verify published website content
         env:
           WEBSITE_ORIGIN: https://drlifeplus.com
