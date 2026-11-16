@@ -515,6 +515,7 @@
 ,"merchant.financeType.settlement": "Settlement"
 ,"merchant.financeType.withdrawal": "Withdrawal"
 ,"merchant.ordersTab": "Orders"
+,"merchant.demandsTab": "Demands"
 ,"merchant.deliveryDays": "Delivery days"
 ,"merchant.note": "Note"
 ,"merchant.submitQuote": "Submit quote"
