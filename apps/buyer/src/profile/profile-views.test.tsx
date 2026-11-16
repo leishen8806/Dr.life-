@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { t as translate, type Language } from "@drlife/i18n";
-import { BuyerProfileView, BuyerWalletView } from "./profile-views";
+import { I18nProvider, t as translate, type Language } from "@drlife/i18n";
+import { BuyerProfileView, BuyerWalletView, legalDocumentUrl } from "./profile-views";
 import type { BuyerProfile, WalletEntry } from "./profile-api";
 
 const profile: BuyerProfile = { displayName: "Sokha Trading", username: "@sokha_demo", orderCounts: { pending: 2, completed: 8 }, availableE4: 1250000, frozenE4: 300000, entries: [{ id: "entry", type: "payment", amountE4: -125000, createdAt: "2026-11-15T08:00:00Z" }] };
@@ -10,7 +10,7 @@ const noOp = () => undefined;
 
 describe("buyer V4 profile views", () => {
   it.each(["zh", "en", "km"] as Language[])("renders profile and wallet in %s", (language) => {
-    const profileMarkup = renderToStaticMarkup(<BuyerProfileView profile={{ status: "ready", value: profile }} language={language} t={translateFor(language)} onOpenWallet={noOp} onOpenOrders={noOp} onRetry={noOp} />);
+    const profileMarkup = renderToStaticMarkup(<I18nProvider initialLanguage={language}><BuyerProfileView profile={{ status: "ready", value: profile }} language={language} t={translateFor(language)} onOpenWallet={noOp} onOpenOrders={noOp} onRetry={noOp} /></I18nProvider>);
     const walletMarkup = renderToStaticMarkup(<BuyerWalletView entries={{ status: "ready", value: profile.entries }} language={language} t={translateFor(language)} onBack={noOp} onRetry={noOp} />);
     expect(profileMarkup).toContain(profile.displayName);
     expect(walletMarkup).toContain(translate("wallet.title", {}, language));
@@ -27,5 +27,10 @@ describe("buyer V4 profile views", () => {
     expect(markup).toContain(`>${translate("wallet.topup", {}, "en")}<`);
     expect(markup).toContain(`>${translate("wallet.withdrawal", {}, "en")}<`);
     expect((markup.match(/disabled/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("builds legal links from the configured website origin", () => {
+    expect(legalDocumentUrl("/privacy", "https://example.test")).toBe("https://example.test/privacy");
+    expect(legalDocumentUrl("/terms", "https://example.test")).toBe("https://example.test/terms");
   });
 });

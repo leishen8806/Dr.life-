@@ -1,14 +1,15 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { t as translate } from "@drlife/i18n";
-import { MerchantV4View, canSubmitQuote } from "./merchant-v4-view";
+import { MerchantV4View, canSubmitInbound, canSubmitQuote } from "./merchant-v4-view";
 import { MerchantProfile, getDemandMetricCount } from "./merchant-v4-view";
 import type { MerchantV4Api } from "./merchant-v4-api";
 
 const api: MerchantV4Api = {
   loadProfile: async () => ({ company: "Mekong Home", user: "Dara Sok", availableE4: 4200000, pendingE4: 950000, permissions: ["merchant.finance.view"], demands: [] }),
-  loadWarehouse: async () => ({ rateE4PerCbm: 125000, volumeCbm: 0, pieces: 0, storageFeeE4: 0 }),
-  submitQuote: async () => undefined
+  loadWarehouse: async () => ({ rateE4PerCbm: 125000, volumeCbm: 0, pieces: 0, storageFeeE4: 0, productIds: [] }),
+  submitQuote: async () => undefined,
+  submitInbound: async () => undefined
 };
 
 describe("merchant V4 adapter boundary", () => {
@@ -46,6 +47,11 @@ describe("merchant V4 adapter boundary", () => {
   it("does not submit quotes in production", () => {
     expect(canSubmitQuote(false)).toBe(false);
     expect(canSubmitQuote(true)).toBe(true);
+  });
+
+  it("does not submit inbound bookings in production", () => {
+    expect(canSubmitInbound(false)).toBe(false);
+    expect(canSubmitInbound(true)).toBe(true);
   });
 });
 

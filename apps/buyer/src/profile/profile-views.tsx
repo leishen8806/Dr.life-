@@ -6,6 +6,11 @@ import type { BuyerProfile, WalletEntry, WalletEntryType } from "./profile-api";
 
 type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
+export function legalDocumentUrl(path: "/privacy" | "/terms", siteOrigin = import.meta.env.VITE_SITE_ORIGIN): string | undefined {
+  const origin = siteOrigin ?? (typeof window === "undefined" ? undefined : window.location.origin);
+  return origin ? new URL(path, origin).toString() : undefined;
+}
+
 function SignedMoney({ amountE4, language, t }: { amountE4: number; language: Language; t: Translate }) {
   return <span>{amountE4 < 0 ? "−" : "+"}<Money value={String(Math.abs(amountE4))} language={language} translate={t} /></span>;
 }
@@ -20,6 +25,8 @@ export function BuyerProfileView({ profile, language, t, onOpenWallet, onOpenOrd
 }) {
   if (profile.status === "loading") return <main className="buyer-page"><Loading label={t("common.loading")} skeleton /></main>;
   if (profile.status === "error") return <main className="buyer-page"><ErrorState title={t("common.failure")} description={t(profile.messageKey)} retryLabel={t("common.retry")} onRetry={onRetry} /></main>;
+  const privacyUrl = legalDocumentUrl("/privacy");
+  const termsUrl = legalDocumentUrl("/terms");
   return <main className="buyer-page"><section className="buyer-page__body profile-page">
     <header className="profile-hero"><p className="profile-eyebrow">{t("profile.buyerLabel")}</p><h1>{profile.value.displayName}</h1><p>{profile.value.username}</p></header>
     <section className="profile-stats" aria-label={t("profile.ordersTitle")}>
@@ -29,7 +36,7 @@ export function BuyerProfileView({ profile, language, t, onOpenWallet, onOpenOrd
     <Card><div className="profile-card-heading"><h2>{t("wallet.title")}</h2><Button variant="secondary" onClick={onOpenWallet}>{t("profile.viewWallet")}</Button></div><div className="wallet-summary"><Money value={String(profile.value.availableE4)} language={language} translate={t} /><span>{t("wallet.available")}</span><small>{t("wallet.frozen")}: <Money value={String(profile.value.frozenE4)} language={language} translate={t} /></small></div></Card>
     <nav className="profile-entry-list" aria-label={t("profile.entriesTitle")}>
       <button type="button" onClick={onOpenWallet}><span>{t("wallet.title")}</span><span aria-hidden="true">›</span></button>
-      <a href="/privacy" target="_blank" rel="noreferrer">{t("consent.privacy")} ↗</a><a href="/terms" target="_blank" rel="noreferrer">{t("consent.terms")} ↗</a>
+      <a href={privacyUrl} target="_blank" rel="noreferrer" aria-disabled={!privacyUrl} onClick={privacyUrl ? undefined : (event) => event.preventDefault()}>{t("consent.privacy")} ↗</a><a href={termsUrl} target="_blank" rel="noreferrer" aria-disabled={!termsUrl} onClick={termsUrl ? undefined : (event) => event.preventDefault()}>{t("consent.terms")} ↗</a>
       <button type="button" disabled title={t("common.comingSoon")}><span>{t("profile.purchaseOrders")}</span><span aria-hidden="true">›</span></button><button type="button" disabled title={t("common.comingSoon")}><span>{t("profile.help")}</span><span aria-hidden="true">›</span></button><LanguageSwitcher />
     </nav>
   </section></main>;
