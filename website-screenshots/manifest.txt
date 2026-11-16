@@ -1,3 +1,4 @@
+head=da9c3fe3
 360/zh/home.png	/?lang=zh
 360/zh/merchant.png	/merchant/?lang=zh
 360/en/home.png	/en/?lang=en
