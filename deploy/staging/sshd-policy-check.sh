@@ -5,22 +5,33 @@ set -euo pipefail
 # Validate the effective SSH policy for every port reported by sshd. A
 # Match LocalPort block makes lport mandatory in sshd -T -C.
 collect_config_ports() {
-  local file=$1 line directive value ports_spec include
+  local file=$1 depth=${2:-0} line directive value ports_spec include resolved
+  local -a includes=() matches=()
   [[ -r $file ]] || return 0
+  if ((depth >= 10)); then
+    printf 'warning: sshd Include recursion limit reached at %s\n' "$file" >&2
+    return 0
+  fi
   while IFS= read -r line || [[ -n $line ]]; do
     line=${line%%#*}
     read -r directive value ports_spec _ <<< "$line"
     directive=$(printf '%s' "$directive" | tr '[:upper:]' '[:lower:]')
     case "$directive" in
       include)
-        for include in $value; do
-          for file in $include; do collect_config_ports "$file"; done
+        read -r -a includes <<< "${line#*[[:space:]]}"
+        for include in "${includes[@]}"; do
+          resolved=$include
+          [[ $resolved == /* ]] || resolved="/etc/ssh/$resolved"
+          matches=()
+          while IFS= read -r file; do matches+=("$file"); done < <(compgen -G "$resolved" || true)
+          for file in "${matches[@]}"; do collect_config_ports "$file" "$((depth + 1))"; done
         done
         ;;
       port) printf '%s\n' "$value" ;;
       listenaddress)
-        [[ $value =~ \]:([0-9]+)$ ]] && printf '%s\n' "${BASH_REMATCH[1]}"
-        [[ $value =~ :([0-9]+)$ ]] && printf '%s\n' "${BASH_REMATCH[1]}"
+        if [[ $value =~ ^\[[^]]+\]:([0-9]+)$ || $value =~ ^[^:]+:([0-9]+)$ ]]; then
+          printf '%s\n' "${BASH_REMATCH[1]}"
+        fi
         ;;
       match)
         if [[ $(printf '%s' "$value" | tr '[:upper:]' '[:lower:]') == localport ]]; then
@@ -37,7 +48,7 @@ validate_sshd_policy() {
   local ss_bin=${SS_BIN:-ss}
   local config_file=${SSHD_CONFIG:-/etc/ssh/sshd_config}
   local -a ports=()
-  local port effective expected port_output
+  local port effective expected port_output sshd_t_status error_file
 
   # The kernel's listener table is authoritative for ports that are actually
   # reachable. Include sshd -T output as a second source before parsing text
@@ -50,12 +61,23 @@ validate_sshd_policy() {
   # containing Match LocalPort refuse the context-free query; in that case
   # use explicit Port directives and OpenSSH's default of 22 as the safe
   # fallback, then still validate every discovered port with lport supplied.
-  port_output=$("$sshd_bin" -T 2>/dev/null || true)
+  error_file=$(mktemp)
+  if port_output=$("$sshd_bin" -T 2>"$error_file"); then
+    sshd_t_status=0
+  else
+    sshd_t_status=$?
+    printf 'warning: sshd -T failed (exit %s): %s\n' "$sshd_t_status" "$(tr '\n' ' ' < "$error_file")" >&2
+    port_output=''
+  fi
+  rm -f "$error_file"
   while IFS= read -r port; do
     [[ $port =~ ^[0-9]+$ ]] && ports+=("$port")
   done < <(printf '%s\n' "$port_output" | awk '$1 == "port" { print $2 }' | sort -nu)
 
   if ((${#ports[@]} == 0)); then
+    if ((sshd_t_status == 0)); then
+      printf '%s\n' 'warning: sshd -T reported no listening port; checking configuration files' >&2
+    fi
     while IFS= read -r port; do
       [[ $port =~ ^[0-9]+$ ]] && ports+=("$port")
     done < <(collect_config_ports "$config_file" | sort -nu)
@@ -66,7 +88,10 @@ validate_sshd_policy() {
   fi
 
   for port in "${ports[@]}"; do
-    effective=$("$sshd_bin" -T -C "user=$ssh_user,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=$port")
+    if ! effective=$("$sshd_bin" -T -C "user=$ssh_user,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=$port" 2>&1); then
+      printf 'sshd effective config port %s failed: %s\n' "$port" "$effective" >&2
+      return 1
+    fi
     for expected in 'passwordauthentication no' 'permitrootlogin no' 'kbdinteractiveauthentication no'; do
       if ! grep -Fxq "$expected" <<< "$effective"; then
         printf 'sshd effective config port %s missing: %s\n' "$port" "$expected" >&2
