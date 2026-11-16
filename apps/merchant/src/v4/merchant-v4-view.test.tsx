@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { t as translate } from "@drlife/i18n";
-import { MerchantV4View } from "./merchant-v4-view";
+import { MerchantV4View, canSubmitQuote } from "./merchant-v4-view";
 import { MerchantProfile, getDemandMetricCount } from "./merchant-v4-view";
 import type { MerchantV4Api } from "./merchant-v4-api";
 
@@ -41,6 +41,11 @@ describe("merchant V4 adapter boundary", () => {
     expect(getDemandMetricCount(demands, "needQuote")).toBe(2);
     expect(getDemandMetricCount(demands, "awaitingPayment")).toBe(1);
     expect(getDemandMetricCount(demands, "awaitingShipment")).toBeUndefined();
+  });
+
+  it("does not submit quotes in production", () => {
+    expect(canSubmitQuote(false)).toBe(false);
+    expect(canSubmitQuote(true)).toBe(true);
   });
 });
 
