@@ -178,6 +178,8 @@ try {
             await page.locator(".buyer-order-list").waitFor({ state: "visible", timeout: 5_000 });
           } },
           { name: "orders-detail", open: async () => {
+            await page.locator(".buyer-orders-action").click();
+            await page.locator(".buyer-order-list").waitFor({ state: "visible", timeout: 5_000 });
             await page.locator(".buyer-order-card").first().click();
             await page.locator(".buyer-order-detail__heading").first().waitFor({ state: "visible", timeout: 5_000 });
           } }
@@ -201,10 +203,8 @@ try {
           }, profile: true }
         ];
         for (const target of targets) {
-          if (target.profile) {
-            await page.goto(url, { waitUntil: "networkidle" });
-            await waitForBusinessPage(page, app);
-          }
+          await page.goto(url, { waitUntil: "networkidle" });
+          await waitForBusinessPage(page, app);
           if (target.open) await target.open();
           const title = await page.title();
           if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
