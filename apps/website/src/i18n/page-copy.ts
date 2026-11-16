@@ -202,4 +202,13 @@ const homepageV2Acceptance = {
   }
 } as const;
 
-export const pageCopy = { zh: { ...zh, home: { ...zh.home, homepageV2: homepageV2Acceptance.zh } }, en: { ...en, home: { ...en.home, homepageV2: homepageV2Acceptance.en } }, km: { ...km, home: { ...km.home, homepageV2: homepageV2Acceptance.km } } } as const;
+// Publish a detached, complete per-locale structure. The homepage renderer and
+// its serialized payload must never observe the intermediate seed/override
+// objects above or accidentally fall back across locale layers.
+const homepageV2Complete = {
+  zh: JSON.parse(JSON.stringify(homepageV2Acceptance.zh)) as typeof homepageV2Acceptance.zh,
+  en: JSON.parse(JSON.stringify(homepageV2Acceptance.en)) as typeof homepageV2Acceptance.en,
+  km: JSON.parse(JSON.stringify(homepageV2Acceptance.km)) as typeof homepageV2Acceptance.km
+} as const;
+
+export const pageCopy = { zh: { ...zh, home: { ...zh.home, homepageV2: homepageV2Complete.zh } }, en: { ...en, home: { ...en.home, homepageV2: homepageV2Complete.en } }, km: { ...km, home: { ...km.home, homepageV2: homepageV2Complete.km } } } as const;
