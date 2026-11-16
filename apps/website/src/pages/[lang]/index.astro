@@ -68,5 +68,6 @@ const localizedSourceBody = Object.keys(localizedSourceTranslations)
   <span id="about" hidden></span>
   <Fragment set:html={localizedSourceBody} />
   <script id="homepage-copy" type="application/json" set:html={homepageCopyJson}></script>
+  <script src="/scripts/homepage-interaction.js" defer></script>
   {needsHomepageRuntime && <script src="/scripts/homepage-source.js" defer></script>}
 </Layout>
