@@ -25,6 +25,13 @@
 .drl-notification-list .drl-list-item { border-top: 1px solid var(--drl-color-border); }
 .buyer-file-previews { display: flex; flex-wrap: wrap; gap: var(--drl-space-2); margin-top: var(--drl-space-2); }
 .buyer-file-previews img { width: 72px; height: 72px; object-fit: cover; border-radius: var(--drl-radius-sm); border: 1px solid var(--drl-color-border); }
+.buyer-upload-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 var(--drl-space-3); border: 1px solid var(--drl-color-border); border-radius: var(--drl-radius); color: inherit; background: var(--drl-color-surface); cursor: pointer; }
+.buyer-upload-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.profile-legal-links { display: flex; flex-wrap: wrap; gap: var(--drl-space-2); }
+.profile-legal-links a + a { padding-left: var(--drl-space-2); border-left: 1px solid var(--drl-color-border); }
+.buyer-page .drl-app-header__brand,
+.buyer-page .drl-app-header__slogan { max-width: 100%; overflow-wrap: normal; word-break: keep-all; }
+.buyer-page .drl-list-item__trailing { overflow-wrap: normal; word-break: keep-all; }
 
 .profile-page,
 .wallet-page { gap: var(--drl-space-4); }
