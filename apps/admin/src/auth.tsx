@@ -42,7 +42,11 @@ export function PasswordChangePage({ onComplete }: { onComplete: () => void }) {
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [state, setState] = useState<"loading" | "login" | "password" | "ready">("loading");
-  useEffect(() => { api.refresh().then(() => setState("ready")).catch(() => setState("login")); }, []);
+  useEffect(() => {
+    if (window.location.pathname === "/login") { setState("login"); return; }
+    if (import.meta.env.VITE_ADMIN_SCREENSHOT === "true") { api.login({ email: "admin@example.test", password: "screenshot-only", totpCode: "123456" }).then(() => setState("ready")); return; }
+    api.refresh().then(() => setState("ready")).catch(() => setState("login"));
+  }, []);
   if (state === "loading") return <div className="admin-auth-layout" aria-busy="true"><Typography.Text>Loading</Typography.Text></div>;
   if (state === "login") return <div className="admin-auth-layout"><LoginPage onSuccess={(mustChange) => setState(mustChange ? "password" : "ready")} /></div>;
   if (state === "password") return <div className="admin-auth-layout"><PasswordChangePage onComplete={() => setState("login")} /></div>;

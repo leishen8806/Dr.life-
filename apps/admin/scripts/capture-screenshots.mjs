@@ -3,13 +3,11 @@ import { spawn } from "node:child_process";
 import { chromium } from "../../website/node_modules/playwright/index.mjs";
 
 const pages = [
-  { name: "overview", path: "/" },
-  { name: "review", path: "/review" },
-  { name: "orders", path: "/orders" },
-  { name: "policies", path: "/policies" },
-  { name: "integrations", path: "/integrations" }
+  { name: "login", path: "/login" },
+  { name: "administrators", path: "/administrators" },
+  { name: "audit", path: "/audit" }
 ];
-const widths = [1440, 1920];
+const widths = [1440, 390];
 const languages = ["zh", "en", "km"];
 
 function waitForServer(url) {
@@ -28,7 +26,8 @@ function waitForServer(url) {
 
 const server = spawn("pnpm", ["exec", "vite", "--host", "127.0.0.1", "--port", "5176", "--strictPort"], {
   cwd: new URL("../", import.meta.url).pathname,
-  stdio: "ignore"
+  stdio: "ignore",
+  env: { ...process.env, VITE_ADMIN_SCREENSHOT: "true" }
 });
 await waitForServer("http://127.0.0.1:5176/");
 const browser = await chromium.launch();
@@ -39,7 +38,6 @@ try {
     await context.addInitScript((selectedLanguage) => localStorage.setItem("drlife_lang", selectedLanguage), language);
     const page = await context.newPage();
     await page.goto("http://127.0.0.1:5176" + pageDefinition.path, { waitUntil: "networkidle" });
-    if (pageDefinition.name === "orders") await page.locator("tbody tr").first().click();
     await page.waitForTimeout(250);
     const relative = width + "/" + language + "/" + pageDefinition.name + ".png";
     await mkdir(new URL("../screenshots/" + width + "/" + language + "/", import.meta.url), { recursive: true });
