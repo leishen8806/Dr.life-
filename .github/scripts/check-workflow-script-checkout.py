@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail when a workflow runs a tracked shell script without checking out the repo."""
+"""Fail when a workflow runs a tracked repository script before checkout."""
 
 from pathlib import Path
 import re
@@ -7,8 +7,9 @@ import sys
 
 WORKFLOW_DIR = Path(".github/workflows")
 SCRIPT_REF = re.compile(
-    r"(?<![A-Za-z0-9_.-])((?:\./)?(?:\.github|backend|deploy)/[A-Za-z0-9_./-]+\.sh)(?![A-Za-z0-9_.-])"
+    r"(?<![A-Za-z0-9_.-])((?:\./)?(?:\.github|apps/website|backend|deploy|loadtest)/[A-Za-z0-9_./-]+\.(?:sh|py|mjs|js))(?![A-Za-z0-9_.-])"
 )
+WEBSITE_EXEC_REF = re.compile(r"--filter\s+@drlife/website\s+exec\s+node\s+([A-Za-z0-9_./-]+\.(?:mjs|js))")
 JOB_HEADER = re.compile(r"^  ([A-Za-z0-9_-]+):\s*$")
 
 
@@ -46,12 +47,19 @@ def main():
         for job, lines in iter_jobs(text):
             job_text = "\n".join(lines)
             refs = {match.group(1).removeprefix("./") for match in SCRIPT_REF.finditer(job_text)}
+            refs.update(f"apps/website/{match.group(1)}" for match in WEBSITE_EXEC_REF.finditer(job_text))
             if not refs:
                 continue
-            has_checkout = bool(re.search(r"uses:\s*actions/checkout@", job_text))
+            checkout_lines = [index for index, line in enumerate(lines) if re.search(r"uses:\s*actions/checkout@", line)]
+            has_checkout = bool(checkout_lines)
             if not has_checkout:
                 for ref in sorted(refs):
                     errors.append(f"{workflow}:{job}: {ref} is used without actions/checkout")
+            else:
+                first_checkout = min(checkout_lines)
+                for ref in sorted(refs):
+                    if any(index < first_checkout for index, line in enumerate(lines) if ref in line or f"./{ref}" in line):
+                        errors.append(f"{workflow}:{job}: actions/checkout must precede {ref}")
             for ref in sorted(refs):
                 if not Path(ref).is_file():
                     errors.append(f"{workflow}:{job}: referenced script does not exist: {ref}")
@@ -59,7 +67,7 @@ def main():
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
-    print(f"PASS: checked {len(workflows)} workflow file(s) for shell-script checkout coverage")
+    print(f"PASS: checked {len(workflows)} workflow file(s) for repository-script checkout coverage")
     return 0
 
 
