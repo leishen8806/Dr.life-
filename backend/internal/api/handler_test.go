@@ -695,6 +695,12 @@ func (f *fakeNotifications) MarkAllRead(_ context.Context, accountID int64) erro
 	f.allAccount = accountID
 	return nil
 }
+func (f *fakeNotifications) ListSettings(context.Context, int64) ([]notifications.Setting, error) {
+	return nil, nil
+}
+func (f *fakeNotifications) UpsertSetting(context.Context, int64, notifications.Setting) error {
+	return nil
+}
 
 type fakeAdminPermissions struct{ allowed, scoped bool }
 

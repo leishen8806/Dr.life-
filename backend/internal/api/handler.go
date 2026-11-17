@@ -165,6 +165,8 @@ type NotificationManagement interface {
 	List(context.Context, int64, int) ([]notifications.Record, int, error)
 	MarkRead(context.Context, int64, string) error
 	MarkAllRead(context.Context, int64) error
+	ListSettings(context.Context, int64) ([]notifications.Setting, error)
+	UpsertSetting(context.Context, int64, notifications.Setting) error
 }
 
 func (h Handler) ListBuyerOrders(w http.ResponseWriter, r *http.Request, params gen.ListBuyerOrdersParams) {

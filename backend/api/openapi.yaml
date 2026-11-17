@@ -565,6 +565,58 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/me/notification-settings:
+    get:
+      tags: [buyer]
+      operationId: listBuyerMeNotificationSettings
+      summary: List buyer notification settings
+      x-roles: [buyer]
+      responses:
+        "200": { $ref: "#/components/responses/NotificationSettingsSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    put:
+      tags: [buyer]
+      operationId: putBuyerMeNotificationSetting
+      summary: Update one buyer notification setting
+      x-roles: [buyer]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/NotificationSettingUpdateRequest"}}}
+      responses:
+        "200": { $ref: "#/components/responses/NotificationSettingsSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/notification-settings:
+    get:
+      tags: [merchant]
+      operationId: listMerchantMeNotificationSettings
+      summary: List merchant notification settings
+      x-roles: [merchant]
+      responses:
+        "200": { $ref: "#/components/responses/NotificationSettingsSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    put:
+      tags: [merchant]
+      operationId: putMerchantMeNotificationSetting
+      summary: Update one merchant notification setting
+      x-roles: [merchant]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/NotificationSettingUpdateRequest"}}}
+      responses:
+        "200": { $ref: "#/components/responses/NotificationSettingsSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /v1/driver/me:
     get:
       tags: [driver]
@@ -1987,6 +2039,30 @@ components:
         ok: {type: boolean, enum: [true]}
         data: {$ref: "#/components/schemas/NotificationMutationData"}
         request_id: {type: string, minLength: 1}
+    NotificationSetting:
+      type: object
+      additionalProperties: false
+      required: [event_type, in_app_enabled, telegram_enabled]
+      properties:
+        event_type: {type: string}
+        in_app_enabled: {type: boolean}
+        telegram_enabled: {type: boolean}
+    NotificationSettingUpdateRequest:
+      allOf: [{$ref: "#/components/schemas/NotificationSetting"}]
+    NotificationSettingsData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/NotificationSetting"}}
+    NotificationSettingsSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/NotificationSettingsData"}
+        request_id: {type: string, minLength: 1}
     AccountProfileData:
       type: object
       additionalProperties: false
@@ -3068,6 +3144,15 @@ components:
               - {$ref: "#/components/schemas/SuccessEnvelope"}
             properties:
               data: {$ref: "#/components/schemas/NotificationMutationData"}
+    NotificationSettingsSucceeded:
+      description: Notification settings for the authenticated account.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/NotificationSettingsData"}
     ConsentStatusSucceeded:
       description: Consent state for every current legal document.
       content:

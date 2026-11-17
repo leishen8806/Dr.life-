@@ -836,6 +836,21 @@ func (e NotificationMutationSuccessResponseOk) Valid() bool {
 	}
 }
 
+// Defines values for NotificationSettingsSuccessResponseOk.
+const (
+	NotificationSettingsSuccessResponseOkTrue NotificationSettingsSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the NotificationSettingsSuccessResponseOk enum.
+func (e NotificationSettingsSuccessResponseOk) Valid() bool {
+	switch e {
+	case NotificationSettingsSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OrderPaymentSuccessResponseOk.
 const (
 	OrderPaymentSuccessResponseOkTrue OrderPaymentSuccessResponseOk = true
@@ -1526,6 +1541,21 @@ func (e NotificationMutationSucceededOk) Valid() bool {
 	}
 }
 
+// Defines values for NotificationSettingsSucceededOk.
+const (
+	NotificationSettingsSucceededOkTrue NotificationSettingsSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the NotificationSettingsSucceededOk enum.
+func (e NotificationSettingsSucceededOk) Valid() bool {
+	switch e {
+	case NotificationSettingsSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostAdminAuthRefreshParamsXRequestedWith.
 const (
 	Drlife PostAdminAuthRefreshParamsXRequestedWith = "drlife"
@@ -1550,6 +1580,36 @@ const (
 func (e GetBuyerMeConsents200JSONResponseBodyOk) Valid() bool {
 	switch e {
 	case GetBuyerMeConsents200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListBuyerMeNotificationSettings200JSONResponseBodyOk.
+const (
+	ListBuyerMeNotificationSettings200JSONResponseBodyOkTrue ListBuyerMeNotificationSettings200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListBuyerMeNotificationSettings200JSONResponseBodyOk enum.
+func (e ListBuyerMeNotificationSettings200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListBuyerMeNotificationSettings200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PutBuyerMeNotificationSetting200JSONResponseBodyOk.
+const (
+	PutBuyerMeNotificationSetting200JSONResponseBodyOkTrue PutBuyerMeNotificationSetting200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the PutBuyerMeNotificationSetting200JSONResponseBodyOk enum.
+func (e PutBuyerMeNotificationSetting200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case PutBuyerMeNotificationSetting200JSONResponseBodyOkTrue:
 		return true
 	default:
 		return false
@@ -1625,6 +1685,36 @@ const (
 func (e GetMerchantMeConsents200JSONResponseBodyOk) Valid() bool {
 	switch e {
 	case GetMerchantMeConsents200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListMerchantMeNotificationSettings200JSONResponseBodyOk.
+const (
+	ListMerchantMeNotificationSettings200JSONResponseBodyOkTrue ListMerchantMeNotificationSettings200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListMerchantMeNotificationSettings200JSONResponseBodyOk enum.
+func (e ListMerchantMeNotificationSettings200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListMerchantMeNotificationSettings200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PutMerchantMeNotificationSetting200JSONResponseBodyOk.
+const (
+	PutMerchantMeNotificationSetting200JSONResponseBodyOkTrue PutMerchantMeNotificationSetting200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the PutMerchantMeNotificationSetting200JSONResponseBodyOk enum.
+func (e PutMerchantMeNotificationSetting200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case PutMerchantMeNotificationSetting200JSONResponseBodyOkTrue:
 		return true
 	default:
 		return false
@@ -2508,6 +2598,31 @@ type NotificationMutationSuccessResponse struct {
 // NotificationMutationSuccessResponseOk defines model for NotificationMutationSuccessResponse.Ok.
 type NotificationMutationSuccessResponseOk bool
 
+// NotificationSetting defines model for NotificationSetting.
+type NotificationSetting struct {
+	EventType       string `json:"event_type"`
+	InAppEnabled    bool   `json:"in_app_enabled"`
+	TelegramEnabled bool   `json:"telegram_enabled"`
+}
+
+// NotificationSettingUpdateRequest defines model for NotificationSettingUpdateRequest.
+type NotificationSettingUpdateRequest = NotificationSetting
+
+// NotificationSettingsData defines model for NotificationSettingsData.
+type NotificationSettingsData struct {
+	Items []NotificationSetting `json:"items"`
+}
+
+// NotificationSettingsSuccessResponse defines model for NotificationSettingsSuccessResponse.
+type NotificationSettingsSuccessResponse struct {
+	Data      NotificationSettingsData              `json:"data"`
+	Ok        NotificationSettingsSuccessResponseOk `json:"ok"`
+	RequestId string                                `json:"request_id"`
+}
+
+// NotificationSettingsSuccessResponseOk defines model for NotificationSettingsSuccessResponse.Ok.
+type NotificationSettingsSuccessResponseOk bool
+
 // OrderCreateItem defines model for OrderCreateItem.
 type OrderCreateItem struct {
 	Quantity    int64  `json:"quantity"`
@@ -3034,6 +3149,16 @@ type NotificationMutationSucceeded struct {
 // NotificationMutationSucceededOk defines model for NotificationMutationSucceeded.Ok.
 type NotificationMutationSucceededOk bool
 
+// NotificationSettingsSucceeded defines model for NotificationSettingsSucceeded.
+type NotificationSettingsSucceeded struct {
+	Data      NotificationSettingsData        `json:"data"`
+	Ok        NotificationSettingsSucceededOk `json:"ok"`
+	RequestId string                          `json:"request_id"`
+}
+
+// NotificationSettingsSucceededOk defines model for NotificationSettingsSucceeded.Ok.
+type NotificationSettingsSucceededOk bool
+
 // OrderBadRequest defines model for OrderBadRequest.
 type OrderBadRequest = ErrorEnvelope
 
@@ -3165,6 +3290,18 @@ type PutBuyerMeLanguageParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
+
+// ListBuyerMeNotificationSettings200JSONResponseBodyOk defines parameters for ListBuyerMeNotificationSettings.
+type ListBuyerMeNotificationSettings200JSONResponseBodyOk bool
+
+// PutBuyerMeNotificationSettingParams defines parameters for PutBuyerMeNotificationSetting.
+type PutBuyerMeNotificationSettingParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PutBuyerMeNotificationSetting200JSONResponseBodyOk defines parameters for PutBuyerMeNotificationSetting.
+type PutBuyerMeNotificationSetting200JSONResponseBodyOk bool
 
 // ListBuyerMeNotificationsParams defines parameters for ListBuyerMeNotifications.
 type ListBuyerMeNotificationsParams struct {
@@ -3308,6 +3445,18 @@ type DeleteMerchantMeLinkParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
+
+// ListMerchantMeNotificationSettings200JSONResponseBodyOk defines parameters for ListMerchantMeNotificationSettings.
+type ListMerchantMeNotificationSettings200JSONResponseBodyOk bool
+
+// PutMerchantMeNotificationSettingParams defines parameters for PutMerchantMeNotificationSetting.
+type PutMerchantMeNotificationSettingParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PutMerchantMeNotificationSetting200JSONResponseBodyOk defines parameters for PutMerchantMeNotificationSetting.
+type PutMerchantMeNotificationSetting200JSONResponseBodyOk bool
 
 // ListMerchantMeNotificationsParams defines parameters for ListMerchantMeNotifications.
 type ListMerchantMeNotificationsParams struct {
@@ -3466,6 +3615,9 @@ type PostBuyerMeConsentRevokeJSONRequestBody = ConsentRevokeRequest
 // PutBuyerMeLanguageJSONRequestBody defines body for PutBuyerMeLanguage for application/json ContentType.
 type PutBuyerMeLanguageJSONRequestBody = LanguageUpdateRequest
 
+// PutBuyerMeNotificationSettingJSONRequestBody defines body for PutBuyerMeNotificationSetting for application/json ContentType.
+type PutBuyerMeNotificationSettingJSONRequestBody = NotificationSettingUpdateRequest
+
 // CreateBuyerOrderJSONRequestBody defines body for CreateBuyerOrder for application/json ContentType.
 type CreateBuyerOrderJSONRequestBody = OrderCreateRequest
 
@@ -3492,6 +3644,9 @@ type PutMerchantMeLanguageJSONRequestBody = LanguageUpdateRequest
 
 // CreateMerchantMeLinkJSONRequestBody defines body for CreateMerchantMeLink for application/json ContentType.
 type CreateMerchantMeLinkJSONRequestBody = AccountLinkCreateRequest
+
+// PutMerchantMeNotificationSettingJSONRequestBody defines body for PutMerchantMeNotificationSetting for application/json ContentType.
+type PutMerchantMeNotificationSettingJSONRequestBody = NotificationSettingUpdateRequest
 
 // CreateMerchantProductJSONRequestBody defines body for CreateMerchantProduct for application/json ContentType.
 type CreateMerchantProductJSONRequestBody = ProductCreateRequest
@@ -3576,6 +3731,12 @@ type ServerInterface interface {
 	// PutBuyerMeLanguage Register or change the current buyer language
 	// (PUT /v1/buyer/me/language)
 	PutBuyerMeLanguage(w http.ResponseWriter, r *http.Request, params PutBuyerMeLanguageParams)
+	// ListBuyerMeNotificationSettings List buyer notification settings
+	// (GET /v1/buyer/me/notification-settings)
+	ListBuyerMeNotificationSettings(w http.ResponseWriter, r *http.Request)
+	// PutBuyerMeNotificationSetting Update one buyer notification setting
+	// (PUT /v1/buyer/me/notification-settings)
+	PutBuyerMeNotificationSetting(w http.ResponseWriter, r *http.Request, params PutBuyerMeNotificationSettingParams)
 	// ListBuyerMeNotifications List notifications for the current buyer
 	// (GET /v1/buyer/me/notifications)
 	ListBuyerMeNotifications(w http.ResponseWriter, r *http.Request, params ListBuyerMeNotificationsParams)
@@ -3684,6 +3845,12 @@ type ServerInterface interface {
 	// DeleteMerchantMeLink Unlink one account link owned by the authenticated merchant owner
 	// (DELETE /v1/merchant/me/links/{id})
 	DeleteMerchantMeLink(w http.ResponseWriter, r *http.Request, id AccountLinkID, params DeleteMerchantMeLinkParams)
+	// ListMerchantMeNotificationSettings List merchant notification settings
+	// (GET /v1/merchant/me/notification-settings)
+	ListMerchantMeNotificationSettings(w http.ResponseWriter, r *http.Request)
+	// PutMerchantMeNotificationSetting Update one merchant notification setting
+	// (PUT /v1/merchant/me/notification-settings)
+	PutMerchantMeNotificationSetting(w http.ResponseWriter, r *http.Request, params PutMerchantMeNotificationSettingParams)
 	// ListMerchantMeNotifications List notifications for the current merchant
 	// (GET /v1/merchant/me/notifications)
 	ListMerchantMeNotifications(w http.ResponseWriter, r *http.Request, params ListMerchantMeNotificationsParams)
@@ -3891,6 +4058,18 @@ func (_ Unimplemented) GetBuyerMeDevices(w http.ResponseWriter, r *http.Request)
 // PutBuyerMeLanguage Register or change the current buyer language
 // (PUT /v1/buyer/me/language)
 func (_ Unimplemented) PutBuyerMeLanguage(w http.ResponseWriter, r *http.Request, params PutBuyerMeLanguageParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListBuyerMeNotificationSettings List buyer notification settings
+// (GET /v1/buyer/me/notification-settings)
+func (_ Unimplemented) ListBuyerMeNotificationSettings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PutBuyerMeNotificationSetting Update one buyer notification setting
+// (PUT /v1/buyer/me/notification-settings)
+func (_ Unimplemented) PutBuyerMeNotificationSetting(w http.ResponseWriter, r *http.Request, params PutBuyerMeNotificationSettingParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4107,6 +4286,18 @@ func (_ Unimplemented) CreateMerchantMeLink(w http.ResponseWriter, r *http.Reque
 // DeleteMerchantMeLink Unlink one account link owned by the authenticated merchant owner
 // (DELETE /v1/merchant/me/links/{id})
 func (_ Unimplemented) DeleteMerchantMeLink(w http.ResponseWriter, r *http.Request, id AccountLinkID, params DeleteMerchantMeLinkParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListMerchantMeNotificationSettings List merchant notification settings
+// (GET /v1/merchant/me/notification-settings)
+func (_ Unimplemented) ListMerchantMeNotificationSettings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PutMerchantMeNotificationSetting Update one merchant notification setting
+// (PUT /v1/merchant/me/notification-settings)
+func (_ Unimplemented) PutMerchantMeNotificationSetting(w http.ResponseWriter, r *http.Request, params PutMerchantMeNotificationSettingParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5172,6 +5363,65 @@ func (siw *ServerInterfaceWrapper) PutBuyerMeLanguage(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutBuyerMeLanguage(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListBuyerMeNotificationSettings operation middleware
+func (siw *ServerInterfaceWrapper) ListBuyerMeNotificationSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBuyerMeNotificationSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutBuyerMeNotificationSetting operation middleware
+func (siw *ServerInterfaceWrapper) PutBuyerMeNotificationSetting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutBuyerMeNotificationSettingParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutBuyerMeNotificationSetting(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6436,6 +6686,65 @@ func (siw *ServerInterfaceWrapper) DeleteMerchantMeLink(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// ListMerchantMeNotificationSettings operation middleware
+func (siw *ServerInterfaceWrapper) ListMerchantMeNotificationSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMerchantMeNotificationSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutMerchantMeNotificationSetting operation middleware
+func (siw *ServerInterfaceWrapper) PutMerchantMeNotificationSetting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutMerchantMeNotificationSettingParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutMerchantMeNotificationSetting(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMerchantMeNotifications operation middleware
 func (siw *ServerInterfaceWrapper) ListMerchantMeNotifications(w http.ResponseWriter, r *http.Request) {
 
@@ -7538,6 +7847,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/merchant/me/notifications/read-all", wrapper.MarkMerchantMeNotificationsReadAll)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/me/notification-settings", wrapper.ListBuyerMeNotificationSettings)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/v1/buyer/me/notification-settings", wrapper.PutBuyerMeNotificationSetting)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/me/notification-settings", wrapper.ListMerchantMeNotificationSettings)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/v1/merchant/me/notification-settings", wrapper.PutMerchantMeNotificationSetting)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/driver/me", wrapper.GetDriverMe)
