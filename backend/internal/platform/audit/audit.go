@@ -35,6 +35,7 @@ const (
 	ActionRuleChanged               Action = "rule.changed"
 	ActionFilePresigned             Action = "file.presigned"
 	ActionFileVerificationRequested Action = "file.verification_requested"
+	ActionAdminBootstrap            Action = "admin.bootstrap"
 )
 
 var validActions = map[Action]struct{}{
@@ -43,6 +44,7 @@ var validActions = map[Action]struct{}{
 	ActionWithdrawalPaid: {}, ActionDisputeResolved: {}, ActionLogisticsChanged: {},
 	ActionIntegrationChanged: {}, ActionRuleChanged: {},
 	ActionFilePresigned: {}, ActionFileVerificationRequested: {},
+	ActionAdminBootstrap: {},
 }
 
 type Entry struct {
@@ -110,6 +112,16 @@ func (s *Store) Append(ctx context.Context, entry Entry) (Record, error) {
 		return Record{}, err
 	}
 	return record, nil
+}
+
+// AppendTx appends to the audit chain using a caller-owned transaction. It is
+// used by bootstrap operations that must commit their resource and audit row
+// atomically.
+func (s *Store) AppendTx(ctx context.Context, tx pgx.Tx, entry Entry) (Record, error) {
+	if s == nil || tx == nil {
+		return Record{}, errors.New("audit transaction is unavailable")
+	}
+	return s.appendTx(ctx, tx, entry)
 }
 
 func (s *Store) appendOnceTx(ctx context.Context, tx pgx.Tx, eventID string, entry Entry) (Record, error) {
