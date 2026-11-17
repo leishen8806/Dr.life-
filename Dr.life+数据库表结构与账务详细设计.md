@@ -92,6 +92,7 @@
 | `sku` | product_id, public_id, attribute_values jsonb, merchant_sku_code（最多 128 字符）, status, unit（空则继承 product.unit，最多 32 字符）；`UNIQUE(product_id,attribute_values)`；单位换算由 logistics.sku_map 在 R-05 负责 |
 | `sku_tier` | sku_id, min_qty, unit_price_e4；`min_qty` 必须为正整数（数据库 `CHECK (min_qty = trunc(min_qty))`）；`UNIQUE(sku_id,min_qty)`；新写入按 SKU 阶梯价，product_tier 仅作旧读兼容 |
 | `product_import` | id, merchant_id, source, status, items jsonb, rights_ack boolean, created_at；导入后商品 `status=review` |
+| `product_review_audit_outbox` | public_id, occurred_at, actor_id, actor_role, action=`product.moderated`, target, detail, request_id, attempts/last_error/delivered_at；审核状态与本地审计待投递记录同一事务写入，投递成功后标记 delivered_at |
 | `search_synonym` | id, terms text[]（三语同义词组） |
 | `search_log` | id, account_id, q, result_n, created_at（热词、联想来源，按天分区） |
 
