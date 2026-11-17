@@ -48,7 +48,7 @@ try {
 
     if (pageDefinition.name === "review") {
       await page.locator(".admin-tabs [role=tab]").nth(1).click();
-      const productRow = page.locator(".ant-table-tbody tr").first();
+      const productRow = page.locator(".ant-table-tbody tr:not(.ant-table-measure-row)").first();
       await productRow.waitFor();
       await productRow.getByRole("button").last().click();
       await page.locator(".admin-tabs [role=tab]").nth(1).waitFor({ state: "visible" });
@@ -60,7 +60,7 @@ try {
     }
 
     if (pageDefinition.name === "orders") {
-      await page.locator(".ant-table-tbody tr").first().click();
+      await page.locator(".ant-table-tbody tr:not(.ant-table-measure-row)").first().click();
       const detailRelative = width + "/" + language + "/orders-detail.png";
       await page.locator(".ant-drawer-open .ant-drawer-body").waitFor({ state: "visible" });
       await page.locator(".order-detail").waitFor({ state: "visible" });
