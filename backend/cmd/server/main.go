@@ -446,6 +446,7 @@ func main() {
 		AdminManagement:     adminManagementService,
 		Files:               fileService,
 		Orders:              orderService,
+		AdminOrders:         orderService,
 		Bulkhead:            bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)

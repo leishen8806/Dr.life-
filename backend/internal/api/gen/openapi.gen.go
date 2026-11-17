@@ -2771,6 +2771,12 @@ type AlreadyProcessed = ErrorEnvelope
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorEnvelope
 
+// BuyerOrderDetailSucceeded defines model for BuyerOrderDetailSucceeded.
+type BuyerOrderDetailSucceeded = BuyerOrderSuccessResponse
+
+// BuyerOrderSucceeded defines model for BuyerOrderSucceeded.
+type BuyerOrderSucceeded = BuyerOrderListSuccessResponse
+
 // Conflict defines model for Conflict.
 type Conflict = ErrorEnvelope
 
@@ -2948,6 +2954,14 @@ type GetAdminFinancialCenterParams struct {
 
 	// MerchantLimit Maximum merchant rows, from 1 through 100.
 	MerchantLimit *int `form:"merchant_limit,omitempty" json:"merchant_limit,omitempty"`
+}
+
+// ListAdminOrdersParams defines parameters for ListAdminOrders.
+type ListAdminOrdersParams struct {
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
 // PostBuyerAuthLogoutParams defines parameters for PostBuyerAuthLogout.
@@ -3326,6 +3340,12 @@ type ServerInterface interface {
 	// GetAdminLedgerTxn Read a transaction and its postings
 	// (GET /v1/admin/ledger/txns/{txn_no})
 	GetAdminLedgerTxn(w http.ResponseWriter, r *http.Request, txnNo string)
+	// ListAdminOrders List all buyer orders for authorized administrators
+	// (GET /v1/admin/orders)
+	ListAdminOrders(w http.ResponseWriter, r *http.Request, params ListAdminOrdersParams)
+	// GetAdminOrder Read one buyer order for authorized administrators
+	// (GET /v1/admin/orders/{public_id})
+	GetAdminOrder(w http.ResponseWriter, r *http.Request, publicId PublicID)
 	// PostBuyerAuthLogout Revoke the current buyer session
 	// (POST /v1/buyer/auth/logout)
 	PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request, params PostBuyerAuthLogoutParams)
@@ -3620,6 +3640,18 @@ func (_ Unimplemented) GetAdminLedgerTxns(w http.ResponseWriter, r *http.Request
 // GetAdminLedgerTxn Read a transaction and its postings
 // (GET /v1/admin/ledger/txns/{txn_no})
 func (_ Unimplemented) GetAdminLedgerTxn(w http.ResponseWriter, r *http.Request, txnNo string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListAdminOrders List all buyer orders for authorized administrators
+// (GET /v1/admin/orders)
+func (_ Unimplemented) ListAdminOrders(w http.ResponseWriter, r *http.Request, params ListAdminOrdersParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAdminOrder Read one buyer order for authorized administrators
+// (GET /v1/admin/orders/{public_id})
+func (_ Unimplemented) GetAdminOrder(w http.ResponseWriter, r *http.Request, publicId PublicID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4891,6 +4923,78 @@ func (siw *ServerInterfaceWrapper) GetAdminLedgerTxn(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdminLedgerTxn(w, r, txnNo)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminOrders operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminOrders(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminOrdersParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminOrders(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminOrder operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminOrder(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminOrder(w, r, publicId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7248,6 +7352,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/v1/admin/catalog/products/{public_id}/reject", wrapper.PostAdminCatalogProductReject)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/orders", wrapper.ListAdminOrders)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/orders/{public_id}", wrapper.GetAdminOrder)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/buyer/orders", wrapper.ListBuyerOrders)

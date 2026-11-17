@@ -618,7 +618,7 @@ export interface paths {
         };
         /**
          * List catalog products waiting for administrative review
-         * @description The review queue is server-scoped to products in review status.
+         * @description The review queue is server-scoped to products in review status; submitted_from and submitted_to filter the time the product entered review, not its creation time.
          */
         get: operations["listAdminCatalogProducts"];
         put?: never;
@@ -657,6 +657,43 @@ export interface paths {
         put?: never;
         /** Reject one catalog product with a required reason */
         post: operations["postAdminCatalogProductReject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all buyer orders for authorized administrators
+         * @description Read-only order view for administrators with the admin.orders.read permission.
+         */
+        get: operations["listAdminOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one buyer order for authorized administrators */
+        get: operations["getAdminOrder"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2173,6 +2210,24 @@ export interface components {
                 "application/json": components["schemas"]["ProductSuccessResponse"];
             };
         };
+        /** @description Read-only buyer order list. */
+        BuyerOrderSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["BuyerOrderListSuccessResponse"];
+            };
+        };
+        /** @description Read-only buyer order detail. */
+        BuyerOrderDetailSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["BuyerOrderSuccessResponse"];
+            };
+        };
         /** @description Refresh token rotated successfully. */
         RefreshSucceeded: {
             headers: {
@@ -3294,6 +3349,44 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["AlreadyProcessed"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listAdminOrders: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["BuyerOrderSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getAdminOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["BuyerOrderDetailSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
         };
     };

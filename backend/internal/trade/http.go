@@ -49,12 +49,32 @@ type PaymentCreator interface {
 }
 
 type OrderHTTPStore interface {
+	ListAdminOrders(context.Context, string, int) ([]BuyerOrderView, string, error)
+	FindAdminOrderDetail(context.Context, string) (BuyerOrderView, error)
 	ListBuyerOrders(context.Context, int64, string, int) ([]BuyerOrderView, string, error)
 	FindBuyerOrderDetail(context.Context, int64, string) (BuyerOrderView, error)
 	ListMerchantOrders(context.Context, int64, string, int) ([]MerchantOrderView, string, error)
 	FindMerchantOrderDetail(context.Context, int64, string) (MerchantOrderView, error)
 	ClaimBuyerReservationRelease(context.Context, int64, string) (Reservation, bool, error)
 	PaymentAttempt(context.Context, int64, string) (PaymentAttempt, error)
+}
+
+// ListAdminOrders reads parent orders without buyer or merchant scoping. The
+// API layer performs the separate admin.orders.read permission check.
+func (s *Service) AdminOrders(ctx context.Context, cursor string, limit int) ([]BuyerOrderView, string, error) {
+	store, ok := s.store.(OrderHTTPStore)
+	if !ok {
+		return nil, "", ErrOrderAdaptersUnavailable
+	}
+	return store.ListAdminOrders(ctx, cursor, limit)
+}
+
+func (s *Service) AdminOrderDetail(ctx context.Context, publicID string) (BuyerOrderView, error) {
+	store, ok := s.store.(OrderHTTPStore)
+	if !ok {
+		return BuyerOrderView{}, ErrOrderAdaptersUnavailable
+	}
+	return store.FindAdminOrderDetail(ctx, publicID)
 }
 
 type OrderLineView struct {

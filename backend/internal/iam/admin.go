@@ -57,6 +57,29 @@ const (
 	PermissionEdit Permission = "edit"
 )
 
+// AdminPermissionCode is the stable permission identifier used at API
+// boundaries. The RBAC table intentionally keeps its compact module/level
+// representation, while callers use these names in policy and audit text.
+type AdminPermissionCode string
+
+const (
+	AdminPermissionCatalogReview AdminPermissionCode = "admin.catalog.review"
+	AdminPermissionOrdersRead    AdminPermissionCode = "admin.orders.read"
+)
+
+// AdminPermissionParts translates a boundary permission code to the seeded
+// RBAC matrix. Unknown codes fail closed.
+func AdminPermissionParts(code AdminPermissionCode) (Module, Permission, bool) {
+	switch code {
+	case AdminPermissionCatalogReview:
+		return ModuleProducts, PermissionView, true
+	case AdminPermissionOrdersRead:
+		return ModuleOrders, PermissionView, true
+	default:
+		return "", PermissionNone, false
+	}
+}
+
 var (
 	adminRoles   = []Role{RoleSuper, RoleOperations, RoleFinance, RoleLogistics, RoleSupport, RoleAuditor}
 	adminModules = []Module{

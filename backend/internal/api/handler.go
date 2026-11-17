@@ -95,6 +95,14 @@ type AdminPermissionChecker interface {
 	HasDataScope(context.Context, string) (bool, error)
 }
 
+func (h Handler) hasAdminPermission(ctx context.Context, adminID string, code iam.AdminPermissionCode) (bool, error) {
+	module, required, ok := iam.AdminPermissionParts(code)
+	if !ok || h.AdminPermissions == nil {
+		return false, nil
+	}
+	return h.AdminPermissions.Can(ctx, adminID, string(module), string(required))
+}
+
 // CatalogReviewManagement is the HTTP-facing port for administrative catalog
 // moderation. The catalog package owns the transaction and audit outbox.
 type CatalogReviewManagement interface {
@@ -140,6 +148,11 @@ type OrderManagement interface {
 	MerchantOrderDetail(context.Context, int64, string) (trade.MerchantOrderView, error)
 }
 
+type AdminOrderReader interface {
+	AdminOrders(context.Context, string, int) ([]trade.BuyerOrderView, string, error)
+	AdminOrderDetail(context.Context, string) (trade.BuyerOrderView, error)
+}
+
 // Handler 实现 gen.ServerInterface。
 // 零值 Handler 只提供 /v1/public/ping；商品接口在依赖未注入时返回 500，
 // 这样 server.NewHandler(nil) 与契约测试的既有行为保持不变。
@@ -166,6 +179,61 @@ type Handler struct {
 	AdminManagement  AdminManagement
 	CatalogReview    CatalogReviewManagement
 	Orders           OrderManagement
+	AdminOrders      AdminOrderReader
+}
+
+func (h Handler) adminOrdersAccess(w http.ResponseWriter, r *http.Request) bool {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return false
+	}
+	if identity.Role != gateway.RoleAdmin || h.AdminPermissions == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	allowed, err := h.hasAdminPermission(r.Context(), identity.AccountID, iam.AdminPermissionOrdersRead)
+	if err != nil || !allowed {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	return true
+}
+
+func (h Handler) ListAdminOrders(w http.ResponseWriter, r *http.Request, params gen.ListAdminOrdersParams) {
+	if !h.adminOrdersAccess(w, r) {
+		return
+	}
+	if h.AdminOrders == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	items, next, err := h.AdminOrders.AdminOrders(r.Context(), stringValue(params.Cursor), intValue(params.PageSize))
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	data := make([]gen.BuyerOrderSummary, 0, len(items))
+	for _, item := range items {
+		data = append(data, buyerOrderSummary(item))
+	}
+	httpx.WriteOK(w, r, gen.BuyerOrderListData{Items: data, NextCursor: optionalString(next)})
+}
+
+func (h Handler) GetAdminOrder(w http.ResponseWriter, r *http.Request, publicID gen.PublicID) {
+	if !h.adminOrdersAccess(w, r) {
+		return
+	}
+	if h.AdminOrders == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	order, err := h.AdminOrders.AdminOrderDetail(r.Context(), publicIDFromPath(publicID))
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, buyerOrder(order))
 }
 
 func (h Handler) ListBuyerOrders(w http.ResponseWriter, r *http.Request, params gen.ListBuyerOrdersParams) {
@@ -465,7 +533,7 @@ func (h Handler) adminCatalogReviewAccess(w http.ResponseWriter, r *http.Request
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
 		return false
 	}
-	allowed, err := h.AdminPermissions.Can(r.Context(), identity.AccountID, "catalog", "review")
+	allowed, err := h.hasAdminPermission(r.Context(), identity.AccountID, iam.AdminPermissionCatalogReview)
 	if err != nil || !allowed {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
 		return false

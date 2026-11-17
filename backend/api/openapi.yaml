@@ -754,6 +754,37 @@ paths:
         "404": {$ref: "#/components/responses/NotFound"}
         "409": {$ref: "#/components/responses/AlreadyProcessed"}
         "500": {$ref: "#/components/responses/InternalServerError"}
+  /v1/admin/orders:
+    get:
+      tags: [admin]
+      operationId: listAdminOrders
+      summary: List all buyer orders for authorized administrators
+      description: Read-only order view for administrators with the admin.orders.read permission.
+      x-roles: [admin]
+      parameters:
+        - name: cursor
+          in: query
+          schema: {type: string, maxLength: 128}
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200": {$ref: "#/components/responses/BuyerOrderSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+  /v1/admin/orders/{public_id}:
+    get:
+      tags: [admin]
+      operationId: getAdminOrder
+      summary: Read one buyer order for authorized administrators
+      x-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/PublicID"
+      responses:
+        "200": {$ref: "#/components/responses/BuyerOrderDetailSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
   /v1/buyer/orders:
     get:
       tags: [buyer]
@@ -3065,6 +3096,16 @@ components:
       content:
         application/json:
           schema: {$ref: "#/components/schemas/ProductSuccessResponse"}
+    BuyerOrderSucceeded:
+      description: Read-only buyer order list.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/BuyerOrderListSuccessResponse"}
+    BuyerOrderDetailSucceeded:
+      description: Read-only buyer order detail.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/BuyerOrderSuccessResponse"}
     RefreshSucceeded:
       description: Refresh token rotated successfully.
       content:

@@ -11,6 +11,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/gateway"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/server"
+	"github.com/leishen8806/Dr.life-/backend/internal/trade"
 )
 
 type reviewManagementStub struct {
@@ -76,5 +77,37 @@ func TestAdminCatalogRejectPassesReasonAndActorToCatalog(t *testing.T) {
 	handler.ServeHTTP(w, req)
 	if w.Code != http.StatusOK || stub.reason != "missing dimensions" || stub.audit.ActorID != 7 || stub.audit.ActorRole != "admin" {
 		t.Fatalf("status=%d reason=%q audit=%+v body=%s", w.Code, stub.reason, stub.audit, w.Body.String())
+	}
+}
+
+type adminOrderStub struct {
+	order trade.BuyerOrderView
+}
+
+func (s *adminOrderStub) AdminOrders(context.Context, string, int) ([]trade.BuyerOrderView, string, error) {
+	return []trade.BuyerOrderView{s.order}, "next-order", nil
+}
+func (s *adminOrderStub) AdminOrderDetail(context.Context, string) (trade.BuyerOrderView, error) {
+	return s.order, nil
+}
+
+func TestAdminOrdersRequiresDedicatedReadPermission(t *testing.T) {
+	orders := &adminOrderStub{order: trade.BuyerOrderView{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAV", Status: "submitted"}}
+	newHandler := func(allowed bool) http.Handler {
+		return server.NewHandlerWithGateway(nil, server.GatewayOptions{
+			AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+			Authenticator:    stubAuth{identity: gateway.Identity{AccountID: "admin-public", Role: gateway.RoleAdmin}},
+			AdminPermissions: fakeAdminPermissions{allowed: allowed}, AdminOrders: orders,
+		})
+	}
+	denied := httptest.NewRecorder()
+	newHandler(false).ServeHTTP(denied, httptest.NewRequest(http.MethodGet, "/v1/admin/orders", nil))
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("denied status=%d body=%s", denied.Code, denied.Body.String())
+	}
+	allowed := httptest.NewRecorder()
+	newHandler(true).ServeHTTP(allowed, httptest.NewRequest(http.MethodGet, "/v1/admin/orders", nil))
+	if allowed.Code != http.StatusOK || !strings.Contains(allowed.Body.String(), orders.order.PublicID) {
+		t.Fatalf("allowed status=%d body=%s", allowed.Code, allowed.Body.String())
 	}
 }

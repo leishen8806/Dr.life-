@@ -12,6 +12,26 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 )
 
+func TestAdminPermissionPartsUsesCanonicalCodes(t *testing.T) {
+	tests := []struct {
+		code     AdminPermissionCode
+		module   Module
+		required Permission
+	}{
+		{AdminPermissionCatalogReview, ModuleProducts, PermissionView},
+		{AdminPermissionOrdersRead, ModuleOrders, PermissionView},
+	}
+	for _, tt := range tests {
+		module, required, ok := AdminPermissionParts(tt.code)
+		if !ok || module != tt.module || required != tt.required {
+			t.Fatalf("AdminPermissionParts(%q)=(%q,%q,%v), want (%q,%q,true)", tt.code, module, required, ok, tt.module, tt.required)
+		}
+	}
+	if _, _, ok := AdminPermissionParts("admin.unknown.read"); ok {
+		t.Fatal("unknown admin permission code must fail closed")
+	}
+}
+
 func TestArgon2WorkHasIndependentConcurrencyLimit(t *testing.T) {
 	var active atomic.Int32
 	var peak atomic.Int32
