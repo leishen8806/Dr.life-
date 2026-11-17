@@ -46,7 +46,7 @@ try {
     await page.waitForTimeout(250);
     const relative = width + "/" + language + "/" + pageDefinition.name + ".png";
     await mkdir(new URL("../screenshots/" + width + "/" + language + "/", import.meta.url), { recursive: true });
-    await page.screenshot({ path: new URL("../screenshots/" + relative, import.meta.url).pathname, fullPage: true });
+    await page.screenshot({ path: new URL("../screenshots/" + relative, import.meta.url).pathname, fullPage: true, animations: "disabled" });
     manifest.push(relative);
 
     if (pageDefinition.name === "review") {
@@ -54,11 +54,12 @@ try {
       const productRow = page.locator(".ant-table-tbody tr:not(.ant-table-measure-row)").first();
       await productRow.waitFor();
       await productRow.getByRole("button").last().click();
-      await page.locator(".admin-tabs [role=tab]").nth(1).waitFor({ state: "visible" });
-      await page.locator(".admin-tabs [role=tab][aria-selected=true]").filter({ hasText: /./ }).waitFor();
+      const productTab = page.locator(".admin-tabs [role=tab]").nth(1);
+      await productTab.waitFor({ state: "visible" });
+      await page.waitForFunction(() => document.querySelectorAll(".admin-tabs [role=tab]")[1]?.getAttribute("aria-selected") === "true");
       const rejectRelative = width + "/" + language + "/review-reject-modal.png";
       await page.locator(".admin-reject-dialog").waitFor();
-      await page.screenshot({ path: new URL("../screenshots/" + rejectRelative, import.meta.url).pathname, fullPage: true });
+      await page.screenshot({ path: new URL("../screenshots/" + rejectRelative, import.meta.url).pathname, fullPage: true, animations: "disabled" });
       manifest.push(rejectRelative);
     }
 
@@ -67,7 +68,7 @@ try {
       const detailRelative = width + "/" + language + "/orders-detail.png";
       await page.locator(".ant-drawer-open .ant-drawer-body").waitFor({ state: "visible" });
       await page.locator(".order-detail").waitFor({ state: "visible" });
-      await page.screenshot({ path: new URL("../screenshots/" + detailRelative, import.meta.url).pathname, fullPage: true });
+      await page.screenshot({ path: new URL("../screenshots/" + detailRelative, import.meta.url).pathname, fullPage: true, animations: "disabled" });
       manifest.push(detailRelative);
     }
     await context.close();
