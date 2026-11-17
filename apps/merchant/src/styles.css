@@ -57,9 +57,12 @@
 @media (max-width: 390px) { .merchant-v7__placeholder { grid-template-columns: 1fr; } }
 .mini-shell {
   min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
   padding: 28px 20px;
   max-width: 520px;
   margin: 0 auto;
+  overflow-x: hidden;
 }
 .mini-shell .drl-button {
   white-space: nowrap;

@@ -482,8 +482,9 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       <Button variant="secondary" className="buyer-profile-action" onClick={openProfile}>
         {t("nav.profile")}
       </Button>
-      <Button variant="secondary" onClick={openDecor}>{t("buyer.findDecor")}</Button>
-      <Button variant="secondary" onClick={openNotifications}>{t("buyer.notifications")}</Button>
+      <Button variant="secondary" className="buyer-decor-action" onClick={openDecor}>{t("buyer.findDecor")}</Button>
+      <Button variant="secondary" className="buyer-notifications-action" onClick={openNotifications}>{t("buyer.notifications")}</Button>
+      <Button variant="secondary" className="buyer-aftercare-action" onClick={openAftercare}>{t("buyer.orderAftercare")}</Button>
     </>
   );
   const knownCategories = categories.status === "ready" ? categories.value : [];

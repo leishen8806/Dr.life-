@@ -155,7 +155,7 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
         <LanguageSwitcher />
         <Button variant="secondary" className="merchant-orders-action" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
         <Button variant="secondary" onClick={() => setV4Open(true)}>{t("merchant.profileLabel")}</Button>
-        <Button variant="secondary" onClick={() => setV7Open(true)}>{t("merchant.dashboard")}</Button>
+        <Button variant="secondary" className="merchant-v7-action" onClick={() => setV7Open(true)}>{t("merchant.dashboard")}</Button>
       </>} />
       {subordersOpen ? (
         selectedSuborder ? (

@@ -58,10 +58,13 @@
 .buyer-page {
   display: grid;
   min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
   align-content: start;
   max-width: 520px;
   margin: 0 auto;
   background: var(--drl-color-surface-muted);
+  overflow-x: hidden;
 }
 
 .buyer-page__body {
