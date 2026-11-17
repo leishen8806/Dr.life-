@@ -169,7 +169,7 @@ function OrderWorkspace() {
       <Select allowClear value={status} onChange={setStatus} placeholder={t("admin.status")} options={[
         { value: "normal", label: t("admin.normal") }, { value: "attention", label: t("admin.attention") }, { value: "exception", label: t("admin.exception") }
       ]} />
-      <DatePicker.RangePicker onChange={(_, dateStrings) => setDateRange(dateStrings as [string, string])} aria-label={t("admin.date")} />
+      <DatePicker.RangePicker placeholder={[t("admin.startDate"), t("admin.endDate")]} onChange={(_, dateStrings) => setDateRange(dateStrings as [string, string])} aria-label={t("admin.date")} />
     </Space>
     {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <Table scroll={{ x: 760 }} rowKey="id" columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} onRow={(row) => ({ onClick: () => openOrder(row), className: "admin-clickable-row" })} locale={{ emptyText: <Empty description={t("admin.noResults")} /> }} />}
     <Drawer open={Boolean(selected)} title={t("admin.orderDetail")} onClose={() => setSelected(undefined)} width={440}>

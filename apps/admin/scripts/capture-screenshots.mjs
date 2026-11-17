@@ -51,6 +51,8 @@ try {
       const productRow = page.locator(".ant-table-tbody tr").first();
       await productRow.waitFor();
       await productRow.getByRole("button").last().click();
+      await page.locator(".admin-tabs [role=tab]").nth(1).waitFor({ state: "visible" });
+      await page.locator(".admin-tabs [role=tab][aria-selected=true]").filter({ hasText: /./ }).waitFor();
       const rejectRelative = width + "/" + language + "/review-reject-modal.png";
       await page.locator(".admin-reject-dialog").waitFor();
       await page.screenshot({ path: new URL("../screenshots/" + rejectRelative, import.meta.url).pathname, fullPage: true });
@@ -58,9 +60,10 @@ try {
     }
 
     if (pageDefinition.name === "orders") {
-      await page.locator(".ant-table-tbody tr").first().evaluate((row) => row.click());
+      await page.locator(".ant-table-tbody tr").first().click();
       const detailRelative = width + "/" + language + "/orders-detail.png";
-      await page.waitForTimeout(500);
+      await page.locator(".ant-drawer-open .ant-drawer-body").waitFor({ state: "visible" });
+      await page.locator(".order-detail").waitFor({ state: "visible" });
       await page.screenshot({ path: new URL("../screenshots/" + detailRelative, import.meta.url).pathname, fullPage: true });
       manifest.push(detailRelative);
     }
