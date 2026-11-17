@@ -1,4 +1,4 @@
-head=6054fb17
+head=edf75968
 1440/zh/login.png
 1440/zh/administrators.png
 1440/zh/audit.png
