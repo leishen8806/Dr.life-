@@ -15,12 +15,14 @@ import (
 )
 
 type reviewManagementStub struct {
-	filter  catalog.ProductFilter
-	plan    catalog.Plan
-	page    catalog.ProductPage
-	product catalog.Product
-	audit   catalog.ReviewAudit
-	reason  string
+	filter       catalog.ProductFilter
+	plan         catalog.Plan
+	page         catalog.ProductPage
+	product      catalog.Product
+	audit        catalog.ReviewAudit
+	reason       string
+	approveCalls int
+	rejectCalls  int
 }
 
 func (s *reviewManagementStub) Pending(_ context.Context, filter catalog.ProductFilter, plan catalog.Plan) (catalog.ProductPage, error) {
@@ -28,10 +30,12 @@ func (s *reviewManagementStub) Pending(_ context.Context, filter catalog.Product
 	return s.page, nil
 }
 func (s *reviewManagementStub) Approve(_ context.Context, _ string, audit catalog.ReviewAudit) (catalog.Product, error) {
+	s.approveCalls++
 	s.audit = audit
 	return s.product, nil
 }
 func (s *reviewManagementStub) Reject(_ context.Context, _ string, reason string, audit catalog.ReviewAudit) (catalog.Product, error) {
+	s.rejectCalls++
 	s.reason, s.audit = reason, audit
 	return s.product, nil
 }
@@ -103,6 +107,29 @@ func TestAdminCatalogReviewWritesRequireEditPermission(t *testing.T) {
 	handler.ServeHTTP(reject, req)
 	if reject.Code != http.StatusForbidden {
 		t.Fatalf("view-only reject status=%d body=%s", reject.Code, reject.Body.String())
+	}
+}
+
+func TestAdminCatalogApproveReplaysSameIdempotencyKey(t *testing.T) {
+	stub := &reviewManagementStub{product: catalog.Product{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAV", Status: catalog.StatusOn}}
+	handler := server.NewHandlerWithGateway(nil, server.GatewayOptions{
+		AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+		Authenticator:    stubAuth{identity: gateway.Identity{AccountID: "admin-public", Role: gateway.RoleAdmin}},
+		AdminPermissions: fakeAdminPermissions{allowed: true}, CatalogReview: stub,
+		Directory:   fakeAccountDirectory{account: iam.AccountResolution{ID: 7}},
+		Idempotency: gateway.IdempotencyOptions{Store: gateway.NewMemoryIdempotencyStore()},
+	})
+	request := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/v1/admin/catalog/products/01arz3ndektsv4rrffq69g5fav/approve", nil)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Idempotency-Key", "review-replay-1")
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, req)
+		return response
+	}
+	first, second := request(), request()
+	if first.Code != http.StatusOK || second.Code != http.StatusOK || first.Body.String() != second.Body.String() || stub.approveCalls != 1 {
+		t.Fatalf("first=%d second=%d calls=%d first_body=%s second_body=%s", first.Code, second.Code, stub.approveCalls, first.Body.String(), second.Body.String())
 	}
 }
 
