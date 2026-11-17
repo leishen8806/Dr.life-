@@ -25,7 +25,7 @@ describe("BuyerNotificationsView", () => {
     expect(await screen.findByText("Order")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
     await waitFor(() => expect(client.POST).toHaveBeenCalledWith("/v1/buyer/me/notifications/{public_id}/read", expect.anything()));
-    const readRequest = client.POST.mock.calls.at(-1)?.[1] as { params: { header: { "Idempotency-Key": string } } };
+    const readRequest = (client.POST as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1] as { params: { header: { "Idempotency-Key": string } } };
     expect(readRequest.params.header["Idempotency-Key"]).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
   });
 
