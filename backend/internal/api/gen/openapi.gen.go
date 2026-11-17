@@ -791,6 +791,51 @@ func (e MerchantSuborderSuccessResponseOk) Valid() bool {
 	}
 }
 
+// Defines values for NotificationListSuccessResponseOk.
+const (
+	NotificationListSuccessResponseOkTrue NotificationListSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the NotificationListSuccessResponseOk enum.
+func (e NotificationListSuccessResponseOk) Valid() bool {
+	switch e {
+	case NotificationListSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationMutationDataUpdated.
+const (
+	NotificationMutationDataUpdatedTrue NotificationMutationDataUpdated = true
+)
+
+// Valid indicates whether the value is a known member of the NotificationMutationDataUpdated enum.
+func (e NotificationMutationDataUpdated) Valid() bool {
+	switch e {
+	case NotificationMutationDataUpdatedTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationMutationSuccessResponseOk.
+const (
+	NotificationMutationSuccessResponseOkTrue NotificationMutationSuccessResponseOk = true
+)
+
+// Valid indicates whether the value is a known member of the NotificationMutationSuccessResponseOk enum.
+func (e NotificationMutationSuccessResponseOk) Valid() bool {
+	switch e {
+	case NotificationMutationSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OrderPaymentSuccessResponseOk.
 const (
 	OrderPaymentSuccessResponseOkTrue OrderPaymentSuccessResponseOk = true
@@ -1451,6 +1496,36 @@ func (e LegalDocumentSucceededOk) Valid() bool {
 	}
 }
 
+// Defines values for NotificationListSucceededOk.
+const (
+	NotificationListSucceededOkTrue NotificationListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the NotificationListSucceededOk enum.
+func (e NotificationListSucceededOk) Valid() bool {
+	switch e {
+	case NotificationListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for NotificationMutationSucceededOk.
+const (
+	NotificationMutationSucceededOkTrue NotificationMutationSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the NotificationMutationSucceededOk enum.
+func (e NotificationMutationSucceededOk) Valid() bool {
+	switch e {
+	case NotificationMutationSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostAdminAuthRefreshParamsXRequestedWith.
 const (
 	Drlife PostAdminAuthRefreshParamsXRequestedWith = "drlife"
@@ -1481,6 +1556,51 @@ func (e GetBuyerMeConsents200JSONResponseBodyOk) Valid() bool {
 	}
 }
 
+// Defines values for ListBuyerMeNotifications200JSONResponseBodyOk.
+const (
+	ListBuyerMeNotifications200JSONResponseBodyOkTrue ListBuyerMeNotifications200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListBuyerMeNotifications200JSONResponseBodyOk enum.
+func (e ListBuyerMeNotifications200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListBuyerMeNotifications200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MarkBuyerMeNotificationsReadAll200JSONResponseBodyOk.
+const (
+	MarkBuyerMeNotificationsReadAll200JSONResponseBodyOkTrue MarkBuyerMeNotificationsReadAll200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the MarkBuyerMeNotificationsReadAll200JSONResponseBodyOk enum.
+func (e MarkBuyerMeNotificationsReadAll200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case MarkBuyerMeNotificationsReadAll200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MarkBuyerMeNotificationRead200JSONResponseBodyOk.
+const (
+	MarkBuyerMeNotificationRead200JSONResponseBodyOkTrue MarkBuyerMeNotificationRead200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the MarkBuyerMeNotificationRead200JSONResponseBodyOk enum.
+func (e MarkBuyerMeNotificationRead200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case MarkBuyerMeNotificationRead200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GetDriverMeConsents200JSONResponseBodyOk.
 const (
 	GetDriverMeConsents200JSONResponseBodyOkTrue GetDriverMeConsents200JSONResponseBodyOk = true
@@ -1505,6 +1625,51 @@ const (
 func (e GetMerchantMeConsents200JSONResponseBodyOk) Valid() bool {
 	switch e {
 	case GetMerchantMeConsents200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListMerchantMeNotifications200JSONResponseBodyOk.
+const (
+	ListMerchantMeNotifications200JSONResponseBodyOkTrue ListMerchantMeNotifications200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListMerchantMeNotifications200JSONResponseBodyOk enum.
+func (e ListMerchantMeNotifications200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListMerchantMeNotifications200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MarkMerchantMeNotificationsReadAll200JSONResponseBodyOk.
+const (
+	MarkMerchantMeNotificationsReadAll200JSONResponseBodyOkTrue MarkMerchantMeNotificationsReadAll200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the MarkMerchantMeNotificationsReadAll200JSONResponseBodyOk enum.
+func (e MarkMerchantMeNotificationsReadAll200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case MarkMerchantMeNotificationsReadAll200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MarkMerchantMeNotificationRead200JSONResponseBodyOk.
+const (
+	MarkMerchantMeNotificationRead200JSONResponseBodyOkTrue MarkMerchantMeNotificationRead200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the MarkMerchantMeNotificationRead200JSONResponseBodyOk enum.
+func (e MarkMerchantMeNotificationRead200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case MarkMerchantMeNotificationRead200JSONResponseBodyOkTrue:
 		return true
 	default:
 		return false
@@ -2298,6 +2463,51 @@ type Messages struct {
 	Zh string `json:"zh"`
 }
 
+// Notification defines model for Notification.
+type Notification struct {
+	Body      Messages   `json:"body"`
+	CreatedAt time.Time  `json:"created_at"`
+	EventId   string     `json:"event_id"`
+	EventType string     `json:"event_type"`
+	PublicId  string     `json:"public_id"`
+	ReadAt    *time.Time `json:"read_at"`
+	Title     Messages   `json:"title"`
+}
+
+// NotificationListData defines model for NotificationListData.
+type NotificationListData struct {
+	Items       []Notification `json:"items"`
+	UnreadCount int32          `json:"unread_count"`
+}
+
+// NotificationListSuccessResponse defines model for NotificationListSuccessResponse.
+type NotificationListSuccessResponse struct {
+	Data      NotificationListData              `json:"data"`
+	Ok        NotificationListSuccessResponseOk `json:"ok"`
+	RequestId string                            `json:"request_id"`
+}
+
+// NotificationListSuccessResponseOk defines model for NotificationListSuccessResponse.Ok.
+type NotificationListSuccessResponseOk bool
+
+// NotificationMutationData defines model for NotificationMutationData.
+type NotificationMutationData struct {
+	Updated NotificationMutationDataUpdated `json:"updated"`
+}
+
+// NotificationMutationDataUpdated defines model for NotificationMutationData.Updated.
+type NotificationMutationDataUpdated bool
+
+// NotificationMutationSuccessResponse defines model for NotificationMutationSuccessResponse.
+type NotificationMutationSuccessResponse struct {
+	Data      NotificationMutationData              `json:"data"`
+	Ok        NotificationMutationSuccessResponseOk `json:"ok"`
+	RequestId string                                `json:"request_id"`
+}
+
+// NotificationMutationSuccessResponseOk defines model for NotificationMutationSuccessResponse.Ok.
+type NotificationMutationSuccessResponseOk bool
+
 // OrderCreateItem defines model for OrderCreateItem.
 type OrderCreateItem struct {
 	Quantity    int64  `json:"quantity"`
@@ -2804,6 +3014,26 @@ type MethodNotAllowed = ErrorEnvelope
 // NotFound defines model for NotFound.
 type NotFound = ErrorEnvelope
 
+// NotificationListSucceeded defines model for NotificationListSucceeded.
+type NotificationListSucceeded struct {
+	Data      NotificationListData        `json:"data"`
+	Ok        NotificationListSucceededOk `json:"ok"`
+	RequestId string                      `json:"request_id"`
+}
+
+// NotificationListSucceededOk defines model for NotificationListSucceeded.Ok.
+type NotificationListSucceededOk bool
+
+// NotificationMutationSucceeded defines model for NotificationMutationSucceeded.
+type NotificationMutationSucceeded struct {
+	Data      NotificationMutationData        `json:"data"`
+	Ok        NotificationMutationSucceededOk `json:"ok"`
+	RequestId string                          `json:"request_id"`
+}
+
+// NotificationMutationSucceededOk defines model for NotificationMutationSucceeded.Ok.
+type NotificationMutationSucceededOk bool
+
 // OrderBadRequest defines model for OrderBadRequest.
 type OrderBadRequest = ErrorEnvelope
 
@@ -2936,6 +3166,32 @@ type PutBuyerMeLanguageParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ListBuyerMeNotificationsParams defines parameters for ListBuyerMeNotifications.
+type ListBuyerMeNotificationsParams struct {
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListBuyerMeNotifications200JSONResponseBodyOk defines parameters for ListBuyerMeNotifications.
+type ListBuyerMeNotifications200JSONResponseBodyOk bool
+
+// MarkBuyerMeNotificationsReadAllParams defines parameters for MarkBuyerMeNotificationsReadAll.
+type MarkBuyerMeNotificationsReadAllParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// MarkBuyerMeNotificationsReadAll200JSONResponseBodyOk defines parameters for MarkBuyerMeNotificationsReadAll.
+type MarkBuyerMeNotificationsReadAll200JSONResponseBodyOk bool
+
+// MarkBuyerMeNotificationReadParams defines parameters for MarkBuyerMeNotificationRead.
+type MarkBuyerMeNotificationReadParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// MarkBuyerMeNotificationRead200JSONResponseBodyOk defines parameters for MarkBuyerMeNotificationRead.
+type MarkBuyerMeNotificationRead200JSONResponseBodyOk bool
+
 // DeleteBuyerMeSessionParams defines parameters for DeleteBuyerMeSession.
 type DeleteBuyerMeSessionParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
@@ -3052,6 +3308,32 @@ type DeleteMerchantMeLinkParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
+
+// ListMerchantMeNotificationsParams defines parameters for ListMerchantMeNotifications.
+type ListMerchantMeNotificationsParams struct {
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListMerchantMeNotifications200JSONResponseBodyOk defines parameters for ListMerchantMeNotifications.
+type ListMerchantMeNotifications200JSONResponseBodyOk bool
+
+// MarkMerchantMeNotificationsReadAllParams defines parameters for MarkMerchantMeNotificationsReadAll.
+type MarkMerchantMeNotificationsReadAllParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// MarkMerchantMeNotificationsReadAll200JSONResponseBodyOk defines parameters for MarkMerchantMeNotificationsReadAll.
+type MarkMerchantMeNotificationsReadAll200JSONResponseBodyOk bool
+
+// MarkMerchantMeNotificationReadParams defines parameters for MarkMerchantMeNotificationRead.
+type MarkMerchantMeNotificationReadParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// MarkMerchantMeNotificationRead200JSONResponseBodyOk defines parameters for MarkMerchantMeNotificationRead.
+type MarkMerchantMeNotificationRead200JSONResponseBodyOk bool
 
 // DeleteMerchantMeSessionParams defines parameters for DeleteMerchantMeSession.
 type DeleteMerchantMeSessionParams struct {
@@ -3294,6 +3576,15 @@ type ServerInterface interface {
 	// PutBuyerMeLanguage Register or change the current buyer language
 	// (PUT /v1/buyer/me/language)
 	PutBuyerMeLanguage(w http.ResponseWriter, r *http.Request, params PutBuyerMeLanguageParams)
+	// ListBuyerMeNotifications List notifications for the current buyer
+	// (GET /v1/buyer/me/notifications)
+	ListBuyerMeNotifications(w http.ResponseWriter, r *http.Request, params ListBuyerMeNotificationsParams)
+	// MarkBuyerMeNotificationsReadAll Mark all buyer notifications as read
+	// (POST /v1/buyer/me/notifications/read-all)
+	MarkBuyerMeNotificationsReadAll(w http.ResponseWriter, r *http.Request, params MarkBuyerMeNotificationsReadAllParams)
+	// MarkBuyerMeNotificationRead Mark one buyer notification as read
+	// (POST /v1/buyer/me/notifications/{public_id}/read)
+	MarkBuyerMeNotificationRead(w http.ResponseWriter, r *http.Request, publicId PublicID, params MarkBuyerMeNotificationReadParams)
 	// GetBuyerMeSessions List the current buyer account sessions
 	// (GET /v1/buyer/me/sessions)
 	GetBuyerMeSessions(w http.ResponseWriter, r *http.Request)
@@ -3393,6 +3684,15 @@ type ServerInterface interface {
 	// DeleteMerchantMeLink Unlink one account link owned by the authenticated merchant owner
 	// (DELETE /v1/merchant/me/links/{id})
 	DeleteMerchantMeLink(w http.ResponseWriter, r *http.Request, id AccountLinkID, params DeleteMerchantMeLinkParams)
+	// ListMerchantMeNotifications List notifications for the current merchant
+	// (GET /v1/merchant/me/notifications)
+	ListMerchantMeNotifications(w http.ResponseWriter, r *http.Request, params ListMerchantMeNotificationsParams)
+	// MarkMerchantMeNotificationsReadAll Mark all merchant notifications as read
+	// (POST /v1/merchant/me/notifications/read-all)
+	MarkMerchantMeNotificationsReadAll(w http.ResponseWriter, r *http.Request, params MarkMerchantMeNotificationsReadAllParams)
+	// MarkMerchantMeNotificationRead Mark one merchant notification as read
+	// (POST /v1/merchant/me/notifications/{public_id}/read)
+	MarkMerchantMeNotificationRead(w http.ResponseWriter, r *http.Request, publicId PublicID, params MarkMerchantMeNotificationReadParams)
 	// GetMerchantMeSessions List the current merchant account sessions
 	// (GET /v1/merchant/me/sessions)
 	GetMerchantMeSessions(w http.ResponseWriter, r *http.Request)
@@ -3594,6 +3894,24 @@ func (_ Unimplemented) PutBuyerMeLanguage(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListBuyerMeNotifications List notifications for the current buyer
+// (GET /v1/buyer/me/notifications)
+func (_ Unimplemented) ListBuyerMeNotifications(w http.ResponseWriter, r *http.Request, params ListBuyerMeNotificationsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// MarkBuyerMeNotificationsReadAll Mark all buyer notifications as read
+// (POST /v1/buyer/me/notifications/read-all)
+func (_ Unimplemented) MarkBuyerMeNotificationsReadAll(w http.ResponseWriter, r *http.Request, params MarkBuyerMeNotificationsReadAllParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// MarkBuyerMeNotificationRead Mark one buyer notification as read
+// (POST /v1/buyer/me/notifications/{public_id}/read)
+func (_ Unimplemented) MarkBuyerMeNotificationRead(w http.ResponseWriter, r *http.Request, publicId PublicID, params MarkBuyerMeNotificationReadParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetBuyerMeSessions List the current buyer account sessions
 // (GET /v1/buyer/me/sessions)
 func (_ Unimplemented) GetBuyerMeSessions(w http.ResponseWriter, r *http.Request) {
@@ -3789,6 +4107,24 @@ func (_ Unimplemented) CreateMerchantMeLink(w http.ResponseWriter, r *http.Reque
 // DeleteMerchantMeLink Unlink one account link owned by the authenticated merchant owner
 // (DELETE /v1/merchant/me/links/{id})
 func (_ Unimplemented) DeleteMerchantMeLink(w http.ResponseWriter, r *http.Request, id AccountLinkID, params DeleteMerchantMeLinkParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListMerchantMeNotifications List notifications for the current merchant
+// (GET /v1/merchant/me/notifications)
+func (_ Unimplemented) ListMerchantMeNotifications(w http.ResponseWriter, r *http.Request, params ListMerchantMeNotificationsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// MarkMerchantMeNotificationsReadAll Mark all merchant notifications as read
+// (POST /v1/merchant/me/notifications/read-all)
+func (_ Unimplemented) MarkMerchantMeNotificationsReadAll(w http.ResponseWriter, r *http.Request, params MarkMerchantMeNotificationsReadAllParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// MarkMerchantMeNotificationRead Mark one merchant notification as read
+// (POST /v1/merchant/me/notifications/{public_id}/read)
+func (_ Unimplemented) MarkMerchantMeNotificationRead(w http.ResponseWriter, r *http.Request, publicId PublicID, params MarkMerchantMeNotificationReadParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4836,6 +5172,138 @@ func (siw *ServerInterfaceWrapper) PutBuyerMeLanguage(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PutBuyerMeLanguage(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListBuyerMeNotifications operation middleware
+func (siw *ServerInterfaceWrapper) ListBuyerMeNotifications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListBuyerMeNotificationsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBuyerMeNotifications(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkBuyerMeNotificationsReadAll operation middleware
+func (siw *ServerInterfaceWrapper) MarkBuyerMeNotificationsReadAll(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params MarkBuyerMeNotificationsReadAllParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkBuyerMeNotificationsReadAll(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkBuyerMeNotificationRead operation middleware
+func (siw *ServerInterfaceWrapper) MarkBuyerMeNotificationRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params MarkBuyerMeNotificationReadParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkBuyerMeNotificationRead(w, r, publicId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5968,6 +6436,138 @@ func (siw *ServerInterfaceWrapper) DeleteMerchantMeLink(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// ListMerchantMeNotifications operation middleware
+func (siw *ServerInterfaceWrapper) ListMerchantMeNotifications(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMerchantMeNotificationsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMerchantMeNotifications(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkMerchantMeNotificationsReadAll operation middleware
+func (siw *ServerInterfaceWrapper) MarkMerchantMeNotificationsReadAll(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params MarkMerchantMeNotificationsReadAllParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkMerchantMeNotificationsReadAll(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkMerchantMeNotificationRead operation middleware
+func (siw *ServerInterfaceWrapper) MarkMerchantMeNotificationRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params MarkMerchantMeNotificationReadParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkMerchantMeNotificationRead(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMerchantMeSessions operation middleware
 func (siw *ServerInterfaceWrapper) GetMerchantMeSessions(w http.ResponseWriter, r *http.Request) {
 
@@ -6920,6 +7520,24 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/merchant/me", wrapper.GetMerchantMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/me/notifications", wrapper.ListBuyerMeNotifications)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/me/notifications", wrapper.ListMerchantMeNotifications)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/buyer/me/notifications/{public_id}/read", wrapper.MarkBuyerMeNotificationRead)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/merchant/me/notifications/{public_id}/read", wrapper.MarkMerchantMeNotificationRead)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/buyer/me/notifications/read-all", wrapper.MarkBuyerMeNotificationsReadAll)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/merchant/me/notifications/read-all", wrapper.MarkMerchantMeNotificationsReadAll)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/driver/me", wrapper.GetDriverMe)

@@ -14,6 +14,7 @@ import (
 	api "github.com/leishen8806/Dr.life-/backend/internal/api"
 	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/comms/notifications"
 	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
@@ -296,6 +297,34 @@ func TestMeProfileRejectsInvalidLanguageAndUnauthorizedOrWrongAudience(t *testin
 	}
 	if response := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/merchant/me", nil)); response.Code != http.StatusForbidden {
 		t.Fatalf("wrong audience status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestNotificationsAreScopedToTheAuthenticatedAccount(t *testing.T) {
+	now := time.Date(2026, 11, 18, 1, 0, 0, 0, time.UTC)
+	store := &fakeNotifications{items: []notifications.Record{{PublicID: merchantULID, EventID: "evt-1", EventType: notifications.OrderCreated, Title: map[string]string{"zh": "订单", "en": "Order", "km": "បញ្ជាទិញ"}, Body: map[string]string{"zh": "已创建", "en": "Created", "km": "បានបង្កើត"}, CreatedAt: now}}, unread: 1}
+	handler := server.NewHandlerWithGateway(nil, server.GatewayOptions{
+		Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+		Authenticator: stubAuth{identity: gateway.Identity{AccountID: accountID, Role: gateway.RoleBuyer}},
+		Directory:     fakeAccountDirectory{account: iam.AccountResolution{ID: 42}}, Notifications: store,
+	})
+	list := serve(t, handler, httptest.NewRequest(http.MethodGet, "/v1/buyer/me/notifications?limit=10", nil))
+	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), `"unread_count":1`) || !strings.Contains(list.Body.String(), `"event_type":"order.created"`) {
+		t.Fatalf("list status/body=%d/%s", list.Code, list.Body.String())
+	}
+	readRequest := httptest.NewRequest(http.MethodPost, "/v1/buyer/me/notifications/"+strings.ToLower(merchantULID)+"/read", strings.NewReader(`{}`))
+	readRequest.Header.Set("Content-Type", "application/json")
+	readRequest.Header.Set("Idempotency-Key", "notification-read-1")
+	read := serve(t, handler, readRequest)
+	if read.Code != http.StatusOK || store.readAccount != 42 || store.readID != merchantULID {
+		t.Fatalf("read status/account/id=%d/%d/%q body=%s", read.Code, store.readAccount, store.readID, read.Body.String())
+	}
+	allRequest := httptest.NewRequest(http.MethodPost, "/v1/buyer/me/notifications/read-all", strings.NewReader(`{}`))
+	allRequest.Header.Set("Content-Type", "application/json")
+	allRequest.Header.Set("Idempotency-Key", "notification-read-all-1")
+	all := serve(t, handler, allRequest)
+	if all.Code != http.StatusOK || store.allAccount != 42 {
+		t.Fatalf("read-all status/account=%d/%d body=%s", all.Code, store.allAccount, all.Body.String())
 	}
 }
 
@@ -645,6 +674,26 @@ type fakeAccountDirectory struct{ account iam.AccountResolution }
 
 func (f fakeAccountDirectory) Resolve(context.Context, string) (iam.AccountResolution, bool, error) {
 	return f.account, true, nil
+}
+
+type fakeNotifications struct {
+	items       []notifications.Record
+	unread      int
+	readAccount int64
+	readID      string
+	allAccount  int64
+}
+
+func (f *fakeNotifications) List(context.Context, int64, int) ([]notifications.Record, int, error) {
+	return f.items, f.unread, nil
+}
+func (f *fakeNotifications) MarkRead(_ context.Context, accountID int64, publicID string) error {
+	f.readAccount, f.readID = accountID, publicID
+	return nil
+}
+func (f *fakeNotifications) MarkAllRead(_ context.Context, accountID int64) error {
+	f.allAccount = accountID
+	return nil
 }
 
 type fakeAdminPermissions struct{ allowed, scoped bool }

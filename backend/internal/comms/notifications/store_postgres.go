@@ -39,6 +39,117 @@ type PostgresRepository struct {
 	ResolveBots BotResolver
 }
 
+type Record struct {
+	PublicID  string
+	EventID   string
+	EventType EventType
+	Title     map[string]string
+	Body      map[string]string
+	ReadAt    *time.Time
+	CreatedAt time.Time
+}
+
+type Setting struct {
+	EventType       EventType
+	InAppEnabled    bool
+	TelegramEnabled bool
+}
+
+func (r *PostgresRepository) List(ctx context.Context, accountID int64, limit int) ([]Record, int, error) {
+	if r == nil || r.DB == nil {
+		return nil, 0, errors.New("notifications: database is required")
+	}
+	if accountID <= 0 {
+		return nil, 0, errors.New("notifications: account id is required")
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	rows, err := r.DB.Query(ctx, `
+		SELECT public_id, event_id, event_type, title, body, read_at, created_at,
+		       count(*) FILTER (WHERE read_at IS NULL) OVER ()
+		FROM comms.notification WHERE account_id = $1
+		ORDER BY id DESC LIMIT $2`, accountID, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	items := make([]Record, 0, limit)
+	unread := 0
+	for rows.Next() {
+		var item Record
+		var title, body []byte
+		if err := rows.Scan(&item.PublicID, &item.EventID, &item.EventType, &title, &body, &item.ReadAt, &item.CreatedAt, &unread); err != nil {
+			return nil, 0, err
+		}
+		if err := json.Unmarshal(title, &item.Title); err != nil {
+			return nil, 0, fmt.Errorf("notifications: decode title: %w", err)
+		}
+		if err := json.Unmarshal(body, &item.Body); err != nil {
+			return nil, 0, fmt.Errorf("notifications: decode body: %w", err)
+		}
+		items = append(items, item)
+	}
+	return items, unread, rows.Err()
+}
+
+func (r *PostgresRepository) MarkRead(ctx context.Context, accountID int64, publicID string) error {
+	if r == nil || r.DB == nil {
+		return errors.New("notifications: database is required")
+	}
+	if accountID <= 0 || publicID == "" {
+		return errors.New("notifications: notification identity is required")
+	}
+	_, err := r.DB.Exec(ctx, `UPDATE comms.notification SET read_at = COALESCE(read_at, clock_timestamp()) WHERE account_id = $1 AND public_id = $2`, accountID, publicID)
+	return err
+}
+
+func (r *PostgresRepository) MarkAllRead(ctx context.Context, accountID int64) error {
+	if r == nil || r.DB == nil {
+		return errors.New("notifications: database is required")
+	}
+	if accountID <= 0 {
+		return errors.New("notifications: account id is required")
+	}
+	_, err := r.DB.Exec(ctx, `UPDATE comms.notification SET read_at = clock_timestamp() WHERE account_id = $1 AND read_at IS NULL`, accountID)
+	return err
+}
+
+func (r *PostgresRepository) ListSettings(ctx context.Context, accountID int64) ([]Setting, error) {
+	if r == nil || r.DB == nil {
+		return nil, errors.New("notifications: database is required")
+	}
+	rows, err := r.DB.Query(ctx, `SELECT event_type, in_app_enabled, telegram_enabled FROM comms.notification_setting WHERE account_id = $1 ORDER BY event_type`, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Setting{}
+	for rows.Next() {
+		var item Setting
+		if err := rows.Scan(&item.EventType, &item.InAppEnabled, &item.TelegramEnabled); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (r *PostgresRepository) UpsertSetting(ctx context.Context, accountID int64, setting Setting) error {
+	if r == nil || r.DB == nil {
+		return errors.New("notifications: database is required")
+	}
+	if accountID <= 0 || !setting.EventType.Valid() {
+		return errors.New("notifications: invalid setting")
+	}
+	_, err := r.DB.Exec(ctx, `
+		INSERT INTO comms.notification_setting (account_id, event_type, in_app_enabled, telegram_enabled)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (account_id, event_type) DO UPDATE SET in_app_enabled = EXCLUDED.in_app_enabled, telegram_enabled = EXCLUDED.telegram_enabled, updated_at = clock_timestamp()`,
+		accountID, setting.EventType, setting.InAppEnabled, setting.TelegramEnabled)
+	return err
+}
+
 func NewPostgresRepository(db postgresPool, resolveBots BotResolver) *PostgresRepository {
 	return &PostgresRepository{DB: db, ResolveBots: resolveBots}
 }

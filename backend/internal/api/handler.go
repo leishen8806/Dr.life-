@@ -14,6 +14,7 @@ import (
 
 	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/comms/notifications"
 	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
@@ -157,6 +158,13 @@ type Handler struct {
 	Files            FileManagement
 	AdminManagement  AdminManagement
 	Orders           OrderManagement
+	Notifications    NotificationManagement
+}
+
+type NotificationManagement interface {
+	List(context.Context, int64, int) ([]notifications.Record, int, error)
+	MarkRead(context.Context, int64, string) error
+	MarkAllRead(context.Context, int64) error
 }
 
 func (h Handler) ListBuyerOrders(w http.ResponseWriter, r *http.Request, params gen.ListBuyerOrdersParams) {
