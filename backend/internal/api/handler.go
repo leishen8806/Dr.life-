@@ -215,7 +215,7 @@ func (h Handler) ListAdminOrders(w http.ResponseWriter, r *http.Request, params 
 	}
 	data := make([]gen.BuyerOrderSummary, 0, len(items))
 	for _, item := range items {
-		data = append(data, buyerOrderSummary(item))
+		data = append(data, adminBuyerOrderSummary(item))
 	}
 	httpx.WriteOK(w, r, gen.BuyerOrderListData{Items: data, NextCursor: optionalString(next)})
 }
@@ -233,7 +233,7 @@ func (h Handler) GetAdminOrder(w http.ResponseWriter, r *http.Request, publicID 
 		h.orderError(w, r, err)
 		return
 	}
-	httpx.WriteOK(w, r, buyerOrder(order))
+	httpx.WriteOK(w, r, adminBuyerOrder(order))
 }
 
 func (h Handler) ListBuyerOrders(w http.ResponseWriter, r *http.Request, params gen.ListBuyerOrdersParams) {
@@ -1889,6 +1889,17 @@ func buyerOrder(order trade.BuyerOrderView) gen.BuyerOrder {
 
 func buyerOrderSummary(order trade.BuyerOrderView) gen.BuyerOrderSummary {
 	data := buyerOrder(order)
+	return gen.BuyerOrderSummary{PublicId: data.PublicId, PaymentStatus: data.PaymentStatus, SummaryStatus: data.SummaryStatus, GoodsAmountE4: data.GoodsAmountE4, ShippingAmountE4: data.ShippingAmountE4, PayableAmountE4: data.PayableAmountE4, ShippingAddressPublicId: data.ShippingAddressPublicId, Suborders: data.Suborders, CreatedAt: data.CreatedAt, UpdatedAt: data.UpdatedAt}
+}
+
+func adminBuyerOrder(order trade.BuyerOrderView) gen.BuyerOrder {
+	data := buyerOrder(order)
+	data.ShippingAddress.Phone = maskPhone(data.ShippingAddress.Phone)
+	return data
+}
+
+func adminBuyerOrderSummary(order trade.BuyerOrderView) gen.BuyerOrderSummary {
+	data := adminBuyerOrder(order)
 	return gen.BuyerOrderSummary{PublicId: data.PublicId, PaymentStatus: data.PaymentStatus, SummaryStatus: data.SummaryStatus, GoodsAmountE4: data.GoodsAmountE4, ShippingAmountE4: data.ShippingAmountE4, PayableAmountE4: data.PayableAmountE4, ShippingAddressPublicId: data.ShippingAddressPublicId, Suborders: data.Suborders, CreatedAt: data.CreatedAt, UpdatedAt: data.UpdatedAt}
 }
 

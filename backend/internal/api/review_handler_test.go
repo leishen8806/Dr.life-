@@ -118,7 +118,7 @@ func (s *adminOrderStub) AdminOrderDetail(context.Context, string) (trade.BuyerO
 }
 
 func TestAdminOrdersRequiresDedicatedReadPermission(t *testing.T) {
-	orders := &adminOrderStub{order: trade.BuyerOrderView{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAV", Status: "submitted"}}
+	orders := &adminOrderStub{order: trade.BuyerOrderView{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAV", Status: "submitted", ShippingAddress: trade.AddressSnapshot{Phone: "+85512345678"}}}
 	newHandler := func(allowed bool) http.Handler {
 		return server.NewHandlerWithGateway(nil, server.GatewayOptions{
 			AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
@@ -135,5 +135,10 @@ func TestAdminOrdersRequiresDedicatedReadPermission(t *testing.T) {
 	newHandler(true).ServeHTTP(allowed, httptest.NewRequest(http.MethodGet, "/v1/admin/orders", nil))
 	if allowed.Code != http.StatusOK || !strings.Contains(allowed.Body.String(), orders.order.PublicID) {
 		t.Fatalf("allowed status=%d body=%s", allowed.Code, allowed.Body.String())
+	}
+	detail := httptest.NewRecorder()
+	newHandler(true).ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/v1/admin/orders/01arz3ndektsv4rrffq69g5fav", nil))
+	if detail.Code != http.StatusOK || strings.Contains(detail.Body.String(), orders.order.ShippingAddress.Phone) || !strings.Contains(detail.Body.String(), "****5678") {
+		t.Fatalf("detail status=%d body=%s", detail.Code, detail.Body.String())
 	}
 }
