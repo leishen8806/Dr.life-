@@ -39,7 +39,7 @@ export function BuyerNotificationsView({ client, onBack }: { client: BuyerApiCli
 
   const markRead = async (publicId: string) => {
     try {
-      const result = await client.POST("/v1/buyer/me/notifications/{public_id}/read", { params: { path: { public_id: publicId }, header: { "Idempotency-Key": createNotificationIdempotencyKey("notification-read") } } });
+      const result = await client.POST("/v1/buyer/me/notifications/{public_id}/read", { params: { path: { public_id: publicId.toLowerCase() }, header: { "Idempotency-Key": createNotificationIdempotencyKey("notification-read") } } });
       if (result.error) throw new Error("notification read failed");
       setItems((current) => current.map((item) => item.public_id === publicId ? { ...item, read_at: item.read_at ?? new Date().toISOString() } : item));
       setUnread((current) => Math.max(0, current - 1));
