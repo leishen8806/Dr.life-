@@ -59,9 +59,11 @@
 .merchant-v7__switch { padding: var(--drl-space-2) 0; border-bottom: 1px solid var(--drl-color-border); }
 .merchant-v7 a { color: var(--drl-color-brand-strong); }
 .merchant-v7__upload-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.merchant-v7 form input.merchant-v7__upload-input { width: 1px; min-width: 1px; min-height: 1px; padding: 0; border: 0; }
 .merchant-v7__upload-preview { width: 96px; height: 96px; object-fit: cover; border-radius: var(--drl-radius-sm); border: 1px solid var(--drl-color-border); }
 .merchant-v7 .drl-notification-bell { justify-self: end; }
 .merchant-v7 .drl-notification-list .drl-list-item { border-top: 1px solid var(--drl-color-border); }
+.merchant-v7 form .drl-button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 @media (max-width: 390px) { .merchant-v7__placeholder { grid-template-columns: 1fr; } }
 .mini-shell {
   min-height: 100vh;

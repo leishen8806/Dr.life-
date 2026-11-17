@@ -20,6 +20,7 @@ await mkdir(out, { recursive: true }); start("buyer", 5173); start("merchant", 5
 try {
   for (const item of matrix) for (const app of ["buyer", "merchant"]) {
     const page = await browser.newPage({ viewport: { width: item.width, height: 900 }, colorScheme: item.theme });
+    page.setDefaultTimeout(3000);
     await page.addInitScript((language) => localStorage.setItem("drlife_lang", language), item.language);
     await setup(page, app, item.language);
     await openHome(page, app, item);
@@ -36,8 +37,8 @@ try {
       await page.locator(".merchant-v7-action").click(); await ready(page, ".merchant-v7"); await shot(page, app, "dashboard", item);
       await page.locator(".merchant-v7 .drl-notification-bell").click(); await shot(page, app, "notifications-settings", item); await page.getByRole("button", { name: /back|返回|ត្រឡប់/i }).first().click();
       await page.locator(".merchant-v7-profile-action").click(); await shot(page, app, "profile", item); await page.getByRole("button", { name: /edit|编辑|កែប្រែ/i }).click(); await shot(page, app, "profile-edit", item);
-      await page.getByRole("button", { name: /back|返回|ត្រឡប់/i }).first().click(); await page.getByRole("button", { name: /business onboarding|企业入驻|ចុះឈ្មោះសហគ្រា/i }).click(); await shot(page, app, "onboarding", item);
-      await page.getByRole("button", { name: /back|返回|ត្រឡប់/i }).click(); await page.locator(".merchant-v7-profile-action").click(); await page.getByRole("button", { name: /back|返回|ត្រឡប់/i }).first().click(); await page.locator(".merchant-v7__entries").getByRole("button", { name: /import|导入|នាំចូល/i }).click(); await shot(page, app, "import-source-preview", item); await page.locator('input[type="checkbox"]').check(); await page.getByRole("button", { name: /import|导入|នាំចូល/i }).last().click(); await shot(page, app, "import-pending", item);
+      await page.getByRole("button", { name: /back|返回|ត្រឡប់/i }).first().click(); await page.locator(".merchant-v7-profile-action").click(); await page.getByRole("button", { name: /business onboarding|企业入驻|ចុះឈ្មោះសហគ្រ/i }).click(); await shot(page, app, "onboarding", item);
+      await page.getByRole("button", { name: /back|返回|ត្រឡប់/i }).first().click(); await page.getByRole("button", { name: /back|返回|ត្រឡប់/i }).first().click(); await page.locator(".merchant-v7__entries").getByRole("button", { name: /import|导入|នាំចូល/i }).click(); await shot(page, app, "import-source-preview", item); await page.locator('input[type="checkbox"]').check(); await page.getByRole("button", { name: /import|导入|នាំចូល/i }).last().click(); await shot(page, app, "import-pending", item);
     }
     await page.close();
   }
