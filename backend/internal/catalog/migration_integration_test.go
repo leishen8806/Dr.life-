@@ -22,6 +22,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/audit/audittest"
+	platformids "github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 )
 
 const (
@@ -686,6 +687,10 @@ func TestCatalogMigration(t *testing.T) {
 		if _, err := admin.Exec(ctx, `DELETE FROM catalog.product_review_audit_outbox WHERE delivered_at IS NULL`); err != nil {
 			t.Fatal(err)
 		}
+		retryPublicID, err := platformids.NewULID()
+		if err != nil {
+			t.Fatal(err)
+		}
 		if _, err := admin.Exec(ctx, `
 			INSERT INTO catalog.product_review_audit_outbox(public_id, occurred_at, actor_id, actor_role, action, target, detail, request_id)
 			VALUES ($1, clock_timestamp(), 7, 'admin', 'product.moderated', $2, '{"decision":"rejected","reason":"test"}', 'outbox-delivery')`, secondProductPublicID, "product:"+secondProductPublicID); err != nil {
@@ -709,7 +714,7 @@ func TestCatalogMigration(t *testing.T) {
 		}
 		if _, err := admin.Exec(ctx, `
 			INSERT INTO catalog.product_review_audit_outbox(public_id, occurred_at, actor_id, actor_role, action, target, detail, request_id)
-			VALUES ($1, clock_timestamp(), 7, 'admin', 'product.moderated', $2, '{}', 'outbox-retry')`, secondProductPublicID, "product:"+secondProductPublicID); err != nil {
+			VALUES ($1, clock_timestamp(), 7, 'admin', 'product.moderated', $2, '{}', 'outbox-retry')`, retryPublicID, "product:"+retryPublicID); err != nil {
 			t.Fatal(err)
 		}
 		writer.Err = errors.New("provider response contains secret")
@@ -718,7 +723,7 @@ func TestCatalogMigration(t *testing.T) {
 		}
 		var attempts int
 		var lastError string
-		if err := admin.QueryRow(ctx, `SELECT attempts, last_error FROM catalog.product_review_audit_outbox WHERE public_id=$1`, secondProductPublicID).Scan(&attempts, &lastError); err != nil {
+		if err := admin.QueryRow(ctx, `SELECT attempts, last_error FROM catalog.product_review_audit_outbox WHERE public_id=$1`, retryPublicID).Scan(&attempts, &lastError); err != nil {
 			t.Fatal(err)
 		}
 		if attempts != 1 || lastError != "audit append failed" {
