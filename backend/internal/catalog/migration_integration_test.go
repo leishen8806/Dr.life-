@@ -782,6 +782,9 @@ func assertIntegerMinQtyMigrationRejectsFractionalData(t *testing.T, database *s
 	if err := goose.UpTo(database, migrations, 57); err != nil {
 		t.Fatalf("migration 00057 after integer fixture repair: %v", err)
 	}
+	if err := goose.UpTo(database, migrations, currentMigration); err != nil {
+		t.Fatalf("apply current catalog migrations after integer fixture repair: %v", err)
+	}
 }
 
 func assertCatalogTables(t *testing.T, database *sql.DB, want bool) {
