@@ -682,7 +682,7 @@ paths:
       tags: [admin]
       operationId: listAdminCatalogProducts
       summary: List catalog products waiting for administrative review
-      description: The review queue is server-scoped to products in review status.
+      description: The review queue is server-scoped to products in review status; submitted_from and submitted_to filter the time the product entered review, not its creation time.
       x-roles: [admin]
       parameters:
         - $ref: "#/components/parameters/Page"

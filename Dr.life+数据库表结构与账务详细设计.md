@@ -86,7 +86,7 @@
 | 表 | 关键字段与约束 |
 |---|---|
 | `category` | id, code, name jsonb, enabled, default_zone, sort；自定义品类 `is_custom` |
-| `product` | id, public_id, merchant_id, category_id, name jsonb, spec jsonb, unit, origin (`cn/lc`), lead_days, vol_m3, status (`draft/review/on/off/rejected`), review_reason（驳回原因；`rejected` 时供商家查看、重新上架后清空）, source (`manual/amazon/shopee/a1688/csv`), source_ref, std_score smallint (0–100，由任务重算), search_text (tsvector) + `pg_trgm` 索引 |
+| `product` | id, public_id, merchant_id, category_id, name jsonb, spec jsonb, unit, origin (`cn/lc`), lead_days, vol_m3, status (`draft/review/on/off/rejected`), submitted_at（进入审核队列时间；与 created_at 区分）, review_reason（驳回原因；`rejected` 时供商家查看、重新上架后清空）, source (`manual/amazon/shopee/a1688/csv`), source_ref, std_score smallint (0–100，由任务重算), search_text (tsvector) + `pg_trgm` 索引 |
 | `product_tier` | product_id, min_qty, unit_price_e4；`min_qty` 必须为正整数（数据库 `CHECK (min_qty = trunc(min_qty))`）；`UNIQUE(product_id,min_qty)`；至少 2 档由应用层要求 |
 | `category_attribute` | category_id, key, name jsonb, type (`enum/text/number`), unit, required, is_sku_dimension, value_json, `km_pending_review`, sort；枚举值为三语数组，SKU 维度只能是 enum |
 | `sku` | product_id, public_id, attribute_values jsonb, merchant_sku_code（最多 128 字符）, status, unit（空则继承 product.unit，最多 32 字符）；`UNIQUE(product_id,attribute_values)`；单位换算由 logistics.sku_map 在 R-05 负责 |

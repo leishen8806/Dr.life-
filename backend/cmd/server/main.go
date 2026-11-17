@@ -369,6 +369,7 @@ func main() {
 		adminManagementService = &iam.AdminManagementService{DB: iamDatabase, Cipher: envelope, Audit: auditStore, SessionCache: sessionCache}
 		if auditStore != nil {
 			go iam.RunAdminAuditOutbox(ctx, iamDatabase, auditStore)
+			go catalog.RunReviewAuditOutbox(ctx, catalogStore, auditStore)
 		}
 		stepUpVerifier = adminStepUpVerifier{tokens: adminTokens}
 		if cfg.RedisURL != "" {

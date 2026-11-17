@@ -20,6 +20,8 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/audit/audittest"
 )
 
 const (
@@ -626,7 +628,7 @@ func TestCatalogMigration(t *testing.T) {
 	})
 
 	t.Run("product review and audit outbox share a transaction", func(t *testing.T) {
-		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review' WHERE public_id=$1`, firstProductPublicID); err != nil {
+		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', submitted_at=clock_timestamp() WHERE public_id=$1`, firstProductPublicID); err != nil {
 			t.Fatal(err)
 		}
 		product, err := store.ReviewProduct(ctx, firstProductPublicID, catalog.StatusRejected, "missing dimensions", catalog.ReviewAudit{ActorID: 7, ActorRole: "super", RequestID: "review-1"})
@@ -651,7 +653,7 @@ func TestCatalogMigration(t *testing.T) {
 			t.Fatalf("approved product=%+v, want cleared review reason", product)
 		}
 
-		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', review_reason=NULL WHERE public_id=$1`, firstProductPublicID); err != nil {
+		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', submitted_at=clock_timestamp(), review_reason=NULL WHERE public_id=$1`, firstProductPublicID); err != nil {
 			t.Fatal(err)
 		}
 		_, err = store.ReviewProduct(ctx, firstProductPublicID, catalog.StatusOn, "", catalog.ReviewAudit{ActorID: 7, ActorRole: "super", IP: "not-an-ip", RequestID: "review-rollback"})
@@ -670,6 +672,57 @@ func TestCatalogMigration(t *testing.T) {
 		}
 		if outboxCount != 0 {
 			t.Fatalf("rollback outbox rows=%d, want 0", outboxCount)
+		}
+	})
+
+	t.Run("review audit outbox delivers once and retries failures", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `DELETE FROM catalog.product_review_audit_outbox WHERE public_id=$1`, secondProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.product_review_audit_outbox(public_id, occurred_at, actor_id, actor_role, action, target, detail, request_id)
+			VALUES ($1, clock_timestamp(), 7, 'admin', 'product.moderated', $2, '{"decision":"rejected","reason":"test"}', 'outbox-delivery')`, secondProductPublicID, "product:"+secondProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		writer := &audittest.Writer{}
+		if err := store.DeliverReviewAudit(ctx, writer); err != nil {
+			t.Fatal(err)
+		}
+		if len(writer.Records) != 1 || writer.Records[0].Action != platformaudit.ActionProductModerated {
+			t.Fatalf("records=%+v", writer.Records)
+		}
+		if err := store.DeliverReviewAudit(ctx, writer); err != nil {
+			t.Fatal(err)
+		}
+		if len(writer.Records) != 1 {
+			t.Fatalf("duplicate delivery records=%d", len(writer.Records))
+		}
+		if _, err := admin.Exec(ctx, `DELETE FROM catalog.product_review_audit_outbox WHERE public_id=$1`, secondProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.product_review_audit_outbox(public_id, occurred_at, actor_id, actor_role, action, target, detail, request_id)
+			VALUES ($1, clock_timestamp(), 7, 'admin', 'product.moderated', $2, '{}', 'outbox-retry')`, secondProductPublicID, "product:"+secondProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		writer.Err = errors.New("provider response contains secret")
+		if err := store.DeliverReviewAudit(ctx, writer); err == nil {
+			t.Fatal("failed delivery returned nil")
+		}
+		var attempts int
+		var lastError string
+		if err := admin.QueryRow(ctx, `SELECT attempts, last_error FROM catalog.product_review_audit_outbox WHERE public_id=$1`, secondProductPublicID).Scan(&attempts, &lastError); err != nil {
+			t.Fatal(err)
+		}
+		if attempts != 1 || lastError != "audit append failed" {
+			t.Fatalf("attempts=%d last_error=%q", attempts, lastError)
+		}
+		writer.Err = nil
+		if err := store.DeliverReviewAudit(ctx, writer); err != nil {
+			t.Fatal(err)
+		}
+		if len(writer.Records) != 2 {
+			t.Fatalf("retry records=%d", len(writer.Records))
 		}
 	})
 }
