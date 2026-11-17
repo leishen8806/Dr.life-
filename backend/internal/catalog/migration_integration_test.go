@@ -683,7 +683,7 @@ func TestCatalogMigration(t *testing.T) {
 	})
 
 	t.Run("review audit outbox delivers once and retries failures", func(t *testing.T) {
-		if _, err := admin.Exec(ctx, `DELETE FROM catalog.product_review_audit_outbox WHERE public_id=$1`, secondProductPublicID); err != nil {
+		if _, err := admin.Exec(ctx, `DELETE FROM catalog.product_review_audit_outbox WHERE delivered_at IS NULL`); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := admin.Exec(ctx, `
