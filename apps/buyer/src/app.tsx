@@ -479,7 +479,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
         {t("nav.profile")}
       </Button>
       <Button variant="secondary" className="buyer-notifications-action" onClick={openNotifications}>
-        Notifications
+        {t("notification.title")}
       </Button>
     </>
   );

@@ -158,7 +158,7 @@ export function ProductScreen({ api, client }: { api: MerchantProductApi; client
         <LanguageSwitcher />
         <Button variant="secondary" className="merchant-orders-action" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
         <Button variant="secondary" onClick={() => setV4Open(true)}>{t("merchant.profileLabel")}</Button>
-        {client ? <Button variant="secondary" onClick={() => setNotificationsOpen(true)}>{t("notification.title")}</Button> : null}
+        {client ? <Button variant="secondary" className="merchant-notifications-action" onClick={() => setNotificationsOpen(true)}>{t("notification.title")}</Button> : null}
       </>} />
       {subordersOpen ? (
         selectedSuborder ? (

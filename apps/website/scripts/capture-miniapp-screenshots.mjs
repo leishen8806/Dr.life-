@@ -222,7 +222,7 @@ try {
             await page.locator(".merchant-v4__warehouse").waitFor({ state: "visible", timeout: 5_000 });
           }, profile: true },
           { name: "merchant-notifications", open: async () => {
-            await page.getByRole("button", { name: "Notifications" }).click();
+            await page.locator(".merchant-notifications-action").click();
             await page.locator(".notification-center").waitFor({ state: "visible", timeout: 5_000 });
           } }
         ];
