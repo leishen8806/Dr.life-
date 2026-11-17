@@ -26,6 +26,7 @@ import { PaymentView } from "./views/payment-view";
 import { SearchView, useProductSearch } from "./views/search-view";
 import { createBuyerProfileApi, type BuyerProfile } from "./profile/profile-api";
 import { BuyerProfileView, BuyerWalletView } from "./profile/profile-views";
+import { BuyerNotificationsView } from "./notifications-view";
 
 type Route =
   | { name: "home" }
@@ -37,7 +38,8 @@ type Route =
   | { name: "payment"; order: BuyerOrder; attempt: PaymentAttempt }
   | { name: "cart" }
   | { name: "profile" }
-  | { name: "wallet" };
+  | { name: "wallet" }
+  | { name: "notifications" };
 
 const featuredPageSize = 6;
 
@@ -448,6 +450,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const openCart = useCallback(() => push({ name: "cart" }), [push]);
   const openProfile = useCallback(() => push({ name: "profile" }), [push]);
   const openWallet = useCallback(() => push({ name: "wallet" }), [push]);
+  const openNotifications = useCallback(() => push({ name: "notifications" }), [push]);
   const updateCartQuantity = useCallback((item: CartItem, quantity: string) => {
     const result = updateQuantity(cart, item.product.public_id, quantity);
     setCart(result.cart);
@@ -474,6 +477,9 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       </Button>
       <Button variant="secondary" className="buyer-profile-action" onClick={openProfile}>
         {t("nav.profile")}
+      </Button>
+      <Button variant="secondary" className="buyer-notifications-action" onClick={openNotifications}>
+        Notifications
       </Button>
     </>
   );
@@ -548,6 +554,9 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
 
   if (route.name === "wallet")
     return <BuyerWalletView entries={profile.status === "ready" ? { status: "ready", value: profile.value.entries } : profile.status === "error" ? { status: "error", messageKey: profile.messageKey } : profile} language={language} t={t} onBack={back} onRetry={retryProfile} />;
+
+  if (route.name === "notifications")
+    return <BuyerNotificationsView client={client} onBack={back} />;
 
   if (route.name === "profile")
     return <BuyerProfileView profile={profile} language={language} t={t} onOpenWallet={openWallet} onOpenOrders={openOrders} onRetry={retryProfile} />;

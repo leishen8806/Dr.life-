@@ -47,7 +47,7 @@ createRoot(document.getElementById("root")!).render(
         gateway={session}
         suggested={supportedLanguage(environment.languageCode)}
       >
-        <ProductScreen api={api} />
+        <ProductScreen api={api} client={session.client} />
       </StartupGate>
     </I18nProvider>
   </StrictMode>

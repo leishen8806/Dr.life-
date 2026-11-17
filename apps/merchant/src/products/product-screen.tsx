@@ -26,6 +26,8 @@ import { SuborderDetailView, SuborderListView } from "../orders/suborder-views";
 import type { MerchantSuborder, SuborderStatus } from "../orders/suborders";
 import { createMerchantV4Api } from "../v4/merchant-v4-api";
 import { MerchantV4View } from "../v4/merchant-v4-view";
+import { MerchantNotificationsView } from "../notifications-view";
+import type { createApiClient } from "@drlife/api-client";
 
 interface Editing {
   /** 缺省表示新建；带上商品表示在编辑它。 */
@@ -33,7 +35,7 @@ interface Editing {
   draft: ProductDraft;
 }
 
-export function ProductScreen({ api }: { api: MerchantProductApi }) {
+export function ProductScreen({ api, client }: { api: MerchantProductApi; client: ReturnType<typeof createApiClient> }) {
   const { language, t } = useI18n();
   const [products, setProducts] = useState<Product[]>();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -50,6 +52,7 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
   const [selectedSuborder, setSelectedSuborder] = useState<MerchantSuborder>();
   const [suborderStatus, setSuborderStatus] = useState<SuborderStatus>();
   const [v4Open, setV4Open] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const v4Api = useMemo(() => createMerchantV4Api(), []);
 
   const reload = useCallback(async () => {
@@ -147,12 +150,15 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
 
   return (
     <main className="mini-shell">
+      {notificationsOpen ? <MerchantNotificationsView client={client} onBack={() => setNotificationsOpen(false)} /> : null}
+      {notificationsOpen ? null : <>
       {v4Open ? <MerchantV4View api={v4Api} language={language} t={t} onBack={() => setV4Open(false)} /> : null}
       {v4Open ? null : <>
       <AppHeader slogan={t("brand.slogan")} actions={<>
         <LanguageSwitcher />
         <Button variant="secondary" className="merchant-orders-action" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
         <Button variant="secondary" onClick={() => setV4Open(true)}>{t("merchant.profileLabel")}</Button>
+        <Button variant="secondary" onClick={() => setNotificationsOpen(true)}>Notifications</Button>
       </>} />
       {subordersOpen ? (
         selectedSuborder ? (
@@ -230,6 +236,7 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
           );
         }}
       />
+      </>}
       </>}
       </>}
     </main>
