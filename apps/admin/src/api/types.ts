@@ -48,6 +48,17 @@ export interface IntegrationCallRecord {
 }
 
 export interface AdminApi {
+  login(input: { email: string; password: string; totpCode: string }): Promise<{ mustChangePassword?: boolean }>;
+  refresh(): Promise<void>;
+  logout(): Promise<void>;
+  changePassword(input: { currentPassword: string; newPassword: string; totpCode: string }): Promise<void>;
+  stepUp(scope: string, totpCode: string): Promise<string>;
+  listAdmins(cursor?: string): Promise<{ items: AdminUserRecord[]; nextCursor?: string }>;
+  createAdmin(input: { name: string; email: string; role: string; dataScope: string[]; stepUpToken?: string }): Promise<{ admin: AdminUserRecord; initialPassword: string; totpProvisioningUri: string }>;
+  disableAdmin(id: string, reason: string, stepUpToken: string): Promise<AdminUserRecord>;
+  enableAdmin(id: string, stepUpToken: string): Promise<AdminUserRecord>;
+  updateAdminRole(id: string, role: string, dataScope: string[], stepUpToken: string): Promise<AdminUserRecord>;
+  listAudit(filters?: { action?: string; target?: string; beforeId?: number }): Promise<{ items: AuditRecord[]; nextBeforeId?: number }>;
   listReviews(): Promise<ReviewList>;
   approveReview(kind: "merchant" | "product", id: string): Promise<void>;
   rejectReview(kind: "merchant" | "product", id: string, reason: string): Promise<void>;
@@ -62,4 +73,26 @@ export interface AdminApi {
   testIntegration(id: string): Promise<IntegrationRecord["lastTest"]>;
   enableIntegration(id: string): Promise<IntegrationRecord>;
   listIntegrationCalls(id: string): Promise<IntegrationCallRecord[]>;
+}
+
+export interface AdminUserRecord {
+  publicId: string;
+  name: string;
+  email: string;
+  role: string;
+  dataScope: string[];
+  status: "active" | "disabled";
+  lastLoginAt?: string;
+  createdAt: string;
+}
+
+export interface AuditRecord {
+  id: number;
+  ts: string;
+  actorId: number;
+  actorRole: string;
+  action: string;
+  target: string;
+  detail?: Record<string, unknown>;
+  requestId: string;
 }

@@ -137,7 +137,17 @@ credentials, or firewall data in the repository.
 
 ## Backup, restore, and operations
 
-The owner schedules a daily full PostgreSQL backup and a restore drill at least
+### 首次初始化后台超管
+
+部署包含 `admininit` 的镜像后，由 owner 使用 deploy 用户在测试服务器执行：
+
+```sh
+deploy/staging/admin-bootstrap.sh --username '<owner-chosen-name>'
+```
+
+脚本创建只继承 `iam_rw` 与 `audit_writer` 的一次性数据库登录，密码只通过进程内存传给容器；无论成功或失败都会在 `trap` 中删除该登录。`admininit` 的初始密码和 `otpauth://` 只显示在执行人的终端，不写日志、不写文件、不接受密码参数。执行完成后只在 #276 评论“第 0 步已完成”，不要贴密码、链接或截图。
+
+The **owner** executes step 0 after the PR is merged and the test deployment is ready. The owner schedules a daily full PostgreSQL backup and a restore drill at least
 once per week in the approved environment. Check `docker compose ps`, API
 health, worker logs, Redis disk/AOF health, and PostgreSQL backup freshness.
 Do not paste credentials, tunnel tokens, customer data, or server addresses in

@@ -1,37 +1,53 @@
-import type { AdminApi } from "./types";
+import type { AdminApi, AdminUserRecord, AuditRecord } from "./types";
 
-async function getApi(): Promise<AdminApi> {
-  if (import.meta.env.DEV) return (await import("./mock")).mockApi;
+let accessToken: string | undefined;
+
+export class AdminApiError extends Error {
+  constructor(public status: number, message: string, public retryAfter?: string) { super(message); }
+}
+
+async function request<T>(path: string, init: RequestInit = {}, authenticated = true, retried = false): Promise<T> {
+  const headers = new Headers(init.headers); headers.set("Content-Type", "application/json");
+  if (authenticated && accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  const response = await fetch(path, { ...init, headers, credentials: "include" });
+  if (response.status === 401 && authenticated && !retried && path !== "/v1/admin/auth/refresh") {
+    try {
+      const refresh = await request<{ access_token: string }>("/v1/admin/auth/refresh", { method: "POST", headers: { "X-Requested-With": "drlife" } }, false);
+      accessToken = refresh.access_token;
+    } catch (error) {
+      accessToken = undefined;
+      window.dispatchEvent(new Event("drlife-auth-expired"));
+      throw error;
+    }
+    return request(path, init, true, true);
+  }
+  if (!response.ok) throw new AdminApiError(response.status, response.status === 429 ? "rate_limited" : "request_failed", response.headers.get("Retry-After") ?? undefined);
+  const body = await response.json() as { data?: T }; return body.data as T;
+}
+
+function mapAdmin(input: { public_id: string; name: string; email: string; role: string; data_scope: string[]; status: "active" | "disabled"; last_login_at?: string; created_at: string }): AdminUserRecord { return { publicId: input.public_id, name: input.name, email: input.email, role: input.role, dataScope: input.data_scope, status: input.status, lastLoginAt: input.last_login_at, createdAt: input.created_at }; }
+function mapAudit(input: { id: number; ts: string; actor_id: number; actor_role: string; action: string; target: string; detail?: Record<string, unknown>; request_id: string }): AuditRecord { return { id: input.id, ts: input.ts, actorId: input.actor_id, actorRole: input.actor_role, action: input.action, target: input.target, detail: input.detail, requestId: input.request_id }; }
+
+function realApi(): AdminApi {
   return {
-    async listReviews() { return { merchants: [], products: [] }; },
-    async approveReview() { /* TODO: connect to the approved OpenAPI fields after backend confirmation. */ },
-    async rejectReview() { /* TODO: connect to the approved OpenAPI fields after backend confirmation. */ },
-    async listOrders() { return []; },
-    async getOrder() { return undefined; },
-    async listAgreements() { return []; },
-    async listAgreementVersions() { return []; },
-    async saveAgreementDraft() { throw new Error("backend_field_mapping_pending"); },
-    async publishAgreement() { throw new Error("backend_field_mapping_pending"); },
-    async listIntegrations() { return []; },
-    async updateIntegration() { throw new Error("backend_field_mapping_pending"); },
-    async testIntegration() { throw new Error("backend_field_mapping_pending"); },
-    async enableIntegration() { throw new Error("backend_field_mapping_pending"); },
-    async listIntegrationCalls() { return []; }
+    async login(input) { const data = await request<{ access_token: string; must_change_password?: boolean }>("/v1/admin/auth/login", { method: "POST", body: JSON.stringify({ email: input.email, password: input.password, totp_code: input.totpCode, device_id: "admin-web" }) }, false); accessToken = data.access_token; return { mustChangePassword: data.must_change_password }; },
+    async refresh() { const data = await request<{ access_token: string }>("/v1/admin/auth/refresh", { method: "POST", headers: { "X-Requested-With": "drlife" } }, false); accessToken = data.access_token; },
+    async logout() { accessToken = undefined; },
+    async changePassword(input) { await request("/v1/admin/auth/password", { method: "POST", body: JSON.stringify({ current_password: input.currentPassword, new_password: input.newPassword, totp_code: input.totpCode }) }); },
+    async stepUp(scope, totpCode) { const data = await request<{ step_up_token: string }>("/v1/admin/auth/step-up", { method: "POST", body: JSON.stringify({ scope, totp_code: totpCode }) }); return data.step_up_token; },
+    async listAdmins(cursor) { const data = await request<{ items: Array<{ public_id: string; name: string; email: string; role: string; data_scope: string[]; status: "active" | "disabled"; last_login_at?: string; created_at: string }>; next_cursor?: string }>(`/v1/admin/admins${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`); return { items: data.items.map(mapAdmin), nextCursor: data.next_cursor ?? undefined }; },
+    async createAdmin(input) { const data = await request<{ admin: Parameters<typeof mapAdmin>[0]; initial_password: string; totp_provisioning_uri: string }>("/v1/admin/admins", { method: "POST", headers: { "Idempotency-Key": crypto.randomUUID(), "X-Admin-Step-Up": input.stepUpToken ?? "" }, body: JSON.stringify({ name: input.name, email: input.email, role: input.role, data_scope: input.dataScope }) }); return { admin: mapAdmin(data.admin), initialPassword: data.initial_password, totpProvisioningUri: data.totp_provisioning_uri }; },
+    async disableAdmin(id, reason, stepUpToken) { const data = await request<{ admin: Parameters<typeof mapAdmin>[0] }>(`/v1/admin/admins/${encodeURIComponent(id)}/disable`, { method: "POST", headers: { "X-Admin-Step-Up": stepUpToken }, body: JSON.stringify({ reason }) }); return mapAdmin(data.admin); },
+    async enableAdmin(id, stepUpToken) { const data = await request<{ admin: Parameters<typeof mapAdmin>[0] }>(`/v1/admin/admins/${encodeURIComponent(id)}/enable`, { method: "POST", headers: { "X-Admin-Step-Up": stepUpToken } }); return mapAdmin(data.admin); },
+    async updateAdminRole(id, role, dataScope, stepUpToken) { const data = await request<{ admin: Parameters<typeof mapAdmin>[0] }>(`/v1/admin/admins/${encodeURIComponent(id)}/role`, { method: "PATCH", headers: { "X-Admin-Step-Up": stepUpToken }, body: JSON.stringify({ role, data_scope: dataScope }) }); return mapAdmin(data.admin); },
+    async listAudit(filters = {}) { const query = new URLSearchParams(); if (filters.action) query.set("action", filters.action); if (filters.target) query.set("target", filters.target); if (filters.beforeId) query.set("before_id", String(filters.beforeId)); const data = await request<{ items: Array<{ id: number; ts: string; actor_id: number; actor_role: string; action: string; target: string; detail?: Record<string, unknown>; request_id: string }>; next_before_id?: number }>(`/v1/admin/audit?${query}`); return { items: data.items.map(mapAudit), nextBeforeId: data.next_before_id }; },
+    async listReviews() { throw new Error("backend_field_mapping_pending"); }, async approveReview() { throw new Error("backend_field_mapping_pending"); }, async rejectReview() { throw new Error("backend_field_mapping_pending"); }, async listOrders() { throw new Error("backend_field_mapping_pending"); }, async getOrder() { throw new Error("backend_field_mapping_pending"); }, async listAgreements() { throw new Error("backend_field_mapping_pending"); }, async listAgreementVersions() { throw new Error("backend_field_mapping_pending"); }, async saveAgreementDraft() { throw new Error("backend_field_mapping_pending"); }, async publishAgreement() { throw new Error("backend_field_mapping_pending"); }, async listIntegrations() { throw new Error("backend_field_mapping_pending"); }, async updateIntegration() { throw new Error("backend_field_mapping_pending"); }, async testIntegration() { throw new Error("backend_field_mapping_pending"); }, async enableIntegration() { throw new Error("backend_field_mapping_pending"); }, async listIntegrationCalls() { throw new Error("backend_field_mapping_pending"); }
   };
 }
+
+async function getApi(): Promise<AdminApi> { return import.meta.env.DEV ? (await import("./mock")).mockApi : realApi(); }
+export { request as requestForTest };
 export const api = {
-  listReviews: () => getApi().then((client) => client.listReviews()),
-  approveReview: (kind: "merchant" | "product", id: string) => getApi().then((client) => client.approveReview(kind, id)),
-  rejectReview: (kind: "merchant" | "product", id: string, reason: string) => getApi().then((client) => client.rejectReview(kind, id, reason)),
-  listOrders: (filters?: Parameters<AdminApi["listOrders"]>[0]) => getApi().then((client) => client.listOrders(filters)),
-  getOrder: (id: string) => getApi().then((client) => client.getOrder(id))
-  ,listAgreements: () => getApi().then((client) => client.listAgreements())
-  ,listAgreementVersions: (id: string) => getApi().then((client) => client.listAgreementVersions(id))
-  ,saveAgreementDraft: (id: string, language: "zh" | "en" | "km", value: string) => getApi().then((client) => client.saveAgreementDraft(id, language, value))
-  ,publishAgreement: (id: string, input: { changeNote: string; effectiveDate: string }) => getApi().then((client) => client.publishAgreement(id, input))
-  ,listIntegrations: () => getApi().then((client) => client.listIntegrations())
-  ,updateIntegration: (id: string, input: { endpoint: string; environment: "test" | "production"; secret?: string }) => getApi().then((client) => client.updateIntegration(id, input))
-  ,testIntegration: (id: string) => getApi().then((client) => client.testIntegration(id))
-  ,enableIntegration: (id: string) => getApi().then((client) => client.enableIntegration(id))
-  ,listIntegrationCalls: (id: string) => getApi().then((client) => client.listIntegrationCalls(id))
+  login: (input: Parameters<AdminApi["login"]>[0]) => getApi().then((client) => client.login(input)), refresh: () => getApi().then((client) => client.refresh()), logout: () => getApi().then((client) => client.logout()), changePassword: (input: Parameters<AdminApi["changePassword"]>[0]) => getApi().then((client) => client.changePassword(input)), stepUp: (scope: string, totpCode: string) => getApi().then((client) => client.stepUp(scope, totpCode)), listAdmins: (cursor?: string) => getApi().then((client) => client.listAdmins(cursor)), createAdmin: (input: Parameters<AdminApi["createAdmin"]>[0]) => getApi().then((client) => client.createAdmin(input)), disableAdmin: (id: string, reason: string, token: string) => getApi().then((client) => client.disableAdmin(id, reason, token)), enableAdmin: (id: string, token: string) => getApi().then((client) => client.enableAdmin(id, token)), updateAdminRole: (id: string, role: string, scope: string[], token: string) => getApi().then((client) => client.updateAdminRole(id, role, scope, token)), listAudit: (filters?: Parameters<AdminApi["listAudit"]>[0]) => getApi().then((client) => client.listAudit(filters)),
+  listReviews: () => getApi().then((client) => client.listReviews()), approveReview: (kind: "merchant" | "product", id: string) => getApi().then((client) => client.approveReview(kind, id)), rejectReview: (kind: "merchant" | "product", id: string, reason: string) => getApi().then((client) => client.rejectReview(kind, id, reason)), listOrders: (filters?: Parameters<AdminApi["listOrders"]>[0]) => getApi().then((client) => client.listOrders(filters)), getOrder: (id: string) => getApi().then((client) => client.getOrder(id)), listAgreements: () => getApi().then((client) => client.listAgreements()), listAgreementVersions: (id: string) => getApi().then((client) => client.listAgreementVersions(id)), saveAgreementDraft: (id: string, language: "zh" | "en" | "km", value: string) => getApi().then((client) => client.saveAgreementDraft(id, language, value)), publishAgreement: (id: string, input: { changeNote: string; effectiveDate: string }) => getApi().then((client) => client.publishAgreement(id, input)), listIntegrations: () => getApi().then((client) => client.listIntegrations()), updateIntegration: (id: string, input: { endpoint: string; environment: "test" | "production"; secret?: string }) => getApi().then((client) => client.updateIntegration(id, input)), testIntegration: (id: string) => getApi().then((client) => client.testIntegration(id)), enableIntegration: (id: string) => getApi().then((client) => client.enableIntegration(id)), listIntegrationCalls: (id: string) => getApi().then((client) => client.listIntegrationCalls(id))
 };

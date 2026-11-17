@@ -1,13 +1,16 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Alert, Button, DatePicker, Drawer, Empty, Input, Layout, Menu, Result, Segmented, Select, Skeleton, Space, Table, Tooltip, Typography } from "antd";
+import { Alert, Button, DatePicker, Drawer, Empty, Input, Layout, Menu, Result, Select, Skeleton, Space, Table, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { applyDocumentLanguage, I18nProvider, readLanguagePreference, resolveLanguage, storeLanguagePreference, useI18n, type Language, type TranslationKey } from "@drlife/i18n";
+import { I18nProvider, readLanguagePreference, resolveLanguage, useI18n, type TranslationKey } from "@drlife/i18n";
 import { Money, StatusTag } from "@drlife/ui";
 import { api } from "./api";
+import { AuthGate, AuthToolbar } from "./auth";
+import { AdminManagementPage, AuditPage } from "./admin-pages";
 import type { OrderRecord, RecordStatus, ReviewRecord } from "./api/types";
 import { AgreementsPage, IntegrationsPage } from "./policy-pages";
+import { AdminLanguageSwitcher } from "./language-switcher";
 import "antd/dist/reset.css";
 import "@drlife/ui/styles.css";
 import "./styles.css";
@@ -21,11 +24,7 @@ function keyText(t: (key: TranslationKey) => string, key: string) {
   return t(key as TranslationKey);
 }
 
-function AdminLanguageSwitcher() {
-  const { language, setLanguage, t } = useI18n();
-  const options = [{ value: "zh", label: t("language.zh") }, { value: "en", label: t("language.en") }, { value: "km", label: t("language.km") }];
-  return <Segmented aria-label={t("language.select")} value={language} options={options} onChange={(value) => { const next = value as Language; storeLanguagePreference(next); applyDocumentLanguage(next); setLanguage(next); }} />;
-}
+export { AdminLanguageSwitcher } from "./language-switcher";
 
 function toneFor(status: string): "neutral" | "success" | "warning" | "danger" {
   if (status === "approved" || status === "normal") return "success";
@@ -88,7 +87,7 @@ export function RejectReasonForm({ onSubmit }: { onSubmit: (reason: string) => v
   </div>;
 }
 
-function ReviewPage() {
+function ReviewWorkspace() {
   const { t } = useI18n();
   const [active, setActive] = useState<"merchant" | "product">("merchant");
   const [data, setData] = useState<{ merchants: ReviewRecord[]; products: ReviewRecord[] }>({ merchants: [], products: [] });
@@ -124,7 +123,9 @@ function ReviewPage() {
   </div>;
 }
 
-export function OrderPage() {
+function ReviewPage() { const { t } = useI18n(); return canUseMockWorkspace ? <ReviewWorkspace /> : <Result status="info" title={t("admin.comingSoon")} />; }
+
+function OrderWorkspace() {
   const { t } = useI18n();
   const [rows, setRows] = useState<OrderRecord[]>([]);
   const [query, setQuery] = useState("");
@@ -161,7 +162,7 @@ export function OrderPage() {
       ]} />
       <DatePicker.RangePicker onChange={(_, dateStrings) => setDateRange(dateStrings as [string, string])} aria-label={t("admin.date")} />
     </Space>
-    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <Table rowKey="id" columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} onRow={(row) => ({ onClick: () => setSelected(row), className: "admin-clickable-row" })} locale={{ emptyText: <Empty description={t("admin.noResults")} /> }} />}
+    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <Table scroll={{ x: 760 }} rowKey="id" columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} onRow={(row) => ({ onClick: () => setSelected(row), className: "admin-clickable-row" })} locale={{ emptyText: <Empty description={t("admin.noResults")} /> }} />}
     <Drawer open={Boolean(selected)} title={t("admin.orderDetail")} onClose={() => setSelected(undefined)} width={440}>
       {selected && <div className="order-detail">
         <Typography.Paragraph><strong>{t("admin.orderNo")}:</strong> {selected.id}</Typography.Paragraph>
@@ -178,25 +179,22 @@ export function OrderPage() {
   </div>;
 }
 
-function ProductionPlaceholder() {
-  const { t } = useI18n();
-  return <Result status="403" title={t("admin.noPermission")} subTitle={t("admin.loginUnavailable")} />;
-}
+export function OrderPage() { const { t } = useI18n(); return canUseMockWorkspace ? <OrderWorkspace /> : <Result status="info" title={t("admin.comingSoon")} />; }
 
 function Shell() {
   const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
-  if (!canUseMockWorkspace) return <ProductionPlaceholder />;
   const items = [
     { key: "/", label: <Link to="/">{t("admin.overview")}</Link> },
     { key: "accounts", label: t("admin.accounts"), children: [
+      { key: "/administrators", label: <Link to="/administrators">{t("admin.administrators")}</Link> },
       ...(hasPermission("admin.orders") ? [{ key: "/orders", label: <Link to="/orders">{t("admin.orders")}</Link> }] : []),
       ...(hasPermission("admin.merchants") ? [{ key: "/merchants", label: <span>{t("admin.merchants")}</span>, disabled: true }] : []),
       ...(hasPermission("admin.products") ? [{ key: "/products", label: <span>{t("admin.products")}</span>, disabled: true }] : [])
     ] },
     { key: "operations", label: t("admin.operations"), children: hasPermission("admin.review") ? [{ key: "/review", label: <Link to="/review">{t("admin.review")}</Link> }] : [] },
-    { key: "system", label: t("admin.system"), children: [{ key: "/policies", label: <Link to="/policies">{t("admin.policies")}</Link> }, { key: "/integrations", label: <Link to="/integrations">{t("admin.integrations")}</Link> }] }
+    { key: "system", label: t("admin.system"), children: [{ key: "/audit", label: <Link to="/audit">{t("admin.audit")}</Link> }, { key: "/policies", label: <Link to="/policies">{t("admin.policies")}</Link> }, { key: "/integrations", label: <Link to="/integrations">{t("admin.integrations")}</Link> }] }
   ];
   const selectedKey = location.pathname === "/" ? "/" : location.pathname;
   return <Layout className="admin-shell">
@@ -205,14 +203,16 @@ function Shell() {
       <Menu theme="dark" mode="inline" selectedKeys={[selectedKey]} items={items} onClick={({ key }) => navigate(key)} />
     </Sider>
     <Layout>
-      <Header className="admin-header"><Typography.Title level={4}>{t("app.admin")} · {t("admin.operator")}</Typography.Title><AdminLanguageSwitcher /></Header>
+      <Header className="admin-header"><Typography.Title level={4}>{t("app.admin")} · {t("admin.operator")}</Typography.Title><Space><AdminLanguageSwitcher /><AuthToolbar /></Space></Header>
       <Content className="admin-content">
         <Routes>
           <Route path="/" element={<Overview />} />
-          <Route path="/review" element={canUseMockWorkspace ? <ReviewPage /> : <ProductionPlaceholder />} />
-          <Route path="/orders" element={canUseMockWorkspace ? <OrderPage /> : <ProductionPlaceholder />} />
-          <Route path="/policies" element={canUseMockWorkspace ? <AgreementsPage canManage={hasPermission("admin.agreement.publish")} /> : <ProductionPlaceholder />} />
-          <Route path="/integrations" element={canUseMockWorkspace ? <IntegrationsPage canManage={hasPermission("admin.integration.manage")} /> : <ProductionPlaceholder />} />
+          <Route path="/review" element={<ReviewPage />} />
+          <Route path="/orders" element={<OrderPage />} />
+          <Route path="/administrators" element={<AdminManagementPage />} />
+          <Route path="/audit" element={<AuditPage />} />
+          <Route path="/policies" element={<AgreementsPage canManage={hasPermission("admin.agreement.publish")} />} />
+          <Route path="/integrations" element={<IntegrationsPage canManage={hasPermission("admin.integration.manage")} />} />
           <Route path="*" element={<Result status="404" title={t("shell.notFound")} />} />
         </Routes>
       </Content>
@@ -225,7 +225,7 @@ if (root) {
   createRoot(root).render(
     <StrictMode>
       <I18nProvider initialLanguage={resolveLanguage(readLanguagePreference(), undefined)}>
-        <BrowserRouter><Shell /></BrowserRouter>
+        <BrowserRouter><AuthGate><Shell /></AuthGate></BrowserRouter>
       </I18nProvider>
     </StrictMode>
   );
