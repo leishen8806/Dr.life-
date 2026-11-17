@@ -24,6 +24,9 @@
 .merchant-v4__metrics button { display: grid; gap: var(--drl-space-1); min-height: 72px; text-align: start; }
 .merchant-v4__metrics strong { font-size: var(--drl-font-size-xl); }
 .merchant-v4__quote { display: grid; gap: var(--drl-space-2); margin-top: var(--drl-space-3); }
+.merchant-v4__form { display: grid; gap: var(--drl-space-2); margin-top: var(--drl-space-3); }
+.merchant-v4__form .drl-form-field { display: grid; gap: var(--drl-space-1); }
+.merchant-v4__form input, .merchant-v4__form select { box-sizing: border-box; width: 100%; min-height: 44px; padding: var(--drl-space-2); border: 1px solid var(--drl-color-border-strong); border-radius: var(--drl-radius-sm); color: var(--drl-color-text); background: var(--drl-color-surface); font: inherit; }
 .merchant-v4__quote label { display: grid; gap: var(--drl-space-1); }
 .merchant-v4__quote input, .merchant-v4__quote textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: var(--drl-space-2); border: 1px solid var(--drl-color-border-strong); border-radius: var(--drl-radius-sm); color: var(--drl-color-text); background: var(--drl-color-surface); font: inherit; }
 .merchant-v4__quote textarea { min-height: 80px; resize: vertical; }

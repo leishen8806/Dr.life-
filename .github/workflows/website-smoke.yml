@@ -51,7 +51,7 @@ jobs:
         run: pnpm --filter @drlife/website exec node scripts/check-lighthouse.mjs /tmp/local-lighthouse.json
       - name: Upload local preview evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-local-preview-lighthouse
           path: /tmp/local-lighthouse.json
@@ -107,7 +107,7 @@ jobs:
         run: pnpm --filter @drlife/website exec node scripts/check-lighthouse.mjs /tmp/lighthouse.json
       - name: Upload smoke evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: website-smoke-evidence
           path: artifacts/website-smoke

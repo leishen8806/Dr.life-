@@ -31,6 +31,10 @@ if [[ ${2:-} == -C ]]; then
     printf '%s\n' 'passwordauthentication no' 'permitrootlogin no' 'kbdinteractiveauthentication no'
   fi
 else
+  if [[ ${FAKE_SSHD_T_FAIL:-} == 1 ]]; then
+    printf '%s\n' 'bad sshd configuration' >&2
+    exit 78
+  fi
   if [[ ${FAKE_SSHD_NO_PORTS:-} == 1 ]]; then
     exit 0
   fi
@@ -42,10 +46,13 @@ chmod +x "$fake_bin/sshd"
 source "$script_dir/sshd-policy-check.sh"
 export PATH="$fake_bin:$PATH" SSHD_BIN=sshd FAKE_SSHD_LOG="$root/sshd.log"
 export SS_BIN=ss
+export FAKE_SS_MODE=listen
 validate_sshd_policy deploy
-test "$(wc -l < "$FAKE_SSHD_LOG")" -eq 2
+test "$(wc -l < "$FAKE_SSHD_LOG")" -eq 3
+grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2200' "$FAKE_SSHD_LOG"
 grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=22' "$FAKE_SSHD_LOG"
 grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2222' "$FAKE_SSHD_LOG"
+unset FAKE_SS_MODE
 
 : > "$FAKE_SSHD_LOG"
 export FAKE_SSHD_NO_PORTS=1
@@ -59,6 +66,7 @@ cat > "$config" <<'CONFIG'
 port 2201
 ListenAddress 127.0.0.1:2202
 ListenAddress [::1]:2205
+ListenAddress ::1
 Match LocalPort 2203,2204
 CONFIG
 : > "$FAKE_SSHD_LOG"
@@ -71,6 +79,12 @@ grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2202'
 grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2205' "$FAKE_SSHD_LOG"
 grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2203' "$FAKE_SSHD_LOG"
 : > "$FAKE_SSHD_LOG"
+export FAKE_SSHD_T_FAIL=1
+error_file="$root/sshd-error.log"
+validate_sshd_policy deploy 2>"$error_file"
+grep -Fq 'sshd -T failed (exit 78)' "$error_file"
+unset FAKE_SSHD_T_FAIL
+: > "$FAKE_SSHD_LOG"
 export FAKE_SSHD_FAIL_PORT=2203
 if validate_sshd_policy deploy; then
   printf '%s\n' 'expected config-derived LocalPort policy to fail' >&2
@@ -80,6 +94,19 @@ grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2201'
 grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2202' "$FAKE_SSHD_LOG"
 grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2203' "$FAKE_SSHD_LOG"
 unset FAKE_SSHD_FAIL_PORT
+unset FAKE_SSHD_NO_PORTS
+
+include_dir="$root/ssh"
+mkdir -p "$include_dir/nested"
+printf '%s\n' "Include $include_dir/nested/*.conf" > "$include_dir/base.conf"
+printf '%s\n' 'Port 2210' > "$include_dir/nested/10-port.conf"
+printf '%s\n' "Include $include_dir/base.conf" > "$root/include-root.conf"
+unset SSHD_CONFIG
+export SSHD_CONFIG="$root/include-root.conf"
+: > "$FAKE_SSHD_LOG"
+export FAKE_SSHD_NO_PORTS=1
+validate_sshd_policy deploy
+grep -Fxq 'user=deploy,host=localhost,addr=127.0.0.1,laddr=127.0.0.1,lport=2210' "$FAKE_SSHD_LOG"
 unset FAKE_SSHD_NO_PORTS
 
 dropin="$root/00-drlifeplus-staging.conf"

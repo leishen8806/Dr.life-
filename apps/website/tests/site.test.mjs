@@ -268,7 +268,13 @@ test("GROW WITH US cards preserve confirmed labels and partner copy without plac
   assert.match(home, /home\.homepageV2\.partners\.cards\.\$\{index\}\.0/);
   assert.match(home, /home\.homepageV2\.partners\.cards\.\$\{index\}\.1/);
   assert.match(home, /home\.homepageV2\.partners\.cards\.\$\{index\}\.2/);
-  assert.match(pageCopy, /homepageV2Full/);
+  assert.doesNotMatch(pageCopy, /homepageV2(?:Full|Localized|Acceptance|Complete)/);
+  const homepageMatch = pageCopy.match(/const homepageV2 = (\{[\s\S]*?\}) as const;/);
+  assert.ok(homepageMatch, "homepageV2 must be a serializable complete structure");
+  const homepageV2 = JSON.parse(homepageMatch[1]);
+  const keySets = ["zh", "en", "km"].map((locale) => Object.keys(homepageV2[locale]).sort());
+  assert.deepEqual(keySets[1], keySets[0]);
+  assert.deepEqual(keySets[2], keySets[0]);
   assert.doesNotMatch(pageCopy, /\[(合作方向待确认|Cooperation direction to be confirmed|ទិសដៅសហការត្រូវបញ្ជាក់)\]/);
 });
 
