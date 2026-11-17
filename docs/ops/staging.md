@@ -4,6 +4,34 @@ This directory contains placeholders only. It does not connect to a server and
 must not be run with production values. The owner creates `deploy/staging/.env`
 from `env.example` in the approved staging environment; `.env` is ignored.
 
+## RouteFit mock fulfillment demo
+
+The V10 test flow uses the in-memory `routefitmock` only. It is a contract
+substitute, not a RouteFit deployment and must never receive production
+credentials. Start the API and worker with the mock base URL supplied by the
+test compose profile, then drive one fulfillment through the following loop:
+
+1. Create a quote for the owner, warehouse, lines, and delivery snapshot. If
+   the mock returns an error, keep the order browsable and display `运费待确认`
+   (the caller must not invent a price).
+2. Submit the fulfillment with the returned quote version. The mock enforces
+   stock, SKU state, owner outbound holds, revision, and idempotency. A 5xx is
+   retried with backoff; `INSUFFICIENT_STOCK`, `SKU_UNAVAILABLE`, and 423
+   `OWNER_OUTBOUND_HELD` are recorded as the corresponding operational result.
+3. Advance the mock fulfillment through `accepted`, `picked`, `packed`,
+   `shipped`, `delivered_verified`, or `delivery_failed`. Deliver the signed
+   events to the API callback. Repeating an event is safe; sending an older
+   aggregate version is retained as stale and does not roll the order back.
+4. For cancellation, call the mock cancel endpoint with the current ETag and
+   a fresh idempotency key. A shipped fulfillment returns
+   `INVALID_TRANSITION`; a picked fulfillment completes only after the mock
+   emits the return/cancellation event and releases inventory.
+
+Use the routefitmock package tests as the executable demonstration:
+`go test ./internal/logistics/routefit ./internal/testutil/routefitmock`.
+The tests use only `test-only` values and an ephemeral HTTP handler; they do
+not connect to RouteFit, a server, or a real database.
+
 ## First deployment
 
 1. Copy `env.example` to `.env`, change `STAGING_ENV_FILE` to `.env`, and
