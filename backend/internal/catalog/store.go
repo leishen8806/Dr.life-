@@ -447,6 +447,14 @@ func productWhere(filter ProductFilter, plan Plan) (string, []any) {
 		args = append(args, string(filter.Status))
 		clauses = append(clauses, "p.status = $"+strconv.Itoa(len(args)))
 	}
+	if filter.SubmittedFrom != nil {
+		args = append(args, *filter.SubmittedFrom)
+		clauses = append(clauses, "p.created_at >= $"+strconv.Itoa(len(args)))
+	}
+	if filter.SubmittedTo != nil {
+		args = append(args, *filter.SubmittedTo)
+		clauses = append(clauses, "p.created_at < $"+strconv.Itoa(len(args)))
+	}
 	if plan.Category != "" {
 		args = append(args, plan.Category)
 		clauses = append(clauses, "c.code = $"+strconv.Itoa(len(args)))

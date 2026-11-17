@@ -194,9 +194,11 @@ type ListQuery struct {
 
 // ProductFilter 是列表查询的服务端强制范围，由 Service 决定，客户端无法覆盖。
 type ProductFilter struct {
-	MerchantID  int64
-	MerchantIDs []int64
-	Status      ProductStatus
+	MerchantID    int64
+	MerchantIDs   []int64
+	Status        ProductStatus
+	SubmittedFrom *time.Time
+	SubmittedTo   *time.Time
 }
 
 // Plan 是已由 Service 校验并规范化的分页与排序计划。

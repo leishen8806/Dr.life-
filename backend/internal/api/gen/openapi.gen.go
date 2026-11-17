@@ -2376,12 +2376,15 @@ type Product struct {
 	LeadDays     *int   `json:"lead_days,omitempty"`
 
 	// Name Trilingual text; every language must be present before a product can be published.
-	Name      LocalizedText `json:"name"`
-	Origin    ProductOrigin `json:"origin"`
-	PublicId  string        `json:"public_id"`
-	Skus      SKUList       `json:"skus"`
-	Source    ProductSource `json:"source"`
-	SourceRef *string       `json:"source_ref,omitempty"`
+	Name     LocalizedText `json:"name"`
+	Origin   ProductOrigin `json:"origin"`
+	PublicId string        `json:"public_id"`
+
+	// ReviewReason Administrative rejection reason, visible to the owning merchant.
+	ReviewReason *string       `json:"review_reason,omitempty"`
+	Skus         SKUList       `json:"skus"`
+	Source       ProductSource `json:"source"`
+	SourceRef    *string       `json:"source_ref,omitempty"`
 
 	// Spec Trilingual text; every language must be present before a product can be published.
 	Spec     *LocalizedText `json:"spec,omitempty"`
@@ -2448,6 +2451,11 @@ type ProductListSuccessResponse struct {
 
 // ProductListSuccessResponseOk defines model for ProductListSuccessResponse.Ok.
 type ProductListSuccessResponseOk bool
+
+// ProductReviewRejectRequest defines model for ProductReviewRejectRequest.
+type ProductReviewRejectRequest struct {
+	Reason string `json:"reason"`
+}
 
 // ProductSuccessResponse defines model for ProductSuccessResponse.
 type ProductSuccessResponse struct {
@@ -2757,6 +2765,9 @@ type AdminRefreshSucceeded = AdminLoginSuccessResponse
 // AdminUserSucceeded defines model for AdminUserSucceeded.
 type AdminUserSucceeded = AdminUserSuccessResponse
 
+// AlreadyProcessed defines model for AlreadyProcessed.
+type AlreadyProcessed = ErrorEnvelope
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorEnvelope
 
@@ -2809,6 +2820,9 @@ type OrderBadRequest = ErrorEnvelope
 
 // OrderConflict defines model for OrderConflict.
 type OrderConflict = ErrorEnvelope
+
+// ProductSucceeded defines model for ProductSucceeded.
+type ProductSucceeded = ProductSuccessResponse
 
 // RefreshSucceeded defines model for RefreshSucceeded.
 type RefreshSucceeded = RefreshSuccessResponse
@@ -2896,6 +2910,33 @@ type PostAdminAuthRefreshParams struct {
 
 // PostAdminAuthRefreshParamsXRequestedWith defines parameters for PostAdminAuthRefresh.
 type PostAdminAuthRefreshParamsXRequestedWith string
+
+// ListAdminCatalogProductsParams defines parameters for ListAdminCatalogProducts.
+type ListAdminCatalogProductsParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+
+	// Sort Comma-separated field names; prefix a field with - for descending order.
+	Sort          *Sort      `form:"sort,omitempty" json:"sort,omitempty"`
+	MerchantId    *int64     `form:"merchant_id,omitempty" json:"merchant_id,omitempty"`
+	SubmittedFrom *time.Time `form:"submitted_from,omitempty" json:"submitted_from,omitempty"`
+	SubmittedTo   *time.Time `form:"submitted_to,omitempty" json:"submitted_to,omitempty"`
+}
+
+// PostAdminCatalogProductApproveParams defines parameters for PostAdminCatalogProductApprove.
+type PostAdminCatalogProductApproveParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PostAdminCatalogProductRejectParams defines parameters for PostAdminCatalogProductReject.
+type PostAdminCatalogProductRejectParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
 
 // GetAdminFinancialCenterParams defines parameters for GetAdminFinancialCenter.
 type GetAdminFinancialCenterParams struct {
@@ -3175,6 +3216,9 @@ type ChangeAdminPasswordJSONRequestBody = AdminPasswordChangeRequest
 // PostAdminAuthStepUpJSONRequestBody defines body for PostAdminAuthStepUp for application/json ContentType.
 type PostAdminAuthStepUpJSONRequestBody = AdminStepUpRequest
 
+// PostAdminCatalogProductRejectJSONRequestBody defines body for PostAdminCatalogProductReject for application/json ContentType.
+type PostAdminCatalogProductRejectJSONRequestBody = ProductReviewRejectRequest
+
 // PostBuyerMeConsentsJSONRequestBody defines body for PostBuyerMeConsents for application/json ContentType.
 type PostBuyerMeConsentsJSONRequestBody = ConsentAcceptRequest
 
@@ -3258,6 +3302,15 @@ type ServerInterface interface {
 	// PostAdminAuthStepUp Exchange a fresh administrator TOTP for a scoped step-up token
 	// (POST /v1/admin/auth/step-up)
 	PostAdminAuthStepUp(w http.ResponseWriter, r *http.Request)
+	// ListAdminCatalogProducts List catalog products waiting for administrative review
+	// (GET /v1/admin/catalog/products)
+	ListAdminCatalogProducts(w http.ResponseWriter, r *http.Request, params ListAdminCatalogProductsParams)
+	// PostAdminCatalogProductApprove Approve one catalog product
+	// (POST /v1/admin/catalog/products/{public_id}/approve)
+	PostAdminCatalogProductApprove(w http.ResponseWriter, r *http.Request, publicId PublicID, params PostAdminCatalogProductApproveParams)
+	// PostAdminCatalogProductReject Reject one catalog product with a required reason
+	// (POST /v1/admin/catalog/products/{public_id}/reject)
+	PostAdminCatalogProductReject(w http.ResponseWriter, r *http.Request, publicId PublicID, params PostAdminCatalogProductRejectParams)
 	// GetAdminFinancialCenter Get ledger-derived financial-center reporting
 	// (GET /v1/admin/financial-center)
 	GetAdminFinancialCenter(w http.ResponseWriter, r *http.Request, params GetAdminFinancialCenterParams)
@@ -3519,6 +3572,24 @@ func (_ Unimplemented) PostAdminAuthRefresh(w http.ResponseWriter, r *http.Reque
 // PostAdminAuthStepUp Exchange a fresh administrator TOTP for a scoped step-up token
 // (POST /v1/admin/auth/step-up)
 func (_ Unimplemented) PostAdminAuthStepUp(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListAdminCatalogProducts List catalog products waiting for administrative review
+// (GET /v1/admin/catalog/products)
+func (_ Unimplemented) ListAdminCatalogProducts(w http.ResponseWriter, r *http.Request, params ListAdminCatalogProductsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostAdminCatalogProductApprove Approve one catalog product
+// (POST /v1/admin/catalog/products/{public_id}/approve)
+func (_ Unimplemented) PostAdminCatalogProductApprove(w http.ResponseWriter, r *http.Request, publicId PublicID, params PostAdminCatalogProductApproveParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PostAdminCatalogProductReject Reject one catalog product with a required reason
+// (POST /v1/admin/catalog/products/{public_id}/reject)
+func (_ Unimplemented) PostAdminCatalogProductReject(w http.ResponseWriter, r *http.Request, publicId PublicID, params PostAdminCatalogProductRejectParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4475,6 +4546,212 @@ func (siw *ServerInterfaceWrapper) PostAdminAuthStepUp(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.PostAdminAuthStepUp(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminCatalogProducts operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminCatalogProducts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminCatalogProductsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "merchant_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "merchant_id", r.URL.Query(), &params.MerchantId, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "merchant_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "merchant_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "submitted_from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "submitted_from", r.URL.Query(), &params.SubmittedFrom, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "submitted_from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "submitted_from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "submitted_to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "submitted_to", r.URL.Query(), &params.SubmittedTo, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "submitted_to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "submitted_to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminCatalogProducts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAdminCatalogProductApprove operation middleware
+func (siw *ServerInterfaceWrapper) PostAdminCatalogProductApprove(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostAdminCatalogProductApproveParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAdminCatalogProductApprove(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PostAdminCatalogProductReject operation middleware
+func (siw *ServerInterfaceWrapper) PostAdminCatalogProductReject(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostAdminCatalogProductRejectParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAdminCatalogProductReject(w, r, publicId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6962,6 +7239,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/admin/ledger/accounts/{account_ref}/postings", wrapper.GetAdminLedgerAccountPostings)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/catalog/products", wrapper.ListAdminCatalogProducts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/admin/catalog/products/{public_id}/approve", wrapper.PostAdminCatalogProductApprove)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/admin/catalog/products/{public_id}/reject", wrapper.PostAdminCatalogProductReject)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/buyer/orders", wrapper.ListBuyerOrders)

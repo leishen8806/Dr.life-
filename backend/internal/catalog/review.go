@@ -56,8 +56,11 @@ func NewReviewService(store ReviewStore) *ReviewService {
 }
 
 // Pending returns only products waiting for a platform decision.
-func (s *ReviewService) Pending(ctx context.Context, plan Plan) (ProductPage, error) {
-	return s.store.ListProducts(ctx, ProductFilter{Status: StatusReview}, plan)
+func (s *ReviewService) Pending(ctx context.Context, filter ProductFilter, plan Plan) (ProductPage, error) {
+	// The review queue is always server-scoped to products awaiting review;
+	// callers may only narrow it by merchant and submission time.
+	filter.Status = StatusReview
+	return s.store.ListProducts(ctx, filter, plan)
 }
 
 func (s *ReviewService) Approve(ctx context.Context, publicID string, audit ReviewAudit) (Product, error) {
