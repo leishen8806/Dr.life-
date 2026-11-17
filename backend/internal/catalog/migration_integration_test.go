@@ -643,6 +643,13 @@ func TestCatalogMigration(t *testing.T) {
 		if outboxCount != 1 {
 			t.Fatalf("outbox rows=%d, want 1", outboxCount)
 		}
+		product, err = store.ReviewProduct(ctx, firstProductPublicID, catalog.StatusOn, "", catalog.ReviewAudit{ActorID: 7, ActorRole: "super", RequestID: "review-approve"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if product.Status != catalog.StatusOn || product.ReviewReason != "" {
+			t.Fatalf("approved product=%+v, want cleared review reason", product)
+		}
 
 		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', review_reason=NULL WHERE public_id=$1`, firstProductPublicID); err != nil {
 			t.Fatal(err)
