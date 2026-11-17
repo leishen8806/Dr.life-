@@ -918,6 +918,8 @@ create table audit.log (
 - `comms.notification_setting`：`account_id` 外键、`event_type` 组成主键；`in_app_enabled` 与 `telegram_enabled` 默认开启；`updated_at` 更新时间。设置属于收件人账号，不跨账号共享。
 - `comms.notification_outbox`：`id` 自增主键；`event_id`、`account_id`、`end_name`、`event_type` 与 `payload` 记录事务提交后的事件；`attempts`、`next_attempt_at`、`last_error`、`dead_lettered_at`、`delivered_at` 记录重试与死信；唯一约束 `(event_id, account_id, end_name)`，待处理索引过滤已投递和死信行。
 
+## 十一、测试清单（账务必须全部通过才能上线）
+
 | 类别 | 用例 |
 |---|---|
 | 平衡 | 每种业务动作（6.1–6.19）入账后借=贷；随机大量交易后恒等式成立 |
@@ -930,8 +932,6 @@ create table audit.log (
 | 对账 | 导入银行文件：匹配、未匹配、重复导入；差异入 `SUSPENSE` 并告警 |
 | 权限 | 非账务角色无法直接写 `ledger` 表（数据库账号层面） |
 | 灾备 | 从备份恢复后，恒等式成立，`balance` 与分录重算一致 |
-
-## 十一、测试清单（账务必须全部通过才能上线）
 
 ---
 
