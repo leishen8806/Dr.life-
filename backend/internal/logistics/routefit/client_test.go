@@ -63,6 +63,49 @@ func TestDeliverRetriesRetryableFailure(t *testing.T) {
 	}
 }
 
+func TestQuoteAndCancelUseRouteFitMock(t *testing.T) {
+	mock := seededMock()
+	server := httptest.NewServer(mock.Handler())
+	defer server.Close()
+	client := newClient(t, server.URL)
+
+	quote, err := client.Quote(context.Background(), routefit.QuoteCmd{
+		OwnerRef: "merchant-1", WarehouseID: "warehouse-1", ServiceLevel: "S1",
+		Lines: []routefit.Line{{Ref: "line-1", SKU: "sku-1", Quantity: 1}}, Delivery: json.RawMessage(`{"address":"test"}`),
+	})
+	if err != nil || quote.QuoteID == "" || quote.Version != 1 || quote.Total.AmountMinor != 100 {
+		t.Fatalf("quote=%#v err=%v", quote, err)
+	}
+
+	deliver, err := client.Deliver(context.Background(), testCommand())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel, err := client.Cancel(context.Background(), routefit.CancelCmd{FulfillmentID: deliver.FulfillmentID, ReasonCode: "BUYER_CANCELLED", Version: deliver.Version})
+	if err != nil || cancel.FulfillmentID != deliver.FulfillmentID {
+		t.Fatalf("cancel=%#v err=%v", cancel, err)
+	}
+}
+
+func TestCancelSurfacesInvalidTransition(t *testing.T) {
+	mock := seededMock()
+	server := httptest.NewServer(mock.Handler())
+	defer server.Close()
+	client := newClient(t, server.URL)
+	deliver, err := client.Deliver(context.Background(), testCommand())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mock.AdvanceFulfillment(deliver.FulfillmentID, "shipped"); err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.Cancel(context.Background(), routefit.CancelCmd{FulfillmentID: deliver.FulfillmentID, ReasonCode: "BUYER_CANCELLED", Version: deliver.Version + 1})
+	var routefitErr *routefit.Error
+	if !errors.As(err, &routefitErr) || routefitErr.Status != http.StatusConflict || routefitErr.Code != "INVALID_TRANSITION" {
+		t.Fatalf("err=%v", err)
+	}
+}
+
 func TestDeliverTimeoutLooksUpExistingFulfillment(t *testing.T) {
 	mock := seededMock()
 	var once sync.Once
