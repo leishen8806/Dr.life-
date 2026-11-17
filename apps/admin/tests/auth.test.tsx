@@ -66,4 +66,11 @@ describe("admin authentication acceptance matrix", () => {
     expect(await screen.findByRole("button", { name: "Sign in" })).toBeTruthy();
     expect(mockApi.refresh).toHaveBeenCalledOnce();
   });
+
+  it("shows an expired-session message after the refresh failure event", async () => {
+    window.history.replaceState({}, "", "/administrators");
+    mockApi.refresh.mockRejectedValue(new Error("expired"));
+    render(<I18nProvider initialLanguage="en"><AuthGate><div>private admin area</div></AuthGate></I18nProvider>);
+    expect((await screen.findByRole("alert")).textContent).toContain("Your session expired. Sign in again.");
+  });
 });

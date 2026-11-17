@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Drawer, Input, Segmented, Space, Table, Tooltip, Typography } from "antd";
+import { Alert, Button, Drawer, Input, Result, Segmented, Space, Table, Tooltip, Typography } from "antd";
 import { useI18n } from "@drlife/i18n";
 import { api } from "./api";
 import type { AgreementRecord, AgreementVersionRecord, IntegrationCallRecord, IntegrationRecord } from "./api/types";
 
-export function AgreementsPage({ canManage = true }: { canManage?: boolean }) {
+const canUseMockWorkspace = import.meta.env.DEV;
+
+function AgreementsWorkspace({ canManage = true }: { canManage?: boolean }) {
   const { t, language } = useI18n();
   const [rows, setRows] = useState<AgreementRecord[]>([]);
   const [selected, setSelected] = useState<AgreementRecord>();
@@ -55,7 +57,7 @@ export function AgreementsPage({ canManage = true }: { canManage?: boolean }) {
   </div>;
 }
 
-export function IntegrationsPage({ canManage = true }: { canManage?: boolean }) {
+function IntegrationsWorkspace({ canManage = true }: { canManage?: boolean }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<IntegrationRecord[]>([]);
   const [selected, setSelected] = useState<IntegrationRecord>();
@@ -79,4 +81,14 @@ export function IntegrationsPage({ canManage = true }: { canManage?: boolean }) 
       {selected && <Space direction="vertical" style={{ width: "100%" }}><Input disabled={!canManage} defaultValue={selected.endpoint} aria-label={t("admin.endpoint")} /><Input.Password disabled={!canManage} value={secret} onChange={(event) => setSecret(event.target.value)} autoComplete="off" placeholder={t("admin.secretLast4")} aria-label={t("admin.secretLast4")} /><Button disabled={!canManage} onClick={async () => { await api.updateIntegration(selected.id, { endpoint: selected.endpoint, environment: selected.environment, secret }); setSecret(""); await refresh(); }}>{t("admin.saveDraft")}</Button><Typography.Title level={5}>{t("admin.callHistory")}</Typography.Title><Table rowKey="id" size="small" pagination={false} dataSource={calls} columns={[{ title: t("admin.occurredAt"), dataIndex: "occurredAt" }, { title: t("admin.status"), dataIndex: "ok", render: (ok: boolean) => ok ? "✓" : "×" }, { title: t("admin.latency"), dataIndex: "latencyMs", render: (value: number) => `${value}ms` }]} /><Typography.Text type="secondary">{t("admin.auditServer")}</Typography.Text></Space>}
     </Drawer>
   </div>;
+}
+
+export function AgreementsPage({ canManage = true }: { canManage?: boolean }) {
+  const { t } = useI18n();
+  return canUseMockWorkspace ? <AgreementsWorkspace canManage={canManage} /> : <Result status="info" title={t("admin.comingSoon")} />;
+}
+
+export function IntegrationsPage({ canManage = true }: { canManage?: boolean }) {
+  const { t } = useI18n();
+  return canUseMockWorkspace ? <IntegrationsWorkspace canManage={canManage} /> : <Result status="info" title={t("admin.comingSoon")} />;
 }

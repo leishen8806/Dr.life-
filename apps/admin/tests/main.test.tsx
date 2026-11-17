@@ -99,6 +99,28 @@ describe("admin review and order views", () => {
     await waitFor(() => expect(mockApi.createAdmin).toHaveBeenCalledWith(expect.objectContaining({ name: "New Operator", email: "operator@example.test", stepUpToken: "step-up-token" })));
     expect(await screen.findByText("one-time-password")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "I saved these credentials" }));
+    await waitFor(() => expect(screen.queryByText("one-time-password")).toBeNull());
     expect(mockApi.createAdmin).toHaveBeenCalledOnce();
+  });
+
+  it("requires step-up before changing an administrator role", async () => {
+    mockApi.updateAdminRole.mockResolvedValue({ ...reviews[0], role: "auditor" });
+    renderAdmin(<AdminManagementPage />);
+    await screen.findByText("Test Admin");
+    fireEvent.click(screen.getByRole("button", { name: "Change role" }));
+    fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: "654321" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(mockApi.stepUp).toHaveBeenCalledWith("permission_change", "654321"));
+    await waitFor(() => expect(mockApi.updateAdminRole).toHaveBeenCalledWith("admin-1", "super", ["KH-PP"], "step-up-token"));
+  });
+
+  it("resets audit pagination when filters change and appends the next page", async () => {
+    mockApi.listAudit.mockImplementation(async ({ beforeId, action } = {}) => beforeId ? { items: [{ id: 2, ts: "2026-11-16", actorId: 1, actorRole: "admin", action: "admin.update", target: "admin:demo", requestId: "request-2" }], nextBeforeId: undefined } : { items: [{ id: 1, ts: "2026-11-17", actorId: 1, actorRole: "admin", action: action || "auth.login", target: "admin:demo", requestId: "request-1" }], nextBeforeId: 1 });
+    renderAdmin(<AuditPage />);
+    await screen.findByText("auth.login");
+    fireEvent.click(screen.getByRole("button", { name: "Load more" }));
+    await screen.findByText("admin.update");
+    fireEvent.change(screen.getByRole("textbox", { name: "Operation" }), { target: { value: "admin" } });
+    await waitFor(() => expect(mockApi.listAudit).toHaveBeenLastCalledWith({ action: "admin", target: undefined, beforeId: undefined }));
   });
 });

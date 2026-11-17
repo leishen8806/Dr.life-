@@ -1,15 +1,16 @@
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Alert, Button, DatePicker, Drawer, Empty, Input, Layout, Menu, Result, Segmented, Select, Skeleton, Space, Table, Tooltip, Typography } from "antd";
+import { Alert, Button, DatePicker, Drawer, Empty, Input, Layout, Menu, Result, Select, Skeleton, Space, Table, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { applyDocumentLanguage, I18nProvider, readLanguagePreference, resolveLanguage, storeLanguagePreference, useI18n, type Language, type TranslationKey } from "@drlife/i18n";
+import { I18nProvider, readLanguagePreference, resolveLanguage, useI18n, type TranslationKey } from "@drlife/i18n";
 import { Money, StatusTag } from "@drlife/ui";
 import { api } from "./api";
 import { AuthGate, AuthToolbar } from "./auth";
 import { AdminManagementPage, AuditPage } from "./admin-pages";
 import type { OrderRecord, RecordStatus, ReviewRecord } from "./api/types";
 import { AgreementsPage, IntegrationsPage } from "./policy-pages";
+import { AdminLanguageSwitcher } from "./language-switcher";
 import "antd/dist/reset.css";
 import "@drlife/ui/styles.css";
 import "./styles.css";
@@ -23,11 +24,7 @@ function keyText(t: (key: TranslationKey) => string, key: string) {
   return t(key as TranslationKey);
 }
 
-export function AdminLanguageSwitcher() {
-  const { language, setLanguage, t } = useI18n();
-  const options = [{ value: "zh", label: t("language.zh") }, { value: "en", label: t("language.en") }, { value: "km", label: t("language.km") }];
-  return <Segmented aria-label={t("language.select")} value={language} options={options} onChange={(value) => { const next = value as Language; storeLanguagePreference(next); applyDocumentLanguage(next); setLanguage(next); }} />;
-}
+export { AdminLanguageSwitcher } from "./language-switcher";
 
 function toneFor(status: string): "neutral" | "success" | "warning" | "danger" {
   if (status === "approved" || status === "normal") return "success";
