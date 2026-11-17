@@ -26,6 +26,7 @@ import { SuborderDetailView, SuborderListView } from "../orders/suborder-views";
 import type { MerchantSuborder, SuborderStatus } from "../orders/suborders";
 import { createMerchantV4Api } from "../v4/merchant-v4-api";
 import { MerchantV4View } from "../v4/merchant-v4-view";
+import { MerchantV7View } from "../v7-view";
 
 interface Editing {
   /** 缺省表示新建；带上商品表示在编辑它。 */
@@ -50,6 +51,7 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
   const [selectedSuborder, setSelectedSuborder] = useState<MerchantSuborder>();
   const [suborderStatus, setSuborderStatus] = useState<SuborderStatus>();
   const [v4Open, setV4Open] = useState(false);
+  const [v7Open, setV7Open] = useState(false);
   const v4Api = useMemo(() => createMerchantV4Api(), []);
 
   const reload = useCallback(async () => {
@@ -147,12 +149,13 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
 
   return (
     <main className="mini-shell">
-      {v4Open ? <MerchantV4View api={v4Api} language={language} t={t} onBack={() => setV4Open(false)} /> : null}
-      {v4Open ? null : <>
+      {v7Open ? <MerchantV7View language={language} t={t} onBack={() => setV7Open(false)} /> : v4Open ? <MerchantV4View api={v4Api} language={language} t={t} onBack={() => setV4Open(false)} /> : null}
+      {v7Open || v4Open ? null : <>
       <AppHeader slogan={t("brand.slogan")} actions={<>
         <LanguageSwitcher />
         <Button variant="secondary" className="merchant-orders-action" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
         <Button variant="secondary" onClick={() => setV4Open(true)}>{t("merchant.profileLabel")}</Button>
+        <Button variant="secondary" onClick={() => setV7Open(true)}>{t("merchant.dashboard")}</Button>
       </>} />
       {subordersOpen ? (
         selectedSuborder ? (
