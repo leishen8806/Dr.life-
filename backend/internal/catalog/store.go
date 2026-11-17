@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -160,7 +161,7 @@ func (s *PgStore) Product(ctx context.Context, publicID string) (Product, error)
 // review. The row lock makes the status check and update one decision point;
 // callers can append the platform audit record on the same transaction in the
 // API layer before committing the request.
-func (s *PgStore) ReviewProduct(ctx context.Context, publicID string, target ProductStatus, reason string) (Product, error) {
+func (s *PgStore) ReviewProduct(ctx context.Context, publicID string, target ProductStatus, reason string, audit ReviewAudit) (Product, error) {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return Product{}, err
@@ -184,6 +185,25 @@ func (s *PgStore) ReviewProduct(ctx context.Context, publicID string, target Pro
 		UPDATE catalog.product
 		SET status = $2, review_reason = NULLIF($3, ''), updated_at = now()
 		WHERE public_id = $1 AND status = 'review'`, publicID, string(target), reason); err != nil {
+		return Product{}, err
+	}
+	detail, err := ReviewAuditDetail(target, reason)
+	if err != nil {
+		return Product{}, err
+	}
+	publicAuditID, err := ids.NewULID()
+	if err != nil {
+		return Product{}, err
+	}
+	occurredAt := audit.Time
+	if occurredAt.IsZero() {
+		occurredAt = time.Now().UTC()
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO catalog.product_review_audit_outbox
+			(public_id, occurred_at, actor_id, actor_role, action, target, detail, ip, request_id)
+		VALUES ($1, $2, $3, $4, 'product.moderated', $5, $6, NULLIF($7, '')::inet, $8)`,
+		publicAuditID, occurredAt, audit.ActorID, audit.ActorRole, "product:"+publicID, detail, audit.IP, audit.RequestID); err != nil {
 		return Product{}, err
 	}
 	product, err := productByPublicID(ctx, tx, publicID)

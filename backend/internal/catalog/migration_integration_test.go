@@ -96,7 +96,7 @@ func TestCatalogMigration(t *testing.T) {
 			WHERE c.table_schema = 'catalog' AND c.table_name <> 'search_log_default'`).Scan(&identityCount, &badTimestamp); err != nil {
 			t.Fatal(err)
 		}
-		if identityCount != 9 || badTimestamp != 0 {
+		if identityCount != 10 || badTimestamp != 0 {
 			t.Fatalf("identity columns=%d, bad timestamps=%d", identityCount, badTimestamp)
 		}
 	})
@@ -624,6 +624,47 @@ func TestCatalogMigration(t *testing.T) {
 			t.Fatalf("seeded categories=%d incomplete=%d, want %d/0", count, incomplete, seededCategoryCount)
 		}
 	})
+
+	t.Run("product review and audit outbox share a transaction", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review' WHERE public_id=$1`, firstProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		product, err := store.ReviewProduct(ctx, firstProductPublicID, catalog.StatusRejected, "missing dimensions", catalog.ReviewAudit{ActorID: 7, ActorRole: "super", RequestID: "review-1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if product.Status != catalog.StatusRejected || product.ReviewReason != "missing dimensions" {
+			t.Fatalf("product=%+v", product)
+		}
+		var outboxCount int
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM catalog.product_review_audit_outbox WHERE target=$1`, "product:"+firstProductPublicID).Scan(&outboxCount); err != nil {
+			t.Fatal(err)
+		}
+		if outboxCount != 1 {
+			t.Fatalf("outbox rows=%d, want 1", outboxCount)
+		}
+
+		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', review_reason=NULL WHERE public_id=$1`, firstProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		_, err = store.ReviewProduct(ctx, firstProductPublicID, catalog.StatusOn, "", catalog.ReviewAudit{ActorID: 7, ActorRole: "super", IP: "not-an-ip", RequestID: "review-rollback"})
+		if err == nil {
+			t.Fatal("invalid audit IP unexpectedly committed review")
+		}
+		var status catalog.ProductStatus
+		if err := admin.QueryRow(ctx, `SELECT status FROM catalog.product WHERE public_id=$1`, firstProductPublicID).Scan(&status); err != nil {
+			t.Fatal(err)
+		}
+		if status != catalog.StatusReview {
+			t.Fatalf("status=%q after rollback, want review", status)
+		}
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM catalog.product_review_audit_outbox WHERE request_id=$1`, "review-rollback").Scan(&outboxCount); err != nil {
+			t.Fatal(err)
+		}
+		if outboxCount != 0 {
+			t.Fatalf("rollback outbox rows=%d, want 0", outboxCount)
+		}
+	})
 }
 
 func seedCatalogFixtures(t *testing.T, ctx context.Context, admin *pgx.Conn) {
@@ -681,7 +722,7 @@ func assertIntegerMinQtyMigrationRejectsFractionalData(t *testing.T, database *s
 
 func assertCatalogTables(t *testing.T, database *sql.DB, want bool) {
 	t.Helper()
-	for _, name := range []string{"category", "product", "product_tier", "category_attribute", "sku", "sku_tier", "product_import", "search_synonym", "search_log"} {
+	for _, name := range []string{"category", "product", "product_tier", "category_attribute", "sku", "sku_tier", "product_import", "search_synonym", "search_log", "product_review_audit_outbox"} {
 		var exists bool
 		if err := database.QueryRow(`SELECT to_regclass('catalog.' || $1) IS NOT NULL`, name).Scan(&exists); err != nil {
 			t.Fatal(err)
