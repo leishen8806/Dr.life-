@@ -13,7 +13,18 @@
 
 ### 步骤 1：准备目录和占位 release
 
-安装 nginx 和 rsync；不要安装 Brotli 模块。创建根目录、`releases`、`incoming`、`staging` 和占位 release：`/srv/drlifeplus`、`/srv/drlifeplus/releases` 由 `root:root` 所有且为 `0755`；`/srv/drlifeplus/incoming` 由 `drlifeplus-deploy:drlifeplus-deploy` 所有且为 `0700`；`/srv/drlifeplus/staging` 由 `root:root` 所有且为 `0700`，部署账号不得进入。创建仅含临时 `index.html` 与 `404.html` 的 `/srv/drlifeplus/releases/bootstrap`，由 `root:root` 所有、目录 `0755`、文件 `0644`；把 `current` 建为指向 `releases/bootstrap` 的符号链接。这样 reload 到首次批准发布之间不会全站 404。
+安装 nginx、rsync 和后续加固所需的 `ufw`、`fail2ban`；测试环境另需 Docker Engine 与 Compose plugin。Ubuntu/Debian 上先用发行版包管理器安装，安装后核对 `nginx -V`、`rsync --version`、`docker compose version` 和 `systemctl is-active nginx`，不要安装 Brotli 模块。创建根目录、`releases`、`incoming`、`staging` 和占位 release：`/srv/drlifeplus`、`/srv/drlifeplus/releases` 由 `root:root` 所有且为 `0755`；`/srv/drlifeplus/incoming` 由 `drlifeplus-deploy:drlifeplus-deploy` 所有且为 `0700`；`/srv/drlifeplus/staging` 由 `root:root` 所有且为 `0700`，部署账号不得进入。创建仅含临时 `index.html` 与 `404.html` 的 `/srv/drlifeplus/releases/bootstrap`，由 `root:root` 所有、目录 `0755`、文件 `0644`；把 `current` 建为指向 `releases/bootstrap` 的符号链接。这样 reload 到首次批准发布之间不会全站 404。
+
+#### 新机上的人工 nginx 清理
+
+先备份 `/etc/nginx` 并记录当前官方站点的状态和标题；确认没有共用项目的
+`default_server` 冲突后，再移除 Ubuntu 新机自带的 `sites-enabled/default`
+符号链接（只删除该默认站点链接，不删除其他站点配置）。随后安装本项目的
+`drlifeplus.com.conf` 和安全头 include，执行 `nginx -t`，通过后才 reload。
+若发现默认站点不是 Ubuntu 包自带的链接、存在其他项目，或 `nginx -t` 报
+`default_server` 冲突，立即停止，恢复备份并由负责人协调，不要强行删除或
+覆盖配置。该清理步骤是一次性人工准备，发布脚本不会修改 nginx 的站点启用
+目录。
 
 ### 步骤 2：安装 nginx 配置
 

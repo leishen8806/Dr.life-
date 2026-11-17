@@ -6,6 +6,23 @@ from `env.example` in the approved staging environment; `.env` is ignored.
 
 ## First deployment
 
+### Host prerequisites (manual, before compose)
+
+On a new Ubuntu/Debian host, the owner or the explicitly authorised executor
+installs Docker Engine, the Docker Compose plugin, nginx, rsync, `ufw`, and
+`fail2ban` using the distribution package manager. Verify the binaries and
+services before continuing; do not copy credentials into the repository or
+shell history. The staging hardening script installs `ufw` and `fail2ban` as a
+defence in depth, but it does not install Docker, nginx, or rsync.
+
+If the host was created from a stock Ubuntu image, back up `/etc/nginx` and
+inspect the enabled sites before adding the staging proxy. Remove only the
+stock `/etc/nginx/sites-enabled/default` symlink, and only after confirming it
+is the package-provided default and that no other project owns it. Never remove
+an arbitrary `default_server` block to make `nginx -t` pass. Restore the backup
+and stop for owner review if another project is present or if the new site
+would create a `default_server` conflict.
+
 1. Copy `env.example` to `.env`, change `STAGING_ENV_FILE` to `.env`, and
    replace every `CHANGE_ME` value in the owner-managed secret store. Keep the
    three Redis URLs on separate services:
