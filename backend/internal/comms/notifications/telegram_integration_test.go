@@ -61,7 +61,11 @@ func TestTelegramWorkerLoadsEncryptedPoolAndSendsThroughLocalBot(t *testing.T) {
 		CREATE TABLE comms.notification (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, public_id text NOT NULL UNIQUE, event_id text NOT NULL, account_id bigint NOT NULL, event_type text NOT NULL, title jsonb NOT NULL, body jsonb NOT NULL, read_at timestamptz, created_at timestamptz NOT NULL DEFAULT clock_timestamp(), UNIQUE (account_id, event_id));
 		CREATE TABLE comms.notification_setting (account_id bigint NOT NULL, event_type text NOT NULL, telegram_enabled boolean NOT NULL DEFAULT true, PRIMARY KEY (account_id, event_type));
 		CREATE TABLE comms.notification_outbox (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, event_id text NOT NULL, account_id bigint NOT NULL, end_name text NOT NULL, event_type text NOT NULL, payload jsonb NOT NULL, attempts integer NOT NULL DEFAULT 0, next_attempt_at timestamptz NOT NULL DEFAULT clock_timestamp(), last_error text, dead_lettered_at timestamptz, delivered_at timestamptz, created_at timestamptz NOT NULL DEFAULT clock_timestamp(), UNIQUE (event_id, account_id, end_name));
-		INSERT INTO iam.bot(id, "end", role_in_pool, priority, token_enc) VALUES (101, 'buyer', 'primary', 0, $1), (202, 'merchant', 'primary', 0, $2);`, encrypted, encrypted)
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(ctx, `INSERT INTO iam.bot(id, "end", role_in_pool, priority, token_enc) VALUES (101, 'buyer', 'primary', 0, $1), (202, 'merchant', 'primary', 0, $2)`, encrypted, encrypted)
 	if err != nil {
 		t.Fatal(err)
 	}
