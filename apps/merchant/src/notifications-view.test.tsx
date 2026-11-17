@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "@drlife/i18n";
 import type { createApiClient } from "@drlife/api-client";
 import { MerchantNotificationsView } from "./notifications-view";
 
@@ -20,7 +21,7 @@ function fakeClient() {
 describe("MerchantNotificationsView", () => {
   it("loads real notification/settings endpoints and marks one item read", async () => {
     const client = fakeClient();
-    render(<MerchantNotificationsView client={client} onBack={vi.fn()} />);
+    render(<I18nProvider initialLanguage="en"><MerchantNotificationsView client={client} onBack={vi.fn()} /></I18nProvider>);
     expect(await screen.findByText("Order")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
     await waitFor(() => expect(client.POST).toHaveBeenCalledWith("/v1/merchant/me/notifications/{public_id}/read", expect.anything()));
