@@ -633,6 +633,16 @@ func TestCatalogMigration(t *testing.T) {
 	})
 
 	t.Run("product review and audit outbox share a transaction", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', submitted_at=NULL, review_reason=NULL WHERE public_id=$1`, firstProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		pending, err := catalog.NewReviewService(store).Pending(ctx, catalog.ProductFilter{}, catalog.Plan{Page: 1, PageSize: 20})
+		if err != nil {
+			t.Fatalf("review queue with unscreened product: %v", err)
+		}
+		if len(pending.Items) != 1 || pending.Items[0].PublicID != firstProductPublicID {
+			t.Fatalf("review queue=%+v, want unscreened product %s", pending.Items, firstProductPublicID)
+		}
 		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', submitted_at=clock_timestamp() WHERE public_id=$1`, firstProductPublicID); err != nil {
 			t.Fatal(err)
 		}

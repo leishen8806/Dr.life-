@@ -45,6 +45,25 @@ try {
     await mkdir(new URL("../screenshots/" + width + "/" + language + "/", import.meta.url), { recursive: true });
     await page.screenshot({ path: new URL("../screenshots/" + relative, import.meta.url).pathname, fullPage: true });
     manifest.push(relative);
+
+    if (pageDefinition.name === "review") {
+      await page.locator(".admin-tabs [role=tab]").nth(1).click();
+      const productRow = page.locator(".ant-table-tbody tr").first();
+      await productRow.waitFor();
+      await productRow.getByRole("button").last().click();
+      const rejectRelative = width + "/" + language + "/review-reject-modal.png";
+      await page.locator(".admin-reject-dialog").waitFor();
+      await page.screenshot({ path: new URL("../screenshots/" + rejectRelative, import.meta.url).pathname, fullPage: true });
+      manifest.push(rejectRelative);
+    }
+
+    if (pageDefinition.name === "orders") {
+      await page.locator(".ant-table-tbody tr").first().evaluate((row) => row.click());
+      const detailRelative = width + "/" + language + "/orders-detail.png";
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: new URL("../screenshots/" + detailRelative, import.meta.url).pathname, fullPage: true });
+      manifest.push(detailRelative);
+    }
     await context.close();
   }
 } finally {
