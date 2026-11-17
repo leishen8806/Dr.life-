@@ -54,3 +54,15 @@ func TestReviewServiceRequiresReasonWhenRejecting(t *testing.T) {
 		t.Fatalf("store mutated on invalid rejection: %#v", store)
 	}
 }
+
+func TestValidateReviewDecisionRejectsNonReviewProducts(t *testing.T) {
+	if err := catalog.ValidateReviewDecision(catalog.StatusDraft, catalog.StatusOn, ""); !errors.Is(err, catalog.ErrInvalidReviewTransition) {
+		t.Fatalf("error=%v, want ErrInvalidReviewTransition", err)
+	}
+	if err := catalog.ValidateReviewDecision(catalog.StatusReview, catalog.StatusRejected, " "); !errors.Is(err, catalog.ErrReviewReasonRequired) {
+		t.Fatalf("error=%v, want ErrReviewReasonRequired", err)
+	}
+	if err := catalog.ValidateReviewDecision(catalog.StatusReview, catalog.StatusRejected, "missing dimensions"); err != nil {
+		t.Fatalf("valid rejection error=%v", err)
+	}
+}

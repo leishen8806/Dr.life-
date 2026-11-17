@@ -67,7 +67,7 @@ func (s *PgStore) CategoryAttributes(ctx context.Context, categoryCode string) (
 // productColumns 是列表与单条读取共用的投影。
 // numeric 一律用 trim_scale 转 text 出库，金额/体积永不经由 float64。
 const productColumns = `p.id, p.public_id, p.merchant_id, p.category_id, c.code, p.name, p.spec, p.unit,
-	p.origin, p.lead_days, trim_scale(p.vol_m3)::text, p.status, p.source, p.source_ref, p.std_score, p.updated_at`
+	 p.origin, p.lead_days, trim_scale(p.vol_m3)::text, p.status, coalesce(p.review_reason, ''), p.source, p.source_ref, p.std_score, p.updated_at`
 
 // productSortSQL 是排序白名单到 SQL 片段的映射：客户端输入永不拼接进 SQL。
 var productSortSQL = map[string]string{
@@ -151,6 +151,46 @@ func (s *PgStore) ListProducts(ctx context.Context, filter ProductFilter, plan P
 func (s *PgStore) Product(ctx context.Context, publicID string) (Product, error) {
 	product, err := productByPublicID(ctx, s.db, publicID)
 	if err != nil {
+		return Product{}, err
+	}
+	return refreshTiers(ctx, s.db, product)
+}
+
+// ReviewProduct atomically decides a product that is waiting for platform
+// review. The row lock makes the status check and update one decision point;
+// callers can append the platform audit record on the same transaction in the
+// API layer before committing the request.
+func (s *PgStore) ReviewProduct(ctx context.Context, publicID string, target ProductStatus, reason string) (Product, error) {
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return Product{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var current ProductStatus
+	if err := tx.QueryRow(ctx, `SELECT status FROM catalog.product WHERE public_id = $1 FOR UPDATE`, publicID).Scan(&current); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Product{}, ErrNotFound
+		}
+		return Product{}, err
+	}
+	if err := ValidateReviewDecision(current, target, reason); err != nil {
+		return Product{}, err
+	}
+	if target == StatusOn {
+		reason = ""
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE catalog.product
+		SET status = $2, review_reason = NULLIF($3, ''), updated_at = now()
+		WHERE public_id = $1 AND status = 'review'`, publicID, string(target), reason); err != nil {
+		return Product{}, err
+	}
+	product, err := productByPublicID(ctx, tx, publicID)
+	if err != nil {
+		return Product{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return Product{}, err
 	}
 	return refreshTiers(ctx, s.db, product)
@@ -443,7 +483,7 @@ func scanProduct(row pgx.Row) (Product, error) {
 		volumeM3, sourceRef    *string
 	)
 	if err := row.Scan(&product.ID, &product.PublicID, &product.MerchantID, &product.CategoryID, &product.CategoryCode,
-		&name, &spec, &product.Unit, &origin, &product.LeadDays, &volumeM3, &status, &source, &sourceRef,
+		&name, &spec, &product.Unit, &origin, &product.LeadDays, &volumeM3, &status, &product.ReviewReason, &source, &sourceRef,
 		&product.StdScore, &product.UpdatedAt); err != nil {
 		return Product{}, err
 	}

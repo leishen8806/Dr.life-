@@ -19,6 +19,18 @@ type ReviewService struct {
 	store ReviewStore
 }
 
+// ValidateReviewDecision checks the state machine before a store mutation.
+// The concrete store repeats the check after locking the row.
+func ValidateReviewDecision(current, target ProductStatus, reason string) error {
+	if current != StatusReview || (target != StatusOn && target != StatusRejected) {
+		return ErrInvalidReviewTransition
+	}
+	if target == StatusRejected && strings.TrimSpace(reason) == "" {
+		return ErrReviewReasonRequired
+	}
+	return nil
+}
+
 func NewReviewService(store ReviewStore) *ReviewService {
 	return &ReviewService{store: store}
 }
@@ -33,8 +45,9 @@ func (s *ReviewService) Approve(ctx context.Context, publicID string) (Product, 
 }
 
 func (s *ReviewService) Reject(ctx context.Context, publicID, reason string) (Product, error) {
-	if strings.TrimSpace(reason) == "" {
-		return Product{}, ErrReviewReasonRequired
+	reason = strings.TrimSpace(reason)
+	if err := ValidateReviewDecision(StatusReview, StatusRejected, reason); err != nil {
+		return Product{}, err
 	}
-	return s.store.ReviewProduct(ctx, publicID, StatusRejected, strings.TrimSpace(reason))
+	return s.store.ReviewProduct(ctx, publicID, StatusRejected, reason)
 }

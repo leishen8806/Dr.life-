@@ -144,6 +144,7 @@ type Product struct {
 	LeadDays     *int
 	VolumeM3     string
 	Status       ProductStatus
+	ReviewReason string
 	Source       string
 	SourceRef    string
 	StdScore     *int
