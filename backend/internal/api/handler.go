@@ -523,7 +523,7 @@ func (h Handler) adminLedgerAccess(w http.ResponseWriter, r *http.Request) bool 
 	return true
 }
 
-func (h Handler) adminCatalogReviewAccess(w http.ResponseWriter, r *http.Request) bool {
+func (h Handler) adminCatalogReviewAccess(w http.ResponseWriter, r *http.Request, code iam.AdminPermissionCode) bool {
 	identity, ok := gateway.IdentityFromContext(r.Context())
 	if !ok {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
@@ -533,7 +533,7 @@ func (h Handler) adminCatalogReviewAccess(w http.ResponseWriter, r *http.Request
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
 		return false
 	}
-	allowed, err := h.hasAdminPermission(r.Context(), identity.AccountID, iam.AdminPermissionCatalogReview)
+	allowed, err := h.hasAdminPermission(r.Context(), identity.AccountID, code)
 	if err != nil || !allowed {
 		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
 		return false
@@ -561,7 +561,7 @@ func (h Handler) catalogReviewAudit(w http.ResponseWriter, r *http.Request) (cat
 }
 
 func (h Handler) ListAdminCatalogProducts(w http.ResponseWriter, r *http.Request, params gen.ListAdminCatalogProductsParams) {
-	if !h.adminCatalogReviewAccess(w, r) {
+	if !h.adminCatalogReviewAccess(w, r, iam.AdminPermissionCatalogReviewQueue) {
 		return
 	}
 	if h.CatalogReview == nil {
@@ -591,7 +591,7 @@ func (h Handler) ListAdminCatalogProducts(w http.ResponseWriter, r *http.Request
 }
 
 func (h Handler) PostAdminCatalogProductApprove(w http.ResponseWriter, r *http.Request, publicID gen.PublicID, _ gen.PostAdminCatalogProductApproveParams) {
-	if !h.adminCatalogReviewAccess(w, r) {
+	if !h.adminCatalogReviewAccess(w, r, iam.AdminPermissionCatalogReview) {
 		return
 	}
 	if h.CatalogReview == nil {
@@ -616,7 +616,7 @@ func (h Handler) PostAdminCatalogProductApprove(w http.ResponseWriter, r *http.R
 }
 
 func (h Handler) PostAdminCatalogProductReject(w http.ResponseWriter, r *http.Request, publicID gen.PublicID, _ gen.PostAdminCatalogProductRejectParams) {
-	if !h.adminCatalogReviewAccess(w, r) {
+	if !h.adminCatalogReviewAccess(w, r, iam.AdminPermissionCatalogReview) {
 		return
 	}
 	if h.CatalogReview == nil {

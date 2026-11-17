@@ -63,8 +63,9 @@ const (
 type AdminPermissionCode string
 
 const (
-	AdminPermissionCatalogReview AdminPermissionCode = "admin.catalog.review"
-	AdminPermissionOrdersRead    AdminPermissionCode = "admin.orders.read"
+	AdminPermissionCatalogReview      AdminPermissionCode = "admin.catalog.review"
+	AdminPermissionCatalogReviewQueue AdminPermissionCode = "admin.catalog.review.queue"
+	AdminPermissionOrdersRead         AdminPermissionCode = "admin.orders.read"
 )
 
 // AdminPermissionParts translates a boundary permission code to the seeded
@@ -72,6 +73,8 @@ const (
 func AdminPermissionParts(code AdminPermissionCode) (Module, Permission, bool) {
 	switch code {
 	case AdminPermissionCatalogReview:
+		return ModuleProducts, PermissionEdit, true
+	case AdminPermissionCatalogReviewQueue:
 		return ModuleProducts, PermissionView, true
 	case AdminPermissionOrdersRead:
 		return ModuleOrders, PermissionView, true

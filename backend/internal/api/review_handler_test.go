@@ -80,6 +80,32 @@ func TestAdminCatalogRejectPassesReasonAndActorToCatalog(t *testing.T) {
 	}
 }
 
+func TestAdminCatalogReviewWritesRequireEditPermission(t *testing.T) {
+	stub := &reviewManagementStub{product: catalog.Product{PublicID: "01ARZ3NDEKTSV4RRFFQ69G5FAV", Status: catalog.StatusOn}}
+	editAllowed := false
+	handler := server.NewHandlerWithGateway(nil, server.GatewayOptions{
+		AppEnv: "dev", Limiter: gateway.NewMemoryLimiter(), IPRules: permissiveRules(), AccountRules: permissiveRules(),
+		Authenticator:    stubAuth{identity: gateway.Identity{AccountID: "admin-public", Role: gateway.RoleAdmin}},
+		AdminPermissions: fakeAdminPermissions{allowed: true, editAllowed: &editAllowed}, CatalogReview: stub,
+	})
+	approve := httptest.NewRecorder()
+	approveReq := httptest.NewRequest(http.MethodPost, "/v1/admin/catalog/products/01arz3ndektsv4rrffq69g5fav/approve", nil)
+	approveReq.Header.Set("Content-Type", "application/json")
+	approveReq.Header.Set("Idempotency-Key", "review-permission-1")
+	handler.ServeHTTP(approve, approveReq)
+	if approve.Code != http.StatusForbidden {
+		t.Fatalf("view-only approve status=%d body=%s", approve.Code, approve.Body.String())
+	}
+	reject := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/admin/catalog/products/01arz3ndektsv4rrffq69g5fav/reject", strings.NewReader(`{"reason":"missing dimensions"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Idempotency-Key", "review-permission-2")
+	handler.ServeHTTP(reject, req)
+	if reject.Code != http.StatusForbidden {
+		t.Fatalf("view-only reject status=%d body=%s", reject.Code, reject.Body.String())
+	}
+}
+
 type adminOrderStub struct {
 	order trade.BuyerOrderView
 }

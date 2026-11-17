@@ -18,7 +18,8 @@ func TestAdminPermissionPartsUsesCanonicalCodes(t *testing.T) {
 		module   Module
 		required Permission
 	}{
-		{AdminPermissionCatalogReview, ModuleProducts, PermissionView},
+		{AdminPermissionCatalogReview, ModuleProducts, PermissionEdit},
+		{AdminPermissionCatalogReviewQueue, ModuleProducts, PermissionView},
 		{AdminPermissionOrdersRead, ModuleOrders, PermissionView},
 	}
 	for _, tt := range tests {
