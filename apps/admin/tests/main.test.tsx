@@ -9,7 +9,7 @@ const mockApi = vi.hoisted(() => ({
   listReviews: vi.fn(),
   approveReview: vi.fn(),
   rejectReview: vi.fn(),
-  listOrders: vi.fn()
+  listOrders: vi.fn(), getOrder: vi.fn()
   ,login: vi.fn(), refresh: vi.fn(), logout: vi.fn(), changePassword: vi.fn(), stepUp: vi.fn(), listAdmins: vi.fn(), createAdmin: vi.fn(), disableAdmin: vi.fn(), enableAdmin: vi.fn(), updateAdminRole: vi.fn(), listAudit: vi.fn()
 }));
 
@@ -40,6 +40,7 @@ describe("admin review and order views", () => {
     mockApi.approveReview.mockResolvedValue(undefined);
     mockApi.rejectReview.mockResolvedValue(undefined);
     mockApi.listOrders.mockImplementation(async ({ query } = {}) => query ? orders.filter((item) => item.id.includes(query)) : orders);
+    mockApi.getOrder.mockResolvedValue(orders[0]);
     mockApi.listAdmins.mockResolvedValue({ items: [{ publicId: "admin-1", name: "Test Admin", email: "admin@example.test", role: "super", dataScope: ["KH-PP"], status: "active", createdAt: "2026-11-01" }] });
     mockApi.listAudit.mockResolvedValue({ items: [{ id: 1, ts: "2026-11-17", actorId: 1, actorRole: "admin", action: "auth.login", target: "admin:test", requestId: "request-1" }] });
     mockApi.stepUp.mockResolvedValue("step-up-token");
