@@ -84,4 +84,21 @@ describe("admin review and order views", () => {
     expect(await screen.findByText("auth.login")).toBeTruthy();
     expect(mockApi.listAudit).toHaveBeenCalledOnce();
   });
+
+  it("requires step-up before creating an administrator and shows credentials once", async () => {
+    mockApi.createAdmin.mockResolvedValue({ admin: reviews[0], initialPassword: "one-time-password", totpProvisioningUri: "otpauth://example.test/fake" });
+    renderAdmin(<AdminManagementPage />);
+    fireEvent.click(screen.getByRole("button", { name: "New administrator" }));
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "New Operator" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "operator@example.test" } });
+    fireEvent.mouseDown(screen.getByRole("combobox"));
+    fireEvent.click(await screen.findByRole("option", { name: "ops" }));
+    fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: "123456" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "New administrator" }).at(-1)!);
+    await waitFor(() => expect(mockApi.stepUp).toHaveBeenCalledWith("permission_change", "123456"));
+    await waitFor(() => expect(mockApi.createAdmin).toHaveBeenCalledWith(expect.objectContaining({ name: "New Operator", email: "operator@example.test", stepUpToken: "step-up-token" })));
+    expect(await screen.findByText("one-time-password")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "I saved these credentials" }));
+    expect(mockApi.createAdmin).toHaveBeenCalledOnce();
+  });
 });
