@@ -35,7 +35,7 @@ interface Editing {
   draft: ProductDraft;
 }
 
-export function ProductScreen({ api, client }: { api: MerchantProductApi; client: ReturnType<typeof createApiClient> }) {
+export function ProductScreen({ api, client }: { api: MerchantProductApi; client?: ReturnType<typeof createApiClient> }) {
   const { language, t } = useI18n();
   const [products, setProducts] = useState<Product[]>();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -150,7 +150,7 @@ export function ProductScreen({ api, client }: { api: MerchantProductApi; client
 
   return (
     <main className="mini-shell">
-      {notificationsOpen ? <MerchantNotificationsView client={client} onBack={() => setNotificationsOpen(false)} /> : null}
+      {notificationsOpen && client ? <MerchantNotificationsView client={client} onBack={() => setNotificationsOpen(false)} /> : null}
       {notificationsOpen ? null : <>
       {v4Open ? <MerchantV4View api={v4Api} language={language} t={t} onBack={() => setV4Open(false)} /> : null}
       {v4Open ? null : <>
@@ -158,7 +158,7 @@ export function ProductScreen({ api, client }: { api: MerchantProductApi; client
         <LanguageSwitcher />
         <Button variant="secondary" className="merchant-orders-action" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
         <Button variant="secondary" onClick={() => setV4Open(true)}>{t("merchant.profileLabel")}</Button>
-        <Button variant="secondary" onClick={() => setNotificationsOpen(true)}>Notifications</Button>
+        {client ? <Button variant="secondary" onClick={() => setNotificationsOpen(true)}>Notifications</Button> : null}
       </>} />
       {subordersOpen ? (
         selectedSuborder ? (

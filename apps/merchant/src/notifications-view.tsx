@@ -12,13 +12,13 @@ export function MerchantNotificationsView({ client, onBack }: { client: Client; 
     setLoading(true); setError(undefined);
     try {
       const [notifications, preferences] = await Promise.all([client.GET("/v1/merchant/me/notifications", { params: { query: { limit: 50 } } }), client.GET("/v1/merchant/me/notification-settings")]);
-      if (!notifications.data || !preferences.data) throw new Error("notification response missing");
+      if (!notifications.data?.data || !preferences.data?.data) throw new Error("notification response missing");
       setItems(notifications.data.data.items); setUnread(notifications.data.data.unread_count); setSettings(preferences.data.data.items);
     } catch { setError("Unable to load notifications"); } finally { setLoading(false); }
   }, [client]);
   useEffect(() => { void load(); }, [load]);
   const markRead = async (publicId: string) => { await client.POST("/v1/merchant/me/notifications/{public_id}/read", { params: { path: { public_id: publicId.toLowerCase() }, header: { "Idempotency-Key": `notification-${publicId}` } } }); setItems((current) => current.map((item) => item.public_id === publicId ? { ...item, read_at: item.read_at ?? new Date().toISOString() } : item)); setUnread((current) => Math.max(0, current - 1)); };
-  const updateSetting = async (setting: Setting) => { const { data } = await client.PUT("/v1/merchant/me/notification-settings", { params: { header: { "Idempotency-Key": `setting-${setting.event_type}` } }, body: setting }); if (data) setSettings(data.data.items); };
+  const updateSetting = async (setting: Setting) => { const { data } = await client.PUT("/v1/merchant/me/notification-settings", { params: { header: { "Idempotency-Key": `setting-${setting.event_type}` } }, body: setting }); if (data?.data) setSettings(data.data.items); };
   return <section aria-label="Merchant notifications" className="notification-center">
     <Button variant="secondary" onClick={onBack}>Back</Button><h1>Notifications {unread > 0 ? `(${unread})` : ""}</h1>
     {loading ? <Loading label="Loading notifications" /> : error ? <p role="alert">{error} <Button variant="secondary" onClick={() => void load()}>Retry</Button></p> : <>

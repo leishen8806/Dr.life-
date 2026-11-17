@@ -19,7 +19,7 @@ export function BuyerNotificationsView({ client, onBack }: { client: BuyerApiCli
         client.GET("/v1/buyer/me/notifications", { params: { query: { limit: 50 } } }),
         client.GET("/v1/buyer/me/notification-settings")
       ]);
-      if (!notifications.data || !preferences.data) throw new Error("notification response missing");
+      if (!notifications.data?.data || !preferences.data?.data) throw new Error("notification response missing");
       setItems(notifications.data.data.items); setUnread(notifications.data.data.unread_count); setSettings(preferences.data.data.items);
     } catch { setError("Unable to load notifications"); } finally { setLoading(false); }
   }, [client]);
@@ -32,7 +32,7 @@ export function BuyerNotificationsView({ client, onBack }: { client: BuyerApiCli
   };
   const updateSetting = async (setting: Setting) => {
     const { data } = await client.PUT("/v1/buyer/me/notification-settings", { params: { header: { "Idempotency-Key": `setting-${setting.event_type}` } }, body: setting });
-    if (data) setSettings(data.data.items);
+    if (data?.data) setSettings(data.data.items);
   };
 
   return <section aria-label="Buyer notifications" className="notification-center">
