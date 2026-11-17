@@ -910,6 +910,10 @@ create table audit.log (
 
 ## 十一、测试清单（账务必须全部通过才能上线）
 
+## 十-A、通知（V9 C1）
+
+通知写入属于业务事务的一部分：业务侧只写 `comms.notification_outbox`，由 worker 在事务提交后创建站内信并按收件人端选择 Telegram Bot。`event_id` 全局唯一，保证同一事件幂等；`comms.notification` 以 `(account_id, event_id)` 再次兜底。`comms.notification_setting` 按事件类型分别控制站内信与 Telegram，缺少对应端可用 Bot 时保留站内信并记录未发送原因。提现到账与结算到账本版本只登记事件类型，不触发发送。
+
 | 类别 | 用例 |
 |---|---|
 | 平衡 | 每种业务动作（6.1–6.19）入账后借=贷；随机大量交易后恒等式成立 |
