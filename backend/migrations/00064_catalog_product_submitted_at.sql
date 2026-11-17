@@ -7,5 +7,5 @@ CREATE INDEX ix_product_review_submitted_at
     WHERE status = 'review';
 
 -- +goose Down
-DROP INDEX ix_product_review_submitted_at;
+DROP INDEX IF EXISTS catalog.ix_product_review_submitted_at;
 ALTER TABLE catalog.product DROP COLUMN submitted_at;
