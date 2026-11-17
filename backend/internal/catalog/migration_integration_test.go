@@ -643,8 +643,19 @@ func TestCatalogMigration(t *testing.T) {
 		if len(pending.Items) != 1 || pending.Items[0].PublicID != firstProductPublicID {
 			t.Fatalf("review queue=%+v, want unscreened product %s", pending.Items, firstProductPublicID)
 		}
-		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', submitted_at=clock_timestamp() WHERE public_id=$1`, firstProductPublicID); err != nil {
+		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='draft', submitted_at=NULL WHERE public_id=$1`, firstProductPublicID); err != nil {
 			t.Fatal(err)
+		}
+		review := catalog.StatusReview
+		if _, err := store.UpdateProduct(ctx, 42, firstProductPublicID, catalog.ProductPatch{Status: &review}); err != nil {
+			t.Fatalf("merchant submit to review: %v", err)
+		}
+		var submittedAt sql.NullTime
+		if err := admin.QueryRow(ctx, `SELECT submitted_at FROM catalog.product WHERE public_id=$1`, firstProductPublicID).Scan(&submittedAt); err != nil {
+			t.Fatal(err)
+		}
+		if !submittedAt.Valid {
+			t.Fatal("merchant submit did not record submitted_at")
 		}
 		product, err := store.ReviewProduct(ctx, firstProductPublicID, catalog.StatusRejected, "missing dimensions", catalog.ReviewAudit{ActorID: 7, ActorRole: "super", RequestID: "review-1"})
 		if err != nil {

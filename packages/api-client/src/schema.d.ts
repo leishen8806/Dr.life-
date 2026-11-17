@@ -1798,10 +1798,10 @@ export interface components {
             vol_m3?: string | null;
             source_ref?: string;
             /**
-             * @description Merchants may only move a product between draft and off; on is reached through publish.
+             * @description Merchants may move a product to draft, off, or submit it for administrative review; on is reached through publish.
              * @enum {string}
              */
-            status?: "draft" | "off";
+            status?: "draft" | "off" | "review";
             tiers?: components["schemas"]["ProductTierList"];
             skus?: components["schemas"]["SkuCreateList"];
         };

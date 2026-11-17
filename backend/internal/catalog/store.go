@@ -342,6 +342,11 @@ func (s *PgStore) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 	}
 	if patch.Status != nil {
 		add(string(*patch.Status), "status = ?")
+		if *patch.Status == StatusReview {
+			sets = append(sets, "submitted_at = now()")
+		} else {
+			sets = append(sets, "submitted_at = NULL")
+		}
 	}
 	args = append(args, publicID, merchantID)
 	var productID int64

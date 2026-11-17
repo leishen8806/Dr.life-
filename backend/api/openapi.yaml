@@ -2502,8 +2502,8 @@ components:
           type: string
         status:
           type: string
-          enum: [draft, off]
-          description: Merchants may only move a product between draft and off; on is reached through publish.
+          enum: [draft, off, review]
+          description: Merchants may move a product to draft, off, or submit it for administrative review; on is reached through publish.
         tiers:
           $ref: "#/components/schemas/ProductTierList"
         skus:

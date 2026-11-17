@@ -34,9 +34,9 @@ func (s ProductStatus) Valid() bool {
 }
 
 // MerchantSettable 报告商家接口能否直接写入该状态。
-// on 只能由上架接口流转，review/rejected 属平台审核（T-01 不做）。
+// on 只能由上架接口流转；review 是商家提交审核的入口，rejected 属平台审核。
 func (s ProductStatus) MerchantSettable() bool {
-	return s == StatusDraft || s == StatusOff
+	return s == StatusDraft || s == StatusOff || s == StatusReview
 }
 
 // MerchantStatus 是 iam.merchant.status 在 catalog 侧的最小只读投影

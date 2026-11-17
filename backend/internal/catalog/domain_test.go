@@ -159,12 +159,12 @@ func TestProductStatusIsBoundedAndMerchantSettable(t *testing.T) {
 	if catalog.ProductStatus("bogus").Valid() {
 		t.Fatal("bogus status reported valid")
 	}
-	for _, status := range []catalog.ProductStatus{catalog.StatusDraft, catalog.StatusOff} {
+	for _, status := range []catalog.ProductStatus{catalog.StatusDraft, catalog.StatusOff, catalog.StatusReview} {
 		if !status.MerchantSettable() {
 			t.Fatalf("%q.MerchantSettable() = false", status)
 		}
 	}
-	for _, status := range []catalog.ProductStatus{catalog.StatusOn, catalog.StatusReview, catalog.StatusRejected} {
+	for _, status := range []catalog.ProductStatus{catalog.StatusOn, catalog.StatusRejected} {
 		if status.MerchantSettable() {
 			t.Fatalf("%q.MerchantSettable() = true, want false", status)
 		}

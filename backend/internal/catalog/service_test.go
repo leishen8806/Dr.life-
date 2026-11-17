@@ -475,6 +475,14 @@ func TestUpdateRejectsStatusTheMerchantMayNotSet(t *testing.T) {
 	if store.updatedWith.Status == nil || *store.updatedWith.Status != catalog.StatusOff {
 		t.Fatalf("store patch = %+v", store.updatedWith)
 	}
+
+	review := catalog.StatusReview
+	if _, err := service.UpdateProduct(context.Background(), merchantID, productULID, catalog.ProductPatch{Status: &review}); err != nil {
+		t.Fatalf("draft to review = %v, want nil", err)
+	}
+	if store.updatedWith.Status == nil || *store.updatedWith.Status != catalog.StatusReview {
+		t.Fatalf("review patch = %+v", store.updatedWith)
+	}
 }
 
 func TestUpdateKeepsAnOnSaleProductPublishable(t *testing.T) {

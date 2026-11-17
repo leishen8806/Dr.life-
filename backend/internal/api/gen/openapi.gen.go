@@ -1141,8 +1141,9 @@ func (e ProductUpdateRequestOrigin) Valid() bool {
 
 // Defines values for ProductUpdateRequestStatus.
 const (
-	ProductUpdateRequestStatusDraft ProductUpdateRequestStatus = "draft"
-	ProductUpdateRequestStatusOff   ProductUpdateRequestStatus = "off"
+	ProductUpdateRequestStatusDraft  ProductUpdateRequestStatus = "draft"
+	ProductUpdateRequestStatusOff    ProductUpdateRequestStatus = "off"
+	ProductUpdateRequestStatusReview ProductUpdateRequestStatus = "review"
 )
 
 // Valid indicates whether the value is a known member of the ProductUpdateRequestStatus enum.
@@ -1151,6 +1152,8 @@ func (e ProductUpdateRequestStatus) Valid() bool {
 	case ProductUpdateRequestStatusDraft:
 		return true
 	case ProductUpdateRequestStatusOff:
+		return true
+	case ProductUpdateRequestStatusReview:
 		return true
 	default:
 		return false
@@ -2491,7 +2494,7 @@ type ProductUpdateRequest struct {
 	SourceRef *string                     `json:"source_ref,omitempty"`
 	Spec      *LocalizedText              `json:"spec,omitempty"`
 
-	// Status Merchants may only move a product between draft and off; on is reached through publish.
+	// Status Merchants may move a product to draft, off, or submit it for administrative review; on is reached through publish.
 	Status *ProductUpdateRequestStatus `json:"status,omitempty"`
 
 	// Tiers At least two tiers, each with a unique minimum order quantity.
@@ -2503,7 +2506,7 @@ type ProductUpdateRequest struct {
 // ProductUpdateRequestOrigin defines model for ProductUpdateRequest.Origin.
 type ProductUpdateRequestOrigin string
 
-// ProductUpdateRequestStatus Merchants may only move a product between draft and off; on is reached through publish.
+// ProductUpdateRequestStatus Merchants may move a product to draft, off, or submit it for administrative review; on is reached through publish.
 type ProductUpdateRequestStatus string
 
 // RefreshData defines model for RefreshData.

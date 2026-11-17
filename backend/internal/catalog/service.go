@@ -326,7 +326,7 @@ func (s *Service) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 	if patch.Status != nil {
 		effectiveStatus = *patch.Status
 	}
-	if effectiveStatus == StatusOn {
+	if effectiveStatus == StatusOn || effectiveStatus == StatusReview {
 		name := product.Name
 		if patch.Name != nil {
 			name = patch.Name
