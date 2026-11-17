@@ -6,6 +6,8 @@ const pages = [
   { name: "login", path: "/login" },
   { name: "administrators", path: "/administrators" },
   { name: "audit", path: "/audit" }
+  , { name: "review", path: "/review" }
+  , { name: "orders", path: "/orders" }
 ];
 const widths = [1440, 390];
 const languages = ["zh", "en", "km"];

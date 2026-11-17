@@ -58,7 +58,7 @@ function realApi(): AdminApi {
   };
 }
 
-async function getApi(): Promise<AdminApi> { return import.meta.env.DEV ? (await import("./mock")).mockApi : realApi(); }
+async function getApi(): Promise<AdminApi> { return import.meta.env.DEV && import.meta.env.VITE_ADMIN_API_MODE !== "real" ? (await import("./mock")).mockApi : realApi(); }
 export { request as requestForTest };
 export const api = {
   login: (input: Parameters<AdminApi["login"]>[0]) => getApi().then((client) => client.login(input)), refresh: () => getApi().then((client) => client.refresh()), logout: () => getApi().then((client) => client.logout()), changePassword: (input: Parameters<AdminApi["changePassword"]>[0]) => getApi().then((client) => client.changePassword(input)), stepUp: (scope: string, totpCode: string) => getApi().then((client) => client.stepUp(scope, totpCode)), listAdmins: (cursor?: string) => getApi().then((client) => client.listAdmins(cursor)), createAdmin: (input: Parameters<AdminApi["createAdmin"]>[0]) => getApi().then((client) => client.createAdmin(input)), disableAdmin: (id: string, reason: string, token: string) => getApi().then((client) => client.disableAdmin(id, reason, token)), enableAdmin: (id: string, token: string) => getApi().then((client) => client.enableAdmin(id, token)), updateAdminRole: (id: string, role: string, scope: string[], token: string) => getApi().then((client) => client.updateAdminRole(id, role, scope, token)), listAudit: (filters?: Parameters<AdminApi["listAudit"]>[0]) => getApi().then((client) => client.listAudit(filters)),

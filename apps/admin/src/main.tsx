@@ -17,7 +17,10 @@ import "./styles.css";
 
 const { Header, Sider, Content } = Layout;
 const canUseMockWorkspace = import.meta.env.DEV;
-const permissions: string[] = canUseMockWorkspace ? ["admin.review", "admin.orders", "admin.merchants", "admin.products", "admin.agreement.publish", "admin.integration.manage"] : [];
+// The server remains the source of truth for permissions. The production UI
+// exposes read routes and renders API 403s instead of hiding a route based on
+// a stale client-side permission snapshot.
+const permissions: string[] = ["admin.review", "admin.orders", "admin.merchants", "admin.products", "admin.agreement.publish", "admin.integration.manage"];
 const hasPermission = (permission: string) => permissions.includes(permission);
 
 function keyText(t: (key: TranslationKey) => string, key: string) {
