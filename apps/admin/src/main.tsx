@@ -6,6 +6,8 @@ import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from "re
 import { applyDocumentLanguage, I18nProvider, readLanguagePreference, resolveLanguage, storeLanguagePreference, useI18n, type Language, type TranslationKey } from "@drlife/i18n";
 import { Money, StatusTag } from "@drlife/ui";
 import { api } from "./api";
+import { AuthGate } from "./auth";
+import { AdminManagementPage, AuditPage } from "./admin-pages";
 import type { OrderRecord, RecordStatus, ReviewRecord } from "./api/types";
 import { AgreementsPage, IntegrationsPage } from "./policy-pages";
 import "antd/dist/reset.css";
@@ -178,25 +180,20 @@ export function OrderPage() {
   </div>;
 }
 
-function ProductionPlaceholder() {
-  const { t } = useI18n();
-  return <Result status="403" title={t("admin.noPermission")} subTitle={t("admin.loginUnavailable")} />;
-}
-
 function Shell() {
   const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
-  if (!canUseMockWorkspace) return <ProductionPlaceholder />;
   const items = [
     { key: "/", label: <Link to="/">{t("admin.overview")}</Link> },
     { key: "accounts", label: t("admin.accounts"), children: [
+      { key: "/administrators", label: <Link to="/administrators">{t("admin.administrators")}</Link> },
       ...(hasPermission("admin.orders") ? [{ key: "/orders", label: <Link to="/orders">{t("admin.orders")}</Link> }] : []),
       ...(hasPermission("admin.merchants") ? [{ key: "/merchants", label: <span>{t("admin.merchants")}</span>, disabled: true }] : []),
       ...(hasPermission("admin.products") ? [{ key: "/products", label: <span>{t("admin.products")}</span>, disabled: true }] : [])
     ] },
     { key: "operations", label: t("admin.operations"), children: hasPermission("admin.review") ? [{ key: "/review", label: <Link to="/review">{t("admin.review")}</Link> }] : [] },
-    { key: "system", label: t("admin.system"), children: [{ key: "/policies", label: <Link to="/policies">{t("admin.policies")}</Link> }, { key: "/integrations", label: <Link to="/integrations">{t("admin.integrations")}</Link> }] }
+    { key: "system", label: t("admin.system"), children: [{ key: "/audit", label: <Link to="/audit">{t("admin.audit")}</Link> }, { key: "/policies", label: <Link to="/policies">{t("admin.policies")}</Link> }, { key: "/integrations", label: <Link to="/integrations">{t("admin.integrations")}</Link> }] }
   ];
   const selectedKey = location.pathname === "/" ? "/" : location.pathname;
   return <Layout className="admin-shell">
@@ -209,10 +206,12 @@ function Shell() {
       <Content className="admin-content">
         <Routes>
           <Route path="/" element={<Overview />} />
-          <Route path="/review" element={canUseMockWorkspace ? <ReviewPage /> : <ProductionPlaceholder />} />
-          <Route path="/orders" element={canUseMockWorkspace ? <OrderPage /> : <ProductionPlaceholder />} />
-          <Route path="/policies" element={canUseMockWorkspace ? <AgreementsPage canManage={hasPermission("admin.agreement.publish")} /> : <ProductionPlaceholder />} />
-          <Route path="/integrations" element={canUseMockWorkspace ? <IntegrationsPage canManage={hasPermission("admin.integration.manage")} /> : <ProductionPlaceholder />} />
+          <Route path="/review" element={<ReviewPage />} />
+          <Route path="/orders" element={<OrderPage />} />
+          <Route path="/administrators" element={<AdminManagementPage />} />
+          <Route path="/audit" element={<AuditPage />} />
+          <Route path="/policies" element={<AgreementsPage canManage={hasPermission("admin.agreement.publish")} />} />
+          <Route path="/integrations" element={<IntegrationsPage canManage={hasPermission("admin.integration.manage")} />} />
           <Route path="*" element={<Result status="404" title={t("shell.notFound")} />} />
         </Routes>
       </Content>
@@ -225,7 +224,7 @@ if (root) {
   createRoot(root).render(
     <StrictMode>
       <I18nProvider initialLanguage={resolveLanguage(readLanguagePreference(), undefined)}>
-        <BrowserRouter><Shell /></BrowserRouter>
+        <BrowserRouter><AuthGate><Shell /></AuthGate></BrowserRouter>
       </I18nProvider>
     </StrictMode>
   );

@@ -38,6 +38,28 @@
   display: grid;
   gap: 24px;
 }
+.admin-auth-layout {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--drl-color-background, #f4f7fb);
+}
+.admin-auth-card {
+  width: min(100%, 440px);
+}
+.admin-auth-card form {
+  display: grid;
+  gap: 8px;
+}
+.admin-authenticated {
+  min-height: 100vh;
+}
+.admin-auth-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 24px 0;
+}
 .admin-page > .ant-typography {
   margin: 0;
 }
