@@ -378,7 +378,7 @@ func TestCreateOrderEnqueuesMerchantNotificationInSameTransaction(t *testing.T) 
 	if err := pool.QueryRow(ctx, `SELECT id,owner_account_id FROM iam.merchant WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FG4'`).Scan(&merchantID, &ownerID); err != nil {
 		t.Fatal(err)
 	}
-	input := CreateOrder{BuyerAccountID: buyerID, Children: []ChildOrder{{MerchantID: merchantID, MerchantAccountID: ownerID, TotalE4: 100, GoodsAmountE4: 100, PayableAmountE4: 100, Lines: []OrderItem{{SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FG6", MerchantID: merchantID, Quantity: 1, UnitPriceE4: 100, LineTotalE4: 100}}}}}
+	input := CreateOrder{BuyerAccountID: buyerID, TotalE4: 100, GoodsAmountE4: 100, PayableAmountE4: 100, Children: []ChildOrder{{MerchantID: merchantID, MerchantAccountID: ownerID, TotalE4: 100, GoodsAmountE4: 100, PayableAmountE4: 100, Lines: []OrderItem{{SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FG6", MerchantID: merchantID, Quantity: 1, UnitPriceE4: 100, LineTotalE4: 100}}}}}
 	created, err := store.Create(ctx, "notification-order", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", input)
 	if err != nil {
 		t.Fatal(err)
