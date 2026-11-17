@@ -6,7 +6,8 @@ import {
   ConfirmDialog,
   ErrorState,
   LanguageSwitcher,
-  Loading
+  Loading,
+  NotificationBell
 } from "@drlife/ui";
 import type { MerchantProductApi } from "./api";
 import { productErrorKey, type ProductAction } from "./errors";
@@ -153,6 +154,7 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
       {v7Open || v4Open ? null : <>
       <AppHeader slogan={t("brand.slogan")} actions={<>
         <LanguageSwitcher />
+        <NotificationBell label={t("merchant.notificationSettings")} unreadCount={3} onClick={() => setV7Open(true)} />
         <Button variant="secondary" className="merchant-orders-action" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
         <Button variant="secondary" onClick={() => setV4Open(true)}>{t("merchant.profileLabel")}</Button>
         <Button variant="secondary" className="merchant-v7-action" onClick={() => setV7Open(true)}>{t("merchant.dashboard")}</Button>

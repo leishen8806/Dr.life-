@@ -9,7 +9,7 @@ export function canWriteMerchant(isDev: boolean): boolean { return isDev; }
 
 const sourceKeys = ["1688", "amazon", "shopee", "csv"] as const;
 const notices = ["order", "wallet", "product", "warehouse"] as const;
-const profileEntries = ["finance", "employees", "aiAssistant", "advertising", "relatedAccounts"] as const;
+const profileEntries = ["finance", "employeeManagement", "aiAssistant", "advertisingCampaign", "relatedAccounts"] as const;
 
 export function MerchantV7View({ language, t, onBack }: { language: Language; t: Translate; onBack: () => void }) {
   const [page, setPage] = useState<"dashboard" | "profile" | "import" | "notifications" | "onboarding">("dashboard");
