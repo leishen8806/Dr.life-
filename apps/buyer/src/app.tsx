@@ -24,6 +24,8 @@ import { OrderDetailView } from "./views/order-detail-view";
 import { OrderListView } from "./views/order-list-view";
 import { PaymentView } from "./views/payment-view";
 import { SearchView, useProductSearch } from "./views/search-view";
+import { createBuyerProfileApi, type BuyerProfile } from "./profile/profile-api";
+import { BuyerProfileView, BuyerWalletView } from "./profile/profile-views";
 
 type Route =
   | { name: "home" }
@@ -33,7 +35,9 @@ type Route =
   | { name: "orders" }
   | { name: "order"; publicId: string }
   | { name: "payment"; order: BuyerOrder; attempt: PaymentAttempt }
-  | { name: "cart" };
+  | { name: "cart" }
+  | { name: "profile" }
+  | { name: "wallet" };
 
 const featuredPageSize = 6;
 
@@ -341,6 +345,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const [paymentAttempts, setPaymentAttempts] = useState<Record<string, PaymentAttempt>>({});
   const [paymentSequences, setPaymentSequences] = useState<Record<string, number>>({});
   const route = stack[stack.length - 1] ?? { name: "home" };
+  const profileApi = useMemo(() => createBuyerProfileApi(), []);
   const push = useCallback(
     (next: Route) => setStack((current) => [...current, next]),
     []
@@ -432,6 +437,8 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     ));
   }, []);
   const orderDetail = useOrderDetail(client, route.name === "order" ? route.publicId : "", language);
+  const loadProfile = useCallback(() => profileApi.loadProfile(language), [language, profileApi]);
+  const [profile, retryProfile] = useLoaded<BuyerProfile>(language, async () => loadProfile(), true);
 
   const addToCart = useCallback((product: Product) => {
     const result = addProduct(cart, product);
@@ -439,6 +446,8 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     setCartError(result.error);
   }, [cart]);
   const openCart = useCallback(() => push({ name: "cart" }), [push]);
+  const openProfile = useCallback(() => push({ name: "profile" }), [push]);
+  const openWallet = useCallback(() => push({ name: "wallet" }), [push]);
   const updateCartQuantity = useCallback((item: CartItem, quantity: string) => {
     const result = updateQuantity(cart, item.product.public_id, quantity);
     setCart(result.cart);
@@ -462,6 +471,9 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       </Button>
       <Button variant="secondary" className="buyer-cart-action" onClick={openCart}>
         {t("mall.cart")} <span aria-label={t("mall.cartCount", { count: cartCount(cart) })}>{cartCount(cart)}</span>
+      </Button>
+      <Button variant="secondary" className="buyer-profile-action" onClick={openProfile}>
+        {t("nav.profile")}
       </Button>
     </>
   );
@@ -533,6 +545,12 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
         onRemove={removeFromCart}
       />
     );
+
+  if (route.name === "wallet")
+    return <BuyerWalletView entries={profile.status === "ready" ? { status: "ready", value: profile.value.entries } : profile.status === "error" ? { status: "error", messageKey: profile.messageKey } : profile} language={language} t={t} onBack={back} onRetry={retryProfile} />;
+
+  if (route.name === "profile")
+    return <BuyerProfileView profile={profile} language={language} t={t} onOpenWallet={openWallet} onOpenOrders={openOrders} onRetry={retryProfile} />;
 
   if (route.name === "search")
     return (
