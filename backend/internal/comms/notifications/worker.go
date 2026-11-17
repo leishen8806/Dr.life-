@@ -8,6 +8,7 @@ import (
 )
 
 type OutboxItem struct {
+	ID              int64
 	Event           Event
 	Bots            []Bot
 	TelegramEnabled bool
@@ -16,8 +17,8 @@ type OutboxItem struct {
 
 type Repository interface {
 	ClaimPending(context.Context) (OutboxItem, bool, error)
-	MarkDelivered(context.Context, string) error
-	MarkRetry(context.Context, string, time.Time, string, bool) error
+	MarkDelivered(context.Context, OutboxItem) error
+	MarkRetry(context.Context, OutboxItem, time.Time, string, bool) error
 }
 
 type InboxWriter interface {
@@ -62,7 +63,7 @@ func (w Worker) RunOnce(ctx context.Context) (bool, error) {
 			return true, w.fail(ctx, item, err)
 		}
 	}
-	return true, w.Repo.MarkDelivered(ctx, item.Event.ID)
+	return true, w.Repo.MarkDelivered(ctx, item)
 }
 
 func (w Worker) fail(ctx context.Context, item OutboxItem, cause error) error {
@@ -83,7 +84,7 @@ func (w Worker) fail(ctx context.Context, item OutboxItem, cause error) error {
 	if dead {
 		backoff = 0
 	}
-	return w.Repo.MarkRetry(ctx, item.Event.ID, now.Add(backoff), sanitizeError(cause), dead)
+	return w.Repo.MarkRetry(ctx, item, now.Add(backoff), sanitizeError(cause), dead)
 }
 
 func sanitizeError(err error) string {

@@ -29,12 +29,12 @@ const (
 )
 
 type Event struct {
-	ID        string
-	AccountID int64
-	End       End
-	Type      EventType
-	Title     map[string]string
-	Body      map[string]string
+	ID        string            `json:"id"`
+	AccountID int64             `json:"account_id"`
+	End       End               `json:"end"`
+	Type      EventType         `json:"type"`
+	Title     map[string]string `json:"title"`
+	Body      map[string]string `json:"body"`
 }
 
 func (e Event) Validate() error {
