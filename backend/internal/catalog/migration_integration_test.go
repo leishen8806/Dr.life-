@@ -31,6 +31,7 @@ const (
 	scratchCategoryCode   = "test_scratch"
 	productNameJSON       = `{"zh":"瓷砖","en":"Tiles","km":"ក្បឿង"}`
 	seededCategoryCount   = 8
+	currentMigration      = 64
 )
 
 func TestCatalogMigration(t *testing.T) {
@@ -76,7 +77,10 @@ func TestCatalogMigration(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertCatalogTables(t, database, false)
-		if err := goose.Up(database, migrations); err != nil {
+		// Keep the round-trip assertion pinned to the schema version exercised
+		// by this test. Goose's implicit max version can stop at the last
+		// migration known when the fixture was originally introduced.
+		if err := goose.UpTo(database, migrations, currentMigration); err != nil {
 			t.Fatal(err)
 		}
 		assertCatalogTables(t, database, true)
