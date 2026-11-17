@@ -1,4 +1,4 @@
-head=edf75968
+head=0d20f01b
 1440/zh/login.png
 1440/zh/administrators.png
 1440/zh/audit.png
