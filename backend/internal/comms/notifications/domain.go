@@ -2,6 +2,7 @@ package notifications
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -44,6 +45,13 @@ func (e Event) Validate() error {
 }
 
 func (e End) Valid() bool { return e == Buyer || e == Merchant }
+
+// RecipientEventKey is the idempotency key for one event delivered to one
+// account/end. The same event may legitimately have one buyer and one merchant
+// recipient, while duplicate writes for either recipient collapse to one row.
+func RecipientEventKey(eventID string, accountID int64, end End) string {
+	return fmt.Sprintf("%s:%d:%s", eventID, accountID, end)
+}
 
 func (t EventType) Valid() bool {
 	switch t {

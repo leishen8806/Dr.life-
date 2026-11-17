@@ -29,7 +29,7 @@ CREATE TABLE comms.notification_setting (
 
 CREATE TABLE comms.notification_outbox (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    event_id text NOT NULL UNIQUE,
+    event_id text NOT NULL,
     account_id bigint NOT NULL REFERENCES iam.account(id),
     end_name text NOT NULL CHECK (end_name IN ('buyer', 'merchant')),
     event_type text NOT NULL,
@@ -39,7 +39,8 @@ CREATE TABLE comms.notification_outbox (
     last_error text,
     dead_lettered_at timestamptz,
     delivered_at timestamptz,
-    created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    UNIQUE (event_id, account_id, end_name)
 );
 
 CREATE INDEX ix_notification_outbox_pending ON comms.notification_outbox (next_attempt_at, id)

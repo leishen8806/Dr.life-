@@ -24,3 +24,14 @@ func TestPlanRejectsUnknownEvent(t *testing.T) {
 		t.Fatal("unknown event accepted")
 	}
 }
+
+func TestRecipientEventKeyScopesIdempotencyByRecipient(t *testing.T) {
+	buyer := RecipientEventKey("order-1", 42, Buyer)
+	merchant := RecipientEventKey("order-1", 84, Merchant)
+	if buyer == merchant {
+		t.Fatalf("buyer and merchant recipients share idempotency key %q", buyer)
+	}
+	if buyer != RecipientEventKey("order-1", 42, Buyer) {
+		t.Fatal("duplicate write for the same recipient did not retain its idempotency key")
+	}
+}
