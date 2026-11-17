@@ -6,12 +6,20 @@ export class AdminApiError extends Error {
   constructor(public status: number, message: string, public retryAfter?: string) { super(message); }
 }
 
-async function request<T>(path: string, init: RequestInit = {}, authenticated = true): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, authenticated = true, retried = false): Promise<T> {
   const headers = new Headers(init.headers); headers.set("Content-Type", "application/json");
   if (authenticated && accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
   const response = await fetch(path, { ...init, headers, credentials: "include" });
-  if (response.status === 401 && authenticated && path !== "/v1/admin/auth/refresh") {
-    try { const refresh = await request<{ access_token: string }>("/v1/admin/auth/refresh", { method: "POST", headers: { "X-Requested-With": "drlife" } }, false); accessToken = refresh.access_token; return request(path, init, true); } catch { accessToken = undefined; window.dispatchEvent(new Event("drlife-auth-expired")); }
+  if (response.status === 401 && authenticated && !retried && path !== "/v1/admin/auth/refresh") {
+    try {
+      const refresh = await request<{ access_token: string }>("/v1/admin/auth/refresh", { method: "POST", headers: { "X-Requested-With": "drlife" } }, false);
+      accessToken = refresh.access_token;
+    } catch (error) {
+      accessToken = undefined;
+      window.dispatchEvent(new Event("drlife-auth-expired"));
+      throw error;
+    }
+    return request(path, init, true, true);
   }
   if (!response.ok) throw new AdminApiError(response.status, response.status === 429 ? "rate_limited" : "request_failed", response.headers.get("Retry-After") ?? undefined);
   const body = await response.json() as { data?: T }; return body.data as T;

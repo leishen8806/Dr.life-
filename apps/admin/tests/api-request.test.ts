@@ -25,4 +25,32 @@ describe("admin request refresh", () => {
     expect(expired).toHaveBeenCalledOnce();
     window.removeEventListener("drlife-auth-expired", expired);
   });
+
+  it("does not refresh again when the one retry is still unauthorized", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { access_token: "fresh" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const expired = vi.fn();
+    window.addEventListener("drlife-auth-expired", expired);
+    await expect(requestForTest("/v1/admin/audit")).rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(expired).not.toHaveBeenCalled();
+    window.removeEventListener("drlife-auth-expired", expired);
+  });
+
+  it("preserves a non-auth error from the one retry", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { access_token: "fresh" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const expired = vi.fn();
+    window.addEventListener("drlife-auth-expired", expired);
+    await expect(requestForTest("/v1/admin/audit")).rejects.toMatchObject({ status: 500 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(expired).not.toHaveBeenCalled();
+    window.removeEventListener("drlife-auth-expired", expired);
+  });
 });
