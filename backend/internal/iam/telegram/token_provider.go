@@ -14,6 +14,29 @@ type PoolTokenProvider struct {
 	End    End
 }
 
+// AnyPoolTokenProvider resolves a bot ID against the configured end pools.
+// The worker only receives the selected bot ID from the notification plan, so
+// trying each pool does not weaken recipient-end selection and keeps encrypted
+// token handling in the IAM adapter.
+type AnyPoolTokenProvider struct {
+	Source PoolSource
+}
+
+func (p AnyPoolTokenProvider) Token(ctx context.Context, botID string) (string, error) {
+	var lastErr error
+	for _, end := range []End{Buyer, Merchant} {
+		token, err := (PoolTokenProvider{Source: p.Source, End: end}).Token(ctx, botID)
+		if err == nil {
+			return token, nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = errors.New("telegram: bot not found")
+	}
+	return "", lastErr
+}
+
 func (p PoolTokenProvider) Token(ctx context.Context, botID string) (string, error) {
 	if p.Source == nil || !p.End.Valid() {
 		return "", errors.New("telegram: bot pool is unavailable")

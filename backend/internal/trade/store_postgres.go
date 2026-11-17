@@ -21,7 +21,13 @@ type tradeDB interface {
 
 // PostgresStore persists only trade-owned tables. Cross-module identifiers are
 // received as values by the service and are never joined here.
-type PostgresStore struct{ db tradeDB }
+type PostgresStore struct {
+	db tradeDB
+	// NotificationWriter is invoked inside the order transaction before commit.
+	// It is optional so the trade package stays usable in isolated tests and
+	// deployments that have not enabled notification delivery yet.
+	NotificationWriter func(context.Context, pgx.Tx, CreateOrder) error
+}
 
 type EventStore interface {
 	Advance(ctx context.Context, merchantOrderID int64, from, to OrderStatus, source EventSource) (bool, error)
@@ -32,6 +38,10 @@ var _ Store = (*PostgresStore)(nil)
 var _ OrderReader = (*PostgresStore)(nil)
 
 func NewPostgresStore(db tradeDB) *PostgresStore { return &PostgresStore{db: db} }
+
+func (s *PostgresStore) SetNotificationWriter(writer func(context.Context, pgx.Tx, CreateOrder) error) {
+	s.NotificationWriter = writer
+}
 
 func (s *PostgresStore) FindByIdempotency(ctx context.Context, buyerID int64, key, requestHash string) (CreateOrder, bool, error) {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
@@ -151,6 +161,13 @@ func (s *PostgresStore) Create(ctx context.Context, idempotencyKey, requestHash 
 			if _, err := tx.Exec(ctx, `INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES ($1,$2,$3,$4,$5)`, merchantOrderID, line.SKUPublicID, line.Quantity, line.UnitPriceE4, line.LineTotalE4); err != nil {
 				return CreateOrder{}, err
 			}
+		}
+	}
+	if s.NotificationWriter != nil {
+		notificationOrder := order
+		notificationOrder.PublicID = parentID
+		if err := s.NotificationWriter(ctx, tx, notificationOrder); err != nil {
+			return CreateOrder{}, err
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {

@@ -38,3 +38,11 @@ func TestPoolTokenProviderRejectsInvalidOrMissingBot(t *testing.T) {
 		t.Fatal("database error was swallowed")
 	}
 }
+
+func TestAnyPoolTokenProviderFindsBotAcrossEnds(t *testing.T) {
+	provider := AnyPoolTokenProvider{Source: tokenProviderSource{bots: []Bot{{ID: 9, Token: secrets.NewSecret([]byte("merchant-token"))}}}}
+	token, err := provider.Token(context.Background(), "9")
+	if err != nil || token != "merchant-token" {
+		t.Fatalf("token=%q err=%v, want merchant pool token", token, err)
+	}
+}

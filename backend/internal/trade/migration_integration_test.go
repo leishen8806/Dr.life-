@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/leishen8806/Dr.life-/backend/internal/comms/notifications"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
@@ -322,6 +323,72 @@ func TestOrderHTTPMigrationUsesPayableAndPersistsReconciliation(t *testing.T) {
 	}
 	if err := goose.Up(db, migrations); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCreateOrderEnqueuesMerchantNotificationInSameTransaction(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	container, err := postgres.Run(ctx, "postgres:16-alpine", postgres.WithDatabase("trade_notifications"), postgres.WithUsername("test_admin"), postgres.WithPassword("test-only"), postgres.BasicWaitStrategies())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = testcontainers.TerminateContainer(container) })
+	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatal(err)
+	}
+	if err := goose.Up(db, migrationDirectory(t)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`
+		INSERT INTO iam.person(public_id,tg_user_id) VALUES
+		('01ARZ3NDEKTSV4RRFFQ69G5FG1', 9101), ('01ARZ3NDEKTSV4RRFFQ69G5FG2', 9102);
+	INSERT INTO iam.account(public_id,person_id,role) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FG3',id,'buyer' FROM iam.person WHERE tg_user_id=9101;
+	INSERT INTO iam.merchant(public_id,name) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FG4','{"en":"Test merchant"}');
+	INSERT INTO iam.account(public_id,person_id,role,merchant_id) SELECT '01ARZ3NDEKTSV4RRFFQ69G5FG5',p.id,'merchant_owner',m.id FROM iam.person p, iam.merchant m WHERE p.tg_user_id=9102 AND m.public_id='01ARZ3NDEKTSV4RRFFQ69G5FG4';
+	UPDATE iam.merchant SET owner_account_id=(SELECT id FROM iam.account WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FG5') WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FG4';
+	`); err != nil {
+		t.Fatal(err)
+	}
+	pool, err := pgxpool.New(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	store := NewPostgresStore(pool)
+	store.SetNotificationWriter(func(ctx context.Context, tx pgx.Tx, order CreateOrder) error {
+		return notifications.EnqueueTx(ctx, tx, notifications.Event{
+			ID: order.PublicID + ":merchant", AccountID: order.Children[0].MerchantAccountID, End: notifications.Merchant,
+			Type: notifications.OrderCreated, Title: map[string]string{"en": "New order"}, Body: map[string]string{"en": "A new order was received"},
+		})
+	})
+	var buyerID, merchantID, ownerID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM iam.account WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FG3'`).Scan(&buyerID); err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT id,owner_account_id FROM iam.merchant WHERE public_id='01ARZ3NDEKTSV4RRFFQ69G5FG4'`).Scan(&merchantID, &ownerID); err != nil {
+		t.Fatal(err)
+	}
+	input := CreateOrder{BuyerAccountID: buyerID, Children: []ChildOrder{{MerchantID: merchantID, MerchantAccountID: ownerID, TotalE4: 100, GoodsAmountE4: 100, PayableAmountE4: 100, Lines: []OrderItem{{SKUPublicID: "01ARZ3NDEKTSV4RRFFQ69G5FG6", MerchantID: merchantID, Quantity: 1, UnitPriceE4: 100, LineTotalE4: 100}}}}}
+	created, err := store.Create(ctx, "notification-order", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM comms.notification_outbox WHERE event_id=$1 AND account_id=$2 AND end_name='merchant'`, created.PublicID+":merchant", ownerID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("notification outbox rows=%d, want 1", count)
 	}
 }
 
