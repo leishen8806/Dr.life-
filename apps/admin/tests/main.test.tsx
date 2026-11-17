@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider, t } from "@drlife/i18n";
 import { OrderPage, RejectReasonForm, ReviewTable } from "../src/main";
+import { AdminManagementPage, AuditPage } from "../src/admin-pages";
 import type { OrderRecord, ReviewRecord } from "../src/api/types";
 
 const mockApi = vi.hoisted(() => ({
@@ -9,6 +10,7 @@ const mockApi = vi.hoisted(() => ({
   approveReview: vi.fn(),
   rejectReview: vi.fn(),
   listOrders: vi.fn()
+  ,login: vi.fn(), refresh: vi.fn(), logout: vi.fn(), changePassword: vi.fn(), stepUp: vi.fn(), listAdmins: vi.fn(), createAdmin: vi.fn(), disableAdmin: vi.fn(), enableAdmin: vi.fn(), updateAdminRole: vi.fn(), listAudit: vi.fn()
 }));
 
 vi.mock("../src/api", () => ({ api: mockApi }));
@@ -38,6 +40,9 @@ describe("admin review and order views", () => {
     mockApi.approveReview.mockResolvedValue(undefined);
     mockApi.rejectReview.mockResolvedValue(undefined);
     mockApi.listOrders.mockImplementation(async ({ query } = {}) => query ? orders.filter((item) => item.id.includes(query)) : orders);
+    mockApi.listAdmins.mockResolvedValue({ items: [{ publicId: "admin-1", name: "Test Admin", email: "admin@example.test", role: "super", dataScope: ["KH-PP"], status: "active", createdAt: "2026-11-01" }] });
+    mockApi.listAudit.mockResolvedValue({ items: [{ id: 1, ts: "2026-11-17", actorId: 1, actorRole: "admin", action: "auth.login", target: "admin:test", requestId: "request-1" }] });
+    mockApi.stepUp.mockResolvedValue("step-up-token");
   });
 
   it("does not submit an empty rejection reason", async () => {
@@ -68,5 +73,15 @@ describe("admin review and order views", () => {
   it("keeps the USD symbol for Chinese and Khmer admin money", () => {
     expect(t("admin.currencySymbol", {}, "zh")).toBe("$");
     expect(t("admin.currencySymbol", {}, "km")).toBe("$");
+  });
+
+  it("loads administrator and audit pages through the adapter", async () => {
+    renderAdmin(<AdminManagementPage />);
+    expect(await screen.findByText("Test Admin")).toBeTruthy();
+    expect(mockApi.listAdmins).toHaveBeenCalledOnce();
+    cleanup();
+    renderAdmin(<AuditPage />);
+    expect(await screen.findByText("auth.login")).toBeTruthy();
+    expect(mockApi.listAudit).toHaveBeenCalledOnce();
   });
 });
