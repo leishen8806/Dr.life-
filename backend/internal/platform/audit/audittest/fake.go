@@ -17,8 +17,11 @@ type Writer struct {
 func (w *Writer) Append(_ context.Context, entry platformaudit.Entry) (platformaudit.Record, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.Err != nil {
+		return platformaudit.Record{}, w.Err
+	}
 	w.Records = append(w.Records, entry)
-	return platformaudit.Record{}, w.Err
+	return platformaudit.Record{}, nil
 }
 
 func (w *Writer) AppendOnce(ctx context.Context, eventID string, entry platformaudit.Entry) (platformaudit.Record, error) {
