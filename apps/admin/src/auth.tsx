@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Alert, Button, Card, Form, Input, Space, Typography } from "antd";
-import { useI18n } from "@drlife/i18n";
+import { applyDocumentLanguage, storeLanguagePreference, useI18n, type Language } from "@drlife/i18n";
 import { AdminApiError, api } from "./api";
 
 export function LoginPage({ onSuccess }: { onSuccess: (mustChangePassword: boolean) => void }) {
@@ -41,19 +41,24 @@ export function PasswordChangePage({ onComplete }: { onComplete: () => void }) {
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [state, setState] = useState<"loading" | "login" | "password" | "ready">(() => window.location.pathname === "/login" ? "login" : "loading");
   useEffect(() => {
+    const expired = () => setState("login"); window.addEventListener("drlife-auth-expired", expired);
     if (window.location.pathname === "/login") return;
-    if (import.meta.env.VITE_ADMIN_SCREENSHOT === "true") { api.login({ email: "admin@example.test", password: "screenshot-only", totpCode: "123456" }).then(() => setState("ready")); return; }
+    if (import.meta.env.DEV && import.meta.env.VITE_ADMIN_SCREENSHOT === "true") { api.login({ email: "admin@example.test", password: "screenshot-only", totpCode: "123456" }).then(() => setState("ready")); return; }
     api.refresh().then(() => setState("ready")).catch(() => setState("login"));
+    return () => window.removeEventListener("drlife-auth-expired", expired);
   }, []);
-  if (state === "loading") return <div className="admin-auth-layout" aria-busy="true"><Typography.Text>Loading</Typography.Text></div>;
-  if (state === "login") return <div className="admin-auth-layout"><LoginPage onSuccess={(mustChange) => setState(mustChange ? "password" : "ready")} /></div>;
+  if (state === "loading") return <div className="admin-auth-layout" aria-busy="true"><Typography.Text>{t("admin.loading")}</Typography.Text></div>;
+  if (state === "login") return <div className="admin-auth-layout"><AuthLanguageSwitcher /><LoginPage onSuccess={(mustChange) => setState(mustChange ? "password" : "ready")} /></div>;
   if (state === "password") return <div className="admin-auth-layout"><PasswordChangePage onComplete={() => setState("login")} /></div>;
-  return <AuthActions onLogout={() => setState("login")}>{children}</AuthActions>;
+  return <AuthActions>{children}</AuthActions>;
 }
 
-function AuthActions({ children, onLogout }: { children: ReactNode; onLogout: () => void }) {
-  const { t } = useI18n();
-  return <div className="admin-authenticated"><div className="admin-auth-toolbar"><Space><Button onClick={() => { api.logout().finally(onLogout); }}>{t("admin.logout")}</Button></Space></div>{children}</div>;
+export function AuthToolbar() { const { t } = useI18n(); return <Button onClick={() => { api.logout(); window.dispatchEvent(new Event("drlife-auth-expired")); }}>{t("admin.logout")}</Button>; }
+function AuthActions({ children }: { children: ReactNode }) {
+  return <div className="admin-authenticated">{children}</div>;
 }
+
+function AuthLanguageSwitcher() { const { language, setLanguage, t } = useI18n(); return <Space className="admin-auth-language"><Button onClick={() => { const next = language === "zh" ? "en" : language === "en" ? "km" : "zh"; storeLanguagePreference(next); applyDocumentLanguage(next); setLanguage(next as Language); }}>{t("language.select")}: {language}</Button></Space>; }

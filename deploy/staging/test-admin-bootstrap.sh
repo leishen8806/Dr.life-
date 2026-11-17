@@ -16,4 +16,5 @@ test "$(grep -c 'DROP ROLE IF EXISTS' "$root/sql")" -eq 1
 test "$(grep -c 'CREATE ROLE' "$root/sql")" -eq 1
 ! grep -q 'printed-only-by-admininit' "$root/docker.log"
 ! grep -q 'bootstrap_password' "$root/docker.log"
+! grep -Eq 'postgres://[^ ]*:[^ ]+@' "$root/docker.log"
 echo 'admin bootstrap script: PASS'

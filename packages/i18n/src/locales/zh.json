@@ -567,4 +567,12 @@
 ,"admin.noData": "暂无记录"
 ,"admin.target": "目标"
 ,"admin.requestId": "请求编号"
+,"admin.time": "时间"
+,"admin.operation": "操作"
+,"admin.changeRole": "改角色"
+,"admin.disableReason": "禁用原因"
+,"admin.confirm": "确认"
+,"admin.loadMore": "加载更多"
+,"admin.loading": "加载中"
+,"admin.comingSoon": "即将开放"
 }

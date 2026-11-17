@@ -6,7 +6,7 @@ import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate } from "re
 import { applyDocumentLanguage, I18nProvider, readLanguagePreference, resolveLanguage, storeLanguagePreference, useI18n, type Language, type TranslationKey } from "@drlife/i18n";
 import { Money, StatusTag } from "@drlife/ui";
 import { api } from "./api";
-import { AuthGate } from "./auth";
+import { AuthGate, AuthToolbar } from "./auth";
 import { AdminManagementPage, AuditPage } from "./admin-pages";
 import type { OrderRecord, RecordStatus, ReviewRecord } from "./api/types";
 import { AgreementsPage, IntegrationsPage } from "./policy-pages";
@@ -23,7 +23,7 @@ function keyText(t: (key: TranslationKey) => string, key: string) {
   return t(key as TranslationKey);
 }
 
-function AdminLanguageSwitcher() {
+export function AdminLanguageSwitcher() {
   const { language, setLanguage, t } = useI18n();
   const options = [{ value: "zh", label: t("language.zh") }, { value: "en", label: t("language.en") }, { value: "km", label: t("language.km") }];
   return <Segmented aria-label={t("language.select")} value={language} options={options} onChange={(value) => { const next = value as Language; storeLanguagePreference(next); applyDocumentLanguage(next); setLanguage(next); }} />;
@@ -90,7 +90,7 @@ export function RejectReasonForm({ onSubmit }: { onSubmit: (reason: string) => v
   </div>;
 }
 
-function ReviewPage() {
+function ReviewWorkspace() {
   const { t } = useI18n();
   const [active, setActive] = useState<"merchant" | "product">("merchant");
   const [data, setData] = useState<{ merchants: ReviewRecord[]; products: ReviewRecord[] }>({ merchants: [], products: [] });
@@ -126,7 +126,9 @@ function ReviewPage() {
   </div>;
 }
 
-export function OrderPage() {
+function ReviewPage() { const { t } = useI18n(); return canUseMockWorkspace ? <ReviewWorkspace /> : <Result status="info" title={t("admin.comingSoon")} />; }
+
+function OrderWorkspace() {
   const { t } = useI18n();
   const [rows, setRows] = useState<OrderRecord[]>([]);
   const [query, setQuery] = useState("");
@@ -163,7 +165,7 @@ export function OrderPage() {
       ]} />
       <DatePicker.RangePicker onChange={(_, dateStrings) => setDateRange(dateStrings as [string, string])} aria-label={t("admin.date")} />
     </Space>
-    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <Table rowKey="id" columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} onRow={(row) => ({ onClick: () => setSelected(row), className: "admin-clickable-row" })} locale={{ emptyText: <Empty description={t("admin.noResults")} /> }} />}
+    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <Table scroll={{ x: 760 }} rowKey="id" columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} onRow={(row) => ({ onClick: () => setSelected(row), className: "admin-clickable-row" })} locale={{ emptyText: <Empty description={t("admin.noResults")} /> }} />}
     <Drawer open={Boolean(selected)} title={t("admin.orderDetail")} onClose={() => setSelected(undefined)} width={440}>
       {selected && <div className="order-detail">
         <Typography.Paragraph><strong>{t("admin.orderNo")}:</strong> {selected.id}</Typography.Paragraph>
@@ -179,6 +181,8 @@ export function OrderPage() {
     </Drawer>
   </div>;
 }
+
+export function OrderPage() { const { t } = useI18n(); return canUseMockWorkspace ? <OrderWorkspace /> : <Result status="info" title={t("admin.comingSoon")} />; }
 
 function Shell() {
   const { t } = useI18n();
@@ -202,7 +206,7 @@ function Shell() {
       <Menu theme="dark" mode="inline" selectedKeys={[selectedKey]} items={items} onClick={({ key }) => navigate(key)} />
     </Sider>
     <Layout>
-      <Header className="admin-header"><Typography.Title level={4}>{t("app.admin")} · {t("admin.operator")}</Typography.Title><AdminLanguageSwitcher /></Header>
+      <Header className="admin-header"><Typography.Title level={4}>{t("app.admin")} · {t("admin.operator")}</Typography.Title><Space><AdminLanguageSwitcher /><AuthToolbar /></Space></Header>
       <Content className="admin-content">
         <Routes>
           <Route path="/" element={<Overview />} />

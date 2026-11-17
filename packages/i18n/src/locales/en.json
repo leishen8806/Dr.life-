@@ -567,4 +567,12 @@
 ,"admin.noData": "No records"
 ,"admin.target": "Target"
 ,"admin.requestId": "Request ID"
+,"admin.time": "Time"
+,"admin.operation": "Operation"
+,"admin.changeRole": "Change role"
+,"admin.disableReason": "Disable reason"
+,"admin.confirm": "Confirm"
+,"admin.loadMore": "Load more"
+,"admin.loading": "Loading"
+,"admin.comingSoon": "Coming soon"
 }

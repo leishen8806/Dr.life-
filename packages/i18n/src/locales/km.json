@@ -567,4 +567,12 @@
 ,"admin.noData": "មិនមានកំណត់ត្រា"
 ,"admin.target": "គោលដៅ"
 ,"admin.requestId": "លេខសំណើ"
+,"admin.time": "ពេលវេលា"
+,"admin.operation": "ប្រតិបត្តិការ"
+,"admin.changeRole": "ប្ដូរតួនាទី"
+,"admin.disableReason": "មូលហេតុបិទ"
+,"admin.confirm": "បញ្ជាក់"
+,"admin.loadMore": "ផ្ទុកបន្ថែម"
+,"admin.loading": "កំពុងផ្ទុក"
+,"admin.comingSoon": "នឹងមានឆាប់ៗនេះ"
 }
