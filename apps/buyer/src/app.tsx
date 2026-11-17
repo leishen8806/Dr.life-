@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type TranslationKey, useI18n } from "@drlife/i18n";
-import { Button, LanguageSwitcher, useBackButton } from "@drlife/ui";
+import { Button, LanguageSwitcher, NotificationBell, useBackButton } from "@drlife/ui";
 import {
   type BuyerApiClient,
   type BuyerOrderPage,
@@ -483,8 +483,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
         {t("nav.profile")}
       </Button>
       <Button variant="secondary" className="buyer-decor-action" onClick={openDecor}>{t("buyer.findDecor")}</Button>
-      <Button variant="secondary" className="buyer-notifications-action" onClick={openNotifications}>{t("buyer.notifications")}</Button>
-      <Button variant="secondary" className="buyer-aftercare-action" onClick={openAftercare}>{t("buyer.orderAftercare")}</Button>
+      <NotificationBell label={t("buyer.notifications")} unreadCount={2} onClick={openNotifications} className="buyer-notifications-action" />
     </>
   );
   const knownCategories = categories.status === "ready" ? categories.value : [];
