@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "@drlife/i18n";
 import type { createApiClient } from "@drlife/api-client";
-import { MerchantNotificationsView } from "./notifications-view";
+import { MerchantNotificationsView, createNotificationIdempotencyKey } from "./notifications-view";
 
 const notification = { public_id: "01HZY0000000000000000NOTIF", event_id: "evt-1", event_type: "order.created", title: { zh: "订单", en: "Order", km: "បញ្ជាទិញ" }, body: { zh: "已创建", en: "Created", km: "បានបង្កើត" }, read_at: null, created_at: "2026-11-18T00:00:00Z" };
 
@@ -25,5 +25,14 @@ describe("MerchantNotificationsView", () => {
     expect(await screen.findByText("Order")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
     await waitFor(() => expect(client.POST).toHaveBeenCalledWith("/v1/merchant/me/notifications/{public_id}/read", expect.anything()));
+    const readRequest = client.POST.mock.calls.at(-1)?.[1] as { params: { header: { "Idempotency-Key": string } } };
+    expect(readRequest.params.header["Idempotency-Key"]).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+  });
+
+  it("creates a fresh valid idempotency key for each setting change", () => {
+    const keys = [createNotificationIdempotencyKey("notification-setting"), createNotificationIdempotencyKey("notification-setting")];
+    expect(keys[0]).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+    expect(keys[1]).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
+    expect(keys[0]).not.toBe(keys[1]);
   });
 });

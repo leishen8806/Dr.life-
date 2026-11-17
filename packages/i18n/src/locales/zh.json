@@ -582,6 +582,7 @@
 ,"notification.settings": "通知设置"
 ,"notification.retry": "重试"
 ,"notification.loadFailed": "通知加载失败"
+,"notification.actionFailed": "通知操作失败"
 ,"notification.telegram": "Telegram"
 ,"notification.event.orderCreated": "新订单"
 ,"notification.event.paymentConfirmed": "付款已确认"

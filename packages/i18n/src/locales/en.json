@@ -582,6 +582,7 @@
 ,"notification.settings": "Notification settings"
 ,"notification.retry": "Retry"
 ,"notification.loadFailed": "Unable to load notifications"
+,"notification.actionFailed": "Notification action failed"
 ,"notification.telegram": "Telegram"
 ,"notification.event.orderCreated": "New order"
 ,"notification.event.paymentConfirmed": "Payment confirmed"

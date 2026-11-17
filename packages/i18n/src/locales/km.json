@@ -582,6 +582,7 @@
 ,"notification.settings": "ការកំណត់ការជូនដំណឹង"
 ,"notification.retry": "ព្យាយាមម្ដងទៀត"
 ,"notification.loadFailed": "មិនអាចផ្ទុកការជូនដំណឹងបានទេ"
+,"notification.actionFailed": "ប្រតិបត្តិការជូនដំណឹងបានបរាជ័យ"
 ,"notification.telegram": "Telegram"
 ,"notification.event.orderCreated": "ការបញ្ជាទិញថ្មី"
 ,"notification.event.paymentConfirmed": "បានបញ្ជាក់ការទូទាត់"
