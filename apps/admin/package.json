@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "test": "vitest run",
-    "capture:screenshots": "node scripts/capture-screenshots.mjs"
+    "capture:screenshots": "node scripts/capture-screenshots.mjs",
+    "test:e2e": "node e2e/admin-api.playwright.mjs"
   },
   "dependencies": {
     "@drlife/i18n": "workspace:*",

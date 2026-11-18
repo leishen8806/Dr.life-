@@ -811,6 +811,114 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/admin/catalog/products:
+    get:
+      tags: [admin]
+      operationId: listAdminCatalogProducts
+      summary: List catalog products waiting for administrative review
+      description: The review queue is server-scoped to products in review status; submitted_from and submitted_to filter the time the product entered review, not its creation time.
+      x-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/Sort"
+        - name: merchant_id
+          in: query
+          schema: {type: integer, format: int64, minimum: 1}
+        - name: submitted_from
+          in: query
+          schema: {type: string, format: date-time}
+        - name: submitted_to
+          in: query
+          schema: {type: string, format: date-time}
+      responses:
+        "200":
+          description: Products waiting for review.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ProductListSuccessResponse"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/admin/catalog/products/{public_id}/approve:
+    post:
+      tags: [admin]
+      operationId: postAdminCatalogProductApprove
+      summary: Approve one catalog product
+      x-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/PublicID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: Product approved.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ProductSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/AlreadyProcessed"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+  /v1/admin/catalog/products/{public_id}/reject:
+    post:
+      tags: [admin]
+      operationId: postAdminCatalogProductReject
+      summary: Reject one catalog product with a required reason
+      x-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/PublicID"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ProductReviewRejectRequest"}
+      responses:
+        "200":
+          description: Product rejected.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ProductSuccessResponse"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/AlreadyProcessed"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+  /v1/admin/orders:
+    get:
+      tags: [admin]
+      operationId: listAdminOrders
+      summary: List all buyer orders for authorized administrators
+      description: Read-only order view for administrators with the admin.orders.read permission.
+      x-roles: [admin]
+      parameters:
+        - name: cursor
+          in: query
+          schema: {type: string, maxLength: 128}
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200": {$ref: "#/components/responses/BuyerOrderSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+  /v1/admin/orders/{public_id}:
+    get:
+      tags: [admin]
+      operationId: getAdminOrder
+      summary: Read one buyer order for authorized administrators
+      x-roles: [admin]
+      parameters:
+        - $ref: "#/components/parameters/PublicID"
+      responses:
+        "200": {$ref: "#/components/responses/BuyerOrderDetailSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
   /v1/buyer/orders:
     get:
       tags: [buyer]
@@ -2494,6 +2602,10 @@ components:
         status:
           type: string
           enum: [draft, review, on, off, rejected]
+        review_reason:
+          type: string
+          nullable: true
+          description: Administrative rejection reason, visible to the owning merchant.
         source:
           type: string
           enum: [manual, amazon, shopee, a1688, csv]
@@ -2548,6 +2660,15 @@ components:
           $ref: "#/components/schemas/ProductTierList"
         skus:
           $ref: "#/components/schemas/SkuCreateList"
+    ProductReviewRejectRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 2000
     ProductUpdateRequest:
       type: object
       additionalProperties: false
@@ -2580,8 +2701,8 @@ components:
           type: string
         status:
           type: string
-          enum: [draft, off]
-          description: Merchants may only move a product between draft and off; on is reached through publish.
+          enum: [draft, off, review]
+          description: Merchants may move a product to draft, off, or submit it for administrative review; on is reached through publish.
         tiers:
           $ref: "#/components/schemas/ProductTierList"
         skus:
@@ -3196,6 +3317,21 @@ components:
       content:
         application/json:
           schema: {$ref: "#/components/schemas/LedgerReadSuccessResponse"}
+    ProductSucceeded:
+      description: Product state changed successfully.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ProductSuccessResponse"}
+    BuyerOrderSucceeded:
+      description: Read-only buyer order list.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/BuyerOrderListSuccessResponse"}
+    BuyerOrderDetailSucceeded:
+      description: Read-only buyer order detail.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/BuyerOrderSuccessResponse"}
     RefreshSucceeded:
       description: Refresh token rotated successfully.
       content:
@@ -3216,6 +3352,12 @@ components:
             $ref: "#/components/schemas/ActionSuccessResponse"
     BadRequest:
       description: Invalid request (error code 1002).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    AlreadyProcessed:
+      description: The requested state transition has already been processed (error code 1003).
       content:
         application/json:
           schema:

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -67,7 +68,7 @@ func (s *PgStore) CategoryAttributes(ctx context.Context, categoryCode string) (
 // productColumns 是列表与单条读取共用的投影。
 // numeric 一律用 trim_scale 转 text 出库，金额/体积永不经由 float64。
 const productColumns = `p.id, p.public_id, p.merchant_id, p.category_id, c.code, p.name, p.spec, p.unit,
-	p.origin, p.lead_days, trim_scale(p.vol_m3)::text, p.status, p.source, p.source_ref, p.std_score, p.updated_at`
+		 p.origin, p.lead_days, trim_scale(p.vol_m3)::text, p.status, coalesce(p.review_reason, ''), p.source, p.source_ref, p.std_score, p.updated_at`
 
 // productSortSQL 是排序白名单到 SQL 片段的映射：客户端输入永不拼接进 SQL。
 var productSortSQL = map[string]string{
@@ -151,6 +152,64 @@ func (s *PgStore) ListProducts(ctx context.Context, filter ProductFilter, plan P
 func (s *PgStore) Product(ctx context.Context, publicID string) (Product, error) {
 	product, err := productByPublicID(ctx, s.db, publicID)
 	if err != nil {
+		return Product{}, err
+	}
+	return refreshTiers(ctx, s.db, product)
+}
+
+// ReviewProduct atomically decides a product that is waiting for platform
+// review. The row lock makes the status check and update one decision point;
+// the catalog-local audit outbox is inserted before this transaction commits.
+func (s *PgStore) ReviewProduct(ctx context.Context, publicID string, target ProductStatus, reason string, audit ReviewAudit) (Product, error) {
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return Product{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var current ProductStatus
+	if err := tx.QueryRow(ctx, `SELECT status FROM catalog.product WHERE public_id = $1 FOR UPDATE`, publicID).Scan(&current); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Product{}, ErrNotFound
+		}
+		return Product{}, err
+	}
+	if err := ValidateReviewDecision(current, target, reason); err != nil {
+		return Product{}, err
+	}
+	if target == StatusOn {
+		reason = ""
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE catalog.product
+		SET status = $2, review_reason = NULLIF($3, ''), updated_at = now()
+		WHERE public_id = $1 AND status = 'review'`, publicID, string(target), reason); err != nil {
+		return Product{}, err
+	}
+	detail, err := ReviewAuditDetail(target, reason)
+	if err != nil {
+		return Product{}, err
+	}
+	publicAuditID, err := ids.NewULID()
+	if err != nil {
+		return Product{}, err
+	}
+	occurredAt := audit.Time
+	if occurredAt.IsZero() {
+		occurredAt = time.Now().UTC()
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO catalog.product_review_audit_outbox
+			(public_id, occurred_at, actor_id, actor_role, action, target, detail, ip, request_id)
+		VALUES ($1, $2, $3, $4, 'product.moderated', $5, $6, NULLIF($7, '')::inet, $8)`,
+		publicAuditID, occurredAt, audit.ActorID, audit.ActorRole, "product:"+publicID, detail, audit.IP, audit.RequestID); err != nil {
+		return Product{}, err
+	}
+	product, err := productByPublicID(ctx, tx, publicID)
+	if err != nil {
+		return Product{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return Product{}, err
 	}
 	return refreshTiers(ctx, s.db, product)
@@ -283,6 +342,11 @@ func (s *PgStore) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 	}
 	if patch.Status != nil {
 		add(string(*patch.Status), "status = ?")
+		if *patch.Status == StatusReview {
+			sets = append(sets, "submitted_at = now()")
+		} else {
+			sets = append(sets, "submitted_at = NULL")
+		}
 	}
 	args = append(args, publicID, merchantID)
 	var productID int64
@@ -387,6 +451,14 @@ func productWhere(filter ProductFilter, plan Plan) (string, []any) {
 		args = append(args, string(filter.Status))
 		clauses = append(clauses, "p.status = $"+strconv.Itoa(len(args)))
 	}
+	if filter.SubmittedFrom != nil {
+		args = append(args, *filter.SubmittedFrom)
+		clauses = append(clauses, "p.submitted_at >= $"+strconv.Itoa(len(args)))
+	}
+	if filter.SubmittedTo != nil {
+		args = append(args, *filter.SubmittedTo)
+		clauses = append(clauses, "p.submitted_at < $"+strconv.Itoa(len(args)))
+	}
 	if plan.Category != "" {
 		args = append(args, plan.Category)
 		clauses = append(clauses, "c.code = $"+strconv.Itoa(len(args)))
@@ -443,7 +515,7 @@ func scanProduct(row pgx.Row) (Product, error) {
 		volumeM3, sourceRef    *string
 	)
 	if err := row.Scan(&product.ID, &product.PublicID, &product.MerchantID, &product.CategoryID, &product.CategoryCode,
-		&name, &spec, &product.Unit, &origin, &product.LeadDays, &volumeM3, &status, &source, &sourceRef,
+		&name, &spec, &product.Unit, &origin, &product.LeadDays, &volumeM3, &status, &product.ReviewReason, &source, &sourceRef,
 		&product.StdScore, &product.UpdatedAt); err != nil {
 		return Product{}, err
 	}

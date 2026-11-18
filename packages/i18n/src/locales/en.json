@@ -184,6 +184,8 @@
   "admin.search": "Search",
   "admin.status": "Status",
   "admin.date": "Date",
+  "admin.startDate": "Start date",
+  "admin.endDate": "End date",
   "admin.all": "All",
   "admin.normal": "Normal",
   "admin.attention": "Attention",

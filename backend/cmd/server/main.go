@@ -150,7 +150,9 @@ func main() {
 	bulkhead.SetBrownout(brownout)
 	go brownout.Run(ctx, cfg.BrownoutSampleInterval)
 	directory := catalogDirectory{db: database}
-	catalogService := catalog.New(catalog.NewPgStore(database), catalog.Options{Merchants: directory})
+	catalogStore := catalog.NewPgStore(database)
+	catalogService := catalog.New(catalogStore, catalog.Options{Merchants: directory})
+	catalogReviewService := catalog.NewReviewService(catalogStore)
 	routeFitReceiver := logistics.RouteFitReceiver{
 		Verifier: logistics.RouteFitWebhookVerifier{Secrets: logistics.RouteFitSecrets(cfg.RouteFitEventSecrets)},
 		Record: func(r *http.Request, event logistics.RouteFitEvent, body []byte) error {
@@ -374,6 +376,7 @@ func main() {
 		adminManagementService = &iam.AdminManagementService{DB: iamDatabase, Cipher: envelope, Audit: auditStore, SessionCache: sessionCache}
 		if auditStore != nil {
 			go iam.RunAdminAuditOutbox(ctx, iamDatabase, auditStore)
+			go catalog.RunReviewAuditOutbox(ctx, catalogStore, auditStore)
 		}
 		stepUpVerifier = adminStepUpVerifier{tokens: adminTokens}
 		if cfg.RedisURL != "" {
@@ -459,6 +462,7 @@ func main() {
 		Metrics:             metrics,
 		ErrorReporter:       reporter,
 		Catalog:             catalogService,
+		CatalogReview:       catalogReviewService,
 		Merchants:           directory,
 		Logger:              logger,
 		Login:               loginService,
@@ -479,6 +483,7 @@ func main() {
 		Files:               fileService,
 		Orders:              orderService,
 		Notifications:       notificationService,
+		AdminOrders:         orderService,
 		Bulkhead:            bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)

@@ -20,6 +20,9 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/audit/audittest"
+	platformids "github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 )
 
 const (
@@ -29,6 +32,7 @@ const (
 	scratchCategoryCode   = "test_scratch"
 	productNameJSON       = `{"zh":"瓷砖","en":"Tiles","km":"ក្បឿង"}`
 	seededCategoryCount   = 8
+	currentMigration      = 64
 )
 
 func TestCatalogMigration(t *testing.T) {
@@ -74,7 +78,10 @@ func TestCatalogMigration(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertCatalogTables(t, database, false)
-		if err := goose.Up(database, migrations); err != nil {
+		// Keep the round-trip assertion pinned to the schema version exercised
+		// by this test. Goose's implicit max version can stop at the last
+		// migration known when the fixture was originally introduced.
+		if err := goose.UpTo(database, migrations, currentMigration); err != nil {
 			t.Fatal(err)
 		}
 		assertCatalogTables(t, database, true)
@@ -96,7 +103,7 @@ func TestCatalogMigration(t *testing.T) {
 			WHERE c.table_schema = 'catalog' AND c.table_name <> 'search_log_default'`).Scan(&identityCount, &badTimestamp); err != nil {
 			t.Fatal(err)
 		}
-		if identityCount != 9 || badTimestamp != 0 {
+		if identityCount != 10 || badTimestamp != 0 {
 			t.Fatalf("identity columns=%d, bad timestamps=%d", identityCount, badTimestamp)
 		}
 	})
@@ -624,6 +631,133 @@ func TestCatalogMigration(t *testing.T) {
 			t.Fatalf("seeded categories=%d incomplete=%d, want %d/0", count, incomplete, seededCategoryCount)
 		}
 	})
+
+	t.Run("product review and audit outbox share a transaction", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', submitted_at=NULL, review_reason=NULL WHERE public_id=$1`, firstProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		pending, err := catalog.NewReviewService(store).Pending(ctx, catalog.ProductFilter{}, catalog.Plan{Page: 1, PageSize: 20})
+		if err != nil {
+			t.Fatalf("review queue with unscreened product: %v", err)
+		}
+		if len(pending.Items) != 1 || pending.Items[0].PublicID != firstProductPublicID {
+			t.Fatalf("review queue=%+v, want unscreened product %s", pending.Items, firstProductPublicID)
+		}
+		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='draft', submitted_at=NULL WHERE public_id=$1`, firstProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		review := catalog.StatusReview
+		if _, err := store.UpdateProduct(ctx, 42, firstProductPublicID, catalog.ProductPatch{Status: &review}); err != nil {
+			t.Fatalf("merchant submit to review: %v", err)
+		}
+		var submittedAt sql.NullTime
+		if err := admin.QueryRow(ctx, `SELECT submitted_at FROM catalog.product WHERE public_id=$1`, firstProductPublicID).Scan(&submittedAt); err != nil {
+			t.Fatal(err)
+		}
+		if !submittedAt.Valid {
+			t.Fatal("merchant submit did not record submitted_at")
+		}
+		product, err := store.ReviewProduct(ctx, firstProductPublicID, catalog.StatusRejected, "missing dimensions", catalog.ReviewAudit{ActorID: 7, ActorRole: "super", RequestID: "review-1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if product.Status != catalog.StatusRejected || product.ReviewReason != "missing dimensions" {
+			t.Fatalf("product=%+v", product)
+		}
+		var outboxCount int
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM catalog.product_review_audit_outbox WHERE target=$1`, "product:"+firstProductPublicID).Scan(&outboxCount); err != nil {
+			t.Fatal(err)
+		}
+		if outboxCount != 1 {
+			t.Fatalf("outbox rows=%d, want 1", outboxCount)
+		}
+		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', submitted_at=clock_timestamp(), review_reason=NULL WHERE public_id=$1`, firstProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		product, err = store.ReviewProduct(ctx, firstProductPublicID, catalog.StatusOn, "", catalog.ReviewAudit{ActorID: 7, ActorRole: "super", RequestID: "review-approve"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if product.Status != catalog.StatusOn || product.ReviewReason != "" {
+			t.Fatalf("approved product=%+v, want cleared review reason", product)
+		}
+
+		if _, err := admin.Exec(ctx, `UPDATE catalog.product SET status='review', submitted_at=clock_timestamp(), review_reason=NULL WHERE public_id=$1`, firstProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		_, err = store.ReviewProduct(ctx, firstProductPublicID, catalog.StatusOn, "", catalog.ReviewAudit{ActorID: 7, ActorRole: "super", IP: "not-an-ip", RequestID: "review-rollback"})
+		if err == nil {
+			t.Fatal("invalid audit IP unexpectedly committed review")
+		}
+		var status catalog.ProductStatus
+		if err := admin.QueryRow(ctx, `SELECT status FROM catalog.product WHERE public_id=$1`, firstProductPublicID).Scan(&status); err != nil {
+			t.Fatal(err)
+		}
+		if status != catalog.StatusReview {
+			t.Fatalf("status=%q after rollback, want review", status)
+		}
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM catalog.product_review_audit_outbox WHERE request_id=$1`, "review-rollback").Scan(&outboxCount); err != nil {
+			t.Fatal(err)
+		}
+		if outboxCount != 0 {
+			t.Fatalf("rollback outbox rows=%d, want 0", outboxCount)
+		}
+	})
+
+	t.Run("review audit outbox delivers once and retries failures", func(t *testing.T) {
+		if _, err := admin.Exec(ctx, `DELETE FROM catalog.product_review_audit_outbox WHERE delivered_at IS NULL`); err != nil {
+			t.Fatal(err)
+		}
+		retryPublicID, err := platformids.NewULID()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.product_review_audit_outbox(public_id, occurred_at, actor_id, actor_role, action, target, detail, request_id)
+			VALUES ($1, clock_timestamp(), 7, 'admin', 'product.moderated', $2, '{"decision":"rejected","reason":"test"}', 'outbox-delivery')`, secondProductPublicID, "product:"+secondProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		writer := &audittest.Writer{}
+		if err := store.DeliverReviewAudit(ctx, writer); err != nil {
+			t.Fatal(err)
+		}
+		if len(writer.Records) != 1 || writer.Records[0].Action != platformaudit.ActionProductModerated {
+			t.Fatalf("records=%+v", writer.Records)
+		}
+		if err := store.DeliverReviewAudit(ctx, writer); err != nil {
+			t.Fatal(err)
+		}
+		if len(writer.Records) != 1 {
+			t.Fatalf("duplicate delivery records=%d", len(writer.Records))
+		}
+		if _, err := admin.Exec(ctx, `DELETE FROM catalog.product_review_audit_outbox WHERE public_id=$1`, secondProductPublicID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.Exec(ctx, `
+			INSERT INTO catalog.product_review_audit_outbox(public_id, occurred_at, actor_id, actor_role, action, target, detail, request_id)
+			VALUES ($1, clock_timestamp(), 7, 'admin', 'product.moderated', $2, '{}', 'outbox-retry')`, retryPublicID, "product:"+retryPublicID); err != nil {
+			t.Fatal(err)
+		}
+		writer.Err = errors.New("provider response contains secret")
+		if err := store.DeliverReviewAudit(ctx, writer); err == nil {
+			t.Fatal("failed delivery returned nil")
+		}
+		var attempts int
+		var lastError string
+		if err := admin.QueryRow(ctx, `SELECT attempts, last_error FROM catalog.product_review_audit_outbox WHERE public_id=$1`, retryPublicID).Scan(&attempts, &lastError); err != nil {
+			t.Fatal(err)
+		}
+		if attempts != 1 || lastError != "audit append failed" {
+			t.Fatalf("attempts=%d last_error=%q", attempts, lastError)
+		}
+		writer.Err = nil
+		if err := store.DeliverReviewAudit(ctx, writer); err != nil {
+			t.Fatal(err)
+		}
+		if len(writer.Records) != 2 {
+			t.Fatalf("retry records=%d", len(writer.Records))
+		}
+	})
 }
 
 func seedCatalogFixtures(t *testing.T, ctx context.Context, admin *pgx.Conn) {
@@ -677,11 +811,14 @@ func assertIntegerMinQtyMigrationRejectsFractionalData(t *testing.T, database *s
 	if err := goose.UpTo(database, migrations, 57); err != nil {
 		t.Fatalf("migration 00057 after integer fixture repair: %v", err)
 	}
+	if err := goose.UpTo(database, migrations, currentMigration); err != nil {
+		t.Fatalf("apply current catalog migrations after integer fixture repair: %v", err)
+	}
 }
 
 func assertCatalogTables(t *testing.T, database *sql.DB, want bool) {
 	t.Helper()
-	for _, name := range []string{"category", "product", "product_tier", "category_attribute", "sku", "sku_tier", "product_import", "search_synonym", "search_log"} {
+	for _, name := range []string{"category", "product", "product_tier", "category_attribute", "sku", "sku_tier", "product_import", "search_synonym", "search_log", "product_review_audit_outbox"} {
 		var exists bool
 		if err := database.QueryRow(`SELECT to_regclass('catalog.' || $1) IS NOT NULL`, name).Scan(&exists); err != nil {
 			t.Fatal(err)

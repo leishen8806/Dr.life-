@@ -78,6 +78,12 @@ func normalisePlan(query ListQuery) (Plan, error) {
 	return plan, nil
 }
 
+// PlanForReview applies the same pagination and sort validation as the public
+// catalog list endpoints without widening the review queue's state scope.
+func PlanForReview(query ListQuery) (Plan, error) {
+	return normalisePlan(query)
+}
+
 func (s *Service) directory() (MerchantDirectory, error) {
 	if s.merchants == nil {
 		return nil, errors.New("catalog: merchant directory is not configured")
@@ -320,7 +326,7 @@ func (s *Service) UpdateProduct(ctx context.Context, merchantID int64, publicID 
 	if patch.Status != nil {
 		effectiveStatus = *patch.Status
 	}
-	if effectiveStatus == StatusOn {
+	if effectiveStatus == StatusOn || effectiveStatus == StatusReview {
 		name := product.Name
 		if patch.Name != nil {
 			name = patch.Name

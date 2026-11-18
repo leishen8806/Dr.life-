@@ -133,6 +133,8 @@ jobs:
         env:
           EVIDENCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
         run: pnpm --filter @drlife/admin capture:screenshots
+      - name: Run admin API Playwright flow
+        run: pnpm --filter @drlife/admin test:e2e
       - name: Bind screenshot manifests to current head
         env:
           EVIDENCE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}

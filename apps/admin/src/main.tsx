@@ -17,7 +17,10 @@ import "./styles.css";
 
 const { Header, Sider, Content } = Layout;
 const canUseMockWorkspace = import.meta.env.DEV;
-const permissions: string[] = canUseMockWorkspace ? ["admin.review", "admin.orders", "admin.merchants", "admin.products", "admin.agreement.publish", "admin.integration.manage"] : [];
+// The server remains the source of truth for permissions. The production UI
+// exposes read routes and renders API 403s instead of hiding a route based on
+// a stale client-side permission snapshot.
+const permissions: string[] = ["admin.review", "admin.orders", "admin.merchants", "admin.products", "admin.agreement.publish", "admin.integration.manage"];
 const hasPermission = (permission: string) => permissions.includes(permission);
 
 function keyText(t: (key: TranslationKey) => string, key: string) {
@@ -60,7 +63,7 @@ function Overview() {
 export function ReviewTable({ rows, canManage, onApprove, onReject, kind }: { rows: ReviewRecord[]; canManage: boolean; onApprove: (row: ReviewRecord) => void; onReject: (row: ReviewRecord) => void; kind: "merchant" | "product" }) {
   const { t } = useI18n();
   const columns: ColumnsType<ReviewRecord> = [
-    { title: kind === "merchant" ? t("admin.merchantName") : t("admin.productName"), dataIndex: "nameKey", render: (value: string) => keyText(t, value) },
+    { title: kind === "merchant" ? t("admin.merchantName") : t("admin.productName"), dataIndex: "nameKey", render: (_value: string, row) => row.name ?? keyText(t, row.nameKey) },
     { title: t("admin.status"), dataIndex: "status", render: (value: string) => <StatusCell status={value} /> },
     { title: t("admin.submittedAt"), dataIndex: "createdAt" },
     { title: t("admin.details"), key: "actions", render: (_value, row) => <Space wrap>
@@ -134,6 +137,8 @@ function OrderWorkspace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<OrderRecord>();
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(false);
   const reload = () => {
     setLoading(true); setError(false);
     api.listOrders({ query, status, from: dateRange[0] || undefined, to: dateRange[1] || undefined }).then(setRows).catch(() => setError(true)).finally(() => setLoading(false));
@@ -144,6 +149,10 @@ function OrderWorkspace() {
     reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, status, dateRange]);
+  const openOrder = (row: OrderRecord) => {
+    setSelected(row); setDetailLoading(true); setDetailError(false);
+    api.getOrder(row.id).then((detail) => setSelected(detail ?? row)).catch(() => setDetailError(true)).finally(() => setDetailLoading(false));
+  };
   const columns: ColumnsType<OrderRecord> = [
     { title: t("admin.orderNo"), dataIndex: "id" },
     { title: t("admin.buyer"), dataIndex: "buyerKey", render: (value: string) => keyText(t, value) },
@@ -160,11 +169,11 @@ function OrderWorkspace() {
       <Select allowClear value={status} onChange={setStatus} placeholder={t("admin.status")} options={[
         { value: "normal", label: t("admin.normal") }, { value: "attention", label: t("admin.attention") }, { value: "exception", label: t("admin.exception") }
       ]} />
-      <DatePicker.RangePicker onChange={(_, dateStrings) => setDateRange(dateStrings as [string, string])} aria-label={t("admin.date")} />
+      <DatePicker.RangePicker placeholder={[t("admin.startDate"), t("admin.endDate")]} onChange={(_, dateStrings) => setDateRange(dateStrings as [string, string])} aria-label={t("admin.date")} />
     </Space>
-    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <Table scroll={{ x: 760 }} rowKey="id" columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} onRow={(row) => ({ onClick: () => setSelected(row), className: "admin-clickable-row" })} locale={{ emptyText: <Empty description={t("admin.noResults")} /> }} />}
+    {loading ? <Skeleton active /> : error ? <Alert type="error" showIcon message={t("admin.error")} action={<Button onClick={reload}>{t("admin.retry")}</Button>} /> : <Table scroll={{ x: 760 }} rowKey="id" columns={columns} dataSource={rows} pagination={{ pageSize: 8 }} onRow={(row) => ({ onClick: () => openOrder(row), className: "admin-clickable-row" })} locale={{ emptyText: <Empty description={t("admin.noResults")} /> }} />}
     <Drawer open={Boolean(selected)} title={t("admin.orderDetail")} onClose={() => setSelected(undefined)} width={440}>
-      {selected && <div className="order-detail">
+      {detailLoading ? <Skeleton active /> : detailError ? <Alert type="error" showIcon message={t("admin.error")} /> : selected && <div className="order-detail">
         <Typography.Paragraph><strong>{t("admin.orderNo")}:</strong> {selected.id}</Typography.Paragraph>
         <Typography.Paragraph><strong>{t("admin.buyer")}:</strong> {keyText(t, selected.buyerKey)}</Typography.Paragraph>
         <Typography.Paragraph><strong>{t("admin.merchant")}:</strong> {keyText(t, selected.merchantKey)}</Typography.Paragraph>

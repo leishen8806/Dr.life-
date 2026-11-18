@@ -702,9 +702,16 @@ func (f *fakeNotifications) UpsertSetting(context.Context, int64, notifications.
 	return nil
 }
 
-type fakeAdminPermissions struct{ allowed, scoped bool }
+type fakeAdminPermissions struct {
+	allowed     bool
+	scoped      bool
+	editAllowed *bool
+}
 
-func (f fakeAdminPermissions) Can(context.Context, string, string, string) (bool, error) {
+func (f fakeAdminPermissions) Can(_ context.Context, _ string, _ string, permission string) (bool, error) {
+	if permission == "edit" && f.editAllowed != nil {
+		return *f.editAllowed, nil
+	}
 	return f.allowed, nil
 }
 func (f fakeAdminPermissions) HasDataScope(context.Context, string) (bool, error) {

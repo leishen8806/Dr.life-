@@ -1,7 +1,7 @@
 export type ReviewStatus = "pending" | "approved" | "rejected";
 export type RecordStatus = "normal" | "attention" | "exception";
 
-export interface ReviewRecord { id: string; nameKey: string; status: ReviewStatus; createdAt: string; }
+export interface ReviewRecord { id: string; nameKey: string; name?: string; status: ReviewStatus; createdAt: string; }
 export interface OrderRecord {
   id: string; buyerKey: string; merchantKey: string; amountE4: string; status: RecordStatus;
   createdAt: string; deliveryKey: string; phone: string;
