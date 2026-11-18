@@ -1,4 +1,4 @@
-head=01421bd
+head=ccba488
 buyer-home-360-light-zh.png	Dr.life+	商品分类
 buyer-profile-360-light-zh.png	Dr.life+	Sokha Trading
 buyer-wallet-360-light-zh.png	Dr.life+	钱包
