@@ -1,4 +1,4 @@
-head=9d64ad1e2445cc84566db61c3efcce454a1cf90f
+head=489063474d3f31e16008b26b157e9d76b9ff7a0e
 360/zh/home.png	/?lang=zh
 360/zh/merchant.png	/merchant/?lang=zh
 360/en/home.png	/en/?lang=en
