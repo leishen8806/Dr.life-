@@ -4,7 +4,7 @@ CREATE TABLE logistics.fulfillment_outbox (
     external_order_id text NOT NULL CHECK (length(btrim(external_order_id)) > 0),
     idempotency_key text NOT NULL UNIQUE CHECK (length(btrim(idempotency_key)) BETWEEN 1 AND 128),
     payload jsonb NOT NULL,
-    status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'retry', 'delivered', 'exception')),
+    status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'retry', 'processing', 'delivered', 'exception')),
     attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
     last_error_code text,
     next_attempt_at timestamptz NOT NULL DEFAULT clock_timestamp(),

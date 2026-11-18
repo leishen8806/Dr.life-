@@ -39,3 +39,9 @@ func TestFulfillmentIdempotencyKeyIsStableAndOpaque(t *testing.T) {
 		t.Fatal("different orders share an idempotency key")
 	}
 }
+
+func TestDeliveryRetryUsesExplicitAction(t *testing.T) {
+	if got := ClassifyDeliveryError(&routefit.Error{Status: http.StatusBadGateway, Code: "UPSTREAM"}); got != DeliveryRetry {
+		t.Fatalf("5xx action=%q, want retry", got)
+	}
+}
