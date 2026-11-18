@@ -154,6 +154,8 @@
   "admin.search": "ស្វែងរក",
   "admin.status": "ស្ថានភាព",
   "admin.date": "កាលបរិច្ឆេទ",
+  "admin.startDate": "កាលបរិច្ឆេទចាប់ផ្តើម",
+  "admin.endDate": "កាលបរិច្ឆេទបញ្ចប់",
   "admin.all": "ទាំងអស់",
   "admin.normal": "ធម្មតា",
   "admin.attention": "ត្រូវយកចិត្តទុកដាក់",

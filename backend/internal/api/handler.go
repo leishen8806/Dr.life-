@@ -95,6 +95,22 @@ type AdminPermissionChecker interface {
 	HasDataScope(context.Context, string) (bool, error)
 }
 
+func (h Handler) hasAdminPermission(ctx context.Context, adminID string, code iam.AdminPermissionCode) (bool, error) {
+	module, required, ok := iam.AdminPermissionParts(code)
+	if !ok || h.AdminPermissions == nil {
+		return false, nil
+	}
+	return h.AdminPermissions.Can(ctx, adminID, string(module), string(required))
+}
+
+// CatalogReviewManagement is the HTTP-facing port for administrative catalog
+// moderation. The catalog package owns the transaction and audit outbox.
+type CatalogReviewManagement interface {
+	Pending(context.Context, catalog.ProductFilter, catalog.Plan) (catalog.ProductPage, error)
+	Approve(context.Context, string, catalog.ReviewAudit) (catalog.Product, error)
+	Reject(context.Context, string, string, catalog.ReviewAudit) (catalog.Product, error)
+}
+
 // AdminManagement is the credential-safe IAM port for administrator records.
 // It deliberately has no method that returns hashes or encrypted TOTP values.
 type AdminManagement interface {
@@ -132,6 +148,11 @@ type OrderManagement interface {
 	MerchantOrderDetail(context.Context, int64, string) (trade.MerchantOrderView, error)
 }
 
+type AdminOrderReader interface {
+	AdminOrders(context.Context, string, int) ([]trade.BuyerOrderView, string, error)
+	AdminOrderDetail(context.Context, string) (trade.BuyerOrderView, error)
+}
+
 // Handler 实现 gen.ServerInterface。
 // 零值 Handler 只提供 /v1/public/ping；商品接口在依赖未注入时返回 500，
 // 这样 server.NewHandler(nil) 与契约测试的既有行为保持不变。
@@ -156,7 +177,63 @@ type Handler struct {
 	AdminPermissions AdminPermissionChecker
 	Files            FileManagement
 	AdminManagement  AdminManagement
+	CatalogReview    CatalogReviewManagement
 	Orders           OrderManagement
+	AdminOrders      AdminOrderReader
+}
+
+func (h Handler) adminOrdersAccess(w http.ResponseWriter, r *http.Request) bool {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return false
+	}
+	if identity.Role != gateway.RoleAdmin || h.AdminPermissions == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	allowed, err := h.hasAdminPermission(r.Context(), identity.AccountID, iam.AdminPermissionOrdersRead)
+	if err != nil || !allowed {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	return true
+}
+
+func (h Handler) ListAdminOrders(w http.ResponseWriter, r *http.Request, params gen.ListAdminOrdersParams) {
+	if !h.adminOrdersAccess(w, r) {
+		return
+	}
+	if h.AdminOrders == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	items, next, err := h.AdminOrders.AdminOrders(r.Context(), stringValue(params.Cursor), intValue(params.PageSize))
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	data := make([]gen.BuyerOrderSummary, 0, len(items))
+	for _, item := range items {
+		data = append(data, adminBuyerOrderSummary(item))
+	}
+	httpx.WriteOK(w, r, gen.BuyerOrderListData{Items: data, NextCursor: optionalString(next)})
+}
+
+func (h Handler) GetAdminOrder(w http.ResponseWriter, r *http.Request, publicID gen.PublicID) {
+	if !h.adminOrdersAccess(w, r) {
+		return
+	}
+	if h.AdminOrders == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	order, err := h.AdminOrders.AdminOrderDetail(r.Context(), publicIDFromPath(publicID))
+	if err != nil {
+		h.orderError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, adminBuyerOrder(order))
 }
 
 func (h Handler) ListBuyerOrders(w http.ResponseWriter, r *http.Request, params gen.ListBuyerOrdersParams) {
@@ -444,6 +521,127 @@ func (h Handler) adminLedgerAccess(w http.ResponseWriter, r *http.Request) bool 
 		return false
 	}
 	return true
+}
+
+func (h Handler) adminCatalogReviewAccess(w http.ResponseWriter, r *http.Request, code iam.AdminPermissionCode) bool {
+	identity, ok := gateway.IdentityFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeUnauthenticated))
+		return false
+	}
+	if identity.Role != gateway.RoleAdmin || h.AdminPermissions == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	allowed, err := h.hasAdminPermission(r.Context(), identity.AccountID, code)
+	if err != nil || !allowed {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodePermissionDenied))
+		return false
+	}
+	return true
+}
+
+func (h Handler) catalogReviewAudit(w http.ResponseWriter, r *http.Request) (catalog.ReviewAudit, bool) {
+	identity, _ := gateway.IdentityFromContext(r.Context())
+	if h.Directory == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return catalog.ReviewAudit{}, false
+	}
+	account, found, err := h.Directory.Resolve(r.Context(), identity.AccountID)
+	if err != nil || !found || account.ID <= 0 {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return catalog.ReviewAudit{}, false
+	}
+	return catalog.ReviewAudit{
+		ActorID:   account.ID,
+		ActorRole: string(identity.Role),
+		IP:        h.ClientIP.Resolve(r),
+		RequestID: httpx.RequestIDFromContext(r.Context()),
+	}, true
+}
+
+func (h Handler) ListAdminCatalogProducts(w http.ResponseWriter, r *http.Request, params gen.ListAdminCatalogProductsParams) {
+	if !h.adminCatalogReviewAccess(w, r, iam.AdminPermissionCatalogReviewQueue) {
+		return
+	}
+	if h.CatalogReview == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	filter := catalog.ProductFilter{Status: catalog.StatusReview, SubmittedFrom: params.SubmittedFrom, SubmittedTo: params.SubmittedTo}
+	if params.MerchantId != nil {
+		filter.MerchantID = *params.MerchantId
+	}
+	plan, err := catalog.PlanForReview(listQuery(params.Page, params.PageSize, params.Sort, "", ""))
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	page, err := h.CatalogReview.Pending(r.Context(), filter, plan)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	data, err := productListData(page)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, data)
+}
+
+func (h Handler) PostAdminCatalogProductApprove(w http.ResponseWriter, r *http.Request, publicID gen.PublicID, _ gen.PostAdminCatalogProductApproveParams) {
+	if !h.adminCatalogReviewAccess(w, r, iam.AdminPermissionCatalogReview) {
+		return
+	}
+	if h.CatalogReview == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	audit, ok := h.catalogReviewAudit(w, r)
+	if !ok {
+		return
+	}
+	product, err := h.CatalogReview.Approve(r.Context(), publicIDFromPath(publicID), audit)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	data, err := toGenProduct(product)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, data)
+}
+
+func (h Handler) PostAdminCatalogProductReject(w http.ResponseWriter, r *http.Request, publicID gen.PublicID, _ gen.PostAdminCatalogProductRejectParams) {
+	if !h.adminCatalogReviewAccess(w, r, iam.AdminPermissionCatalogReview) {
+		return
+	}
+	if h.CatalogReview == nil {
+		httpx.WriteError(w, r, httpx.NewAppError(httpx.CodeServiceUnavailable))
+		return
+	}
+	body, ok := decodeJSON[gen.PostAdminCatalogProductRejectJSONRequestBody](w, r)
+	if !ok {
+		return
+	}
+	audit, ok := h.catalogReviewAudit(w, r)
+	if !ok {
+		return
+	}
+	product, err := h.CatalogReview.Reject(r.Context(), publicIDFromPath(publicID), body.Reason, audit)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	data, err := toGenProduct(product)
+	if err != nil {
+		h.writeError(w, r, err)
+		return
+	}
+	httpx.WriteOK(w, r, data)
 }
 
 func (h Handler) ListAdminUsers(w http.ResponseWriter, r *http.Request, params gen.ListAdminUsersParams) {
@@ -1524,6 +1722,8 @@ func (h Handler) writeError(w http.ResponseWriter, r *http.Request, err error) {
 		code = httpx.CodeResourceNotFound
 	case errors.Is(err, catalog.ErrNotFound):
 		code = httpx.CodeResourceNotFound
+	case errors.Is(err, catalog.ErrReviewReasonRequired), errors.Is(err, catalog.ErrInvalidReviewTransition):
+		code = httpx.CodeInvalidArgument
 	case errors.Is(err, catalog.ErrForbidden), errors.Is(err, catalog.ErrMerchantUnknown):
 		code = httpx.CodePermissionDenied
 	case errors.As(err, &invalid):
@@ -1689,6 +1889,17 @@ func buyerOrder(order trade.BuyerOrderView) gen.BuyerOrder {
 
 func buyerOrderSummary(order trade.BuyerOrderView) gen.BuyerOrderSummary {
 	data := buyerOrder(order)
+	return gen.BuyerOrderSummary{PublicId: data.PublicId, PaymentStatus: data.PaymentStatus, SummaryStatus: data.SummaryStatus, GoodsAmountE4: data.GoodsAmountE4, ShippingAmountE4: data.ShippingAmountE4, PayableAmountE4: data.PayableAmountE4, ShippingAddressPublicId: data.ShippingAddressPublicId, Suborders: data.Suborders, CreatedAt: data.CreatedAt, UpdatedAt: data.UpdatedAt}
+}
+
+func adminBuyerOrder(order trade.BuyerOrderView) gen.BuyerOrder {
+	data := buyerOrder(order)
+	data.ShippingAddress.Phone = maskPhone(data.ShippingAddress.Phone)
+	return data
+}
+
+func adminBuyerOrderSummary(order trade.BuyerOrderView) gen.BuyerOrderSummary {
+	data := adminBuyerOrder(order)
 	return gen.BuyerOrderSummary{PublicId: data.PublicId, PaymentStatus: data.PaymentStatus, SummaryStatus: data.SummaryStatus, GoodsAmountE4: data.GoodsAmountE4, ShippingAmountE4: data.ShippingAmountE4, PayableAmountE4: data.PayableAmountE4, ShippingAddressPublicId: data.ShippingAddressPublicId, Suborders: data.Suborders, CreatedAt: data.CreatedAt, UpdatedAt: data.UpdatedAt}
 }
 
@@ -1961,6 +2172,7 @@ func toGenProduct(product catalog.Product) (gen.Product, error) {
 		SourceRef:    optionalString(product.SourceRef),
 		Spec:         toGenLocalizedPtr(product.Spec),
 		Status:       gen.ProductStatus(product.Status),
+		ReviewReason: optionalString(product.ReviewReason),
 		StdScore:     product.StdScore,
 		Tiers:        tiers,
 		Skus:         skus,

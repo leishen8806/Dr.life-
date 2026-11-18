@@ -625,7 +625,57 @@ func (s *PostgresStore) ListBuyerOrders(ctx context.Context, buyerID int64, curs
 	return orders, next, nil
 }
 
+func (s *PostgresStore) ListAdminOrders(ctx context.Context, cursor string, limit int) ([]BuyerOrderView, string, error) {
+	after, err := decodeCursor(cursor)
+	if err != nil {
+		return nil, "", ErrInvalidOrderLine
+	}
+	limit = pageLimit(limit)
+	rows, err := s.db.Query(ctx, `SELECT id,public_id FROM trade.buyer_order WHERE ($1=0 OR id<$1) ORDER BY id DESC LIMIT $2`, after, limit+1)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+	type item struct {
+		id       int64
+		publicID string
+	}
+	var ids []item
+	for rows.Next() {
+		var value item
+		if err := rows.Scan(&value.id, &value.publicID); err != nil {
+			return nil, "", err
+		}
+		ids = append(ids, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", err
+	}
+	next := ""
+	if len(ids) > limit {
+		next = encodeCursor(ids[limit-1].id)
+		ids = ids[:limit]
+	}
+	orders := make([]BuyerOrderView, 0, len(ids))
+	for _, id := range ids {
+		order, err := s.FindAdminOrderDetail(ctx, id.publicID)
+		if err != nil {
+			return nil, "", err
+		}
+		orders = append(orders, order)
+	}
+	return orders, next, nil
+}
+
 func (s *PostgresStore) FindBuyerOrderDetail(ctx context.Context, buyerID int64, publicID string) (BuyerOrderView, error) {
+	return s.findBuyerOrderDetail(ctx, buyerID, publicID, true)
+}
+
+func (s *PostgresStore) FindAdminOrderDetail(ctx context.Context, publicID string) (BuyerOrderView, error) {
+	return s.findBuyerOrderDetail(ctx, 0, publicID, false)
+}
+
+func (s *PostgresStore) findBuyerOrderDetail(ctx context.Context, buyerID int64, publicID string, scoped bool) (BuyerOrderView, error) {
 	var order BuyerOrderView
 	var paymentIntentStatus string
 	err := s.db.QueryRow(ctx, `
@@ -637,8 +687,8 @@ func (s *PostgresStore) FindBuyerOrderDetail(ctx context.Context, buyerID int64,
 		FROM trade.buyer_order buyer
 		JOIN trade.merchant_order child ON child.buyer_order_id=buyer.id
 		LEFT JOIN LATERAL (SELECT status FROM trade.kess_payment_intent WHERE source_ref=buyer.public_id ORDER BY (status='SUCCESS') DESC,attempt_no DESC LIMIT 1) latest ON true
-		WHERE buyer.public_id=$1 AND buyer.buyer_account_id=$2
-		GROUP BY buyer.id,latest.status`, publicID, buyerID).Scan(
+		WHERE buyer.public_id=$1 AND (NOT $3 OR buyer.buyer_account_id=$2)
+		GROUP BY buyer.id,latest.status`, publicID, buyerID, scoped).Scan(
 		new(int64), &order.PublicID, &order.BuyerAccountID, &order.GoodsAmountE4, &order.ShippingAmountE4, &order.PayableAmountE4,
 		&order.ShippingAddress.PublicID, &order.ShippingAddress.RecipientName, &order.ShippingAddress.AddressText, &order.ShippingAddress.Phone,
 		&order.CreatedAt, &order.UpdatedAt, &order.Status, &paymentIntentStatus)

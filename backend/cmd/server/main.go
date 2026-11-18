@@ -148,7 +148,9 @@ func main() {
 	bulkhead.SetBrownout(brownout)
 	go brownout.Run(ctx, cfg.BrownoutSampleInterval)
 	directory := catalogDirectory{db: database}
-	catalogService := catalog.New(catalog.NewPgStore(database), catalog.Options{Merchants: directory})
+	catalogStore := catalog.NewPgStore(database)
+	catalogService := catalog.New(catalogStore, catalog.Options{Merchants: directory})
+	catalogReviewService := catalog.NewReviewService(catalogStore)
 	tradeStore := trade.NewPostgresStore(database)
 	serviceLevel := strings.TrimSpace(os.Getenv("ROUTEFIT_DEFAULT_SERVICE_LEVEL"))
 	if serviceLevel == "" {
@@ -396,6 +398,7 @@ func main() {
 		adminManagementService = &iam.AdminManagementService{DB: iamDatabase, Cipher: envelope, Audit: auditStore, SessionCache: sessionCache}
 		if auditStore != nil {
 			go iam.RunAdminAuditOutbox(ctx, iamDatabase, auditStore)
+			go catalog.RunReviewAuditOutbox(ctx, catalogStore, auditStore)
 		}
 		stepUpVerifier = adminStepUpVerifier{tokens: adminTokens}
 		if cfg.RedisURL != "" {
@@ -420,7 +423,7 @@ func main() {
 
 	var orderService *trade.Service
 	if orderAccounts != nil {
-		orderService = trade.NewService(tradeStore, orderAccounts, unavailableOrderCatalog{})
+		orderService = trade.NewService(trade.NewPostgresStore(database), orderAccounts, unavailableOrderCatalog{})
 	}
 	handler := httpx.ETag(server.NewHandlerWithGateway(logger, server.GatewayOptions{
 		AppEnv: cfg.AppEnv,
@@ -452,6 +455,7 @@ func main() {
 		Metrics:             metrics,
 		ErrorReporter:       reporter,
 		Catalog:             catalogService,
+		CatalogReview:       catalogReviewService,
 		Merchants:           directory,
 		Logger:              logger,
 		Login:               loginService,
@@ -471,6 +475,7 @@ func main() {
 		AdminManagement:     adminManagementService,
 		Files:               fileService,
 		Orders:              orderService,
+		AdminOrders:         orderService,
 		Bulkhead:            bulkhead,
 	}, checks...))
 	httpServer := server.NewHTTPServer(cfg.HTTPAddr, handler, cfg.ReadHeaderTimeout, cfg.ReadTimeout, cfg.IdleTimeout)

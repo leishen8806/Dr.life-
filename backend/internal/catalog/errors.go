@@ -4,8 +4,10 @@ import "errors"
 
 // 领域错误：接口层分别映射为 1003 not_found 与 2002 permission_denied。
 var (
-	ErrNotFound  = errors.New("catalog: resource not found")
-	ErrForbidden = errors.New("catalog: merchant cannot modify another merchant product")
+	ErrNotFound                = errors.New("catalog: resource not found")
+	ErrForbidden               = errors.New("catalog: merchant cannot modify another merchant product")
+	ErrInvalidReviewTransition = errors.New("catalog: invalid product review transition")
+	ErrReviewReasonRequired    = errors.New("catalog: review rejection reason is required")
 	// ErrMerchantUnknown 表示 MerchantDirectory 里没有这个商户（未注册或已删除）。
 	ErrMerchantUnknown = errors.New("catalog: merchant is unknown to the directory")
 )
