@@ -27,6 +27,10 @@ type FulfillmentEnqueuer func(context.Context, pgx.Tx, string) (mappingMissing b
 type PostgresStore struct {
 	db          tradeDB
 	fulfillment FulfillmentEnqueuer
+	// NotificationWriter is invoked inside the order transaction before commit.
+	// It is optional so the trade package stays usable in isolated tests and
+	// deployments that have not enabled notification delivery yet.
+	NotificationWriter func(context.Context, pgx.Tx, CreateOrder) error
 }
 
 type EventStore interface {
@@ -41,6 +45,10 @@ func NewPostgresStore(db tradeDB) *PostgresStore { return &PostgresStore{db: db}
 
 func (s *PostgresStore) SetFulfillmentEnqueuer(enqueuer FulfillmentEnqueuer) {
 	s.fulfillment = enqueuer
+}
+
+func (s *PostgresStore) SetNotificationWriter(writer func(context.Context, pgx.Tx, CreateOrder) error) {
+	s.NotificationWriter = writer
 }
 
 func (s *PostgresStore) FindByIdempotency(ctx context.Context, buyerID int64, key, requestHash string) (CreateOrder, bool, error) {
@@ -161,6 +169,13 @@ func (s *PostgresStore) Create(ctx context.Context, idempotencyKey, requestHash 
 			if _, err := tx.Exec(ctx, `INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES ($1,$2,$3,$4,$5)`, merchantOrderID, line.SKUPublicID, line.Quantity, line.UnitPriceE4, line.LineTotalE4); err != nil {
 				return CreateOrder{}, err
 			}
+		}
+	}
+	if s.NotificationWriter != nil {
+		notificationOrder := order
+		notificationOrder.PublicID = parentID
+		if err := s.NotificationWriter(ctx, tx, notificationOrder); err != nil {
+			return CreateOrder{}, err
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {

@@ -27,6 +27,7 @@ import { SuborderDetailView, SuborderListView } from "../orders/suborder-views";
 import type { MerchantSuborder, SuborderStatus } from "../orders/suborders";
 import { createMerchantV4Api } from "../v4/merchant-v4-api";
 import { MerchantV4View } from "../v4/merchant-v4-view";
+import type { createApiClient } from "@drlife/api-client";
 import { MerchantV7View } from "../v7-view";
 
 interface Editing {
@@ -35,7 +36,7 @@ interface Editing {
   draft: ProductDraft;
 }
 
-export function ProductScreen({ api }: { api: MerchantProductApi }) {
+export function ProductScreen({ api, client }: { api: MerchantProductApi; client?: ReturnType<typeof createApiClient> }) {
   const { language, t } = useI18n();
   const [products, setProducts] = useState<Product[]>();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -53,7 +54,14 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
   const [suborderStatus, setSuborderStatus] = useState<SuborderStatus>();
   const [v4Open, setV4Open] = useState(false);
   const [v7Open, setV7Open] = useState(false);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const v4Api = useMemo(() => createMerchantV4Api(), []);
+  useEffect(() => {
+    if (!client) return;
+    void client.GET("/v1/merchant/me/notifications", { params: { query: { limit: 1 } } }).then((result) => {
+      if (result.data?.data) setNotificationUnreadCount(result.data.data.unread_count);
+    }).catch(() => undefined);
+  }, [client]);
 
   const reload = useCallback(async () => {
     setSubordersLoading(true);
@@ -150,11 +158,10 @@ export function ProductScreen({ api }: { api: MerchantProductApi }) {
 
   return (
     <main className="mini-shell">
-      {v7Open ? <MerchantV7View language={language} t={t} onBack={() => setV7Open(false)} /> : v4Open ? <MerchantV4View api={v4Api} language={language} t={t} onBack={() => setV4Open(false)} /> : null}
-      {v7Open || v4Open ? null : <>
+      {v7Open ? <MerchantV7View language={language} t={t} client={client} unreadCount={notificationUnreadCount} onBack={() => setV7Open(false)} /> : v4Open ? <MerchantV4View api={v4Api} language={language} t={t} onBack={() => setV4Open(false)} /> : <>
       <AppHeader slogan={t("brand.slogan")} actions={<>
         <LanguageSwitcher />
-        <NotificationBell label={t("merchant.notificationSettings")} unreadCount={3} onClick={() => setV7Open(true)} />
+        <NotificationBell label={t("merchant.notificationSettings")} unreadCount={notificationUnreadCount} onClick={() => setV7Open(true)} />
         <Button variant="secondary" className="merchant-orders-action" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
         <Button variant="secondary" onClick={() => setV4Open(true)}>{t("merchant.profileLabel")}</Button>
         <Button variant="secondary" className="merchant-v7-action" onClick={() => setV7Open(true)}>{t("merchant.dashboard")}</Button>

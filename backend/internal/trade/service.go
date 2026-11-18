@@ -25,6 +25,13 @@ var (
 type AccountDirectory interface {
 	Status(context.Context, int64) (string, error)
 }
+
+// MerchantOwnerDirectory is the optional IAM adapter used to resolve the
+// account that should receive a merchant-side order notification. The trade
+// package consumes the fact through an interface; it never joins IAM tables.
+type MerchantOwnerDirectory interface {
+	MerchantOwnerAccount(context.Context, int64) (int64, error)
+}
 type Catalog interface {
 	// ResolveAndReserve must resolve current server-side facts and reserve stock
 	// atomically. reservationKey makes retries idempotent; abandoned keys must be
@@ -68,6 +75,7 @@ type OrderReader interface {
 }
 type ChildOrder struct {
 	MerchantID             int64
+	MerchantAccountID      int64
 	MerchantPublicID       string
 	TotalE4                int64
 	GoodsAmountE4          int64
@@ -179,6 +187,15 @@ func (s *Service) place(ctx context.Context, buyer int64, idempotencyKey string,
 		child.TotalE4 += item.LineTotalE4
 		child.GoodsAmountE4 += item.LineTotalE4
 		child.PayableAmountE4 += item.LineTotalE4
+	}
+	if owners, ok := s.accounts.(MerchantOwnerDirectory); ok {
+		for index := range order.Children {
+			accountID, resolveErr := owners.MerchantOwnerAccount(ctx, order.Children[index].MerchantID)
+			if resolveErr != nil {
+				return CreateOrder{}, errors.Join(resolveErr, s.releaseOrQueue(ctx, reservationKey, "merchant_owner_lookup_failed"))
+			}
+			order.Children[index].MerchantAccountID = accountID
+		}
 	}
 	if address.PublicID != "" {
 		for _, child := range order.Children {

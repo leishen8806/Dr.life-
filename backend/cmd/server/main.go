@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -14,7 +15,9 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/jackc/pgx/v5"
+	api "github.com/leishen8806/Dr.life-/backend/internal/api"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/comms/notifications"
 	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
@@ -315,6 +318,8 @@ func main() {
 	var stepUpVerifier gateway.StepUpVerifier
 	var adminStepUpJTIStore gateway.JTIStore
 	var authenticator gateway.Authenticator
+	var notificationService api.NotificationManagement
+	var notificationBotSource *telegram.DBPoolSource
 	checks := []server.ReadinessCheck{database.Ping}
 	if reportReadiness != nil {
 		checks = append(checks, reportReadiness)
@@ -371,9 +376,10 @@ func main() {
 		accountProfileService = &iam.AccountProfileService{DB: iamDatabase}
 		accountLinkService = iam.NewAccountLinkService(iam.PostgresAccountLinkRepository{DB: iamDatabase}, ids.NewULID)
 		consentService = iam.NewConsentService(iam.PostgresConsentRepository{DB: iamDatabase}, nil)
+		notificationBotSource = &telegram.DBPoolSource{DB: iamDatabase, Envelope: envelope, TTL: cfg.BotTokenCacheTTL}
 		loginService = &iam.Service{
 			DB:       iamDatabase,
-			Verifier: telegram.PoolVerifier{Validator: telegram.NewValidator(cfg.TelegramInitDataMaxAge), Source: &telegram.DBPoolSource{DB: iamDatabase, Envelope: envelope, TTL: cfg.BotTokenCacheTTL}},
+			Verifier: telegram.PoolVerifier{Validator: telegram.NewValidator(cfg.TelegramInitDataMaxAge), Source: notificationBotSource},
 			Tokens:   tokens, RefreshTTL: cfg.RefreshTokenTTL, IdleTTL: cfg.SessionIdleTTL, MaxSessions: cfg.SessionMaxPerAccount, SessionCache: sessionCache,
 			Failures: &iam.FailureGuard{Limiter: limiter, Rule: gateway.Rule{Limit: cfg.LoginFailureLimit, Window: cfg.LoginFailureWindow}},
 			Metrics:  metrics.Business(),
@@ -423,7 +429,36 @@ func main() {
 
 	var orderService *trade.Service
 	if orderAccounts != nil {
-		orderService = trade.NewService(trade.NewPostgresStore(database), orderAccounts, unavailableOrderCatalog{})
+		notificationRepo := notifications.NewPostgresRepository(database, func(ctx context.Context, _ int64, end notifications.End) ([]notifications.Bot, error) {
+			if notificationBotSource == nil {
+				return nil, nil
+			}
+			bots, err := notificationBotSource.Bots(ctx, telegram.End(end))
+			if err != nil {
+				return nil, err
+			}
+			result := make([]notifications.Bot, 0, len(bots))
+			for _, bot := range bots {
+				bot.Token.Destroy()
+				result = append(result, notifications.Bot{ID: bot.ID, End: end, Active: true})
+			}
+			return result, nil
+		})
+		notificationService = notificationRepo
+		tradeStore := trade.NewPostgresStore(database)
+		tradeStore.SetNotificationWriter(func(ctx context.Context, tx pgx.Tx, order trade.CreateOrder) error {
+			for _, child := range order.Children {
+				if child.MerchantAccountID <= 0 {
+					continue
+				}
+				eventID := order.PublicID + ":" + strconv.FormatInt(child.MerchantID, 10)
+				if err := notifications.EnqueueTx(ctx, tx, notifications.Event{ID: eventID, AccountID: child.MerchantAccountID, End: notifications.Merchant, Type: notifications.OrderCreated, Title: map[string]string{"zh": "新订单", "en": "New order", "km": "ការបញ្ជាទិញថ្មី"}, Body: map[string]string{"zh": "收到新的买家订单", "en": "A new buyer order was received", "km": "បានទទួលការបញ្ជាទិញថ្មីពីអ្នកទិញ"}}); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		orderService = trade.NewService(tradeStore, orderAccounts, unavailableOrderCatalog{})
 	}
 	handler := httpx.ETag(server.NewHandlerWithGateway(logger, server.GatewayOptions{
 		AppEnv: cfg.AppEnv,
@@ -475,6 +510,7 @@ func main() {
 		AdminManagement:     adminManagementService,
 		Files:               fileService,
 		Orders:              orderService,
+		Notifications:       notificationService,
 		AdminOrders:         orderService,
 		Bulkhead:            bulkhead,
 	}, checks...))

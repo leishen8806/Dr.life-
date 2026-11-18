@@ -12,8 +12,12 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5/pgxpool"
+	commsNotifications "github.com/leishen8806/Dr.life-/backend/internal/comms/notifications"
 	commsTelegram "github.com/leishen8806/Dr.life-/backend/internal/comms/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/files"
+	"github.com/leishen8806/Dr.life-/backend/internal/iam"
+	iamTelegram "github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/logistics"
 	"github.com/leishen8806/Dr.life-/backend/internal/logistics/routefit"
@@ -24,6 +28,7 @@ import (
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/opsalert"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/queue/outbox"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/storage"
 	"github.com/redis/go-redis/v9"
 )
@@ -48,6 +53,17 @@ func main() {
 		os.Exit(1)
 	}
 	defer database.Close()
+	notificationIAMDatabase := database
+	if cfg.IAMDatabaseURL != "" && cfg.IAMDatabaseURL != cfg.DatabaseURL {
+		iamCfg := cfg
+		iamCfg.DatabaseURL = cfg.IAMDatabaseURL
+		notificationIAMDatabase, err = observability.NewDatabasePool(ctx, iamCfg, nil, logger)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "IAM database configuration error:", err)
+			os.Exit(1)
+		}
+		defer notificationIAMDatabase.Close()
+	}
 	if err := queue.QueueRedisPolicy(ctx, cfg.QueueRedisURL, cfg.QueueAllowEviction); err != nil {
 		fmt.Fprintln(os.Stderr, "queue Redis configuration error:", err)
 		os.Exit(1)
@@ -118,6 +134,11 @@ func main() {
 			}
 		}()
 	}
+	notificationWorker, err := buildNotificationWorker(cfg, database, notificationIAMDatabase, logger)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "notification worker configuration error:", err)
+		os.Exit(1)
+	}
 	worker, err := queue.NewWorker(cfg.QueueRedisURL, registry, queue.WorkerOptions{ShutdownTimeout: cfg.ShutdownTimeout, Logger: logger, Observer: queueMetrics})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "worker configuration error:", err)
@@ -177,6 +198,9 @@ func main() {
 		fmt.Fprintln(os.Stderr, "worker start error:", err)
 		os.Exit(1)
 	}
+	if notificationWorker != nil {
+		go runNotificationWorker(ctx, notificationWorker, logger)
+	}
 	relayDone := make(chan error, 1)
 	go func() { relayDone <- relay.Run(ctx) }()
 	select {
@@ -188,6 +212,69 @@ func main() {
 		}
 		logger.Error("outbox relay stopped", "error", relayErr)
 		os.Exit(relayExitCode(relayErr))
+	}
+}
+
+func buildNotificationWorker(cfg config.Config, database, iamDatabase *pgxpool.Pool, logger *slog.Logger) (*commsNotifications.Worker, error) {
+	if !cfg.JWTSigningConfigured {
+		return nil, nil
+	}
+	masterKeys, err := secrets.LoadFromEnvironment()
+	if err != nil {
+		return nil, fmt.Errorf("bot token configuration: %w", err)
+	}
+	envelope, err := secrets.NewEnvelope(masterKeys)
+	if err != nil {
+		return nil, fmt.Errorf("bot token encryption configuration: %w", err)
+	}
+	source := &iamTelegram.DBPoolSource{DB: iamDatabase, Envelope: envelope, TTL: cfg.BotTokenCacheTTL}
+	accountDirectory := iam.AccountDirectory{DB: iamDatabase}
+	repo := commsNotifications.NewPostgresRepository(database, func(ctx context.Context, _ int64, end commsNotifications.End) ([]commsNotifications.Bot, error) {
+		bots, err := source.Bots(ctx, iamTelegram.End(end))
+		if err != nil {
+			return nil, err
+		}
+		result := make([]commsNotifications.Bot, 0, len(bots))
+		for _, bot := range bots {
+			bot.Token.Destroy()
+			result = append(result, commsNotifications.Bot{ID: bot.ID, End: end, Active: true})
+		}
+		return result, nil
+	})
+	sender := commsTelegram.NewHTTPSender("https://api.telegram.org", iamTelegram.AnyPoolTokenProvider{Source: source}, commsTelegram.SenderOptions{})
+	return &commsNotifications.Worker{
+		Repo: repo, Inbox: repo, Telegram: commsNotifications.TelegramDeliveryWriter{
+			Sender: sender,
+			ChatID: func(ctx context.Context, accountID int64) (int64, error) {
+				return accountDirectory.TelegramChatID(ctx, accountID)
+			},
+			DeepLink: func(event commsNotifications.Event) string {
+				username := os.Getenv("TELEGRAM_BUYER_BOT_USERNAME")
+				if event.End == commsNotifications.Merchant {
+					username = os.Getenv("TELEGRAM_MERCHANT_BOT_USERNAME")
+				}
+				link, err := commsNotifications.StartAppLink(username, event.ID)
+				if err != nil {
+					return ""
+				}
+				return link
+			},
+		}, MaxAttempts: 8,
+	}, nil
+}
+
+func runNotificationWorker(ctx context.Context, worker *commsNotifications.Worker, logger *slog.Logger) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if _, err := worker.RunOnce(ctx); err != nil {
+				logger.Error("notification worker iteration failed", "error", err)
+			}
+		}
 	}
 }
 

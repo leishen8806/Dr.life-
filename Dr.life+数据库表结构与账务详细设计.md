@@ -909,6 +909,16 @@ create table audit.log (
 
 ---
 
+## 十-A、通知（V9 C1）
+
+通知写入属于业务事务的一部分：业务侧只写 `comms.notification_outbox`，由 worker 在事务提交后创建站内信并按收件人端选择 Telegram Bot。事件按 `(event_id, account_id, end_name)` 去重，同一事件可以分别通知买家与商家；`comms.notification` 以 `(account_id, event_id)` 再次兜底。`comms.notification_setting` 按事件类型分别控制站内信与 Telegram，缺少对应端可用 Bot 时保留站内信并记录未发送原因。提现到账与结算到账本版本只登记事件类型，不触发发送。
+
+三张表与迁移 `00065_comms_notifications.sql` 对齐：
+
+- `comms.notification`：`id` 自增主键；`public_id` ULID 唯一；`event_id` 业务事件标识；`account_id` 外键指向 `iam.account`；`event_type` 事件类型；`title` / `body` 三语 JSONB；`read_at` 可空已读时间；`created_at` 创建时间；唯一约束 `(account_id, event_id)`，并按 `(account_id, id DESC)` 建列表与未读部分索引。
+- `comms.notification_setting`：`account_id` 外键、`event_type` 组成主键；`in_app_enabled` 与 `telegram_enabled` 默认开启；`updated_at` 更新时间。设置属于收件人账号，不跨账号共享。
+- `comms.notification_outbox`：`id` 自增主键；`event_id`、`account_id`、`end_name`、`event_type` 与 `payload` 记录事务提交后的事件；`attempts`、`next_attempt_at`、`last_error`、`dead_lettered_at`、`delivered_at` 记录重试与死信；唯一约束 `(event_id, account_id, end_name)`，待处理索引过滤已投递和死信行。
+
 ## 十一、测试清单（账务必须全部通过才能上线）
 
 | 类别 | 用例 |

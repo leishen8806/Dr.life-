@@ -483,6 +483,140 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/me/notifications:
+    get:
+      tags: [buyer]
+      operationId: listBuyerMeNotifications
+      summary: List notifications for the current buyer
+      x-roles: [buyer]
+      parameters:
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        "200": { $ref: "#/components/responses/NotificationListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/notifications:
+    get:
+      tags: [merchant]
+      operationId: listMerchantMeNotifications
+      summary: List notifications for the current merchant
+      x-roles: [merchant]
+      parameters:
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        "200": { $ref: "#/components/responses/NotificationListSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/me/notifications/{public_id}/read:
+    post:
+      tags: [buyer]
+      operationId: markBuyerMeNotificationRead
+      summary: Mark one buyer notification as read
+      x-roles: [buyer]
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      responses:
+        "200": { $ref: "#/components/responses/NotificationMutationSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/notifications/{public_id}/read:
+    post:
+      tags: [merchant]
+      operationId: markMerchantMeNotificationRead
+      summary: Mark one merchant notification as read
+      x-roles: [merchant]
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      responses:
+        "200": { $ref: "#/components/responses/NotificationMutationSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/me/notifications/read-all:
+    post:
+      tags: [buyer]
+      operationId: markBuyerMeNotificationsReadAll
+      summary: Mark all buyer notifications as read
+      x-roles: [buyer]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { $ref: "#/components/responses/NotificationMutationSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/notifications/read-all:
+    post:
+      tags: [merchant]
+      operationId: markMerchantMeNotificationsReadAll
+      summary: Mark all merchant notifications as read
+      x-roles: [merchant]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { $ref: "#/components/responses/NotificationMutationSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/buyer/me/notification-settings:
+    get:
+      tags: [buyer]
+      operationId: listBuyerMeNotificationSettings
+      summary: List buyer notification settings
+      x-roles: [buyer]
+      responses:
+        "200": { $ref: "#/components/responses/NotificationSettingsSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    put:
+      tags: [buyer]
+      operationId: putBuyerMeNotificationSetting
+      summary: Update one buyer notification setting
+      x-roles: [buyer]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/NotificationSettingUpdateRequest"}}}
+      responses:
+        "200": { $ref: "#/components/responses/NotificationSettingsSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+  /v1/merchant/me/notification-settings:
+    get:
+      tags: [merchant]
+      operationId: listMerchantMeNotificationSettings
+      summary: List merchant notification settings
+      x-roles: [merchant]
+      responses:
+        "200": { $ref: "#/components/responses/NotificationSettingsSucceeded" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
+    put:
+      tags: [merchant]
+      operationId: putMerchantMeNotificationSetting
+      summary: Update one merchant notification setting
+      x-roles: [merchant]
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/NotificationSettingUpdateRequest"}}}
+      responses:
+        "200": { $ref: "#/components/responses/NotificationSettingsSucceeded" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalServerError" }
   /v1/driver/me:
     get:
       tags: [driver]
@@ -1972,6 +2106,71 @@ components:
         lang:
           type: string
           enum: [zh, en, km]
+    Notification:
+      type: object
+      additionalProperties: false
+      required: [public_id, event_id, event_type, title, body, read_at, created_at]
+      properties:
+        public_id: {type: string}
+        event_id: {type: string}
+        event_type: {type: string}
+        title: {$ref: "#/components/schemas/Messages"}
+        body: {$ref: "#/components/schemas/Messages"}
+        read_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+    NotificationListData:
+      type: object
+      additionalProperties: false
+      required: [items, unread_count]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/Notification"}}
+        unread_count: {type: integer, format: int32, minimum: 0}
+    NotificationListSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/NotificationListData"}
+        request_id: {type: string, minLength: 1}
+    NotificationMutationData:
+      type: object
+      additionalProperties: false
+      required: [updated]
+      properties:
+        updated: {type: boolean, enum: [true]}
+    NotificationMutationSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/NotificationMutationData"}
+        request_id: {type: string, minLength: 1}
+    NotificationSetting:
+      type: object
+      additionalProperties: false
+      required: [event_type, in_app_enabled, telegram_enabled]
+      properties:
+        event_type: {type: string}
+        in_app_enabled: {type: boolean}
+        telegram_enabled: {type: boolean}
+    NotificationSettingUpdateRequest:
+      allOf: [{$ref: "#/components/schemas/NotificationSetting"}]
+    NotificationSettingsData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/NotificationSetting"}}
+    NotificationSettingsSuccessResponse:
+      type: object
+      additionalProperties: false
+      required: [ok, data, request_id]
+      properties:
+        ok: {type: boolean, enum: [true]}
+        data: {$ref: "#/components/schemas/NotificationSettingsData"}
+        request_id: {type: string, minLength: 1}
     AccountProfileData:
       type: object
       additionalProperties: false
@@ -3062,6 +3261,33 @@ components:
         data: {$ref: "#/components/schemas/LedgerReadData"}
         request_id: {type: string, minLength: 1}
   responses:
+    NotificationListSucceeded:
+      description: Notifications for the authenticated account.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/NotificationListData"}
+    NotificationMutationSucceeded:
+      description: Notification mutation completed.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/NotificationMutationData"}
+    NotificationSettingsSucceeded:
+      description: Notification settings for the authenticated account.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/NotificationSettingsData"}
     ConsentStatusSucceeded:
       description: Consent state for every current legal document.
       content:

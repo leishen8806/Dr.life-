@@ -70,6 +70,7 @@ type GatewayOptions struct {
 	AdminManagement     api.AdminManagement
 	Files               api.FileManagement
 	Orders              api.OrderManagement
+	Notifications       api.NotificationManagement
 	AdminOrders         api.AdminOrderReader
 	AdminStepUpVerifier gateway.StepUpVerifier
 	AdminStepUpJTIStore gateway.JTIStore
@@ -141,7 +142,7 @@ func NewHandlerWithGateway(logger *slog.Logger, options GatewayOptions, checks .
 	if auditWriter == nil {
 		auditWriter = options.Audit
 	}
-	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, CatalogReview: options.CatalogReview, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, AdminLogin: options.AdminLogin, AdminStepUp: options.AdminStepUp, AdminPassword: options.AdminPassword, Sessions: options.Sessions, AccountProfiles: options.AccountProfiles, AccountLinks: options.AccountLinks, Consents: options.Consents, ClientIP: options.ClientIP, Audit: options.Audit, AuditWriter: auditWriter, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions, Files: options.Files, AdminManagement: options.AdminManagement, Orders: options.Orders, AdminOrders: options.AdminOrders}, router)
+	gen.HandlerFromMux(api.Handler{Catalog: options.Catalog, CatalogReview: options.CatalogReview, Merchants: options.Merchants, Logger: options.Logger, Login: options.Login, AdminLogin: options.AdminLogin, AdminStepUp: options.AdminStepUp, AdminPassword: options.AdminPassword, Sessions: options.Sessions, AccountProfiles: options.AccountProfiles, AccountLinks: options.AccountLinks, Consents: options.Consents, ClientIP: options.ClientIP, Audit: options.Audit, AuditWriter: auditWriter, Ledger: options.Ledger, Directory: options.Directory, AdminPermissions: options.AdminPermissions, Files: options.Files, AdminManagement: options.AdminManagement, Orders: options.Orders, Notifications: options.Notifications, AdminOrders: options.AdminOrders}, router)
 	if options.RouteFit != nil {
 		router.Post(routeFitEventsPath, options.RouteFit.ServeHTTP)
 	}
