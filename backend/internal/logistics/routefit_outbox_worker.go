@@ -23,11 +23,13 @@ type fulfillmentOutboxRow struct {
 // FulfillmentOutboxWorker drains the durable command table without holding a
 // database transaction across the external RouteFit request.
 type FulfillmentOutboxWorker struct {
-	DB         *pgxpool.Pool
-	Client     *routefit.Client
-	BatchSize  int
-	RetryDelay time.Duration
-	Now        func() time.Time
+	DB          *pgxpool.Pool
+	Client      *routefit.Client
+	BatchSize   int
+	Lease       time.Duration
+	MaxAttempts int
+	RetryDelay  time.Duration
+	Now         func() time.Time
 }
 
 func (w FulfillmentOutboxWorker) RunOnce(ctx context.Context) error {
@@ -38,12 +40,32 @@ func (w FulfillmentOutboxWorker) RunOnce(ctx context.Context) error {
 	if batchSize <= 0 {
 		batchSize = 20
 	}
+	lease := w.Lease
+	if lease <= 0 {
+		lease = 15 * time.Minute
+	}
+	maxAttempts := w.MaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = 5
+	}
 	now := time.Now().UTC()
 	if w.Now != nil {
 		now = w.Now().UTC()
 	}
 	tx, err := w.DB.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE logistics.fulfillment_outbox
+		SET status='retry', next_attempt_at=clock_timestamp(), updated_at=clock_timestamp()
+		WHERE status='processing' AND updated_at < clock_timestamp() - ($1 * interval '1 second')`, lease.Seconds()); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE logistics.fulfillment_outbox
+		SET status='exception', last_error_code='MAX_ATTEMPTS_EXCEEDED', updated_at=clock_timestamp()
+		WHERE status IN ('pending','retry') AND attempts >= $1`, maxAttempts); err != nil {
+		_ = tx.Rollback(ctx)
 		return err
 	}
 	rows, err := tx.Query(ctx, `
@@ -100,6 +122,10 @@ func (w FulfillmentOutboxWorker) RunOnce(ctx context.Context) error {
 			} else {
 				code = "DELIVERY_FAILED"
 			}
+		}
+		if deliveryErr != nil && row.Attempts+1 >= maxAttempts {
+			action = DeliveryException
+			code = "MAX_ATTEMPTS_EXCEEDED"
 		}
 		if err := w.finish(ctx, row.ID, action, code, result.FulfillmentID); err != nil {
 			return err

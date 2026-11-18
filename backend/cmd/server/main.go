@@ -148,6 +148,7 @@ func main() {
 	go brownout.Run(ctx, cfg.BrownoutSampleInterval)
 	directory := catalogDirectory{db: database}
 	catalogService := catalog.New(catalog.NewPgStore(database), catalog.Options{Merchants: directory})
+	tradeStore := trade.NewPostgresStore(database)
 	routeFitReceiver := logistics.RouteFitReceiver{
 		Verifier: logistics.RouteFitWebhookVerifier{Secrets: logistics.RouteFitSecrets(cfg.RouteFitEventSecrets)},
 		Record: func(r *http.Request, event logistics.RouteFitEvent, body []byte) error {
@@ -165,7 +166,9 @@ func main() {
 					if err != nil {
 						return err
 					}
-					return logistics.ApplyFulfillmentUpdateTx(ctx, tx, update, received.EventID)
+					return logistics.ApplyFulfillmentUpdateTx(ctx, tx, update, received.EventID, func(ctx context.Context, tx pgx.Tx, update logistics.FulfillmentUpdate, sourceRef string) error {
+						return tradeStore.ApplyFulfillmentEventTx(ctx, tx, update.ExternalOrderID, update.State, sourceRef)
+					})
 				}
 			}
 			return recorder.Record(r.Context(), event, body)
@@ -409,7 +412,7 @@ func main() {
 
 	var orderService *trade.Service
 	if orderAccounts != nil {
-		orderService = trade.NewService(trade.NewPostgresStore(database), orderAccounts, unavailableOrderCatalog{})
+		orderService = trade.NewService(tradeStore, orderAccounts, unavailableOrderCatalog{})
 	}
 	handler := httpx.ETag(server.NewHandlerWithGateway(logger, server.GatewayOptions{
 		AppEnv: cfg.AppEnv,

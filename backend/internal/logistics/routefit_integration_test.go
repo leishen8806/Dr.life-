@@ -158,6 +158,60 @@ func TestFulfillmentOutboxWorkerDispatchesRouteFitMock(t *testing.T) {
 	if fulfillmentCount != 1 {
 		t.Fatalf("outbox rows=%d, want 1", fulfillmentCount)
 	}
+
+	recoveredCommand := command
+	recoveredCommand.ExternalOrderID = "order-outbox-recovered"
+	tx, err = e.pool.Begin(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := EnqueueFulfillmentTx(e.ctx, tx, recoveredCommand); err != nil {
+		_ = tx.Rollback(e.ctx)
+		t.Fatal(err)
+	}
+	if err := tx.Commit(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.pool.Exec(e.ctx, `UPDATE logistics.fulfillment_outbox SET status='processing', attempts=1, updated_at=clock_timestamp()-interval '1 hour' WHERE external_order_id=$1`, recoveredCommand.ExternalOrderID); err != nil {
+		t.Fatal(err)
+	}
+	if err := worker.RunOnce(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.pool.QueryRow(e.ctx, `SELECT status, attempts FROM logistics.fulfillment_outbox WHERE external_order_id=$1`, recoveredCommand.ExternalOrderID).Scan(&status, &attempts); err != nil {
+		t.Fatal(err)
+	}
+	if status != "delivered" || attempts != 2 {
+		t.Fatalf("recovered outbox status=%q attempts=%d", status, attempts)
+	}
+
+	maxAttemptCommand := command
+	maxAttemptCommand.ExternalOrderID = "order-outbox-max-attempts"
+	tx, err = e.pool.Begin(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := EnqueueFulfillmentTx(e.ctx, tx, maxAttemptCommand); err != nil {
+		_ = tx.Rollback(e.ctx)
+		t.Fatal(err)
+	}
+	if err := tx.Commit(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	mock.SetFault(routefitmock.Fault{Status: 500, Count: 5})
+	maxAttemptWorker := worker
+	maxAttemptWorker.MaxAttempts = 1
+	if err := maxAttemptWorker.RunOnce(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	mock.SetFault(routefitmock.Fault{})
+	var errorCode string
+	if err := e.pool.QueryRow(e.ctx, `SELECT status, last_error_code FROM logistics.fulfillment_outbox WHERE external_order_id=$1`, maxAttemptCommand.ExternalOrderID).Scan(&status, &errorCode); err != nil {
+		t.Fatal(err)
+	}
+	if status != "exception" || errorCode != "MAX_ATTEMPTS_EXCEEDED" {
+		t.Fatalf("max-attempt outbox status=%q error=%q", status, errorCode)
+	}
 }
 
 func TestRouteFitEventRecorderAcceptsOnlyOneConcurrentFirstAggregateVersion(t *testing.T) {

@@ -83,27 +83,16 @@ func ClassifyDeliveryError(err error) DeliveryAction {
 	return DeliveryException
 }
 
-// ApplyFulfillmentUpdateTx advances the merchant order from a verified
-// RouteFit event. The source row and transition event are written before the
-// status update so the existing order trigger can enforce allowed transitions.
-func ApplyFulfillmentUpdateTx(ctx context.Context, tx pgx.Tx, update FulfillmentUpdate, sourceRef string) error {
-	if tx == nil || strings.TrimSpace(update.ExternalOrderID) == "" || strings.TrimSpace(sourceRef) == "" {
-		return errors.New("routefit fulfillment update requires transaction and source")
+// FulfillmentEventApplier is implemented by the trade module. Keeping the
+// transaction callback here makes the inbox receipt atomic without letting
+// logistics query or mutate trade-owned tables.
+type FulfillmentEventApplier func(context.Context, pgx.Tx, FulfillmentUpdate, string) error
+
+// ApplyFulfillmentUpdateTx advances the merchant order through the trade
+// adapter from a verified RouteFit event.
+func ApplyFulfillmentUpdateTx(ctx context.Context, tx pgx.Tx, update FulfillmentUpdate, sourceRef string, applier FulfillmentEventApplier) error {
+	if tx == nil || strings.TrimSpace(update.ExternalOrderID) == "" || strings.TrimSpace(sourceRef) == "" || applier == nil {
+		return errors.New("routefit fulfillment update requires transaction, source, and trade adapter")
 	}
-	var merchantOrderID, buyerOrderID int64
-	var current string
-	if err := tx.QueryRow(ctx, `SELECT id, buyer_order_id, status FROM trade.merchant_order WHERE external_order_id=$1 FOR UPDATE`, update.ExternalOrderID).Scan(&merchantOrderID, &buyerOrderID, &current); err != nil {
-		return err
-	}
-	if current == update.State {
-		return nil
-	}
-	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event_source (buyer_order_id, source_type, source_ref) VALUES ($1, 'routefit_event', $2) ON CONFLICT DO NOTHING`, buyerOrderID, sourceRef); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id, buyer_order_id, from_status, to_status, source_type, source_ref) VALUES ($1, $2, $3, $4, 'routefit_event', $5) ON CONFLICT DO NOTHING`, merchantOrderID, buyerOrderID, current, update.State, sourceRef); err != nil {
-		return err
-	}
-	_, err := tx.Exec(ctx, `UPDATE trade.merchant_order SET status=$1, version=version+1, updated_at=clock_timestamp() WHERE id=$2 AND status=$3`, update.State, merchantOrderID, current)
-	return err
+	return applier(ctx, tx, update, sourceRef)
 }

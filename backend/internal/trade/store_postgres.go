@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -433,6 +434,64 @@ func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from
 		return false, err
 	}
 	return true, tx.Commit(ctx)
+}
+
+// ApplyFulfillmentEventTx applies a verified RouteFit transition inside the
+// caller-owned inbox transaction. Trade owns the status machine and all trade
+// table writes; logistics only supplies the projected event values.
+func (s *PostgresStore) ApplyFulfillmentEventTx(ctx context.Context, tx pgx.Tx, externalOrderID, state, sourceRef string) error {
+	if tx == nil || strings.TrimSpace(externalOrderID) == "" || strings.TrimSpace(sourceRef) == "" {
+		return ErrEventSourceRequired
+	}
+	target := OrderStatus(state)
+	var merchantOrderID, buyerOrderID int64
+	var current string
+	if err := tx.QueryRow(ctx, `SELECT id, buyer_order_id, status FROM trade.merchant_order WHERE external_order_id=$1 FOR UPDATE`, externalOrderID).Scan(&merchantOrderID, &buyerOrderID, &current); err != nil {
+		return err
+	}
+	source := EventSource{Type: SourceRouteFitEvent, Reference: sourceRef}
+	if _, err := Advance(OrderStatus(current), target, source); err != nil {
+		return err
+	}
+	var refundRequired, reservationCommitted bool
+	if err := tx.QueryRow(ctx, `SELECT refund_required_at IS NOT NULL,reservation_committed_at IS NOT NULL FROM trade.buyer_order WHERE id=$1 FOR UPDATE`, buyerOrderID).Scan(&refundRequired, &reservationCommitted); err != nil {
+		return err
+	}
+	if refundRequired && OrderStatus(current) == Paid && target == Submitted {
+		return ErrReservationReleased
+	}
+	if !reservationCommitted && OrderStatus(current) == Paid && target == Submitted {
+		return ErrInvalidTransition
+	}
+	var seenFrom, seenTo string
+	err := tx.QueryRow(ctx, `SELECT from_status,to_status FROM trade.order_event WHERE merchant_order_id=$1 AND source_type=$2 AND source_ref=$3`, merchantOrderID, string(source.Type), source.Reference).Scan(&seenFrom, &seenTo)
+	if err == nil {
+		if OrderStatus(seenFrom) == OrderStatus(current) && OrderStatus(seenTo) == target {
+			return nil
+		}
+		return ErrInvalidTransition
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	if OrderStatus(current) == target {
+		return nil
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref) VALUES ($1,$2,$3) ON CONFLICT (source_type,source_ref) DO NOTHING`, buyerOrderID, string(source.Type), source.Reference); err != nil {
+		return err
+	}
+	var sourceBuyerOrderID int64
+	if err := tx.QueryRow(ctx, `SELECT buyer_order_id FROM trade.order_event_source WHERE source_type=$1 AND source_ref=$2`, string(source.Type), source.Reference).Scan(&sourceBuyerOrderID); err != nil {
+		return err
+	}
+	if sourceBuyerOrderID != buyerOrderID {
+		return ErrInvalidTransition
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) VALUES ($1,$2,$3,$4,$5,$6)`, merchantOrderID, buyerOrderID, current, target, string(source.Type), source.Reference); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `UPDATE trade.merchant_order SET status=$2,version=version+1,updated_at=clock_timestamp() WHERE id=$1 AND status=$3`, merchantOrderID, string(target), current)
+	return err
 }
 
 // ConfirmPayment delegates the parent-wide payment transition to the only
