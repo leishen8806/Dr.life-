@@ -1671,7 +1671,7 @@ func assertTransitionMatrix(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 	t.Helper()
 	statuses := []OrderStatus{AwaitingPayment, Paid, Submitted, Accepted, InFulfillment, Shipped, DeliveredVerified, Settled, Rejected, Cancelled, DeliveryFailed, Returning, Returned, Exception}
 	allowed := map[[2]OrderStatus]bool{
-		{Paid, Submitted}: true, {Submitted, Accepted}: true, {Submitted, Rejected}: true,
+		{Paid, Submitted}: true, {Paid, Exception}: true, {Submitted, Accepted}: true, {Submitted, Rejected}: true,
 		{Accepted, InFulfillment}: true, {InFulfillment, Shipped}: true,
 		{Shipped, DeliveredVerified}: true, {DeliveredVerified, Settled}: true,
 	}
