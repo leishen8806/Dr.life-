@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
 	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
@@ -150,7 +151,24 @@ func main() {
 	routeFitReceiver := logistics.RouteFitReceiver{
 		Verifier: logistics.RouteFitWebhookVerifier{Secrets: logistics.RouteFitSecrets(cfg.RouteFitEventSecrets)},
 		Record: func(r *http.Request, event logistics.RouteFitEvent, body []byte) error {
-			return (logistics.RouteFitEventRecorder{DB: database}).Record(r.Context(), event, body)
+			recorder := logistics.RouteFitEventRecorder{
+				DB:       database,
+				Handlers: map[string]logistics.RouteFitEventHandler{},
+			}
+			for _, eventType := range []string{
+				"fulfillment.accepted", "fulfillment.rejected", "fulfillment.picked", "fulfillment.packed",
+				"fulfillment.shipped", "fulfillment.delivery_reported", "fulfillment.delivered_verified",
+				"fulfillment.delivery_failed", "fulfillment.cancelled", "fulfillment.returned",
+			} {
+				recorder.Handlers[eventType] = func(ctx context.Context, tx pgx.Tx, received logistics.RouteFitEvent) error {
+					update, err := logistics.ProjectRouteFitEvent(received, time.Now().UTC(), 24*time.Hour)
+					if err != nil {
+						return err
+					}
+					return logistics.ApplyFulfillmentUpdateTx(ctx, tx, update, received.EventID)
+				}
+			}
+			return recorder.Record(r.Context(), event, body)
 		},
 	}
 	var auditStore *platformaudit.Store
