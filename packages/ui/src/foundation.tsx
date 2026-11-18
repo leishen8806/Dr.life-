@@ -102,17 +102,20 @@ export function NotificationBell({
   label,
   unreadCount,
   onClick,
-  className
+  className,
+  testId
 }: {
   label: string;
   unreadCount: number;
   onClick: () => void;
   className?: string;
+  testId?: string;
 }) {
   return (
     <button
       type="button"
       className={['drl-notification-bell', className].filter(Boolean).join(' ')}
+      data-testid={testId}
       aria-label={label}
       onClick={onClick}
     >
@@ -121,6 +124,36 @@ export function NotificationBell({
       </svg>
       {unreadCount > 0 && <span className="drl-notification-bell__badge">{unreadCount}</span>}
     </button>
+  );
+}
+
+export function Switch({
+  checked,
+  onChange,
+  label,
+  disabled = false
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      className="drl-switch"
+      aria-label={label}
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onChange(!checked);
+        }
+      }}
+    />
   );
 }
 
@@ -327,11 +360,11 @@ export function ConfirmDialog({
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "text";
 
-export function Button({ children, variant = "primary", loading = false, disabled = false, type = "button", onClick, className, ariaPressed, ariaLabel, title, lang }: {
+export function Button({ children, variant = "primary", loading = false, disabled = false, type = "button", onClick, className, ariaPressed, ariaLabel, title, lang, testId }: {
   children: ReactNode; variant?: ButtonVariant; loading?: boolean; disabled?: boolean;
-  type?: "button" | "submit" | "reset"; onClick?: () => void; className?: string; ariaPressed?: boolean; ariaLabel?: string; title?: string; lang?: string;
+  type?: "button" | "submit" | "reset"; onClick?: () => void; className?: string; ariaPressed?: boolean; ariaLabel?: string; title?: string; lang?: string; testId?: string;
 }) {
-  return <button type={type} className={["drl-button", `drl-button--${variant}`, className].filter(Boolean).join(" ")} lang={lang} disabled={disabled || loading} aria-busy={loading || undefined} aria-pressed={ariaPressed} aria-label={ariaLabel} title={title} onClick={onClick}>{children}</button>;
+  return <button type={type} className={["drl-button", `drl-button--${variant}`, className].filter(Boolean).join(" ")} data-testid={testId} lang={lang} disabled={disabled || loading} aria-busy={loading || undefined} aria-pressed={ariaPressed} aria-label={ariaLabel} title={title} onClick={onClick}>{children}</button>;
 }
 
 export function FormField({ label, error, children }: { label: string; error?: string; children: ReactNode }) {

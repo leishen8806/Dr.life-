@@ -22,6 +22,7 @@ export {
   parseMoneyE4,
   Skeleton,
   StatusTag,
+  Switch,
   Stepper,
   Tabs,
   TieredPrice,

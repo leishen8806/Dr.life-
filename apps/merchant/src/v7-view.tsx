@@ -15,7 +15,7 @@ const profileEntries = ["finance", "employeeManagement", "aiAssistant", "adverti
 
 export function MerchantV7View({ language, t, onBack, client, unreadCount = 0 }: { language: Language; t: Translate; onBack: () => void; client?: ReturnType<typeof createApiClient>; unreadCount?: number }) {
   const [page, setPage] = useState<"dashboard" | "profile" | "import" | "notifications" | "onboarding">("dashboard");
-  const NotificationBell = (props: { label: string; unreadCount?: number; onClick: () => void }) => <BaseNotificationBell {...props} unreadCount={unreadCount} />;
+  const NotificationBell = (props: { label: string; unreadCount?: number; onClick: () => void }) => <BaseNotificationBell {...props} testId="merchant-notifications" unreadCount={unreadCount} />;
   if (page === "profile") return <ProfilePage t={t} onBack={() => setPage("dashboard")} onOnboarding={() => setPage("onboarding")} />;
   if (page === "import") return <ImportPage t={t} onBack={() => setPage("dashboard")} />;
   if (page === "notifications") return <MerchantV7NotificationSettings client={client} language={language} t={t} onBack={() => setPage("dashboard")} />;

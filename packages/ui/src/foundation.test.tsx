@@ -18,6 +18,7 @@ import {
   ProductCard,
   Skeleton,
   StatusTag,
+  Switch,
   Stepper,
   Tabs,
   TieredPrice,
@@ -67,6 +68,11 @@ describe("foundation components", () => {
     expect(Toast({ children: "Saved" }).props.role).toBe("status");
     expect(Skeleton({}).props["aria-hidden"]).toBe("true");
     expect(Badge({ children: "New" }).props.className).toBe("drl-badge");
+    const toggle = Switch({ checked: false, label: "Telegram", onChange: click });
+    expect(toggle.props.role).toBe("switch");
+    expect(toggle.props["aria-checked"]).toBe(false);
+    toggle.props.onKeyDown({ key: "Enter", preventDefault: vi.fn() });
+    expect(click).toHaveBeenCalledWith(true);
   });
 
   it("renders the reusable shell with accessible navigation and snapshots", () => {
@@ -119,5 +125,11 @@ describe("foundation components", () => {
       ".drl-list-item small",
       ".drl-list-item__trailing"
     ].forEach((selector) => expectWrappingRule(styles, selector));
+  });
+
+  it("keeps Khmer heading scale independent from body copy", () => {
+    const styles = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+    expect(styles).toContain(":lang(km) :where(p, li, small, label, dt, dd, button, input, textarea, select)");
+    expect(styles).not.toMatch(/:lang\(km\) h1[\s\S]{0,160}font-size:/);
   });
 });

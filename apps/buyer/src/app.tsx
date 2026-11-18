@@ -487,8 +487,8 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       <Button variant="secondary" className="buyer-profile-action" onClick={openProfile}>
         {t("nav.profile")}
       </Button>
-      <Button variant="secondary" className="buyer-decor-action" onClick={openDecor}>{t("buyer.findDecor")}</Button>
-      <NotificationBell label={t("buyer.notifications")} unreadCount={notificationUnreadCount} onClick={openNotifications} className="buyer-notifications-bell" />
+      <Button variant="secondary" testId="buyer-decor" className="buyer-decor-action" onClick={openDecor}>{t("buyer.findDecor")}</Button>
+      <NotificationBell testId="buyer-notifications" label={t("buyer.notifications")} unreadCount={notificationUnreadCount} onClick={openNotifications} className="buyer-notifications-bell" />
     </>
   );
   const knownCategories = categories.status === "ready" ? categories.value : [];
