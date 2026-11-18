@@ -1,4 +1,4 @@
-head=f3fb4fd3b62bdf16748253f7297ca69cf630b5d5
+head=e04b6b62c7904ece4371938d4fd47370ecda052e
 1440/zh/login.png
 1440/zh/administrators.png
 1440/zh/audit.png

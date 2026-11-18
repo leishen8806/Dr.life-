@@ -1,3 +1,4 @@
+head=e04b6b62c7904ece4371938d4fd47370ecda052e
 360/zh/home.png	/?lang=zh
 360/zh/merchant.png	/merchant/?lang=zh
 360/en/home.png	/en/?lang=en
