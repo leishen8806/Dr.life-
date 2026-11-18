@@ -197,6 +197,35 @@ body {
   gap: var(--drl-space-2);
 }
 
+.drl-notification-bell {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--drl-color-border);
+  border-radius: 999px;
+  color: var(--drl-color-text);
+  background: var(--drl-color-surface);
+}
+
+.drl-notification-bell__badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  color: var(--drl-color-text-on-brand);
+  background: var(--drl-color-danger);
+  font-size: 11px;
+  line-height: 1;
+}
+
 .drl-bottom-navigation {
   display: flex;
   justify-content: space-around;
