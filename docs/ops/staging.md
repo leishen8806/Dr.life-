@@ -177,6 +177,24 @@ health, worker logs, Redis disk/AOF health, and PostgreSQL backup freshness.
 Do not paste credentials, tunnel tokens, customer data, or server addresses in
 logs or issues. Escalate incidents to `leishen8806`.
 
+### 登记 Telegram Bot
+
+After the first super administrator exists, register the buyer and merchant
+BotFather usernames from the staging project directory. The token is read from
+standard input only; the script does not accept it as an argument or
+environment variable, and does not print it. Use a 1Password CLI pipe so the
+token is not written to disk:
+
+```sh
+op read "op://<保险库>/<条目>/凭据" | ssh <别名> "cd /srv/drlifeplus-staging && sh ./admin-bootstrap.sh --bot buyer --bot-username '<BotFather 用户名>' --actor-username '<超管用户名>'"
+op read "op://<保险库>/<条目>/凭据" | ssh <别名> "cd /srv/drlifeplus-staging && sh ./admin-bootstrap.sh --bot merchant --bot-username '<BotFather 用户名>' --actor-username '<超管用户名>'"
+```
+
+Replace only the placeholders with owner-managed values. The actor username
+must match an active super administrator; the script resolves its `public_id`
+inside PostgreSQL and passes only that public ID to `admininit`. Do not paste
+the commands, token, command output, or screenshots into an issue or chat.
+
 For E-09.4, first run `deploy/staging/worker-healthcheck.sh` to confirm that
 the asynq v0.26 worker heartbeat exists in the `asynq:servers` ZSET and that
 its expiry score advances during the observation window. Then run
