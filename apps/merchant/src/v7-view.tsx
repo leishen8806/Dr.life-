@@ -206,7 +206,7 @@ function ProfilePage({
   const errors = validateCompany(draft, t);
   return (
     <main className="mini-shell merchant-v7">
-      <Button variant="text" onClick={onBack}>
+      <Button testId="merchant-back" variant="text" onClick={onBack}>
         {t("common.back")}
       </Button>
       <Card>
@@ -311,7 +311,7 @@ function ImportPage({ t, onBack }: { t: Translate; onBack: () => void }) {
   const [imported, setImported] = useState(false);
   return (
     <main className="mini-shell merchant-v7">
-      <Button variant="text" onClick={onBack}>
+      <Button testId="merchant-back" variant="text" onClick={onBack}>
         {t("common.back")}
       </Button>
       <Card>
@@ -345,6 +345,7 @@ function ImportPage({ t, onBack }: { t: Translate; onBack: () => void }) {
         </label>
         {imported ? <p role="status">{t("merchant.imported")}</p> : null}
         <Button
+          testId="merchant-import"
           disabled={!rights || !import.meta.env.DEV}
           onClick={() => setImported(true)}
         >

@@ -152,20 +152,11 @@ try {
         await page.getByTestId("buyer-decor").click();
         await ready(page, ".v7-tabs");
         await shot(page, app, "decor", item, manifest);
-        await page
-          .getByRole("button", { name: /view company|查看企业|មើលសហគ្រាស/i })
-          .first()
-          .click();
+        await page.getByTestId("buyer-company").first().click();
         await shot(page, app, "company", item, manifest);
-        await page
-          .locator(".buyer-page")
-          .getByRole("button", { name: /back|返回|ត្រឡប់/i })
-          .first()
-          .click();
-        await page.getByRole("button", { name: /cases|案例|ករណី/i }).click();
-        await page
-          .getByRole("button", { name: /warm apartment|温馨公寓|ផ្ទះល្វែង/i })
-          .click();
+        await page.getByTestId("buyer-back").first().click();
+        await page.getByTestId("buyer-tab-cases").click();
+        await page.getByTestId("buyer-case-case-1").click();
         await shot(page, app, "case-detail", item, manifest);
         await page.goto(
           `http://127.0.0.1:5173/${launch(item.theme, item.language)}`,
@@ -211,44 +202,35 @@ try {
           .getByTestId("merchant-notifications")
           .click();
         await shot(page, app, "notifications-settings", item, manifest);
-        await page
-          .getByRole("button", { name: /back|返回|ត្រឡប់/i })
-          .first()
-          .click();
+        await page.getByTestId("merchant-back").first().click();
         await page.getByTestId("merchant-profile").click();
         await shot(page, app, "profile", item, manifest);
         await page.getByTestId("merchant-profile-edit").click();
         await shot(page, app, "profile-edit", item, manifest);
-        await page
-          .getByRole("button", { name: /back|返回|ត្រឡប់/i })
-          .first()
-          .click();
+        await page.getByTestId("merchant-back").first().click();
         await page
           .getByTestId("merchant-profile")
           .click()
           .catch(() => undefined);
         await page.getByTestId("merchant-onboarding").click();
         await shot(page, app, "onboarding", item, manifest);
-        await page.getByRole("button", { name: /back|返回|ត្រឡប់/i }).click();
+        await page.getByTestId("merchant-back").click();
         await page
           .getByTestId("merchant-profile")
           .click()
           .catch(() => undefined);
         await page
-          .getByRole("button", { name: /back|返回|ត្រឡប់/i })
+          .getByTestId("merchant-back")
           .first()
           .click()
           .catch(() => undefined);
         await page
           .locator(".merchant-v7__entries")
-          .getByRole("button", { name: /import|导入|នាំចូល/i })
+          .getByTestId("merchant-import")
           .click();
         await shot(page, app, "import-source-preview", item, manifest);
         await page.locator('input[type="checkbox"]').check();
-        await page
-          .getByRole("button", { name: /import|导入|នាំចូល/i })
-          .last()
-          .click();
+        await page.getByTestId("merchant-import").last().click();
         await shot(page, app, "import-pending", item, manifest);
       }
       await page.close();

@@ -140,7 +140,11 @@ export function DecorView({
     return (
       <main className="buyer-page">
         <section className="buyer-page__body">
-          <Button variant="text" onClick={() => setSelectedCase(undefined)}>
+          <Button
+            testId="buyer-back"
+            variant="text"
+            onClick={() => setSelectedCase(undefined)}
+          >
             {t("common.back")}
           </Button>
           <Card>
@@ -160,7 +164,11 @@ export function DecorView({
     return (
       <main className="buyer-page">
         <section className="buyer-page__body">
-          <Button variant="text" onClick={() => setSelectedCompany(undefined)}>
+          <Button
+            testId="buyer-back"
+            variant="text"
+            onClick={() => setSelectedCompany(undefined)}
+          >
             {t("common.back")}
           </Button>
           <Card>
@@ -272,7 +280,7 @@ export function DecorView({
     <main className="buyer-page">
       <section className="buyer-page__body">
         <div className="v7-page-heading">
-          <Button variant="text" onClick={onBack}>
+          <Button testId="buyer-back" variant="text" onClick={onBack}>
             {t("common.back")}
           </Button>
           <Button variant="secondary" onClick={onOpenNotifications}>
@@ -282,6 +290,7 @@ export function DecorView({
         <div className="v7-tabs" role="tablist">
           <button
             type="button"
+            data-testid="buyer-tab-companies"
             aria-pressed={tab === "companies"}
             onClick={() => setTab("companies")}
           >
@@ -289,6 +298,7 @@ export function DecorView({
           </button>
           <button
             type="button"
+            data-testid="buyer-tab-cases"
             aria-pressed={tab === "cases"}
             onClick={() => setTab("cases")}
           >
@@ -332,6 +342,7 @@ export function DecorView({
               filteredCompanies.map((item) => (
                 <Card key={item.id}>
                   <ListItem
+                    testId="buyer-company"
                     title={item.name}
                     description={`${item.region} · ${item.description}`}
                     trailing={t("buyer.viewCompany")}
@@ -349,6 +360,7 @@ export function DecorView({
               <Card key={item.id}>
                 <button
                   type="button"
+                  data-testid={`buyer-case-${item.id}`}
                   className="v7-card-button"
                   onClick={() => setSelectedCase(item)}
                 >
@@ -400,7 +412,7 @@ export function AftercareView({
   return (
     <main className="buyer-page">
       <section className="buyer-page__body">
-        <Button variant="text" onClick={onBack}>
+        <Button testId="buyer-back" variant="text" onClick={onBack}>
           {t("common.back")}
         </Button>
         <Card>
@@ -679,7 +691,7 @@ export function NotificationView({
   return (
     <main className="buyer-page">
       <section className="buyer-page__body">
-        <Button variant="text" onClick={onBack}>
+        <Button testId="buyer-back" variant="text" onClick={onBack}>
           {t("common.back")}
         </Button>
         <Card>
