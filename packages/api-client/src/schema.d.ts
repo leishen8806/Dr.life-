@@ -609,6 +609,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/catalog/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List catalog products waiting for administrative review
+         * @description The review queue is server-scoped to products in review status; submitted_from and submitted_to filter the time the product entered review, not its creation time.
+         */
+        get: operations["listAdminCatalogProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/catalog/products/{public_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve one catalog product */
+        post: operations["postAdminCatalogProductApprove"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/catalog/products/{public_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject one catalog product with a required reason */
+        post: operations["postAdminCatalogProductReject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all buyer orders for authorized administrators
+         * @description Read-only order view for administrators with the admin.orders.read permission.
+         */
+        get: operations["listAdminOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/orders/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one buyer order for authorized administrators */
+        get: operations["getAdminOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/buyer/orders": {
         parameters: {
             query?: never;
@@ -1665,6 +1756,8 @@ export interface components {
             vol_m3?: string | null;
             /** @enum {string} */
             status: "draft" | "review" | "on" | "off" | "rejected";
+            /** @description Administrative rejection reason, visible to the owning merchant. */
+            review_reason?: string | null;
             /** @enum {string} */
             source: "manual" | "amazon" | "shopee" | "a1688" | "csv";
             source_ref?: string | null;
@@ -1690,6 +1783,9 @@ export interface components {
             tiers?: components["schemas"]["ProductTierList"];
             skus?: components["schemas"]["SkuCreateList"];
         };
+        ProductReviewRejectRequest: {
+            reason: string;
+        };
         /** @description When changing price data, provide exactly one of tiers or skus. */
         ProductUpdateRequest: {
             category_code?: string;
@@ -1702,10 +1798,10 @@ export interface components {
             vol_m3?: string | null;
             source_ref?: string;
             /**
-             * @description Merchants may only move a product between draft and off; on is reached through publish.
+             * @description Merchants may move a product to draft, off, or submit it for administrative review; on is reached through publish.
              * @enum {string}
              */
-            status?: "draft" | "off";
+            status?: "draft" | "off" | "review";
             tiers?: components["schemas"]["ProductTierList"];
             skus?: components["schemas"]["SkuCreateList"];
         };
@@ -2105,6 +2201,33 @@ export interface components {
                 "application/json": components["schemas"]["LedgerReadSuccessResponse"];
             };
         };
+        /** @description Product state changed successfully. */
+        ProductSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ProductSuccessResponse"];
+            };
+        };
+        /** @description Read-only buyer order list. */
+        BuyerOrderSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["BuyerOrderListSuccessResponse"];
+            };
+        };
+        /** @description Read-only buyer order detail. */
+        BuyerOrderDetailSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["BuyerOrderSuccessResponse"];
+            };
+        };
         /** @description Refresh token rotated successfully. */
         RefreshSucceeded: {
             headers: {
@@ -2134,6 +2257,15 @@ export interface components {
         };
         /** @description Invalid request (error code 1002). */
         BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorEnvelope"];
+            };
+        };
+        /** @description The requested state transition has already been processed (error code 1003). */
+        AlreadyProcessed: {
             headers: {
                 [name: string]: unknown;
             };
@@ -3112,6 +3244,146 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["LedgerReadSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listAdminCatalogProducts: {
+        parameters: {
+            query?: {
+                /** @description One-based page number. */
+                page?: components["parameters"]["Page"];
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description Comma-separated field names; prefix a field with - for descending order. */
+                sort?: components["parameters"]["Sort"];
+                merchant_id?: number;
+                submitted_from?: string;
+                submitted_to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Products waiting for review. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductListSuccessResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    postAdminCatalogProductApprove: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Product approved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["AlreadyProcessed"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    postAdminCatalogProductReject: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductReviewRejectRequest"];
+            };
+        };
+        responses: {
+            /** @description Product rejected. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductSuccessResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["AlreadyProcessed"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    listAdminOrders: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["BuyerOrderSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getAdminOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["BuyerOrderDetailSucceeded"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

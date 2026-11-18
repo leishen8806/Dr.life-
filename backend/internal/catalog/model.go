@@ -34,9 +34,9 @@ func (s ProductStatus) Valid() bool {
 }
 
 // MerchantSettable 报告商家接口能否直接写入该状态。
-// on 只能由上架接口流转，review/rejected 属平台审核（T-01 不做）。
+// on 只能由上架接口流转；review 是商家提交审核的入口，rejected 属平台审核。
 func (s ProductStatus) MerchantSettable() bool {
-	return s == StatusDraft || s == StatusOff
+	return s == StatusDraft || s == StatusOff || s == StatusReview
 }
 
 // MerchantStatus 是 iam.merchant.status 在 catalog 侧的最小只读投影
@@ -144,6 +144,7 @@ type Product struct {
 	LeadDays     *int
 	VolumeM3     string
 	Status       ProductStatus
+	ReviewReason string
 	Source       string
 	SourceRef    string
 	StdScore     *int
@@ -193,9 +194,11 @@ type ListQuery struct {
 
 // ProductFilter 是列表查询的服务端强制范围，由 Service 决定，客户端无法覆盖。
 type ProductFilter struct {
-	MerchantID  int64
-	MerchantIDs []int64
-	Status      ProductStatus
+	MerchantID    int64
+	MerchantIDs   []int64
+	Status        ProductStatus
+	SubmittedFrom *time.Time
+	SubmittedTo   *time.Time
 }
 
 // Plan 是已由 Service 校验并规范化的分页与排序计划。
