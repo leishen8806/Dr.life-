@@ -159,8 +159,15 @@ credentials, or firewall data in the repository.
 部署包含 `admininit` 的镜像后，由 owner 使用 deploy 用户在测试服务器执行：
 
 ```sh
-deploy/staging/admin-bootstrap.sh --username '<owner-chosen-name>'
+STAGING_COMPOSE_FILE=compose.yaml DOCKER_USE_SUDO=1 \
+  deploy/staging/admin-bootstrap.sh --username '<owner-chosen-name>'
 ```
+
+Run this from the staging project directory containing `compose.yaml`. The
+`STAGING_COMPOSE_FILE` override is explicit so the same command also works
+when the script is invoked from a checkout. If the `deploy` user is not in the
+Docker group, set `DOCKER_USE_SUDO=1`; the script then invokes `sudo docker`
+without printing the temporary bootstrap credentials.
 
 脚本创建只继承 `iam_rw` 与 `audit_writer` 的一次性数据库登录，密码只通过进程内存传给容器；无论成功或失败都会在 `trap` 中删除该登录。`admininit` 的初始密码和 `otpauth://` 只显示在执行人的终端，不写日志、不写文件、不接受密码参数。执行完成后只在 #276 评论“第 0 步已完成”，不要贴密码、链接或截图。
 
