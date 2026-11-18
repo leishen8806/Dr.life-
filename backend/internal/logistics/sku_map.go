@@ -50,7 +50,7 @@ func BuildFulfillmentCommandTx(ctx context.Context, tx pgx.Tx, merchantOrderPubl
 		return routefit.CreateShipmentCmd{}, fmt.Errorf("%w: merchant public_id", ErrSKUMappingMissing)
 	}
 	rows, err := tx.Query(ctx, `
-		SELECT line.sku_public_id, map.routefit_sku_id, map.warehouse_id, COALESCE(map.unit_ratio, 0), line.quantity
+		SELECT line.sku_public_id, COALESCE(map.routefit_sku_id, ''), COALESCE(map.warehouse_id, ''), COALESCE(map.unit_ratio, 0), line.quantity
 		FROM trade.order_line line
 		JOIN trade.merchant_order child ON child.id = line.merchant_order_id
 		JOIN catalog.sku sku ON sku.public_id = line.sku_public_id
