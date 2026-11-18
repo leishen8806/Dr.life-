@@ -601,7 +601,14 @@ func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID s
 					return "", false, enqueueErr
 				}
 				if missing {
-					if _, eventErr := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) SELECT id,buyer_order_id,'paid','exception','system','SKU_MAPPING_MISSING' FROM trade.merchant_order WHERE public_id=$1 AND status='paid'`, order.MerchantOrderPublicID); eventErr != nil {
+					sourceRef := "SKU_MAPPING_MISSING:" + order.MerchantOrderPublicID
+					if _, sourceErr := tx.Exec(ctx, `
+						INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref)
+						SELECT buyer_order_id,'system',$2 FROM trade.merchant_order WHERE public_id=$1
+						ON CONFLICT (source_type,source_ref) DO NOTHING`, order.MerchantOrderPublicID, sourceRef); sourceErr != nil {
+						return "", false, sourceErr
+					}
+					if _, eventErr := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) SELECT id,buyer_order_id,'paid','exception','system',$2 FROM trade.merchant_order WHERE public_id=$1 AND status='paid'`, order.MerchantOrderPublicID, sourceRef); eventErr != nil {
 						return "", false, eventErr
 					}
 					if _, updateErr := tx.Exec(ctx, `UPDATE trade.merchant_order SET status='exception',version=version+1,updated_at=clock_timestamp() WHERE public_id=$1 AND status='paid'`, order.MerchantOrderPublicID); updateErr != nil {
