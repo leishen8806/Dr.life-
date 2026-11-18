@@ -3,7 +3,9 @@ package logistics
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"net/http/httptest"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,6 +16,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/leishen8806/Dr.life-/backend/internal/logistics/routefit"
+	"github.com/leishen8806/Dr.life-/backend/internal/testutil/routefitmock"
 	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -93,6 +97,66 @@ func TestRouteFitEventRecorderCommitsInboxAndDedupAtomically(t *testing.T) {
 	}
 	if strings.Contains(stored, "+85510000001") || strings.Contains(stored, "do-not-store") {
 		t.Fatalf("shipment inbox retained non-whitelisted payload: %s", stored)
+	}
+}
+
+func TestFulfillmentOutboxWorkerDispatchesRouteFitMock(t *testing.T) {
+	e := newRouteFitIntegrationEnvironment(t)
+	mock := routefitmock.New(routefitmock.Config{})
+	mock.AddOwner(routefitmock.Owner{OwnerRef: "merchant-1", WarehouseIDs: []string{"warehouse-1"}})
+	mock.AddSKU("merchant-1", routefitmock.SKU{ID: "sku-1", State: "active"}, "warehouse-1", 10)
+	server := httptest.NewServer(mock.Handler())
+	t.Cleanup(server.Close)
+	client, err := routefit.New(routefit.Config{BaseURL: server.URL, ServiceToken: "test-service-token", Timeout: 2 * time.Second, RetryAttempts: 2, RetryInitialDelay: time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := routefit.CreateShipmentCmd{
+		ExternalOrderID:         "order-outbox-1",
+		OwnerRef:                "merchant-1",
+		WarehouseID:             "warehouse-1",
+		Lines:                   []routefit.Line{{Ref: "line-1", SKU: "sku-1", Quantity: 1}},
+		Delivery:                json.RawMessage(`{"address":"test"}`),
+		RequestedDeliveryWindow: json.RawMessage(`{"from":"2026-11-18T08:00:00Z","to":"2026-11-18T10:00:00Z"}`),
+		ServiceLevel:            "S1",
+		DeclaredValue:           routefit.Money{AmountMinor: 100, Currency: "USD"},
+	}
+	tx, err := e.pool.Begin(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := EnqueueFulfillmentTx(e.ctx, tx, command); err != nil {
+		_ = tx.Rollback(e.ctx)
+		t.Fatal(err)
+	}
+	if err := tx.Commit(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	worker := FulfillmentOutboxWorker{DB: e.pool, Client: client, RetryDelay: time.Millisecond}
+	if err := worker.RunOnce(e.ctx); err != nil {
+		t.Fatal(err)
+	}
+	var status, fulfillmentID, storedKey string
+	var attempts int
+	if err := e.pool.QueryRow(e.ctx, `SELECT status, fulfillment_id, idempotency_key, attempts FROM logistics.fulfillment_outbox WHERE external_order_id=$1`, command.ExternalOrderID).Scan(&status, &fulfillmentID, &storedKey, &attempts); err != nil {
+		t.Fatal(err)
+	}
+	if status != "delivered" || fulfillmentID == "" || attempts != 1 {
+		t.Fatalf("outbox status=%q fulfillment=%q attempts=%d", status, fulfillmentID, attempts)
+	}
+	if storedKey != fulfillmentIdempotencyKey(command.ExternalOrderID) {
+		t.Fatalf("stored idempotency key=%q does not match stable key", storedKey)
+	}
+	if _, err := client.Deliver(e.ctx, command); err != nil {
+		t.Fatal(err)
+	}
+	var fulfillmentCount int
+	if err := e.pool.QueryRow(e.ctx, `SELECT count(*) FROM logistics.fulfillment_outbox WHERE external_order_id=$1`, command.ExternalOrderID).Scan(&fulfillmentCount); err != nil {
+		t.Fatal(err)
+	}
+	if fulfillmentCount != 1 {
+		t.Fatalf("outbox rows=%d, want 1", fulfillmentCount)
 	}
 }
 
