@@ -114,7 +114,7 @@ export function NotificationView({ client, language, t, onBack, onNavigate, onUn
     try {
       const { data, error: requestError } = await client.PUT("/v1/buyer/me/notification-settings", { params: { header: { "Idempotency-Key": createNotificationIdempotencyKey("notification-setting") } }, body: setting });
       if (requestError) throw new Error("notification setting failed");
-      if (data?.data) setSettings(data.data.items);
+      if (data?.data) setSettings(mergeNotificationSettings(data.data.items));
     } catch { setError(t("notification.actionFailed")); }
   };
   const select = (id: string) => { const item = items.find((entry) => entry.public_id === id); void markRead(id); if (item) onNavigate(item.event_type.startsWith("order.") ? "orders" : "profile"); };

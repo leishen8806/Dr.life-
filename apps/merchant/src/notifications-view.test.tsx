@@ -58,5 +58,6 @@ describe("Merchant V7 notifications", () => {
     const settingRequest = (client.PUT as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1] as { params: { header: { "Idempotency-Key": string } } };
     expect(settingRequest.params.header["Idempotency-Key"]).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
     await waitFor(() => expect(orderSetting.checked).toBe(false));
+    expect(screen.getAllByRole("checkbox").slice(-10)).toHaveLength(10);
   });
 });
