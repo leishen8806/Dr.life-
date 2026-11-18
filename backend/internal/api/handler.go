@@ -14,6 +14,7 @@ import (
 
 	"github.com/leishen8806/Dr.life-/backend/internal/api/gen"
 	"github.com/leishen8806/Dr.life-/backend/internal/catalog"
+	"github.com/leishen8806/Dr.life-/backend/internal/comms/notifications"
 	"github.com/leishen8806/Dr.life-/backend/internal/files"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam"
 	"github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
@@ -179,7 +180,16 @@ type Handler struct {
 	AdminManagement  AdminManagement
 	CatalogReview    CatalogReviewManagement
 	Orders           OrderManagement
+	Notifications    NotificationManagement
 	AdminOrders      AdminOrderReader
+}
+
+type NotificationManagement interface {
+	List(context.Context, int64, int) ([]notifications.Record, int, error)
+	MarkRead(context.Context, int64, string) error
+	MarkAllRead(context.Context, int64) error
+	ListSettings(context.Context, int64) ([]notifications.Setting, error)
+	UpsertSetting(context.Context, int64, notifications.Setting) error
 }
 
 func (h Handler) adminOrdersAccess(w http.ResponseWriter, r *http.Request) bool {

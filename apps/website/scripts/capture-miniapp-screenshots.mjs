@@ -129,6 +129,22 @@ async function installMockApi(page, language, app) {
       await route.fulfill(json({ items: [], next_cursor: null }));
       return;
     }
+    if (path.endsWith("/me/notifications") && request.method() === "GET") {
+      await route.fulfill(json({ items: [{ public_id: "01EVIDENCENOTIFICATION", event_id: "evt-1", event_type: "order.created", title: { zh: "订单通知", en: "Order notification", km: "ការជូនដំណឹងការបញ្ជាទិញ" }, body: { zh: "订单已创建", en: "Your order was created", km: "ការបញ្ជាទិញរបស់អ្នកត្រូវបានបង្កើត" }, read_at: null, created_at: "2026-01-01T00:00:00Z" }], unread_count: 1 }));
+      return;
+    }
+    if (path.endsWith("/me/notification-settings") && request.method() === "GET") {
+      await route.fulfill(json({ items: [] }));
+      return;
+    }
+    if (path.includes("/me/notifications/") || path.endsWith("/me/notifications/read-all")) {
+      await route.fulfill(json({ updated: true }));
+      return;
+    }
+    if (path.endsWith("/me/notification-settings") && request.method() === "PUT") {
+      await route.fulfill(json({ items: [{ event_type: "order.created", in_app_enabled: true, telegram_enabled: true }] }));
+      return;
+    }
     await route.continue();
   });
 }
@@ -182,6 +198,11 @@ try {
             await page.locator(".buyer-order-list").waitFor({ state: "visible", timeout: 5_000 });
             await page.locator(".buyer-order-card").first().click();
             await page.locator(".buyer-order-detail__heading").first().waitFor({ state: "visible", timeout: 5_000 });
+          } },
+          { name: "notifications", open: async () => {
+            await page.locator(".buyer-notifications-bell").click();
+            await page.locator(".buyer-page").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".drl-notification-list .drl-list-item").first().waitFor({ state: "visible", timeout: 10_000 });
           } }
         ] : [
           { name: "home" },
@@ -200,7 +221,13 @@ try {
             await page.locator(".merchant-v4").waitFor({ state: "visible", timeout: 5_000 });
             await page.locator(".merchant-v4__tabs button").nth(2).click();
             await page.locator(".merchant-v4__warehouse").waitFor({ state: "visible", timeout: 5_000 });
-          }, profile: true }
+          }, profile: true },
+          { name: "merchant-notifications", open: async () => {
+            await page.locator(".merchant-v7-action").click();
+            await page.locator(".merchant-v7 .drl-notification-bell").click();
+            await page.locator(".merchant-v7").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".merchant-v7 .drl-notification-list .drl-list-item").first().waitFor({ state: "visible", timeout: 10_000 });
+          } }
         ];
         for (const target of targets) {
           await page.goto(url, { waitUntil: "networkidle" });
@@ -209,8 +236,8 @@ try {
           const title = await page.title();
           if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
           const headingSelector = app === "buyer"
-            ? (target.name === "home" ? ".buyer-section__title" : target.name === "profile" ? ".profile-hero h1" : target.name === "wallet" ? ".wallet-page h1" : ".buyer-order-list, .buyer-order-detail__heading")
-            : target.name === "home" ? "h1" : ".merchant-v4 h1, .merchant-v4__section h2";
+            ? (target.name === "home" ? ".buyer-section__title" : target.name === "profile" ? ".profile-hero h1" : target.name === "wallet" ? ".wallet-page h1" : target.name === "notifications" ? ".buyer-section__title" : ".buyer-order-list, .buyer-order-detail__heading")
+            : target.name === "home" ? "h1" : target.name === "merchant-notifications" ? ".merchant-v7 h1" : ".merchant-v4 h1, .merchant-v4__section h2";
           const pageHeading = await page.locator(headingSelector).first().textContent();
           if (!pageHeading?.trim()) throw new Error(`missing business page heading for ${app}-${target.name}-${item.language}`);
           const name = `${app}-${target.name}-${item.width}-${item.theme}-${item.language}.png`;

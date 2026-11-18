@@ -443,6 +443,12 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const orderDetail = useOrderDetail(client, route.name === "order" ? route.publicId : "", language);
   const loadProfile = useCallback(() => profileApi.loadProfile(language), [language, profileApi]);
   const [profile, retryProfile] = useLoaded<BuyerProfile>(language, async () => loadProfile(), true);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+  useEffect(() => {
+    void client.GET("/v1/buyer/me/notifications", { params: { query: { limit: 1 } } }).then((result) => {
+      if (result.data?.data) setNotificationUnreadCount(result.data.data.unread_count);
+    }).catch(() => undefined);
+  }, [client]);
 
   const addToCart = useCallback((product: Product) => {
     const result = addProduct(cart, product);
@@ -453,7 +459,6 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const openProfile = useCallback(() => push({ name: "profile" }), [push]);
   const openWallet = useCallback(() => push({ name: "wallet" }), [push]);
   const openDecor = useCallback(() => push({ name: "decor" }), [push]);
-  const openAftercare = useCallback(() => push({ name: "aftercare" }), [push]);
   const openNotifications = useCallback(() => push({ name: "notifications" }), [push]);
   const updateCartQuantity = useCallback((item: CartItem, quantity: string) => {
     const result = updateQuantity(cart, item.product.public_id, quantity);
@@ -483,7 +488,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
         {t("nav.profile")}
       </Button>
       <Button variant="secondary" className="buyer-decor-action" onClick={openDecor}>{t("buyer.findDecor")}</Button>
-      <NotificationBell label={t("buyer.notifications")} unreadCount={2} onClick={openNotifications} className="buyer-notifications-action" />
+      <NotificationBell label={t("buyer.notifications")} unreadCount={notificationUnreadCount} onClick={openNotifications} className="buyer-notifications-bell" />
     </>
   );
   const knownCategories = categories.status === "ready" ? categories.value : [];
@@ -558,6 +563,9 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   if (route.name === "wallet")
     return <BuyerWalletView entries={profile.status === "ready" ? { status: "ready", value: profile.value.entries } : profile.status === "error" ? { status: "error", messageKey: profile.messageKey } : profile} language={language} t={t} onBack={back} onRetry={retryProfile} />;
 
+  if (route.name === "notifications")
+    return <NotificationView client={client} language={language} t={t} onBack={back} onNavigate={(target) => target === "orders" ? openOrders() : openProfile()} onUnreadCountChange={setNotificationUnreadCount} />;
+
   if (route.name === "profile")
     return <BuyerProfileView profile={profile} language={language} t={t} onOpenWallet={openWallet} onOpenOrders={openOrders} onRetry={retryProfile} />;
 
@@ -566,9 +574,6 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
 
   if (route.name === "aftercare")
     return <AftercareView t={t} onBack={back} />;
-
-  if (route.name === "notifications")
-    return <NotificationView language={language} t={t} onBack={back} onNavigate={(target) => { if (target === "order") openAftercare(); else openProfile(); }} />;
 
   if (route.name === "search")
     return (
