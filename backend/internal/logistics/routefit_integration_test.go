@@ -119,9 +119,9 @@ func TestBuildFulfillmentCommandUsesActiveSKUMap(t *testing.T) {
 		args  []any
 	}{
 		{`INSERT INTO catalog.sku (public_id, product_id, status) VALUES ($1,$2,'on')`, []any{skuID, productDBID}},
-		{`INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,payable_amount_e4) VALUES ($1,7,'sku-map-test',repeat('a',64),100,100,100)`, []any{buyerID}},
-		{`INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,payable_amount_e4) VALUES ($1,(SELECT id FROM trade.buyer_order WHERE public_id=$2),7,'merchant-public',100,100,100)`, []any{merchantOrderID, buyerID}},
-		{`INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES ((SELECT id FROM trade.merchant_order WHERE public_id=$1),$2,2,50,100)`, []any{merchantOrderID, skuID}},
+		{`INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,payable_amount_e4) VALUES ($1,7,'sku-map-test',repeat('a',64),0,0,0)`, []any{buyerID}},
+		{`INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,payable_amount_e4) VALUES ($1,(SELECT id FROM trade.buyer_order WHERE public_id=$2),7,'merchant-public',0,0,0)`, []any{merchantOrderID, buyerID}},
+		{`INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES ((SELECT id FROM trade.merchant_order WHERE public_id=$1),$2,2,0,0)`, []any{merchantOrderID, skuID}},
 		{`INSERT INTO logistics.sku_map (product_id,routefit_sku_id,warehouse_id,unit_ratio,state) VALUES ($1,'routefit-sku','warehouse-1',2,'active')`, []any{productDBID}},
 	}
 	for _, statement := range statements {
