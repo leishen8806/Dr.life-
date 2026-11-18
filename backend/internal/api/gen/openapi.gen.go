@@ -1913,6 +1913,15 @@ type BuyerOrder struct {
 	UpdatedAt     time.Time          `json:"updated_at"`
 }
 
+// BuyerOrderEvent defines model for BuyerOrderEvent.
+type BuyerOrderEvent struct {
+	// OccurredAt Time at which the suborder entered this status.
+	OccurredAt time.Time `json:"occurred_at"`
+
+	// Status Authoritative merchant-suborder state. Parent-order status is a derived summary only.
+	Status OrderStatus `json:"status"`
+}
+
 // BuyerOrderListData defines model for BuyerOrderListData.
 type BuyerOrderListData struct {
 	Items      []BuyerOrderSummary `json:"items"`
@@ -1974,6 +1983,9 @@ type BuyerShippingAddressSnapshot struct {
 
 // BuyerSuborder defines model for BuyerSuborder.
 type BuyerSuborder struct {
+	// Events Append-only delivery/status history for this merchant suborder, ordered oldest first.
+	Events []BuyerOrderEvent `json:"events"`
+
 	// GoodsAmountE4 Snapshotted merchandise subtotal for this suborder.
 	GoodsAmountE4    OrderMoneyE4        `json:"goods_amount_e4"`
 	Items            []OrderLineSnapshot `json:"items"`

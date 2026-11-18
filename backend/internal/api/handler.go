@@ -1693,7 +1693,11 @@ func buyerOrderSummary(order trade.BuyerOrderView) gen.BuyerOrderSummary {
 }
 
 func buyerSuborder(order trade.MerchantOrderView) gen.BuyerSuborder {
-	return gen.BuyerSuborder{PublicId: order.PublicID, MerchantPublicId: order.MerchantPublicID, Status: gen.OrderStatus(order.Status), GoodsAmountE4: order.GoodsAmountE4, ShippingAmountE4: order.ShippingAmountE4, PayableAmountE4: order.PayableAmountE4, ShippingQuoteExpiresAt: order.ShippingQuoteExpiresAt, Items: orderLines(order.Lines)}
+	events := make([]gen.BuyerOrderEvent, 0, len(order.Events))
+	for _, event := range order.Events {
+		events = append(events, gen.BuyerOrderEvent{Status: gen.OrderStatus(event.Status), OccurredAt: event.OccurredAt})
+	}
+	return gen.BuyerSuborder{PublicId: order.PublicID, MerchantPublicId: order.MerchantPublicID, Status: gen.OrderStatus(order.Status), GoodsAmountE4: order.GoodsAmountE4, ShippingAmountE4: order.ShippingAmountE4, PayableAmountE4: order.PayableAmountE4, ShippingQuoteExpiresAt: order.ShippingQuoteExpiresAt, Items: orderLines(order.Lines), Events: events}
 }
 
 func merchantSuborder(order trade.MerchantOrderView) gen.MerchantSuborder {

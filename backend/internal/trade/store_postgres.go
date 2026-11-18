@@ -627,6 +627,10 @@ func (s *PostgresStore) findMerchantOrder(ctx context.Context, merchantID int64,
 		return MerchantOrderView{}, err
 	}
 	order.TotalE4 = order.GoodsAmountE4
+	order.Events, err = loadOrderEvents(ctx, s.db, publicID)
+	if err != nil {
+		return MerchantOrderView{}, err
+	}
 	rows, err := s.db.Query(ctx, `SELECT sku_public_id,quantity,unit_price_e4,line_total_e4 FROM trade.order_line WHERE merchant_order_id=(SELECT id FROM trade.merchant_order WHERE public_id=$1) ORDER BY id`, publicID)
 	if err != nil {
 		return MerchantOrderView{}, err
@@ -640,6 +644,25 @@ func (s *PostgresStore) findMerchantOrder(ctx context.Context, merchantID int64,
 		order.Lines = append(order.Lines, line)
 	}
 	return order, rows.Err()
+}
+
+func loadOrderEvents(ctx context.Context, db interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}, publicID string) ([]OrderEventView, error) {
+	rows, err := db.Query(ctx, `SELECT to_status,created_at FROM trade.order_event WHERE merchant_order_id=(SELECT id FROM trade.merchant_order WHERE public_id=$1) ORDER BY created_at,id`, publicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var events []OrderEventView
+	for rows.Next() {
+		var event OrderEventView
+		if err := rows.Scan(&event.Status, &event.OccurredAt); err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, rows.Err()
 }
 
 func (s *PostgresStore) ClaimBuyerReservationRelease(ctx context.Context, buyerID int64, publicID string) (Reservation, bool, error) {

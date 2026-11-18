@@ -103,7 +103,8 @@ async function installMockApi(page, language, app) {
           goods_amount_e4: 190000,
           shipping_amount_e4: 0,
           payable_amount_e4: 190000,
-          shipping_quote_expires_at: "2026-11-15T10:00:00Z"
+          shipping_quote_expires_at: "2026-11-15T10:00:00Z",
+          events: [{ status: "paid", occurred_at: "2026-11-14T09:01:00Z" }, { status: "submitted", occurred_at: "2026-11-14T09:02:00Z" }]
         }]
       }], next_cursor: null }));
       return;
@@ -117,7 +118,7 @@ async function installMockApi(page, language, app) {
         shipping_amount_e4: 0,
         payable_amount_e4: 190000,
         created_at: "2026-11-14T09:00:00Z",
-        suborders: [{ public_id: "01EVIDENCESUBORDER", merchant_public_id: "01EVIDENCEMERCHANT", status: "paid", items: [{ sku_public_id: "01EVIDENCESKU", quantity: 2, unit_price_e4: 95000, line_total_e4: 190000 }], goods_amount_e4: 190000, shipping_amount_e4: 0, payable_amount_e4: 190000, shipping_quote_expires_at: "2026-11-15T10:00:00Z" }]
+        suborders: [{ public_id: "01EVIDENCESUBORDER", merchant_public_id: "01EVIDENCEMERCHANT", status: "paid", items: [{ sku_public_id: "01EVIDENCESKU", quantity: 2, unit_price_e4: 95000, line_total_e4: 190000 }], goods_amount_e4: 190000, shipping_amount_e4: 0, payable_amount_e4: 190000, shipping_quote_expires_at: "2026-11-15T10:00:00Z", events: [{ status: "paid", occurred_at: "2026-11-14T09:01:00Z" }, { status: "submitted", occurred_at: "2026-11-14T09:02:00Z" }] }]
       }));
       return;
     }
