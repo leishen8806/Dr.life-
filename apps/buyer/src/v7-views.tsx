@@ -380,7 +380,7 @@ export function DecorView({
 }
 
 export type ReceiptMethod = "photo" | "signature" | "code";
-export function AftercareView({
+export function LegacyAftercareView({
   t,
   onBack,
   delivered = true
@@ -514,6 +514,8 @@ export function AftercareView({
     </main>
   );
 }
+
+export { AftercareView } from "./v7-aftercare-view";
 
 export interface NotificationItem {
   id: string;
