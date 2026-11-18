@@ -155,10 +155,7 @@ export function ProductScreen({ api, client }: { api: MerchantProductApi; client
     <main className="mini-shell">
       {notificationsOpen && client ? <MerchantNotificationsView client={client} onBack={() => setNotificationsOpen(false)} /> : null}
       {notificationsOpen ? null : <>
-      {v4Open ? <MerchantV4View api={v4Api} language={language} t={t} onBack={() => setV4Open(false)} /> : null}
-      {v4Open ? null : <>
-      {v7Open ? <MerchantV7View language={language} t={t} onBack={() => setV7Open(false)} /> : v4Open ? <MerchantV4View api={v4Api} language={language} t={t} onBack={() => setV4Open(false)} /> : null}
-      {v7Open || v4Open ? null : <>
+      {v7Open ? <MerchantV7View language={language} t={t} onBack={() => setV7Open(false)} /> : v4Open ? <MerchantV4View api={v4Api} language={language} t={t} onBack={() => setV4Open(false)} /> : <>
       <AppHeader slogan={t("brand.slogan")} actions={<>
         <LanguageSwitcher />
         <NotificationBell label={t("merchant.notificationSettings")} unreadCount={3} onClick={() => setV7Open(true)} />
