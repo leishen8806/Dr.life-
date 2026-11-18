@@ -200,9 +200,9 @@ try {
             await page.locator(".buyer-order-detail__heading").first().waitFor({ state: "visible", timeout: 5_000 });
           } },
           { name: "notifications", open: async () => {
-            await page.locator(".buyer-notifications-action").click();
-            await page.locator(".notification-center").waitFor({ state: "visible", timeout: 5_000 });
-            await page.locator(".notification-center li").first().waitFor({ state: "visible", timeout: 10_000 });
+            await page.locator(".buyer-notifications-bell").click();
+            await page.locator(".buyer-page").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".drl-notification-list .drl-list-item").first().waitFor({ state: "visible", timeout: 10_000 });
           } }
         ] : [
           { name: "home" },
@@ -223,9 +223,10 @@ try {
             await page.locator(".merchant-v4__warehouse").waitFor({ state: "visible", timeout: 5_000 });
           }, profile: true },
           { name: "merchant-notifications", open: async () => {
-            await page.locator(".merchant-notifications-action").click();
-            await page.locator(".notification-center").waitFor({ state: "visible", timeout: 5_000 });
-            await page.locator(".notification-center li").first().waitFor({ state: "visible", timeout: 10_000 });
+            await page.locator(".merchant-v7-action").click();
+            await page.locator(".merchant-v7 .drl-notification-bell").click();
+            await page.locator(".merchant-v7").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".merchant-v7 .drl-notification-list .drl-list-item").first().waitFor({ state: "visible", timeout: 10_000 });
           } }
         ];
         for (const target of targets) {
@@ -235,8 +236,8 @@ try {
           const title = await page.title();
           if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
           const headingSelector = app === "buyer"
-            ? (target.name === "home" ? ".buyer-section__title" : target.name === "profile" ? ".profile-hero h1" : target.name === "wallet" ? ".wallet-page h1" : target.name === "notifications" ? ".notification-center h1" : ".buyer-order-list, .buyer-order-detail__heading")
-            : target.name === "home" ? "h1" : target.name === "merchant-notifications" ? ".notification-center h1" : ".merchant-v4 h1, .merchant-v4__section h2";
+            ? (target.name === "home" ? ".buyer-section__title" : target.name === "profile" ? ".profile-hero h1" : target.name === "wallet" ? ".wallet-page h1" : target.name === "notifications" ? ".buyer-section__title" : ".buyer-order-list, .buyer-order-detail__heading")
+            : target.name === "home" ? "h1" : target.name === "merchant-notifications" ? ".merchant-v7 h1" : ".merchant-v4 h1, .merchant-v4__section h2";
           const pageHeading = await page.locator(headingSelector).first().textContent();
           if (!pageHeading?.trim()) throw new Error(`missing business page heading for ${app}-${target.name}-${item.language}`);
           const name = `${app}-${target.name}-${item.width}-${item.theme}-${item.language}.png`;
