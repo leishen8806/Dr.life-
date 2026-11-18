@@ -103,22 +103,26 @@ func TestRouteFitEventRecorderCommitsInboxAndDedupAtomically(t *testing.T) {
 func TestBuildFulfillmentCommandUsesActiveSKUMap(t *testing.T) {
 	e := newRouteFitIntegrationEnvironment(t)
 	ctx := e.ctx
-	const categoryID = 991
-	const productID = 992
 	const skuID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 	const buyerID = "01ARZ3NDEKTSV4RRFFQ69G5FAW"
 	const merchantOrderID = "01ARZ3NDEKTSV4RRFFQ69G5FAX"
+	var categoryDBID int64
+	if err := e.pool.QueryRow(ctx, `INSERT INTO catalog.category (public_id, code, name) VALUES ($1,$2,$3) RETURNING id`, "01ARZ3NDEKTSV4RRFFQ69G5FAY", "sku_map_test", `{"zh":"测试","en":"Test","km":"សាកល្បង"}`).Scan(&categoryDBID); err != nil {
+		t.Fatal(err)
+	}
+	var productDBID int64
+	if err := e.pool.QueryRow(ctx, `INSERT INTO catalog.product (public_id, merchant_id, category_id, name, unit, origin, status) VALUES ($1,7,$2,$3,'piece','cn','on') RETURNING id`, "01ARZ3NDEKTSV4RRFFQ69G5FAZ", categoryDBID, `{"zh":"测试","en":"Test","km":"សាកល្បង"}`).Scan(&productDBID); err != nil {
+		t.Fatal(err)
+	}
 	statements := []struct {
 		query string
 		args  []any
 	}{
-		{`INSERT INTO catalog.category (id, public_id, code, name) VALUES ($1,$2,$3,$4)`, []any{categoryID, "01ARZ3NDEKTSV4RRFFQ69G5FAY", "sku_map_test", `{"zh":"测试","en":"Test","km":"សាកល្បង"}`}},
-		{`INSERT INTO catalog.product (id, public_id, merchant_id, category_id, name, unit, origin, status) VALUES ($1,$2,7,$3,$4,'piece','cn','on')`, []any{productID, "01ARZ3NDEKTSV4RRFFQ69G5FAZ", categoryID, `{"zh":"测试","en":"Test","km":"សាកល្បង"}`}},
-		{`INSERT INTO catalog.sku (public_id, product_id, status) VALUES ($1,$2,'on')`, []any{skuID, productID}},
+		{`INSERT INTO catalog.sku (public_id, product_id, status) VALUES ($1,$2,'on')`, []any{skuID, productDBID}},
 		{`INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,payable_amount_e4) VALUES ($1,7,'sku-map-test',repeat('a',64),100,100,100)`, []any{buyerID}},
 		{`INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,payable_amount_e4) VALUES ($1,(SELECT id FROM trade.buyer_order WHERE public_id=$2),7,'merchant-public',100,100,100)`, []any{merchantOrderID, buyerID}},
 		{`INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES ((SELECT id FROM trade.merchant_order WHERE public_id=$1),$2,2,50,100)`, []any{merchantOrderID, skuID}},
-		{`INSERT INTO logistics.sku_map (product_id,routefit_sku_id,warehouse_id,unit_ratio,state) VALUES ($1,'routefit-sku','warehouse-1',2,'active')`, []any{productID}},
+		{`INSERT INTO logistics.sku_map (product_id,routefit_sku_id,warehouse_id,unit_ratio,state) VALUES ($1,'routefit-sku','warehouse-1',2,'active')`, []any{productDBID}},
 	}
 	for _, statement := range statements {
 		if _, err := e.pool.Exec(ctx, statement.query, statement.args...); err != nil {
@@ -140,7 +144,7 @@ func TestBuildFulfillmentCommandUsesActiveSKUMap(t *testing.T) {
 	if command.ExternalOrderID != "DRL-"+merchantOrderID || command.OwnerRef != "merchant-public" || command.WarehouseID != "warehouse-1" || command.ServiceLevel != "S2" || len(command.Lines) != 1 || command.Lines[0].SKU != "routefit-sku" || command.Lines[0].Quantity != 4 {
 		t.Fatalf("unexpected fulfillment command: %+v", command)
 	}
-	if _, err := e.pool.Exec(ctx, `UPDATE logistics.sku_map SET state='disabled' WHERE product_id=$1`, productID); err != nil {
+	if _, err := e.pool.Exec(ctx, `UPDATE logistics.sku_map SET state='disabled' WHERE product_id=$1`, productDBID); err != nil {
 		t.Fatal(err)
 	}
 	tx, err = e.pool.Begin(ctx)
