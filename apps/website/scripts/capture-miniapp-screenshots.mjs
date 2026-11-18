@@ -134,7 +134,7 @@ async function installMockApi(page, language, app) {
       return;
     }
     if (path.endsWith("/me/notification-settings") && request.method() === "GET") {
-      await route.fulfill(json({ items: [{ event_type: "order.created", in_app_enabled: true, telegram_enabled: true }] }));
+      await route.fulfill(json({ items: [] }));
       return;
     }
     if (path.includes("/me/notifications/") || path.endsWith("/me/notifications/read-all")) {
