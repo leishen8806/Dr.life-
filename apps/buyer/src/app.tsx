@@ -454,7 +454,6 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const openProfile = useCallback(() => push({ name: "profile" }), [push]);
   const openWallet = useCallback(() => push({ name: "wallet" }), [push]);
   const openDecor = useCallback(() => push({ name: "decor" }), [push]);
-  const openAftercare = useCallback(() => push({ name: "aftercare" }), [push]);
   const openNotifications = useCallback(() => push({ name: "notifications" }), [push]);
   const updateCartQuantity = useCallback((item: CartItem, quantity: string) => {
     const result = updateQuantity(cart, item.product.public_id, quantity);
