@@ -33,7 +33,7 @@ func BuildFulfillmentCommandTx(ctx context.Context, tx pgx.Tx, merchantOrderPubl
 		return routefit.CreateShipmentCmd{}, errors.New("logistics: fulfillment transaction and order are required")
 	}
 	if strings.TrimSpace(serviceLevel) == "" {
-		serviceLevel = "S1"
+		serviceLevel = "S2"
 	}
 	var externalOrderID, ownerRef string
 	if err := tx.QueryRow(ctx, `

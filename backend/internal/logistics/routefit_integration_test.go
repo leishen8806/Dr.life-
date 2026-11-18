@@ -130,7 +130,7 @@ func TestBuildFulfillmentCommandUsesActiveSKUMap(t *testing.T) {
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if command.ExternalOrderID != "DRL-"+merchantOrderID || command.OwnerRef != "merchant-public" || command.WarehouseID != "warehouse-1" || command.ServiceLevel != "S1" || len(command.Lines) != 1 || command.Lines[0].SKU != "routefit-sku" || command.Lines[0].Quantity != 4 {
+	if command.ExternalOrderID != "DRL-"+merchantOrderID || command.OwnerRef != "merchant-public" || command.WarehouseID != "warehouse-1" || command.ServiceLevel != "S2" || len(command.Lines) != 1 || command.Lines[0].SKU != "routefit-sku" || command.Lines[0].Quantity != 4 {
 		t.Fatalf("unexpected fulfillment command: %+v", command)
 	}
 	if _, err := e.pool.Exec(ctx, `UPDATE logistics.sku_map SET state='disabled' WHERE product_id=$1`, productID); err != nil {

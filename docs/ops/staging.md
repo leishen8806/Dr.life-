@@ -11,6 +11,12 @@ substitute, not a RouteFit deployment and must never receive production
 credentials. Start the API and worker with the mock base URL supplied by the
 test compose profile, then drive one fulfillment through the following loop:
 
+The payment-success auto-fulfillment default is `S2` (same-day). Set
+`ROUTEFIT_DEFAULT_SERVICE_LEVEL` in the owner-managed staging environment to
+override it for a controlled test; the value is passed through unchanged to
+RouteFit. Do not put credentials or real service configuration in this
+repository.
+
 1. Create a quote for the owner, warehouse, lines, and delivery snapshot. If
    the mock returns an error, keep the order browsable and display `运费待确认`
    (the caller must not invent a price).

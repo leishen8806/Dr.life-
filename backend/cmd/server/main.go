@@ -154,7 +154,7 @@ func main() {
 	tradeStore := trade.NewPostgresStore(database)
 	serviceLevel := strings.TrimSpace(os.Getenv("ROUTEFIT_DEFAULT_SERVICE_LEVEL"))
 	if serviceLevel == "" {
-		serviceLevel = "S1"
+		serviceLevel = "S2"
 	}
 	tradeStore.SetFulfillmentEnqueuer(func(ctx context.Context, tx pgx.Tx, merchantOrderID string) (bool, error) {
 		return logistics.EnqueuePaidFulfillmentTx(ctx, tx, merchantOrderID, serviceLevel)
