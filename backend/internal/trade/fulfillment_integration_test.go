@@ -54,8 +54,8 @@ func TestConfirmPaymentEnqueuesFulfillmentAndHandlesMissingMapping(t *testing.T)
 		{missingBuyer, missingMerchant, missingSKU},
 	} {
 		if _, err := db.Exec(`
-			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,payable_amount_e4)
-			VALUES ($1,7,$2,repeat('a',64),100,100,100)`, fixture.buyer, fixture.merchant); err != nil {
+			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
+			VALUES ($1,7,$2,repeat('a',64),100,100,0,100)`, fixture.buyer, fixture.merchant); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := db.Exec(`
