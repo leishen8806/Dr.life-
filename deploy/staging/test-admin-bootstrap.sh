@@ -83,6 +83,19 @@ grep -q -- '--end buyer --username BuyerBot --actor 01ACTORPUBLICID' "$root/bot-
 ! grep -R -q -- "$bot_token" "$bot_output" "$bot_error" "$root/bot-docker.log" "$root/bot-sql"
 grep -q -- 'DROP ROLE IF EXISTS' "$root/bot-sql"
 
+merchant_token='123456:merchant-token-must-stay-on-stdin'
+FAKE_ACTOR_ID='01ACTORPUBLICID' FAKE_STDIN="$root/merchant-stdin" \
+  DOCKER_BIN="$fake_bin/docker" STAGING_ENV_FILE="$root/env" STAGING_COMPOSE_FILE="$root/compose.yaml" \
+  FAKE_DOCKER_LOG="$root/merchant-docker.log" FAKE_SQL="$root/merchant-sql" \
+  "$script_dir/admin-bootstrap.sh" --bot merchant --bot-username 'MerchantBot' --actor-username 'Test Admin' \
+  >/dev/null 2>"$root/merchant-error" <<EOF
+$merchant_token
+EOF
+grep -qx "$merchant_token" "$root/merchant-stdin"
+grep -q -- '--end merchant --username MerchantBot --actor 01ACTORPUBLICID' "$root/merchant-docker.log"
+! grep -R -q -- "$merchant_token" "$root/merchant-error" "$root/merchant-docker.log" "$root/merchant-sql"
+grep -q -- 'DROP ROLE IF EXISTS' "$root/merchant-sql"
+
 if "$script_dir/admin-bootstrap.sh" --bot >/dev/null 2>"$root/missing-args"; then exit 1; fi
 if "$script_dir/admin-bootstrap.sh" --bot driver --bot-username 'BadBot' --actor-username 'Test Admin' </dev/null >/dev/null 2>"$root/bad-end"; then exit 1; fi
 grep -q -- 'usage:' "$root/missing-args"
