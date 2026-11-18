@@ -57,8 +57,8 @@ func (w FulfillmentOutboxWorker) RunOnce(ctx context.Context) error {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE logistics.fulfillment_outbox
-		SET status='retry', next_attempt_at=clock_timestamp(), updated_at=clock_timestamp()
-		WHERE status='processing' AND updated_at < clock_timestamp() - ($1 * interval '1 second')`, lease.Seconds()); err != nil {
+		SET status='retry', next_attempt_at=$2, updated_at=clock_timestamp()
+		WHERE status='processing' AND updated_at < clock_timestamp() - ($1 * interval '1 second')`, lease.Seconds(), now); err != nil {
 		_ = tx.Rollback(ctx)
 		return err
 	}
