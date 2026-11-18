@@ -79,6 +79,8 @@ const notificationSettingLabels: Record<string, TranslationKey> = {
   "account.status_changed": "notification.event.accountStatusChanged", "agreement.updated": "notification.event.agreementUpdated",
   "withdrawal.settled": "notification.event.withdrawalSettled", "settlement.settled": "notification.event.settlementSettled"
 };
+const defaultBuyerNotificationSettings: ApiSetting[] = Object.keys(notificationSettingLabels).map((event_type) => ({ event_type, in_app_enabled: true, telegram_enabled: true }));
+const mergeNotificationSettings = (items: ApiSetting[]) => defaultBuyerNotificationSettings.map((fallback) => items.find((item) => item.event_type === fallback.event_type) ?? fallback).concat(items.filter((item) => !notificationSettingLabels[item.event_type]));
 const localized = (values: Record<string, string>, language: Language) => values[language] || values.en || values.zh || values.km || "";
 
 export function NotificationView({ client, language, t, onBack, onNavigate, onUnreadCountChange }: { client: BuyerApiClient; language: Language; t: Translate; onBack: () => void; onNavigate: (target: string) => void; onUnreadCountChange?: (count: number) => void }) {
@@ -95,7 +97,7 @@ export function NotificationView({ client, language, t, onBack, onNavigate, onUn
         client.GET("/v1/buyer/me/notification-settings")
       ]);
       if (!notifications.data?.data || !preferences.data?.data) throw new Error("notification response missing");
-      setItems(notifications.data.data.items); setUnread(notifications.data.data.unread_count); onUnreadCountChange?.(notifications.data.data.unread_count); setSettings(preferences.data.data.items);
+      setItems(notifications.data.data.items); setUnread(notifications.data.data.unread_count); onUnreadCountChange?.(notifications.data.data.unread_count); setSettings(mergeNotificationSettings(preferences.data.data.items));
     } catch { setError(t("notification.loadFailed")); } finally { setLoading(false); }
   }, [client, onUnreadCountChange, t]);
   useEffect(() => { void load(); }, [load]);
@@ -123,5 +125,5 @@ export function NotificationView({ client, language, t, onBack, onNavigate, onUn
       await load();
     } catch { setError(t("notification.actionFailed")); }
   };
-  return <main className="buyer-page"><section className="buyer-page__body"><Button variant="text" onClick={onBack}>{t("common.back")}</Button><Card><div className="v7-page-heading"><h1 className="buyer-section__title">{t("buyer.notifications")}</h1>{unread ? <StatusTag tone="warning">{unread}</StatusTag> : null}</div>{loading ? <p role="status">{t("common.loading")}</p> : error ? <p role="alert">{error} <Button variant="secondary" onClick={() => void load()}>{t("notification.retry")}</Button></p> : <><NotificationList items={items.map((item) => ({ id: item.public_id, title: localized(item.title, language), description: localized(item.body, language), unread: !item.read_at }))} markAllLabel={t("buyer.markAllRead")} onMarkAllRead={() => void markAllRead()} onSelect={select} /><h2>{t("notification.settings")}</h2>{settings.map((setting) => <label key={setting.event_type}><input type="checkbox" checked={setting.telegram_enabled} onChange={(event) => void updateSetting({ ...setting, telegram_enabled: event.target.checked })} /> {t(notificationSettingLabels[setting.event_type] ?? "notification.title")} {t("notification.telegram")}</label>)}</>}</Card></section></main>;
+  return <main className="buyer-page"><section className="buyer-page__body"><Button variant="text" onClick={onBack}>{t("common.back")}</Button><Card><div className="v7-page-heading"><h1 className="buyer-section__title">{t("buyer.notifications")}</h1>{unread ? <StatusTag tone="warning">{unread}</StatusTag> : null}</div>{loading ? <p role="status">{t("common.loading")}</p> : error ? <p role="alert">{error} <Button variant="secondary" onClick={() => void load()}>{t("notification.retry")}</Button></p> : <><NotificationList items={items.map((item) => ({ id: item.public_id, title: localized(item.title, language), description: localized(item.body, language), unread: !item.read_at }))} markAllLabel={t("buyer.markAllRead")} onMarkAllRead={() => void markAllRead()} onSelect={select} /><h2>{t("notification.settings")}</h2>{settings.map((setting) => <label className="buyer-notification-setting" key={setting.event_type}><span>{t(notificationSettingLabels[setting.event_type] ?? "notification.title")} {t("notification.telegram")}</span><input type="checkbox" checked={setting.telegram_enabled} onChange={(event) => void updateSetting({ ...setting, telegram_enabled: event.target.checked })} /></label>)}</>}</Card></section></main>;
 }
