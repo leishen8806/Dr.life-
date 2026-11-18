@@ -1,0 +1,133 @@
+head=8999c96
+buyer-home-360-light-zh.png	Dr.life+	商品分类
+buyer-profile-360-light-zh.png	Dr.life+	Sokha Trading
+buyer-wallet-360-light-zh.png	Dr.life+	钱包
+buyer-orders-list-360-light-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情
+buyer-orders-detail-360-light-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）
+buyer-notifications-360-light-zh.png	Dr.life+	通知
+buyer-home-360-light-en.png	Dr.life+	Categories
+buyer-profile-360-light-en.png	Dr.life+	Sokha Trading
+buyer-wallet-360-light-en.png	Dr.life+	Wallet
+buyer-orders-list-360-light-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details
+buyer-orders-detail-360-light-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)
+buyer-notifications-360-light-en.png	Dr.life+	Notifications
+buyer-home-360-light-km.png	Dr.life+	ប្រភេទទំនិញ
+buyer-profile-360-light-km.png	Dr.life+	Sokha Trading
+buyer-wallet-360-light-km.png	Dr.life+	កាបូប
+buyer-orders-list-360-light-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន
+buyer-orders-detail-360-light-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)
+buyer-notifications-360-light-km.png	Dr.life+	ការជូនដំណឹង
+buyer-home-360-dark-zh.png	Dr.life+	商品分类
+buyer-profile-360-dark-zh.png	Dr.life+	Sokha Trading
+buyer-wallet-360-dark-zh.png	Dr.life+	钱包
+buyer-orders-list-360-dark-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情
+buyer-orders-detail-360-dark-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）
+buyer-notifications-360-dark-zh.png	Dr.life+	通知
+buyer-home-360-dark-en.png	Dr.life+	Categories
+buyer-profile-360-dark-en.png	Dr.life+	Sokha Trading
+buyer-wallet-360-dark-en.png	Dr.life+	Wallet
+buyer-orders-list-360-dark-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details
+buyer-orders-detail-360-dark-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)
+buyer-notifications-360-dark-en.png	Dr.life+	Notifications
+buyer-home-360-dark-km.png	Dr.life+	ប្រភេទទំនិញ
+buyer-profile-360-dark-km.png	Dr.life+	Sokha Trading
+buyer-wallet-360-dark-km.png	Dr.life+	កាបូប
+buyer-orders-list-360-dark-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន
+buyer-orders-detail-360-dark-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)
+buyer-notifications-360-dark-km.png	Dr.life+	ការជូនដំណឹង
+buyer-home-430-light-zh.png	Dr.life+	商品分类
+buyer-profile-430-light-zh.png	Dr.life+	Sokha Trading
+buyer-wallet-430-light-zh.png	Dr.life+	钱包
+buyer-orders-list-430-light-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情
+buyer-orders-detail-430-light-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）
+buyer-notifications-430-light-zh.png	Dr.life+	通知
+buyer-home-430-light-en.png	Dr.life+	Categories
+buyer-profile-430-light-en.png	Dr.life+	Sokha Trading
+buyer-wallet-430-light-en.png	Dr.life+	Wallet
+buyer-orders-list-430-light-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details
+buyer-orders-detail-430-light-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)
+buyer-notifications-430-light-en.png	Dr.life+	Notifications
+buyer-home-430-light-km.png	Dr.life+	ប្រភេទទំនិញ
+buyer-profile-430-light-km.png	Dr.life+	Sokha Trading
+buyer-wallet-430-light-km.png	Dr.life+	កាបូប
+buyer-orders-list-430-light-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន
+buyer-orders-detail-430-light-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)
+buyer-notifications-430-light-km.png	Dr.life+	ការជូនដំណឹង
+buyer-home-430-dark-zh.png	Dr.life+	商品分类
+buyer-profile-430-dark-zh.png	Dr.life+	Sokha Trading
+buyer-wallet-430-dark-zh.png	Dr.life+	钱包
+buyer-orders-list-430-dark-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情
+buyer-orders-detail-430-dark-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）
+buyer-notifications-430-dark-zh.png	Dr.life+	通知
+buyer-home-430-dark-en.png	Dr.life+	Categories
+buyer-profile-430-dark-en.png	Dr.life+	Sokha Trading
+buyer-wallet-430-dark-en.png	Dr.life+	Wallet
+buyer-orders-list-430-dark-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details
+buyer-orders-detail-430-dark-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)
+buyer-notifications-430-dark-en.png	Dr.life+	Notifications
+buyer-home-430-dark-km.png	Dr.life+	ប្រភេទទំនិញ
+buyer-profile-430-dark-km.png	Dr.life+	Sokha Trading
+buyer-wallet-430-dark-km.png	Dr.life+	កាបូប
+buyer-orders-list-430-dark-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន
+buyer-orders-detail-430-dark-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)
+buyer-notifications-430-dark-km.png	Dr.life+	ការជូនដំណឹង
+merchant-home-360-light-zh.png	Dr.life+	商品管理
+merchant-merchant-profile-360-light-zh.png	Dr.life+	Mekong Home
+merchant-merchant-demands-360-light-zh.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-360-light-zh.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-360-light-zh.png	Dr.life+	消息通知设置
+merchant-home-360-light-en.png	Dr.life+	Products
+merchant-merchant-profile-360-light-en.png	Dr.life+	Mekong Home
+merchant-merchant-demands-360-light-en.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-360-light-en.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-360-light-en.png	Dr.life+	Notification settings
+merchant-home-360-light-km.png	Dr.life+	ទំនិញ
+merchant-merchant-profile-360-light-km.png	Dr.life+	Mekong Home
+merchant-merchant-demands-360-light-km.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-360-light-km.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-360-light-km.png	Dr.life+	ការកំណត់ជូនដំណឹង
+merchant-home-360-dark-zh.png	Dr.life+	商品管理
+merchant-merchant-profile-360-dark-zh.png	Dr.life+	Mekong Home
+merchant-merchant-demands-360-dark-zh.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-360-dark-zh.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-360-dark-zh.png	Dr.life+	消息通知设置
+merchant-home-360-dark-en.png	Dr.life+	Products
+merchant-merchant-profile-360-dark-en.png	Dr.life+	Mekong Home
+merchant-merchant-demands-360-dark-en.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-360-dark-en.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-360-dark-en.png	Dr.life+	Notification settings
+merchant-home-360-dark-km.png	Dr.life+	ទំនិញ
+merchant-merchant-profile-360-dark-km.png	Dr.life+	Mekong Home
+merchant-merchant-demands-360-dark-km.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-360-dark-km.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-360-dark-km.png	Dr.life+	ការកំណត់ជូនដំណឹង
+merchant-home-430-light-zh.png	Dr.life+	商品管理
+merchant-merchant-profile-430-light-zh.png	Dr.life+	Mekong Home
+merchant-merchant-demands-430-light-zh.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-430-light-zh.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-430-light-zh.png	Dr.life+	消息通知设置
+merchant-home-430-light-en.png	Dr.life+	Products
+merchant-merchant-profile-430-light-en.png	Dr.life+	Mekong Home
+merchant-merchant-demands-430-light-en.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-430-light-en.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-430-light-en.png	Dr.life+	Notification settings
+merchant-home-430-light-km.png	Dr.life+	ទំនិញ
+merchant-merchant-profile-430-light-km.png	Dr.life+	Mekong Home
+merchant-merchant-demands-430-light-km.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-430-light-km.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-430-light-km.png	Dr.life+	ការកំណត់ជូនដំណឹង
+merchant-home-430-dark-zh.png	Dr.life+	商品管理
+merchant-merchant-profile-430-dark-zh.png	Dr.life+	Mekong Home
+merchant-merchant-demands-430-dark-zh.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-430-dark-zh.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-430-dark-zh.png	Dr.life+	消息通知设置
+merchant-home-430-dark-en.png	Dr.life+	Products
+merchant-merchant-profile-430-dark-en.png	Dr.life+	Mekong Home
+merchant-merchant-demands-430-dark-en.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-430-dark-en.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-430-dark-en.png	Dr.life+	Notification settings
+merchant-home-430-dark-km.png	Dr.life+	ទំនិញ
+merchant-merchant-profile-430-dark-km.png	Dr.life+	Mekong Home
+merchant-merchant-demands-430-dark-km.png	Dr.life+	Mekong Home
+merchant-merchant-warehouse-430-dark-km.png	Dr.life+	Mekong Home
+merchant-merchant-notifications-430-dark-km.png	Dr.life+	ការកំណត់ជូនដំណឹង
