@@ -9,9 +9,10 @@ username=$2
 compose_file=${STAGING_COMPOSE_FILE:-compose.yaml}
 env_file=${STAGING_ENV_FILE:-.env}
 docker_bin=${DOCKER_BIN:-docker}
+sudo_bin=${SUDO_BIN:-sudo}
 docker_cmd() {
   if [ "${DOCKER_USE_SUDO:-0}" = 1 ]; then
-    sudo "$docker_bin" "$@"
+    "$sudo_bin" --preserve-env=IAM_DATABASE_URL "$docker_bin" "$@"
   else
     "$docker_bin" "$@"
   fi
