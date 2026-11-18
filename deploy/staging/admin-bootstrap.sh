@@ -9,14 +9,17 @@ username=$2
 compose_file=${STAGING_COMPOSE_FILE:-compose.yaml}
 env_file=${STAGING_ENV_FILE:-.env}
 docker_bin=${DOCKER_BIN:-docker}
-docker_cmd=("$docker_bin")
-if [ "${DOCKER_USE_SUDO:-0}" = 1 ]; then
-  docker_cmd=(sudo "$docker_bin")
-fi
+docker_cmd() {
+  if [ "${DOCKER_USE_SUDO:-0}" = 1 ]; then
+    sudo "$docker_bin" "$@"
+  else
+    "$docker_bin" "$@"
+  fi
+}
 bootstrap_role="drlife_admininit_$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
 bootstrap_password=$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')
 cleanup() {
-  if ! "${docker_cmd[@]}" compose --env-file "$env_file" -f "$compose_file" exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_ADMIN_USER:-postgres}" -d "${POSTGRES_DB:-drlife_staging}" <<SQL >/dev/null 2>&1
+  if ! docker_cmd compose --env-file "$env_file" -f "$compose_file" exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_ADMIN_USER:-postgres}" -d "${POSTGRES_DB:-drlife_staging}" <<SQL >/dev/null 2>&1
 DROP ROLE IF EXISTS "$bootstrap_role";
 SQL
   then
@@ -26,7 +29,7 @@ SQL
 }
 trap cleanup EXIT HUP INT TERM
 
-"${docker_cmd[@]}" compose --env-file "$env_file" -f "$compose_file" exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_ADMIN_USER:-postgres}" -d "${POSTGRES_DB:-drlife_staging}" <<SQL
+docker_cmd compose --env-file "$env_file" -f "$compose_file" exec -T postgres psql -v ON_ERROR_STOP=1 -U "${POSTGRES_ADMIN_USER:-postgres}" -d "${POSTGRES_DB:-drlife_staging}" <<SQL
 CREATE ROLE "$bootstrap_role" LOGIN PASSWORD '$bootstrap_password';
 GRANT iam_rw TO "$bootstrap_role";
 GRANT audit_writer TO "$bootstrap_role";
@@ -34,4 +37,4 @@ SQL
 
 iam_database_url="postgres://${bootstrap_role}:${bootstrap_password}@postgres:5432/${POSTGRES_DB:-drlife_staging}?sslmode=disable"
 export IAM_DATABASE_URL="$iam_database_url"
-"${docker_cmd[@]}" compose --env-file "$env_file" -f "$compose_file" run --rm --no-deps -T --entrypoint /admininit -e IAM_DATABASE_URL api super --username "$username"
+docker_cmd compose --env-file "$env_file" -f "$compose_file" run --rm --no-deps -T --entrypoint /admininit -e IAM_DATABASE_URL api super --username "$username"
