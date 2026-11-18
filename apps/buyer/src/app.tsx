@@ -26,8 +26,7 @@ import { PaymentView } from "./views/payment-view";
 import { SearchView, useProductSearch } from "./views/search-view";
 import { createBuyerProfileApi, type BuyerProfile } from "./profile/profile-api";
 import { BuyerProfileView, BuyerWalletView } from "./profile/profile-views";
-import { BuyerNotificationsView } from "./notifications-view";
-import { AftercareView, DecorView } from "./v7-views";
+import { AftercareView, DecorView, NotificationView } from "./v7-views";
 
 type Route =
   | { name: "home" }
@@ -444,6 +443,12 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const orderDetail = useOrderDetail(client, route.name === "order" ? route.publicId : "", language);
   const loadProfile = useCallback(() => profileApi.loadProfile(language), [language, profileApi]);
   const [profile, retryProfile] = useLoaded<BuyerProfile>(language, async () => loadProfile(), true);
+  const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
+  useEffect(() => {
+    void client.GET("/v1/buyer/me/notifications", { params: { query: { limit: 1 } } }).then((result) => {
+      if (result.data?.data) setNotificationUnreadCount(result.data.data.unread_count);
+    }).catch(() => undefined);
+  }, [client]);
 
   const addToCart = useCallback((product: Product) => {
     const result = addProduct(cart, product);
@@ -482,11 +487,8 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       <Button variant="secondary" className="buyer-profile-action" onClick={openProfile}>
         {t("nav.profile")}
       </Button>
-      <Button variant="secondary" className="buyer-notifications-action" onClick={openNotifications}>
-        {t("notification.title")}
-      </Button>
       <Button variant="secondary" className="buyer-decor-action" onClick={openDecor}>{t("buyer.findDecor")}</Button>
-      <NotificationBell label={t("buyer.notifications")} unreadCount={2} onClick={openNotifications} className="buyer-notifications-bell" />
+      <NotificationBell label={t("buyer.notifications")} unreadCount={notificationUnreadCount} onClick={openNotifications} className="buyer-notifications-bell" />
     </>
   );
   const knownCategories = categories.status === "ready" ? categories.value : [];
@@ -562,7 +564,7 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     return <BuyerWalletView entries={profile.status === "ready" ? { status: "ready", value: profile.value.entries } : profile.status === "error" ? { status: "error", messageKey: profile.messageKey } : profile} language={language} t={t} onBack={back} onRetry={retryProfile} />;
 
   if (route.name === "notifications")
-    return <BuyerNotificationsView client={client} onBack={back} />;
+    return <NotificationView client={client} language={language} t={t} onBack={back} onNavigate={(target) => target === "orders" ? openOrders() : openProfile()} onUnreadCountChange={setNotificationUnreadCount} />;
 
   if (route.name === "profile")
     return <BuyerProfileView profile={profile} language={language} t={t} onOpenWallet={openWallet} onOpenOrders={openOrders} onRetry={retryProfile} />;

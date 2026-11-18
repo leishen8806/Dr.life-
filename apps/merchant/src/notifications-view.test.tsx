@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { I18nProvider } from "@drlife/i18n";
+import { I18nProvider, t as translate } from "@drlife/i18n";
 import type { createApiClient } from "@drlife/api-client";
-import { MerchantNotificationsView, createNotificationIdempotencyKey } from "./notifications-view";
+import { createNotificationIdempotencyKey } from "./notifications-view";
+import { MerchantV7NotificationSettings } from "./merchant-v7-notifications";
 
 const notification = { public_id: "01HZY0000000000000000NOTIF", event_id: "evt-1", event_type: "order.created", title: { zh: "订单", en: "Order", km: "បញ្ជាទិញ" }, body: { zh: "已创建", en: "Created", km: "បានបង្កើត" }, read_at: null, created_at: "2026-11-18T00:00:00Z" };
 
@@ -18,12 +19,12 @@ function fakeClient() {
   return client as unknown as ReturnType<typeof createApiClient>;
 }
 
-describe("MerchantNotificationsView", () => {
+describe("Merchant V7 notifications", () => {
   it("loads real notification/settings endpoints and marks one item read", async () => {
     const client = fakeClient();
-    render(<I18nProvider initialLanguage="en"><MerchantNotificationsView client={client} onBack={vi.fn()} /></I18nProvider>);
+    render(<I18nProvider initialLanguage="en"><MerchantV7NotificationSettings client={client} language="en" t={(key, params) => translate(key, params, "en")} onBack={vi.fn()} /></I18nProvider>);
     expect(await screen.findByText("Order")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
+    fireEvent.click(screen.getByRole("button", { name: /Order/ }));
     await waitFor(() => expect(client.POST).toHaveBeenCalledWith("/v1/merchant/me/notifications/{public_id}/read", expect.anything()));
     const readRequest = (client.POST as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1] as { params: { path: { public_id: string }; header: { "Idempotency-Key": string } } };
     expect(readRequest.params.path.public_id).toBe(notification.public_id.toLowerCase());
