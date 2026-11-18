@@ -6,8 +6,10 @@
 CREATE OR REPLACE FUNCTION trade.guard_merchant_order_update() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF NEW.public_id <> OLD.public_id OR NEW.buyer_order_id <> OLD.buyer_order_id
-       OR NEW.merchant_id <> OLD.merchant_id OR NEW.external_order_id <> OLD.external_order_id
-       OR NEW.total_e4 <> OLD.total_e4 OR NEW.created_at <> OLD.created_at THEN
+       OR NEW.merchant_id <> OLD.merchant_id OR NEW.merchant_public_id IS DISTINCT FROM OLD.merchant_public_id OR NEW.external_order_id <> OLD.external_order_id
+       OR NEW.total_e4 <> OLD.total_e4 OR NEW.goods_amount_e4 <> OLD.goods_amount_e4
+       OR NEW.shipping_amount_e4 <> OLD.shipping_amount_e4 OR NEW.payable_amount_e4 <> OLD.payable_amount_e4
+       OR NEW.shipping_quote_expires_at IS DISTINCT FROM OLD.shipping_quote_expires_at OR NEW.created_at <> OLD.created_at THEN
         RAISE EXCEPTION 'trade.merchant_order business facts are immutable' USING ERRCODE = '55000';
     END IF;
     IF NEW.status <> OLD.status THEN

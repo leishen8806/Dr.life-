@@ -588,6 +588,10 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	if _, err := db.Exec(`UPDATE trade.merchant_order SET status='awaiting_payment' WHERE id=1`); err == nil {
 		t.Fatal("direct status rollback unexpectedly succeeded")
 	}
+	assertPGCode(t, func() error {
+		_, err := db.Exec(`UPDATE trade.merchant_order SET goods_amount_e4=99 WHERE id=1`)
+		return err
+	}(), "55000")
 	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FAV", 100, source); err != nil || applied {
 		t.Fatalf("replay after state rollback applied=%v err=%v", applied, err)
 	}
