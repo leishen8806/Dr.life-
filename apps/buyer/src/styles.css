@@ -53,6 +53,10 @@
   padding: var(--drl-space-3);
 }
 
+.notification-center {
+  margin-inline: var(--drl-space-2);
+}
+
 .buyer-section__title {
   margin: 0 0 var(--drl-space-3);
   font-size: var(--drl-font-size-lg);

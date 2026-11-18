@@ -202,6 +202,7 @@ try {
           { name: "notifications", open: async () => {
             await page.locator(".buyer-notifications-action").click();
             await page.locator(".notification-center").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".notification-center li").first().waitFor({ state: "visible", timeout: 10_000 });
           } }
         ] : [
           { name: "home" },
@@ -224,6 +225,7 @@ try {
           { name: "merchant-notifications", open: async () => {
             await page.locator(".merchant-notifications-action").click();
             await page.locator(".notification-center").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".notification-center li").first().waitFor({ state: "visible", timeout: 10_000 });
           } }
         ];
         for (const target of targets) {
