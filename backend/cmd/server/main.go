@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -149,6 +150,13 @@ func main() {
 	directory := catalogDirectory{db: database}
 	catalogService := catalog.New(catalog.NewPgStore(database), catalog.Options{Merchants: directory})
 	tradeStore := trade.NewPostgresStore(database)
+	serviceLevel := strings.TrimSpace(os.Getenv("ROUTEFIT_DEFAULT_SERVICE_LEVEL"))
+	if serviceLevel == "" {
+		serviceLevel = "S1"
+	}
+	tradeStore.SetFulfillmentEnqueuer(func(ctx context.Context, tx pgx.Tx, merchantOrderID string) (bool, error) {
+		return logistics.EnqueuePaidFulfillmentTx(ctx, tx, merchantOrderID, serviceLevel)
+	})
 	routeFitReceiver := logistics.RouteFitReceiver{
 		Verifier: logistics.RouteFitWebhookVerifier{Secrets: logistics.RouteFitSecrets(cfg.RouteFitEventSecrets)},
 		Record: func(r *http.Request, event logistics.RouteFitEvent, body []byte) error {

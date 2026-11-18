@@ -12,6 +12,17 @@ import (
 
 var ErrSKUMappingMissing = errors.New("logistics: SKU_MAPPING_MISSING")
 
+func EnqueuePaidFulfillmentTx(ctx context.Context, tx pgx.Tx, merchantOrderPublicID, serviceLevel string) (bool, error) {
+	command, err := BuildFulfillmentCommandTx(ctx, tx, merchantOrderPublicID, serviceLevel)
+	if errors.Is(err, ErrSKUMappingMissing) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return false, EnqueueFulfillmentTx(ctx, tx, command)
+}
+
 // BuildFulfillmentCommandTx reads the trade order and the logistics-owned SKU
 // map in the caller's transaction. It deliberately returns no RouteFit
 // command when a map is absent or disabled; the caller can move the suborder

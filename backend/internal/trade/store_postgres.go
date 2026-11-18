@@ -22,7 +22,12 @@ type tradeDB interface {
 
 // PostgresStore persists only trade-owned tables. Cross-module identifiers are
 // received as values by the service and are never joined here.
-type PostgresStore struct{ db tradeDB }
+type FulfillmentEnqueuer func(context.Context, pgx.Tx, string) (mappingMissing bool, err error)
+
+type PostgresStore struct {
+	db          tradeDB
+	fulfillment FulfillmentEnqueuer
+}
 
 type EventStore interface {
 	Advance(ctx context.Context, merchantOrderID int64, from, to OrderStatus, source EventSource) (bool, error)
@@ -33,6 +38,10 @@ var _ Store = (*PostgresStore)(nil)
 var _ OrderReader = (*PostgresStore)(nil)
 
 func NewPostgresStore(db tradeDB) *PostgresStore { return &PostgresStore{db: db} }
+
+func (s *PostgresStore) SetFulfillmentEnqueuer(enqueuer FulfillmentEnqueuer) {
+	s.fulfillment = enqueuer
+}
 
 func (s *PostgresStore) FindByIdempotency(ctx context.Context, buyerID int64, key, requestHash string) (CreateOrder, bool, error) {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
@@ -502,7 +511,12 @@ func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID s
 	}
 	var key, errorCode string
 	var applied, reconciliationRequired bool
-	err := s.db.QueryRow(ctx, `SELECT reservation_key,applied,reconciliation_required,error_code FROM trade.confirm_order_payment($1,$2,$3)`, buyerOrderPublicID, source.Reference, paidAmountE4).Scan(&key, &applied, &reconciliationRequired, &errorCode)
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return "", false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	err = tx.QueryRow(ctx, `SELECT reservation_key,applied,reconciliation_required,error_code FROM trade.confirm_order_payment($1,$2,$3)`, buyerOrderPublicID, source.Reference, paidAmountE4).Scan(&key, &applied, &reconciliationRequired, &errorCode)
 	if err == nil {
 		switch errorCode {
 		case "TR001":
@@ -512,6 +526,37 @@ func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID s
 		}
 		if reconciliationRequired {
 			return key, false, ErrPaymentReconciliation
+		}
+		if applied && s.fulfillment != nil {
+			rows, queryErr := tx.Query(ctx, `SELECT public_id FROM trade.merchant_order WHERE buyer_order_id=(SELECT id FROM trade.buyer_order WHERE public_id=$1) ORDER BY id`, buyerOrderPublicID)
+			if queryErr != nil {
+				return "", false, queryErr
+			}
+			defer rows.Close()
+			for rows.Next() {
+				var merchantOrderID string
+				if scanErr := rows.Scan(&merchantOrderID); scanErr != nil {
+					return "", false, scanErr
+				}
+				missing, enqueueErr := s.fulfillment(ctx, tx, merchantOrderID)
+				if enqueueErr != nil {
+					return "", false, enqueueErr
+				}
+				if missing {
+					if _, eventErr := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) SELECT id,buyer_order_id,'paid','exception','system','SKU_MAPPING_MISSING' FROM trade.merchant_order WHERE public_id=$1 AND status='paid'`, merchantOrderID); eventErr != nil {
+						return "", false, eventErr
+					}
+					if _, updateErr := tx.Exec(ctx, `UPDATE trade.merchant_order SET status='exception',version=version+1,updated_at=clock_timestamp() WHERE public_id=$1 AND status='paid'`, merchantOrderID); updateErr != nil {
+						return "", false, updateErr
+					}
+				}
+			}
+			if rowsErr := rows.Err(); rowsErr != nil {
+				return "", false, rowsErr
+			}
+		}
+		if commitErr := tx.Commit(ctx); commitErr != nil {
+			return "", false, commitErr
 		}
 		return key, applied, nil
 	}
