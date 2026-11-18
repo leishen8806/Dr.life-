@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type TranslationKey, useI18n } from "@drlife/i18n";
-import { Button, LanguageSwitcher, useBackButton } from "@drlife/ui";
+import { Button, LanguageSwitcher, NotificationBell, useBackButton } from "@drlife/ui";
 import {
   type BuyerApiClient,
   type BuyerOrderPage,
@@ -26,6 +26,7 @@ import { PaymentView } from "./views/payment-view";
 import { SearchView, useProductSearch } from "./views/search-view";
 import { createBuyerProfileApi, type BuyerProfile } from "./profile/profile-api";
 import { BuyerProfileView, BuyerWalletView } from "./profile/profile-views";
+import { AftercareView, DecorView, NotificationView } from "./v7-views";
 
 type Route =
   | { name: "home" }
@@ -37,7 +38,10 @@ type Route =
   | { name: "payment"; order: BuyerOrder; attempt: PaymentAttempt }
   | { name: "cart" }
   | { name: "profile" }
-  | { name: "wallet" };
+  | { name: "wallet" }
+  | { name: "decor" }
+  | { name: "aftercare" }
+  | { name: "notifications" };
 
 const featuredPageSize = 6;
 
@@ -448,6 +452,9 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
   const openCart = useCallback(() => push({ name: "cart" }), [push]);
   const openProfile = useCallback(() => push({ name: "profile" }), [push]);
   const openWallet = useCallback(() => push({ name: "wallet" }), [push]);
+  const openDecor = useCallback(() => push({ name: "decor" }), [push]);
+  const openAftercare = useCallback(() => push({ name: "aftercare" }), [push]);
+  const openNotifications = useCallback(() => push({ name: "notifications" }), [push]);
   const updateCartQuantity = useCallback((item: CartItem, quantity: string) => {
     const result = updateQuantity(cart, item.product.public_id, quantity);
     setCart(result.cart);
@@ -475,6 +482,8 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
       <Button variant="secondary" className="buyer-profile-action" onClick={openProfile}>
         {t("nav.profile")}
       </Button>
+      <Button variant="secondary" className="buyer-decor-action" onClick={openDecor}>{t("buyer.findDecor")}</Button>
+      <NotificationBell label={t("buyer.notifications")} unreadCount={2} onClick={openNotifications} className="buyer-notifications-action" />
     </>
   );
   const knownCategories = categories.status === "ready" ? categories.value : [];
@@ -551,6 +560,15 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
 
   if (route.name === "profile")
     return <BuyerProfileView profile={profile} language={language} t={t} onOpenWallet={openWallet} onOpenOrders={openOrders} onRetry={retryProfile} />;
+
+  if (route.name === "decor")
+    return <DecorView language={language} t={t} onBack={back} onOpenNotifications={openNotifications} />;
+
+  if (route.name === "aftercare")
+    return <AftercareView t={t} onBack={back} />;
+
+  if (route.name === "notifications")
+    return <NotificationView language={language} t={t} onBack={back} onNavigate={(target) => { if (target === "order") openAftercare(); else openProfile(); }} />;
 
   if (route.name === "search")
     return (

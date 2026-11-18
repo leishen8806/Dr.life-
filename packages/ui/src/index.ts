@@ -11,6 +11,8 @@ export {
   FormField,
   ImagePlaceholder,
   ListItem,
+  NotificationBell,
+  NotificationList,
   Loading,
   Money,
   MoneyWithI18n,
@@ -26,6 +28,7 @@ export {
   Toast,
   type NavigationItem
 } from "./foundation";
+export type { NotificationListItem } from "./foundation";
 export { LanguageSwitcher, LanguageSwitcherView } from "./language-switcher";
 export { StartupGate, useStartup, type Startup } from "./startup-gate";
 export {
