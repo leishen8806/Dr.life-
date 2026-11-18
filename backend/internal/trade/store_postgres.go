@@ -520,11 +520,20 @@ func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID s
 	if err == nil {
 		switch errorCode {
 		case "TR001":
+			if commitErr := tx.Commit(ctx); commitErr != nil {
+				return "", false, commitErr
+			}
 			return key, false, ErrReservationReleased
 		case "TR002":
+			if commitErr := tx.Commit(ctx); commitErr != nil {
+				return "", false, commitErr
+			}
 			return key, false, ErrPaymentAmount
 		}
 		if reconciliationRequired {
+			if commitErr := tx.Commit(ctx); commitErr != nil {
+				return "", false, commitErr
+			}
 			return key, false, ErrPaymentReconciliation
 		}
 		if applied && s.fulfillment != nil {
