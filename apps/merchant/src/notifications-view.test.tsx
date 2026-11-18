@@ -58,6 +58,11 @@ describe("Merchant V7 notifications", () => {
     const settingRequest = (client.PUT as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1] as { params: { header: { "Idempotency-Key": string } } };
     expect(settingRequest.params.header["Idempotency-Key"]).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
     await waitFor(() => expect(orderSetting.checked).toBe(false));
-    expect(screen.getAllByRole("checkbox").slice(-10)).toHaveLength(10);
+    expect(screen.getAllByRole("checkbox").slice(-5)).toHaveLength(5);
+    expect(screen.queryByText("Payment confirmed")).toBeNull();
+    expect(screen.queryByText("Order shipped")).toBeNull();
+    expect(screen.queryByText("Order delivered")).toBeNull();
+    expect(screen.queryByText("Withdrawal settled")).toBeNull();
+    expect(screen.queryByText("Settlement settled")).toBeNull();
   });
 });

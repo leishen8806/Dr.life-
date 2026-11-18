@@ -73,14 +73,12 @@ export const mockNotifications: NotificationItem[] = [
 type ApiNotification = import("@drlife/api-client").components["schemas"]["Notification"];
 type ApiSetting = import("@drlife/api-client").components["schemas"]["NotificationSetting"];
 const notificationSettingLabels: Record<string, TranslationKey> = {
-  "order.created": "notification.event.orderCreated", "payment.confirmed": "notification.event.paymentConfirmed",
-  "order.shipped": "notification.event.orderShipped", "order.delivered": "notification.event.orderDelivered",
-  "product.moderated": "notification.event.productModerated", "warehouse.received": "notification.event.warehouseReceived",
-  "account.status_changed": "notification.event.accountStatusChanged", "agreement.updated": "notification.event.agreementUpdated",
-  "withdrawal.settled": "notification.event.withdrawalSettled", "settlement.settled": "notification.event.settlementSettled"
+  "payment.confirmed": "notification.event.paymentConfirmed", "order.shipped": "notification.event.orderShipped",
+  "order.delivered": "notification.event.orderDelivered", "account.status_changed": "notification.event.accountStatusChanged",
+  "agreement.updated": "notification.event.agreementUpdated"
 };
 const defaultBuyerNotificationSettings: ApiSetting[] = Object.keys(notificationSettingLabels).map((event_type) => ({ event_type, in_app_enabled: true, telegram_enabled: true }));
-const mergeNotificationSettings = (items: ApiSetting[]) => defaultBuyerNotificationSettings.map((fallback) => items.find((item) => item.event_type === fallback.event_type) ?? fallback).concat(items.filter((item) => !notificationSettingLabels[item.event_type]));
+const mergeNotificationSettings = (items: ApiSetting[]) => defaultBuyerNotificationSettings.map((fallback) => items.find((item) => item.event_type === fallback.event_type) ?? fallback);
 const localized = (values: Record<string, string>, language: Language) => values[language] || values.en || values.zh || values.km || "";
 
 export function NotificationView({ client, language, t, onBack, onNavigate, onUnreadCountChange }: { client: BuyerApiClient; language: Language; t: Translate; onBack: () => void; onNavigate: (target: string) => void; onUnreadCountChange?: (count: number) => void }) {

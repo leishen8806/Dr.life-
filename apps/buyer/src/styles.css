@@ -7,7 +7,7 @@
 .v7-tabs button, .v7-choice-grid button, .v7-category-grid button { min-height: 44px; padding: var(--drl-space-2); border: 1px solid var(--drl-color-border); border-radius: var(--drl-radius); color: inherit; background: var(--drl-color-surface); font: inherit; }
 .v7-tabs button[aria-pressed="true"], .v7-choice-grid button[aria-pressed="true"], .v7-category-grid button[aria-pressed="true"] { color: var(--drl-color-text-on-brand); background: var(--drl-color-brand); }
 .v7-search-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, .45fr); gap: var(--drl-space-2); }
-.v7-search-row input, .v7-search-row select, .buyer-page textarea, .buyer-page input:not([type="radio"]):not([type="file"]), .buyer-page select { box-sizing: border-box; width: 100%; min-height: 44px; padding: var(--drl-space-2); border: 1px solid var(--drl-color-border-strong); border-radius: var(--drl-radius); color: inherit; background: var(--drl-color-surface); font: inherit; }
+.v7-search-row input, .v7-search-row select, .buyer-page textarea, .buyer-page input:not([type="radio"]):not([type="file"]):not([type="checkbox"]), .buyer-page select { box-sizing: border-box; width: 100%; min-height: 44px; padding: var(--drl-space-2); border: 1px solid var(--drl-color-border-strong); border-radius: var(--drl-radius); color: inherit; background: var(--drl-color-surface); font: inherit; }
 .v7-category-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--drl-space-2); }
 .v7-case-grid { display: grid; gap: var(--drl-space-2); grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .v7-card-button { display: grid; gap: var(--drl-space-2); width: 100%; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; text-align: start; }

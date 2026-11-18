@@ -7,9 +7,9 @@ import { createNotificationIdempotencyKey } from "./notifications-view";
 type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
 type ApiNotification = import("@drlife/api-client").components["schemas"]["Notification"];
 type ApiSetting = import("@drlife/api-client").components["schemas"]["NotificationSetting"];
-const eventLabels: Record<string, TranslationKey> = { "order.created": "notification.event.orderCreated", "payment.confirmed": "notification.event.paymentConfirmed", "order.shipped": "notification.event.orderShipped", "order.delivered": "notification.event.orderDelivered", "product.moderated": "notification.event.productModerated", "warehouse.received": "notification.event.warehouseReceived", "account.status_changed": "notification.event.accountStatusChanged", "agreement.updated": "notification.event.agreementUpdated", "withdrawal.settled": "notification.event.withdrawalSettled", "settlement.settled": "notification.event.settlementSettled" };
+const eventLabels: Record<string, TranslationKey> = { "order.created": "notification.event.orderCreated", "product.moderated": "notification.event.productModerated", "warehouse.received": "notification.event.warehouseReceived", "account.status_changed": "notification.event.accountStatusChanged", "agreement.updated": "notification.event.agreementUpdated" };
 const defaultMerchantNotificationSettings: ApiSetting[] = Object.keys(eventLabels).map((event_type) => ({ event_type, in_app_enabled: true, telegram_enabled: true }));
-const mergeNotificationSettings = (items: ApiSetting[]) => defaultMerchantNotificationSettings.map((fallback) => items.find((item) => item.event_type === fallback.event_type) ?? fallback).concat(items.filter((item) => !eventLabels[item.event_type]));
+const mergeNotificationSettings = (items: ApiSetting[]) => defaultMerchantNotificationSettings.map((fallback) => items.find((item) => item.event_type === fallback.event_type) ?? fallback);
 const localized = (values: Record<string, string>, language: Language) => values[language] || values.en || values.zh || values.km || "";
 
 export function MerchantV7NotificationSettings({ client, language, t, onBack }: { client?: ReturnType<typeof createApiClient>; language: Language; t: Translate; onBack: () => void }) {

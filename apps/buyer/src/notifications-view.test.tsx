@@ -18,7 +18,7 @@ function fakeClient() {
       if (path.endsWith("/read-all")) allRead = true;
       return Promise.resolve({ data: { data: { updated: true } } });
     }),
-    PUT: vi.fn(() => Promise.resolve({ data: { data: { items: [{ event_type: "order.created", in_app_enabled: true, telegram_enabled: false }] } } }))
+    PUT: vi.fn(() => Promise.resolve({ data: { data: { items: [{ event_type: "payment.confirmed", in_app_enabled: true, telegram_enabled: false }] } } }))
   };
   return client as unknown as BuyerApiClient;
 }
@@ -45,8 +45,8 @@ describe("Buyer V7 NotificationView", () => {
   it("renders default settings and sends read-all and setting updates", async () => {
     const client = fakeClient();
     render(<I18nProvider initialLanguage="en"><NotificationView client={client} language="en" t={(key, params) => translate(key, params, "en")} onBack={vi.fn()} onNavigate={vi.fn()} /></I18nProvider>);
-    await screen.findByRole("checkbox", { name: /New order/i });
-    const orderSetting = screen.getAllByRole("checkbox", { name: /New order/i }).at(-1)! as HTMLInputElement;
+    await screen.findByRole("checkbox", { name: /Payment confirmed/i });
+    const orderSetting = screen.getAllByRole("checkbox", { name: /Payment confirmed/i }).at(-1)! as HTMLInputElement;
     expect(screen.getAllByRole("checkbox").length).toBeGreaterThan(1);
     fireEvent.click(screen.getAllByRole("button", { name: "Mark all read" }).at(-1)!);
     await waitFor(() => expect(client.POST).toHaveBeenCalledWith("/v1/buyer/me/notifications/read-all", expect.anything()));
@@ -58,6 +58,8 @@ describe("Buyer V7 NotificationView", () => {
     const settingRequest = (client.PUT as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1] as { params: { header: { "Idempotency-Key": string } } };
     expect(settingRequest.params.header["Idempotency-Key"]).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
     await waitFor(() => expect(orderSetting.checked).toBe(false));
-    expect(screen.getAllByRole("checkbox").slice(-10)).toHaveLength(10);
+    expect(screen.getAllByRole("checkbox").slice(-5)).toHaveLength(5);
+    expect(screen.queryByText("Withdrawal settled")).toBeNull();
+    expect(screen.queryByText("Settlement settled")).toBeNull();
   });
 });
