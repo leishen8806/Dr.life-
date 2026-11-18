@@ -55,11 +55,17 @@ func TestConfirmPaymentEnqueuesFulfillmentAndHandlesMissingMapping(t *testing.T)
 	} {
 		if _, err := db.Exec(`
 			INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,payable_amount_e4)
-			VALUES ($1,7,$2,repeat('a',64),100,100,100);
+			VALUES ($1,7,$2,repeat('a',64),100,100,100)`, fixture.buyer, fixture.merchant); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`
 			INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,shipping_amount_e4,payable_amount_e4)
-			VALUES ($2,(SELECT id FROM trade.buyer_order WHERE public_id=$1),7,'merchant-public',100,100,0,100);
+			VALUES ($1,(SELECT id FROM trade.buyer_order WHERE public_id=$2),7,'merchant-public',100,100,0,100)`, fixture.merchant, fixture.buyer); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Exec(`
 			INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4)
-			VALUES ((SELECT id FROM trade.merchant_order WHERE public_id=$2),$3,1,100,100)`, fixture.buyer, fixture.merchant, fixture.sku); err != nil {
+			VALUES ((SELECT id FROM trade.merchant_order WHERE public_id=$1),$2,1,100,100)`, fixture.merchant, fixture.sku); err != nil {
 			t.Fatal(err)
 		}
 	}
