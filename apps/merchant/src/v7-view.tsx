@@ -1,39 +1,537 @@
 import { useRef, useState } from "react";
-import { Button, Card, FormField, ListItem, Money, NotificationBell as BaseNotificationBell, NotificationList, StatusTag } from "@drlife/ui";
+import {
+  Button,
+  Card,
+  FormField,
+  ListItem,
+  Money,
+  NotificationBell as BaseNotificationBell,
+  NotificationList,
+  StatusTag
+} from "@drlife/ui";
 import type { Language, TranslationKey } from "@drlife/i18n";
 import type { createApiClient } from "@drlife/api-client";
 import { MerchantV7NotificationSettings } from "./merchant-v7-notifications";
 
-type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
-export interface CompanyDraft { name: string; address: string; category: string; employees: string; stores: string; city: string; }
-export function validateCompany(draft: CompanyDraft, t: Translate): string[] { return [draft.name, draft.address, draft.category, draft.city].map((value) => value.trim() ? "" : t("validation.required")).filter(Boolean); }
-export function canWriteMerchant(isDev: boolean): boolean { return isDev; }
+type Translate = (
+  key: TranslationKey,
+  params?: Record<string, string | number>
+) => string;
+export interface CompanyDraft {
+  name: string;
+  address: string;
+  category: string;
+  employees: string;
+  stores: string;
+  city: string;
+}
+export function validateCompany(draft: CompanyDraft, t: Translate): string[] {
+  return [draft.name, draft.address, draft.category, draft.city]
+    .map((value) => (value.trim() ? "" : t("validation.required")))
+    .filter(Boolean);
+}
+export function canWriteMerchant(isDev: boolean): boolean {
+  return isDev;
+}
 
 const sourceKeys = ["1688", "amazon", "shopee", "csv"] as const;
 const notices = ["order", "wallet", "product", "warehouse"] as const;
-const profileEntries = ["finance", "employeeManagement", "aiAssistant", "advertisingCampaign", "relatedAccounts"] as const;
+const profileEntries = [
+  "finance",
+  "employeeManagement",
+  "aiAssistant",
+  "advertisingCampaign",
+  "relatedAccounts"
+] as const;
 
-export function MerchantV7View({ language, t, onBack, client, unreadCount = 0 }: { language: Language; t: Translate; onBack: () => void; client?: ReturnType<typeof createApiClient>; unreadCount?: number }) {
-  const [page, setPage] = useState<"dashboard" | "profile" | "import" | "notifications" | "onboarding">("dashboard");
-  const NotificationBell = (props: { label: string; unreadCount?: number; onClick: () => void }) => <BaseNotificationBell {...props} testId="merchant-notifications" unreadCount={unreadCount} />;
-  if (page === "profile") return <ProfilePage t={t} onBack={() => setPage("dashboard")} onOnboarding={() => setPage("onboarding")} />;
-  if (page === "import") return <ImportPage t={t} onBack={() => setPage("dashboard")} />;
-  if (page === "notifications") return <MerchantV7NotificationSettings client={client} language={language} t={t} onBack={() => setPage("dashboard")} />;
-  if (page === "onboarding") return <OnboardingPage t={t} onBack={() => setPage("profile")} />;
-  return <main className="mini-shell merchant-v7"><div className="v7-page-heading"><Button variant="secondary" onClick={onBack}>{t("common.back")}</Button><NotificationBell label={t("merchant.notificationSettings")} unreadCount={3} onClick={() => setPage("notifications")} /><Button variant="secondary" className="merchant-v7-profile-action" onClick={() => setPage("profile")}>{t("nav.profile")}</Button></div><header className="merchant-v7__hero"><p>{t("merchant.dashboard")}</p><h1>{t("merchant.dashboardTitle")}</h1></header><div className="merchant-v7__metrics"><Card><strong>12</strong><span>{t("merchant.todayOrders")}</span></Card><Card><strong>38</strong><span>{t("merchant.weekOrders")}</span></Card><Card><Money value="6800000" language={language} translate={t} /><span>{t("merchant.weekRevenue")}</span></Card><Card><strong>4</strong><span>{t("merchant.pendingTasks")}</span></Card></div><Card><div className="profile-card-heading"><h2>{t("merchant.fulfilmentCost")}</h2><StatusTag tone="neutral">{t("merchant.simulated")}</StatusTag></div><Money value="125000" language={language} translate={t} /></Card><button type="button" className="merchant-v7__warehouse" onClick={() => setPage("dashboard")}><strong>{t("merchant.warehouseEntry")}</strong><div className="merchant-v7__warehouse-values"><span><strong>42 m³</strong> {t("merchant.inventory")}</span><span><Money value="125000" language={language} translate={t} /> {t("merchant.storageFee")}</span></div></button><div className="merchant-v7__placeholder"><Card><strong>{t("merchant.advertising")}</strong><span>{t("common.comingSoon")}</span></Card><Card><strong>{t("merchant.aiAssistant")}</strong><span>{t("common.comingSoon")}</span></Card></div><div className="merchant-v7__entries"><ListItem title={t("merchant.importProducts")} onClick={() => setPage("import")} /><ListItem title={t("merchant.notificationSettings")} onClick={() => setPage("notifications")} /><ListItem title={t("merchant.finance")} /><ListItem title={t("merchant.employees")} /><ListItem title={t("merchant.companyProfile")} /></div></main>;
+export function MerchantV7View({
+  language,
+  t,
+  onBack,
+  client,
+  unreadCount = 0
+}: {
+  language: Language;
+  t: Translate;
+  onBack: () => void;
+  client?: ReturnType<typeof createApiClient>;
+  unreadCount?: number;
+}) {
+  const [page, setPage] = useState<
+    "dashboard" | "profile" | "import" | "notifications" | "onboarding"
+  >("dashboard");
+  const NotificationBell = (props: {
+    label: string;
+    unreadCount?: number;
+    onClick: () => void;
+  }) => (
+    <BaseNotificationBell
+      {...props}
+      testId="merchant-notifications"
+      unreadCount={unreadCount}
+    />
+  );
+  if (page === "profile")
+    return (
+      <ProfilePage
+        t={t}
+        onBack={() => setPage("dashboard")}
+        onOnboarding={() => setPage("onboarding")}
+      />
+    );
+  if (page === "import")
+    return <ImportPage t={t} onBack={() => setPage("dashboard")} />;
+  if (page === "notifications")
+    return (
+      <MerchantV7NotificationSettings
+        client={client}
+        language={language}
+        t={t}
+        onBack={() => setPage("dashboard")}
+      />
+    );
+  if (page === "onboarding")
+    return <OnboardingPage t={t} onBack={() => setPage("profile")} />;
+  return (
+    <main className="mini-shell merchant-v7">
+      <div className="v7-page-heading">
+        <Button variant="secondary" onClick={onBack}>
+          {t("common.back")}
+        </Button>
+        <NotificationBell
+          label={t("merchant.notificationSettings")}
+          unreadCount={3}
+          onClick={() => setPage("notifications")}
+        />
+        <Button
+          variant="secondary"
+          className="merchant-v7-profile-action"
+          testId="merchant-profile"
+          onClick={() => setPage("profile")}
+        >
+          {t("nav.profile")}
+        </Button>
+      </div>
+      <header className="merchant-v7__hero">
+        <p>{t("merchant.dashboard")}</p>
+        <h1>{t("merchant.dashboardTitle")}</h1>
+      </header>
+      <div className="merchant-v7__metrics">
+        <Card>
+          <strong>12</strong>
+          <span>{t("merchant.todayOrders")}</span>
+        </Card>
+        <Card>
+          <strong>38</strong>
+          <span>{t("merchant.weekOrders")}</span>
+        </Card>
+        <Card>
+          <Money value="6800000" language={language} translate={t} />
+          <span>{t("merchant.weekRevenue")}</span>
+        </Card>
+        <Card>
+          <strong>4</strong>
+          <span>{t("merchant.pendingTasks")}</span>
+        </Card>
+      </div>
+      <Card>
+        <div className="profile-card-heading">
+          <h2>{t("merchant.fulfilmentCost")}</h2>
+          <StatusTag tone="neutral">{t("merchant.simulated")}</StatusTag>
+        </div>
+        <Money value="125000" language={language} translate={t} />
+      </Card>
+      <button
+        type="button"
+        className="merchant-v7__warehouse"
+        onClick={() => setPage("dashboard")}
+      >
+        <strong>{t("merchant.warehouseEntry")}</strong>
+        <div className="merchant-v7__warehouse-values">
+          <span>
+            <strong>42 m³</strong> {t("merchant.inventory")}
+          </span>
+          <span>
+            <Money value="125000" language={language} translate={t} />{" "}
+            {t("merchant.storageFee")}
+          </span>
+        </div>
+      </button>
+      <div className="merchant-v7__placeholder">
+        <Card>
+          <strong>{t("merchant.advertising")}</strong>
+          <span>{t("common.comingSoon")}</span>
+        </Card>
+        <Card>
+          <strong>{t("merchant.aiAssistant")}</strong>
+          <span>{t("common.comingSoon")}</span>
+        </Card>
+      </div>
+      <div className="merchant-v7__entries">
+        <ListItem
+          title={t("merchant.importProducts")}
+          onClick={() => setPage("import")}
+        />
+        <ListItem
+          title={t("merchant.notificationSettings")}
+          onClick={() => setPage("notifications")}
+        />
+        <ListItem title={t("merchant.finance")} />
+        <ListItem title={t("merchant.employees")} />
+        <ListItem title={t("merchant.companyProfile")} />
+      </div>
+    </main>
+  );
 }
 
-function ProfilePage({ t, onBack, onOnboarding }: { t: Translate; onBack: () => void; onOnboarding: () => void }) {
-  const [editing, setEditing] = useState(false); const [saved, setSaved] = useState(false); const [draft, setDraft] = useState<CompanyDraft>({ name: "Mekong Home", address: "Kandal", category: "Materials", employees: "8", stores: "1", city: "Phnom Penh" }); const errors = validateCompany(draft, t);
-  return <main className="mini-shell merchant-v7"><Button variant="text" onClick={onBack}>{t("common.back")}</Button><Card><h1>{t("merchant.companyProfile")}</h1>{saved ? <p role="status">{t("common.success")}</p> : null}{editing ? <form onSubmit={(event) => { event.preventDefault(); if (canWriteMerchant(import.meta.env.DEV) && !errors.length) { setSaved(true); setEditing(false); } }}><FormField label={t("merchant.companyName")} error={errors[0]}><input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></FormField><FormField label={t("merchant.address")} error={errors[1]}><input value={draft.address} onChange={(event) => setDraft({ ...draft, address: event.target.value })} /></FormField><FormField label={t("merchant.category")} error={errors[2]}><input value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} /></FormField><FormField label={t("merchant.city")} error={errors[3]}><input value={draft.city} onChange={(event) => setDraft({ ...draft, city: event.target.value })} /></FormField><Button type="submit" disabled={!import.meta.env.DEV}>{t("common.save")}</Button></form> : <><dl className="merchant-v7__facts"><dt>{t("merchant.companyName")}</dt><dd>{draft.name}</dd><dt>{t("merchant.address")}</dt><dd>{draft.address}</dd><dt>{t("merchant.category")}</dt><dd>{draft.category}</dd><dt>{t("merchant.city")}</dt><dd>{draft.city}</dd><dt>{t("merchant.employees")}</dt><dd>{draft.employees}</dd><dt>{t("merchant.stores")}</dt><dd>{draft.stores}</dd></dl><Button onClick={() => setEditing(true)}>{t("common.edit")}</Button></>}</Card><div className="merchant-v7__profile-entry"><Button variant="secondary" ariaLabel="business onboarding" onClick={onOnboarding}>{t("merchant.joinCompany")}</Button></div><div className="merchant-v7__profile-entry-list">{profileEntries.map((key) => <button type="button" disabled key={key}>{t(`merchant.${key}` as TranslationKey)}<span>{t("common.comingSoon")}</span></button>)}</div></main>;
+function ProfilePage({
+  t,
+  onBack,
+  onOnboarding
+}: {
+  t: Translate;
+  onBack: () => void;
+  onOnboarding: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [draft, setDraft] = useState<CompanyDraft>({
+    name: "Mekong Home",
+    address: "Kandal",
+    category: "Materials",
+    employees: "8",
+    stores: "1",
+    city: "Phnom Penh"
+  });
+  const errors = validateCompany(draft, t);
+  return (
+    <main className="mini-shell merchant-v7">
+      <Button variant="text" onClick={onBack}>
+        {t("common.back")}
+      </Button>
+      <Card>
+        <h1>{t("merchant.companyProfile")}</h1>
+        {saved ? <p role="status">{t("common.success")}</p> : null}
+        {editing ? (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (canWriteMerchant(import.meta.env.DEV) && !errors.length) {
+                setSaved(true);
+                setEditing(false);
+              }
+            }}
+          >
+            <FormField label={t("merchant.companyName")} error={errors[0]}>
+              <input
+                value={draft.name}
+                onChange={(event) =>
+                  setDraft({ ...draft, name: event.target.value })
+                }
+              />
+            </FormField>
+            <FormField label={t("merchant.address")} error={errors[1]}>
+              <input
+                value={draft.address}
+                onChange={(event) =>
+                  setDraft({ ...draft, address: event.target.value })
+                }
+              />
+            </FormField>
+            <FormField label={t("merchant.category")} error={errors[2]}>
+              <input
+                value={draft.category}
+                onChange={(event) =>
+                  setDraft({ ...draft, category: event.target.value })
+                }
+              />
+            </FormField>
+            <FormField label={t("merchant.city")} error={errors[3]}>
+              <input
+                value={draft.city}
+                onChange={(event) =>
+                  setDraft({ ...draft, city: event.target.value })
+                }
+              />
+            </FormField>
+            <Button type="submit" disabled={!import.meta.env.DEV}>
+              {t("common.save")}
+            </Button>
+          </form>
+        ) : (
+          <>
+            <dl className="merchant-v7__facts">
+              <dt>{t("merchant.companyName")}</dt>
+              <dd>{draft.name}</dd>
+              <dt>{t("merchant.address")}</dt>
+              <dd>{draft.address}</dd>
+              <dt>{t("merchant.category")}</dt>
+              <dd>{draft.category}</dd>
+              <dt>{t("merchant.city")}</dt>
+              <dd>{draft.city}</dd>
+              <dt>{t("merchant.employees")}</dt>
+              <dd>{draft.employees}</dd>
+              <dt>{t("merchant.stores")}</dt>
+              <dd>{draft.stores}</dd>
+            </dl>
+            <Button
+              testId="merchant-profile-edit"
+              onClick={() => setEditing(true)}
+            >
+              {t("common.edit")}
+            </Button>
+          </>
+        )}
+      </Card>
+      <div className="merchant-v7__profile-entry">
+        <Button
+          variant="secondary"
+          ariaLabel="business onboarding"
+          testId="merchant-onboarding"
+          onClick={onOnboarding}
+        >
+          {t("merchant.joinCompany")}
+        </Button>
+      </div>
+      <div className="merchant-v7__profile-entry-list">
+        {profileEntries.map((key) => (
+          <button type="button" disabled key={key}>
+            {t(`merchant.${key}` as TranslationKey)}
+            <span>{t("common.comingSoon")}</span>
+          </button>
+        ))}
+      </div>
+    </main>
+  );
 }
 
 function ImportPage({ t, onBack }: { t: Translate; onBack: () => void }) {
-  const [source, setSource] = useState<typeof sourceKeys[number]>("1688"); const [rights, setRights] = useState(false); const [imported, setImported] = useState(false);
-  return <main className="mini-shell merchant-v7"><Button variant="text" onClick={onBack}>{t("common.back")}</Button><Card><h1>{t("merchant.importProducts")}</h1><FormField label={t("merchant.importSource")}><select value={source} onChange={(event) => setSource(event.target.value as typeof source)}>{sourceKeys.map((key) => <option key={key} value={key}>{t(`merchant.source.${key}` as TranslationKey)}</option>)}</select></FormField><div className="merchant-v7__preview"><strong>{t("merchant.preview")}</strong><ListItem title={t("merchant.sampleProduct")} description={t("merchant.waitingReview")} /></div><label className="merchant-v7__rights"><input type="checkbox" checked={rights} onChange={(event) => setRights(event.target.checked)} />{t("merchant.rightsConfirm")}</label>{imported ? <p role="status">{t("merchant.imported")}</p> : null}<Button disabled={!rights || !import.meta.env.DEV} onClick={() => setImported(true)}>{t("merchant.import")}</Button>{!import.meta.env.DEV && <p role="status">{t("common.comingSoon")}</p>}</Card></main>;
+  const [source, setSource] = useState<(typeof sourceKeys)[number]>("1688");
+  const [rights, setRights] = useState(false);
+  const [imported, setImported] = useState(false);
+  return (
+    <main className="mini-shell merchant-v7">
+      <Button variant="text" onClick={onBack}>
+        {t("common.back")}
+      </Button>
+      <Card>
+        <h1>{t("merchant.importProducts")}</h1>
+        <FormField label={t("merchant.importSource")}>
+          <select
+            value={source}
+            onChange={(event) => setSource(event.target.value as typeof source)}
+          >
+            {sourceKeys.map((key) => (
+              <option key={key} value={key}>
+                {t(`merchant.source.${key}` as TranslationKey)}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <div className="merchant-v7__preview">
+          <strong>{t("merchant.preview")}</strong>
+          <ListItem
+            title={t("merchant.sampleProduct")}
+            description={t("merchant.waitingReview")}
+          />
+        </div>
+        <label className="merchant-v7__rights">
+          <input
+            type="checkbox"
+            checked={rights}
+            onChange={(event) => setRights(event.target.checked)}
+          />
+          {t("merchant.rightsConfirm")}
+        </label>
+        {imported ? <p role="status">{t("merchant.imported")}</p> : null}
+        <Button
+          disabled={!rights || !import.meta.env.DEV}
+          onClick={() => setImported(true)}
+        >
+          {t("merchant.import")}
+        </Button>
+        {!import.meta.env.DEV && <p role="status">{t("common.comingSoon")}</p>}
+      </Card>
+    </main>
+  );
 }
 
-function NotificationSettings({ t, onBack }: { t: Translate; onBack: () => void }) { const [saved, setSaved] = useState(false); const [enabled, setEnabled] = useState<Record<string, boolean>>({ order: true, wallet: true, product: false, warehouse: true }); const [items, setItems] = useState(notices.map((notice, index) => ({ id: notice, title: t(`merchant.notice.${notice}` as TranslationKey), description: t("merchant.notificationSettings"), unread: index !== 2 }))); return <main className="mini-shell merchant-v7"><Button variant="text" onClick={onBack}>{t("common.back")}</Button><Card><h1>{t("merchant.notificationSettings")}</h1><NotificationList items={items} markAllLabel={t("buyer.markAllRead")} onMarkAllRead={() => setItems((current) => current.map((item) => ({ ...item, unread: false })))} onSelect={(id) => setItems((current) => current.map((item) => item.id === id ? { ...item, unread: false } : item))} />{notices.map((notice) => <label className="merchant-v7__switch" key={notice}><span>{t(`merchant.notice.${notice}` as TranslationKey)}</span><input type="checkbox" checked={enabled[notice]} onChange={(event) => setEnabled({ ...enabled, [notice]: event.target.checked })} /></label>)}<Button disabled={!import.meta.env.DEV} onClick={() => setSaved(true)}>{t("common.save")}</Button>{saved ? <p role="status">{t("common.success")}</p> : null}{!import.meta.env.DEV && <p role="status">{t("common.comingSoon")}</p>}</Card><Card><h2>{t("merchant.help")}</h2><div className="merchant-v7__legal-links"><a href="/privacy" target="_blank" rel="noreferrer">{t("consent.privacy")}</a><a href="/terms" target="_blank" rel="noreferrer">{t("consent.terms")}</a></div></Card></main>; }
+function NotificationSettings({
+  t,
+  onBack
+}: {
+  t: Translate;
+  onBack: () => void;
+}) {
+  const [saved, setSaved] = useState(false);
+  const [enabled, setEnabled] = useState<Record<string, boolean>>({
+    order: true,
+    wallet: true,
+    product: false,
+    warehouse: true
+  });
+  const [items, setItems] = useState(
+    notices.map((notice, index) => ({
+      id: notice,
+      title: t(`merchant.notice.${notice}` as TranslationKey),
+      description: t("merchant.notificationSettings"),
+      unread: index !== 2
+    }))
+  );
+  return (
+    <main className="mini-shell merchant-v7">
+      <Button variant="text" onClick={onBack}>
+        {t("common.back")}
+      </Button>
+      <Card>
+        <h1>{t("merchant.notificationSettings")}</h1>
+        <NotificationList
+          items={items}
+          markAllLabel={t("buyer.markAllRead")}
+          onMarkAllRead={() =>
+            setItems((current) =>
+              current.map((item) => ({ ...item, unread: false }))
+            )
+          }
+          onSelect={(id) =>
+            setItems((current) =>
+              current.map((item) =>
+                item.id === id ? { ...item, unread: false } : item
+              )
+            )
+          }
+        />
+        {notices.map((notice) => (
+          <label className="merchant-v7__switch" key={notice}>
+            <span>{t(`merchant.notice.${notice}` as TranslationKey)}</span>
+            <input
+              type="checkbox"
+              checked={enabled[notice]}
+              onChange={(event) =>
+                setEnabled({ ...enabled, [notice]: event.target.checked })
+              }
+            />
+          </label>
+        ))}
+        <Button disabled={!import.meta.env.DEV} onClick={() => setSaved(true)}>
+          {t("common.save")}
+        </Button>
+        {saved ? <p role="status">{t("common.success")}</p> : null}
+        {!import.meta.env.DEV && <p role="status">{t("common.comingSoon")}</p>}
+      </Card>
+      <Card>
+        <h2>{t("merchant.help")}</h2>
+        <div className="merchant-v7__legal-links">
+          <a href="/privacy" target="_blank" rel="noreferrer">
+            {t("consent.privacy")}
+          </a>
+          <a href="/terms" target="_blank" rel="noreferrer">
+            {t("consent.terms")}
+          </a>
+        </div>
+      </Card>
+    </main>
+  );
+}
 
-function OnboardingPage({ t, onBack }: { t: Translate; onBack: () => void }) { const [submitted, setSubmitted] = useState(false); const [name, setName] = useState(""); const [contact, setContact] = useState(""); const [phone, setPhone] = useState(""); const [licenseName, setLicenseName] = useState(""); const [licensePreview, setLicensePreview] = useState<string>(); const fileRef = useRef<HTMLInputElement>(null); return <main className="mini-shell merchant-v7"><Button variant="text" onClick={onBack}>{t("common.back")}</Button><Card><h1>{t("merchant.joinCompany")}</h1>{submitted ? <p role="status">{t("merchant.applicationPending")}</p> : <form onSubmit={(event) => { event.preventDefault(); if (name.trim() && contact.trim() && phone.trim() && import.meta.env.DEV) setSubmitted(true); }}><FormField label={t("merchant.companyName")}><input required value={name} onChange={(event) => setName(event.target.value)} /></FormField><FormField label={t("merchant.contact")}><input required value={contact} onChange={(event) => setContact(event.target.value)} /></FormField><FormField label={t("buyer.contact.phone")}><input required type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} /></FormField><FormField label={t("merchant.license")}><input ref={fileRef} className="merchant-v7__upload-input" type="file" accept="image/*,.pdf" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; setLicenseName(file.name); setLicensePreview(file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined); }} /><Button type="button" variant="secondary" onClick={() => fileRef.current?.click()}>{t("merchant.chooseLicense")}</Button>{licenseName && <small>{licenseName}</small>}{licensePreview && <img className="merchant-v7__upload-preview" src={licensePreview} alt={t("merchant.license")} />}</FormField><FormField label={t("merchant.category")}><input required /></FormField><Button type="submit" disabled={!import.meta.env.DEV}>{t("common.submit")}</Button>{!import.meta.env.DEV && <p role="status">{t("common.comingSoon")}</p>}</form>}</Card></main>; }
+function OnboardingPage({ t, onBack }: { t: Translate; onBack: () => void }) {
+  const [submitted, setSubmitted] = useState(false);
+  const [name, setName] = useState("");
+  const [contact, setContact] = useState("");
+  const [phone, setPhone] = useState("");
+  const [licenseName, setLicenseName] = useState("");
+  const [licensePreview, setLicensePreview] = useState<string>();
+  const fileRef = useRef<HTMLInputElement>(null);
+  return (
+    <main className="mini-shell merchant-v7">
+      <Button variant="text" onClick={onBack}>
+        {t("common.back")}
+      </Button>
+      <Card>
+        <h1>{t("merchant.joinCompany")}</h1>
+        {submitted ? (
+          <p role="status">{t("merchant.applicationPending")}</p>
+        ) : (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (
+                name.trim() &&
+                contact.trim() &&
+                phone.trim() &&
+                import.meta.env.DEV
+              )
+                setSubmitted(true);
+            }}
+          >
+            <FormField label={t("merchant.companyName")}>
+              <input
+                required
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+              />
+            </FormField>
+            <FormField label={t("merchant.contact")}>
+              <input
+                required
+                value={contact}
+                onChange={(event) => setContact(event.target.value)}
+              />
+            </FormField>
+            <FormField label={t("buyer.contact.phone")}>
+              <input
+                required
+                type="tel"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+              />
+            </FormField>
+            <FormField label={t("merchant.license")}>
+              <input
+                ref={fileRef}
+                className="merchant-v7__upload-input"
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  setLicenseName(file.name);
+                  setLicensePreview(
+                    file.type.startsWith("image/")
+                      ? URL.createObjectURL(file)
+                      : undefined
+                  );
+                }}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => fileRef.current?.click()}
+              >
+                {t("merchant.chooseLicense")}
+              </Button>
+              {licenseName && <small>{licenseName}</small>}
+              {licensePreview && (
+                <img
+                  className="merchant-v7__upload-preview"
+                  src={licensePreview}
+                  alt={t("merchant.license")}
+                />
+              )}
+            </FormField>
+            <FormField label={t("merchant.category")}>
+              <input required />
+            </FormField>
+            <Button type="submit" disabled={!import.meta.env.DEV}>
+              {t("common.submit")}
+            </Button>
+            {!import.meta.env.DEV && (
+              <p role="status">{t("common.comingSoon")}</p>
+            )}
+          </form>
+        )}
+      </Card>
+    </main>
+  );
+}
 export { NotificationSettings };
