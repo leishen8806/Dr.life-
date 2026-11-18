@@ -11,7 +11,7 @@ export function MerchantV4View({ api, language, t, onBack }: { api: MerchantV4Ap
   const [warehouse, setWarehouse] = useState<Resource<WarehouseSnapshot>>({ status: "loading" });
   const [section, setSection] = useState<"profile" | "demands" | "warehouse">("profile");
   const [attempt, setAttempt] = useState(0);
-  useEffect(() => { setProfile({ status: "loading" }); setWarehouse({ status: "loading" }); Promise.all([api.loadProfile(language), api.loadWarehouse(language)]).then(([nextProfile, nextWarehouse]) => { setProfile({ status: "ready", value: nextProfile }); setWarehouse({ status: "ready", value: nextWarehouse }); }, () => { setProfile({ status: "error" }); setWarehouse({ status: "error" }); }); }, [api, language, attempt]);
+  useEffect(() => { let active = true; Promise.all([api.loadProfile(language), api.loadWarehouse(language)]).then(([nextProfile, nextWarehouse]) => { if (!active) return; setProfile({ status: "ready", value: nextProfile }); setWarehouse({ status: "ready", value: nextWarehouse }); }, () => { if (!active) return; setProfile({ status: "error" }); setWarehouse({ status: "error" }); }); return () => { active = false; }; }, [api, language, attempt]);
   if (profile.status === "loading" || warehouse.status === "loading") return <main className="mini-shell"><Loading label={t("common.loading")} skeleton /></main>;
   if (profile.status === "error" || warehouse.status === "error") return <main className="mini-shell"><ErrorState title={t("common.failure")} description={t("common.networkError")} retryLabel={t("common.retry")} onRetry={() => setAttempt((value) => value + 1)} /></main>;
   const hasFinance = profile.value.permissions.includes("merchant.finance.view");
@@ -46,11 +46,12 @@ export function getDemandMetricCount(demands: MerchantDemand[], key: MetricKey):
   return demands.filter((demand) => demand.state === state).length;
 }
 
+const orderStates = ["awaitingPayment", "awaitingShipment", "inDelivery"] as const;
+
 function DemandBoard({ demands, api, language, t }: { demands: MerchantDemand[]; api: MerchantV4Api; language: Language; t: Translate }) {
   const [filter, setFilter] = useState<"all" | MerchantDemand["state"]>("all");
   const [view, setView] = useState<"orders" | "demands">("demands");
   const [active, setActive] = useState<MerchantDemand>();
-  const orderStates = ["awaitingPayment", "awaitingShipment", "inDelivery"] as const;
   const visible = useMemo(() => demands.filter((demand) => view === "orders" ? orderStates.includes(demand.state as typeof orderStates[number]) && (filter === "all" || demand.state === filter) : (filter === "all" || demand.state === filter)), [demands, filter, view]);
   const filters = view === "orders" ? (["all", ...orderStates] as const) : (["all", "open", "quoted", "selected", "selectedByOthers"] as const);
   return <section className="merchant-v4__section"><div className="merchant-v4__subtabs" role="tablist"><button type="button" aria-pressed={view === "orders"} onClick={() => { setView("orders"); setFilter("all"); setActive(undefined); }}>{t("merchant.ordersTab")}</button><button type="button" aria-pressed={view === "demands"} onClick={() => { setView("demands"); setFilter("all"); setActive(undefined); }}>{t("merchant.demandsTab")}</button></div><h2>{view === "orders" ? t("merchant.ordersTab") : t("merchant.demands")}</h2>{view === "demands" ? <div className="merchant-v4__metrics">{metricKeys.map((key) => { const count = getDemandMetricCount(demands, key); return count === undefined ? null : <button type="button" key={key} onClick={() => setFilter(metricStates[key] ?? "all")}><strong>{count}</strong><span>{t(`merchant.metric.${key}` as TranslationKey)}</span></button>; })}</div> : null}<div className="merchant-v4__filters">{filters.map((value) => <button type="button" key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{t(`merchant.filter.${value}` as TranslationKey)}</button>)}</div>{visible.length === 0 ? <EmptyState title={view === "orders" ? t("merchant.noOrders") : t("merchant.noDemands")} /> : <ul className="merchant-v4__demand-list">{visible.map((demand) => <li key={demand.id}><button type="button" onClick={() => setActive(demand)}><span><strong>{demand.title}</strong><small>{t("merchant.quantity")}: {demand.quantity}</small></span><Money value={String(demand.budgetE4)} language={language} translate={t} /></button></li>)}</ul>}{active && view === "demands" ? <QuotePanel demand={active} api={api} t={t} onClose={() => setActive(undefined)} /> : null}</section>;

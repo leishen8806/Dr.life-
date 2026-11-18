@@ -98,6 +98,68 @@ export function ListItem({
   );
 }
 
+export function NotificationBell({
+  label,
+  unreadCount,
+  onClick,
+  className
+}: {
+  label: string;
+  unreadCount: number;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={['drl-notification-bell', className].filter(Boolean).join(' ')}
+      aria-label={label}
+      onClick={onClick}
+    >
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" focusable="false">
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {unreadCount > 0 && <span className="drl-notification-bell__badge">{unreadCount}</span>}
+    </button>
+  );
+}
+
+export interface NotificationListItem {
+  id: string;
+  title: string;
+  description: string;
+  unread: boolean;
+}
+
+export function NotificationList({
+  items,
+  markAllLabel,
+  onMarkAllRead,
+  onSelect
+}: {
+  items: readonly NotificationListItem[];
+  markAllLabel: string;
+  onMarkAllRead: () => void;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="drl-notification-list">
+      <div className="drl-notification-list__toolbar">
+        <Button variant="secondary" onClick={onMarkAllRead}>{markAllLabel}</Button>
+      </div>
+      {items.map((item) => (
+        <ListItem
+          key={item.id}
+          title={item.title}
+          description={item.description}
+          trailing={item.unread ? <Badge>●</Badge> : undefined}
+          onClick={() => onSelect(item.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function Stepper({
   steps,
   current
