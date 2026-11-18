@@ -45,7 +45,8 @@ import {
   type BuyerProfile
 } from "./profile/profile-api";
 import { BuyerProfileView, BuyerWalletView } from "./profile/profile-views";
-import { AftercareView, DecorView, NotificationView } from "./v7-views";
+import { DecorView, NotificationView } from "./v7-views";
+import { AftercareView as SplitAftercareView } from "./v7-aftercare-view";
 
 type Route =
   | { name: "home" }
@@ -847,7 +848,8 @@ export function BuyerApp({
       />
     );
 
-  if (route.name === "aftercare") return <AftercareView t={t} onBack={back} />;
+  if (route.name === "aftercare")
+    return <SplitAftercareView t={t} onBack={back} />;
 
   if (route.name === "search")
     return (
