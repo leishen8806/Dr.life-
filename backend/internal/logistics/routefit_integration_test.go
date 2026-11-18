@@ -100,6 +100,60 @@ func TestRouteFitEventRecorderCommitsInboxAndDedupAtomically(t *testing.T) {
 	}
 }
 
+func TestBuildFulfillmentCommandUsesActiveSKUMap(t *testing.T) {
+	e := newRouteFitIntegrationEnvironment(t)
+	ctx := e.ctx
+	const categoryID = 991
+	const productID = 992
+	const skuID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+	const buyerID = "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+	const merchantOrderID = "01ARZ3NDEKTSV4RRFFQ69G5FAX"
+	if _, err := e.pool.Exec(ctx, `
+		INSERT INTO catalog.category (id, public_id, code, name) VALUES ($1,$2,$3,$4);
+		INSERT INTO catalog.product (id, public_id, merchant_id, category_id, name, unit, origin, status) VALUES ($5,$6,7,$1,$4,'piece','cn','on');
+		INSERT INTO catalog.sku (public_id, product_id, status) VALUES ($7,$5,'on');
+		INSERT INTO trade.buyer_order (public_id,buyer_account_id,idempotency_key,request_hash,total_e4,goods_amount_e4,payable_amount_e4) VALUES ($8,7,'sku-map-test',repeat('a',64),100,100,100);
+		INSERT INTO trade.merchant_order (public_id,buyer_order_id,merchant_id,merchant_public_id,total_e4,goods_amount_e4,payable_amount_e4) VALUES ($9,(SELECT id FROM trade.buyer_order WHERE public_id=$8),7,'merchant-public',100,100,100);
+		INSERT INTO trade.order_line (merchant_order_id,sku_public_id,quantity,unit_price_e4,line_total_e4) VALUES ((SELECT id FROM trade.merchant_order WHERE public_id=$9),$7,2,50,100);
+		INSERT INTO logistics.sku_map (product_id,routefit_sku_id,warehouse_id,unit_ratio,state) VALUES ($5,'routefit-sku','warehouse-1',2,'active')`, categoryID, "01ARZ3NDEKTSV4RRFFQ69G5FAY", "sku_map_test", `{"zh":"测试","en":"Test","km":"សាកល្បង"}`, productID, "01ARZ3NDEKTSV4RRFFQ69G5FAZ", skuID, buyerID, merchantOrderID); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := e.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	command, err := BuildFulfillmentCommandTx(ctx, tx, merchantOrderID, "")
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if command.ExternalOrderID != "DRL-"+merchantOrderID || command.OwnerRef != "merchant-public" || command.WarehouseID != "warehouse-1" || command.ServiceLevel != "S1" || len(command.Lines) != 1 || command.Lines[0].SKU != "routefit-sku" || command.Lines[0].Quantity != 4 {
+		t.Fatalf("unexpected fulfillment command: %+v", command)
+	}
+	if _, err := e.pool.Exec(ctx, `UPDATE logistics.sku_map SET state='disabled' WHERE product_id=$1`, productID); err != nil {
+		t.Fatal(err)
+	}
+	tx, err = e.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	missing, err := EnqueuePaidFulfillmentTx(ctx, tx, merchantOrderID, "S1")
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatal(err)
+	}
+	if !missing {
+		_ = tx.Rollback(ctx)
+		t.Fatal("disabled SKU mapping was accepted")
+	}
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestFulfillmentOutboxWorkerDispatchesRouteFitMock(t *testing.T) {
 	e := newRouteFitIntegrationEnvironment(t)
 	mock := routefitmock.New(routefitmock.Config{})
