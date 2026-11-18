@@ -50,6 +50,29 @@ func TestDeliverCreatesFulfillmentWithStableIdempotencyKey(t *testing.T) {
 	}
 }
 
+func TestDeliverCanonicalizesNestedJSONForOutboxReplay(t *testing.T) {
+	mock := seededMock()
+	server := httptest.NewServer(mock.Handler())
+	defer server.Close()
+
+	client := newClient(t, server.URL)
+	firstCommand := testCommand()
+	firstCommand.Delivery = json.RawMessage(`{"b":2,"a":1}`)
+	secondCommand := firstCommand
+	secondCommand.Delivery = json.RawMessage(`{"a":1,"b":2}`)
+	first, err := client.Deliver(context.Background(), firstCommand)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := client.Deliver(context.Background(), secondCommand)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.FulfillmentID == "" || second.FulfillmentID != first.FulfillmentID || !second.Duplicate {
+		t.Fatalf("unexpected results: %#v %#v", first, second)
+	}
+}
+
 func TestDeliverRetriesRetryableFailure(t *testing.T) {
 	mock := seededMock()
 	mock.SetFault(routefitmock.Fault{Status: http.StatusServiceUnavailable, Count: 1})

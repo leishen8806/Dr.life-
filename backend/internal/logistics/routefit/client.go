@@ -187,6 +187,12 @@ func (c *Client) Cancel(ctx context.Context, cmd CancelCmd) (Result, error) {
 }
 
 func (c *Client) create(ctx context.Context, cmd CreateShipmentCmd, key string) (Result, bool, error) {
+	// The fulfillment command is persisted in the outbox as jsonb. PostgreSQL
+	// may reorder object keys while round-tripping json.RawMessage values, so
+	// canonicalize nested JSON before encoding the request. This keeps the
+	// request body stable for RouteFit's idempotency contract across retries.
+	cmd.Delivery = canonicalJSON(cmd.Delivery)
+	cmd.RequestedDeliveryWindow = canonicalJSON(cmd.RequestedDeliveryWindow)
 	body, err := json.Marshal(struct {
 		CreateShipmentCmd
 		ExternalRevision int64  `json:"externalRevision"`
@@ -201,6 +207,21 @@ func (c *Client) create(ctx context.Context, cmd CreateShipmentCmd, key string) 
 		return Result{}, errors.Is(err, context.DeadlineExceeded), err
 	}
 	return response, false, nil
+}
+
+func canonicalJSON(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return raw
+	}
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return raw
+	}
+	canonical, err := json.Marshal(value)
+	if err != nil {
+		return raw
+	}
+	return canonical
 }
 
 func (c *Client) lookup(ctx context.Context, externalOrderID string) (Result, error) {
