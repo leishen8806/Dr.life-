@@ -159,8 +159,20 @@ func main() {
 	if serviceLevel == "" {
 		serviceLevel = "S2"
 	}
-	tradeStore.SetFulfillmentEnqueuer(func(ctx context.Context, tx pgx.Tx, merchantOrderID string) (bool, error) {
-		return logistics.EnqueuePaidFulfillmentTx(ctx, tx, merchantOrderID, serviceLevel)
+	tradeStore.SetFulfillmentEnqueuer(func(ctx context.Context, tx pgx.Tx, order trade.FulfillmentOrder, requestedServiceLevel string) (bool, error) {
+		lines := make([]logistics.FulfillmentLine, len(order.Lines))
+		for i, line := range order.Lines {
+			lines[i] = logistics.FulfillmentLine{SKU: line.SKU, Quantity: line.Quantity}
+		}
+		if requestedServiceLevel == "" {
+			requestedServiceLevel = serviceLevel
+		}
+		return logistics.EnqueuePaidFulfillmentTx(ctx, tx, logistics.FulfillmentOrder{
+			MerchantOrderPublicID: order.MerchantOrderPublicID,
+			ExternalOrderID:       order.ExternalOrderID,
+			OwnerRef:              order.OwnerRef,
+			Lines:                 lines,
+		}, requestedServiceLevel)
 	})
 	routeFitReceiver := logistics.RouteFitReceiver{
 		Verifier: logistics.RouteFitWebhookVerifier{Secrets: logistics.RouteFitSecrets(cfg.RouteFitEventSecrets)},

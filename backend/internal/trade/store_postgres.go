@@ -22,7 +22,19 @@ type tradeDB interface {
 
 // PostgresStore persists only trade-owned tables. Cross-module identifiers are
 // received as values by the service and are never joined here.
-type FulfillmentEnqueuer func(context.Context, pgx.Tx, string) (mappingMissing bool, err error)
+type FulfillmentLine struct {
+	SKU      string
+	Quantity int64
+}
+
+type FulfillmentOrder struct {
+	MerchantOrderPublicID string
+	ExternalOrderID       string
+	OwnerRef              string
+	Lines                 []FulfillmentLine
+}
+
+type FulfillmentEnqueuer func(context.Context, pgx.Tx, FulfillmentOrder, string) (mappingMissing bool, err error)
 
 type PostgresStore struct {
 	db          tradeDB
@@ -552,25 +564,47 @@ func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID s
 			return key, false, ErrPaymentReconciliation
 		}
 		if applied && s.fulfillment != nil {
-			rows, queryErr := tx.Query(ctx, `SELECT public_id FROM trade.merchant_order WHERE buyer_order_id=(SELECT id FROM trade.buyer_order WHERE public_id=$1) ORDER BY id`, buyerOrderPublicID)
+			rows, queryErr := tx.Query(ctx, `
+				SELECT child.public_id, COALESCE(child.merchant_public_id,''), line.sku_public_id, line.quantity
+				FROM trade.merchant_order child
+				JOIN trade.order_line line ON line.merchant_order_id = child.id
+				WHERE child.buyer_order_id=(SELECT id FROM trade.buyer_order WHERE public_id=$1)
+				ORDER BY child.id, line.id`, buyerOrderPublicID)
 			if queryErr != nil {
 				return "", false, queryErr
 			}
-			defer rows.Close()
+			orders := make([]FulfillmentOrder, 0)
+			orderIndex := make(map[string]int)
 			for rows.Next() {
-				var merchantOrderID string
-				if scanErr := rows.Scan(&merchantOrderID); scanErr != nil {
+				var orderID, ownerRef, sku string
+				var quantity int64
+				if scanErr := rows.Scan(&orderID, &ownerRef, &sku, &quantity); scanErr != nil {
+					rows.Close()
 					return "", false, scanErr
 				}
-				missing, enqueueErr := s.fulfillment(ctx, tx, merchantOrderID)
+				idx, ok := orderIndex[orderID]
+				if !ok {
+					idx = len(orders)
+					orderIndex[orderID] = idx
+					orders = append(orders, FulfillmentOrder{MerchantOrderPublicID: orderID, ExternalOrderID: "DRL-" + orderID, OwnerRef: ownerRef})
+				}
+				orders[idx].Lines = append(orders[idx].Lines, FulfillmentLine{SKU: sku, Quantity: quantity})
+			}
+			if rowsErr := rows.Err(); rowsErr != nil {
+				rows.Close()
+				return "", false, rowsErr
+			}
+			rows.Close()
+			for _, order := range orders {
+				missing, enqueueErr := s.fulfillment(ctx, tx, order, "")
 				if enqueueErr != nil {
 					return "", false, enqueueErr
 				}
 				if missing {
-					if _, eventErr := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) SELECT id,buyer_order_id,'paid','exception','system','SKU_MAPPING_MISSING' FROM trade.merchant_order WHERE public_id=$1 AND status='paid'`, merchantOrderID); eventErr != nil {
+					if _, eventErr := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) SELECT id,buyer_order_id,'paid','exception','system','SKU_MAPPING_MISSING' FROM trade.merchant_order WHERE public_id=$1 AND status='paid'`, order.MerchantOrderPublicID); eventErr != nil {
 						return "", false, eventErr
 					}
-					if _, updateErr := tx.Exec(ctx, `UPDATE trade.merchant_order SET status='exception',version=version+1,updated_at=clock_timestamp() WHERE public_id=$1 AND status='paid'`, merchantOrderID); updateErr != nil {
+					if _, updateErr := tx.Exec(ctx, `UPDATE trade.merchant_order SET status='exception',version=version+1,updated_at=clock_timestamp() WHERE public_id=$1 AND status='paid'`, order.MerchantOrderPublicID); updateErr != nil {
 						return "", false, updateErr
 					}
 				}

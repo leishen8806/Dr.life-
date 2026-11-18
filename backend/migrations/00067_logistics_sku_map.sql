@@ -1,6 +1,6 @@
 -- +goose Up
 CREATE TABLE logistics.sku_map (
-    product_id bigint PRIMARY KEY REFERENCES catalog.product(id) ON DELETE CASCADE,
+    sku_public_id text PRIMARY KEY CHECK (length(btrim(sku_public_id)) > 0),
     routefit_sku_id text NOT NULL CHECK (length(btrim(routefit_sku_id)) > 0),
     warehouse_id text NOT NULL CHECK (length(btrim(warehouse_id)) > 0),
     unit_ratio numeric(20,8) NOT NULL DEFAULT 1 CHECK (unit_ratio > 0),
