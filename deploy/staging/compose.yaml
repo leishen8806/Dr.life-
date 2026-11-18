@@ -47,6 +47,10 @@ services:
     env_file: ["${STAGING_ENV_FILE:-.env}"]
     environment: { APP_ENV: staging }
     entrypoint: [/routefitmock]
+    # The shared image healthcheck probes the API port; routefitmock has no
+    # HTTP listener on that port and must not report unhealthy for that reason.
+    healthcheck:
+      disable: true
   migrate:
     image: drlife-api:${APP_RELEASE:-staging}
     environment:
@@ -87,7 +91,7 @@ services:
     image: redis:7.4-alpine
     environment:
       REDIS_CACHE_PASSWORD: "${REDIS_CACHE_PASSWORD:?set REDIS_CACHE_PASSWORD}"
-    command: [sh, -c, 'exec redis-server --maxmemory-policy allkeys-lru --requirepass "$${REDIS_CACHE_PASSWORD}"']
+    command: [sh, -c, 'exec redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass "$${REDIS_CACHE_PASSWORD}"']
     volumes: [redis-cache:/data]
     healthcheck: { test: [CMD-SHELL, 'redis-cli -a "$${REDIS_CACHE_PASSWORD}" ping'] }
   buyer:
