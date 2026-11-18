@@ -8,10 +8,11 @@ cat > "$fake_bin/docker" <<'FAKE'
 set -euo pipefail
 printf '%s\n' "$*" >> "${FAKE_DOCKER_LOG:?}"
 if [[ $* == *' exec '* ]]; then
-  if [[ $* == *'SELECT public_id FROM iam.admin_user'* ]]; then
+  query=$(cat)
+  if [[ $query == *'SELECT public_id FROM iam.admin_user'* ]]; then
     printf '%s\n' "${FAKE_ACTOR_ID-01ACTORPUBLICID}"
   else
-    cat >> "${FAKE_SQL:?}"
+    printf '%s\n' "$query" >> "${FAKE_SQL:?}"
   fi
 else
   cat > "${FAKE_STDIN:?}"
@@ -52,10 +53,11 @@ set -euo pipefail
 printf '%s\n' "$*" >> "${SUDO_DOCKER_LOG:?}"
 if [[ -n ${IAM_DATABASE_URL-} ]]; then printf '%s\n' present > "${SUDO_IAM_MARKER:?}"; else printf '%s\n' missing > "${SUDO_IAM_MARKER:?}"; fi
 if [[ $* == *' exec '* ]]; then
-  if [[ $* == *'SELECT public_id FROM iam.admin_user'* ]]; then
+  query=$(cat)
+  if [[ $query == *'SELECT public_id FROM iam.admin_user'* ]]; then
     printf '%s\n' "${SUDO_ACTOR_ID-01ACTORPUBLICID}"
   else
-    cat >> "${SUDO_SQL:?}"
+    printf '%s\n' "$query" >> "${SUDO_SQL:?}"
   fi
 else
   cat > "${SUDO_STDIN:?}"

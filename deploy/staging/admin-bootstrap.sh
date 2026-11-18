@@ -73,7 +73,10 @@ export IAM_DATABASE_URL="$iam_database_url"
 if [ "$mode" = "--username" ]; then
   docker_cmd compose --env-file "$env_file" -f "$compose_file" run --rm --no-deps -T --entrypoint /admininit -e IAM_DATABASE_URL api super --username "$username"
 else
-  actor_public_id=$(docker_cmd compose --env-file "$env_file" -f "$compose_file" exec -T postgres psql -At -v ON_ERROR_STOP=1 -v actor_username="$actor_username" -U "${POSTGRES_ADMIN_USER:-postgres}" -d "${POSTGRES_DB:-drlife_staging}" -c "SELECT public_id FROM iam.admin_user WHERE name=:'actor_username' AND role='super' AND status='active';")
+  actor_public_id=$(docker_cmd compose --env-file "$env_file" -f "$compose_file" exec -T postgres psql -At -v ON_ERROR_STOP=1 -v actor_username="$actor_username" -U "${POSTGRES_ADMIN_USER:-postgres}" -d "${POSTGRES_DB:-drlife_staging}" <<'SQL'
+SELECT public_id FROM iam.admin_user WHERE name=:'actor_username' AND role='super' AND status='active';
+SQL
+  )
   [ -n "$actor_public_id" ] || {
     printf '%s\n' 'error: active super administrator was not found' >&2
     exit 1
