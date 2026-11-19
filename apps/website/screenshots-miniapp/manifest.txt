@@ -1,157 +1,157 @@
-head=1bd61c817d47c98ec61711a6d91b73d679b7cfc7
-buyer-home-360-light-zh.png	Dr.life+	商品分类
-buyer-profile-360-light-zh.png	Dr.life+	Sokha Trading
-buyer-wallet-360-light-zh.png	Dr.life+	钱包
-buyer-orders-list-360-light-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情
-buyer-orders-detail-360-light-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）
-buyer-notifications-360-light-zh.png	Dr.life+	通知
-buyer-home-360-light-en.png	Dr.life+	Categories
-buyer-profile-360-light-en.png	Dr.life+	Sokha Trading
-buyer-wallet-360-light-en.png	Dr.life+	Wallet
-buyer-orders-list-360-light-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details
-buyer-orders-detail-360-light-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)
-buyer-notifications-360-light-en.png	Dr.life+	Notifications
-buyer-home-360-light-km.png	Dr.life+	ប្រភេទទំនិញ
-buyer-profile-360-light-km.png	Dr.life+	Sokha Trading
-buyer-wallet-360-light-km.png	Dr.life+	កាបូប
-buyer-orders-list-360-light-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន
-buyer-orders-detail-360-light-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)
-buyer-notifications-360-light-km.png	Dr.life+	ការជូនដំណឹង
-buyer-home-360-dark-zh.png	Dr.life+	商品分类
-buyer-profile-360-dark-zh.png	Dr.life+	Sokha Trading
-buyer-wallet-360-dark-zh.png	Dr.life+	钱包
-buyer-orders-list-360-dark-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情
-buyer-orders-detail-360-dark-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）
-buyer-notifications-360-dark-zh.png	Dr.life+	通知
-buyer-home-360-dark-en.png	Dr.life+	Categories
-buyer-profile-360-dark-en.png	Dr.life+	Sokha Trading
-buyer-wallet-360-dark-en.png	Dr.life+	Wallet
-buyer-orders-list-360-dark-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details
-buyer-orders-detail-360-dark-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)
-buyer-notifications-360-dark-en.png	Dr.life+	Notifications
-buyer-home-360-dark-km.png	Dr.life+	ប្រភេទទំនិញ
-buyer-profile-360-dark-km.png	Dr.life+	Sokha Trading
-buyer-wallet-360-dark-km.png	Dr.life+	កាបូប
-buyer-orders-list-360-dark-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន
-buyer-orders-detail-360-dark-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)
-buyer-notifications-360-dark-km.png	Dr.life+	ការជូនដំណឹង
-buyer-home-430-light-zh.png	Dr.life+	商品分类
-buyer-profile-430-light-zh.png	Dr.life+	Sokha Trading
-buyer-wallet-430-light-zh.png	Dr.life+	钱包
-buyer-orders-list-430-light-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情
-buyer-orders-detail-430-light-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）
-buyer-notifications-430-light-zh.png	Dr.life+	通知
-buyer-home-430-light-en.png	Dr.life+	Categories
-buyer-profile-430-light-en.png	Dr.life+	Sokha Trading
-buyer-wallet-430-light-en.png	Dr.life+	Wallet
-buyer-orders-list-430-light-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details
-buyer-orders-detail-430-light-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)
-buyer-notifications-430-light-en.png	Dr.life+	Notifications
-buyer-home-430-light-km.png	Dr.life+	ប្រភេទទំនិញ
-buyer-profile-430-light-km.png	Dr.life+	Sokha Trading
-buyer-wallet-430-light-km.png	Dr.life+	កាបូប
-buyer-orders-list-430-light-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន
-buyer-orders-detail-430-light-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)
-buyer-notifications-430-light-km.png	Dr.life+	ការជូនដំណឹង
-buyer-home-430-dark-zh.png	Dr.life+	商品分类
-buyer-profile-430-dark-zh.png	Dr.life+	Sokha Trading
-buyer-wallet-430-dark-zh.png	Dr.life+	钱包
-buyer-orders-list-430-dark-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情
-buyer-orders-detail-430-dark-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）
-buyer-notifications-430-dark-zh.png	Dr.life+	通知
-buyer-home-430-dark-en.png	Dr.life+	Categories
-buyer-profile-430-dark-en.png	Dr.life+	Sokha Trading
-buyer-wallet-430-dark-en.png	Dr.life+	Wallet
-buyer-orders-list-430-dark-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details
-buyer-orders-detail-430-dark-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)
-buyer-notifications-430-dark-en.png	Dr.life+	Notifications
-buyer-home-430-dark-km.png	Dr.life+	ប្រភេទទំនិញ
-buyer-profile-430-dark-km.png	Dr.life+	Sokha Trading
-buyer-wallet-430-dark-km.png	Dr.life+	កាបូប
-buyer-orders-list-430-dark-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន
-buyer-orders-detail-430-dark-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)
-buyer-notifications-430-dark-km.png	Dr.life+	ការជូនដំណឹង
-merchant-home-360-light-zh.png	Dr.life+	商品管理
-merchant-merchant-orders-list-360-light-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit 已发货，配送中$19.00
-merchant-merchant-orders-detail-360-light-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit 已发货，配送中
-merchant-merchant-profile-360-light-zh.png	Dr.life+	Mekong Home
-merchant-merchant-demands-360-light-zh.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-360-light-zh.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-360-light-zh.png	Dr.life+	消息通知设置
-merchant-home-360-light-en.png	Dr.life+	Products
-merchant-merchant-orders-list-360-light-en.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit shipped, in delivery$19.00
-merchant-merchant-orders-detail-360-light-en.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit shipped, in delivery
-merchant-merchant-profile-360-light-en.png	Dr.life+	Mekong Home
-merchant-merchant-demands-360-light-en.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-360-light-en.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-360-light-en.png	Dr.life+	Notification settings
-merchant-home-360-light-km.png	Dr.life+	ទំនិញ
-merchant-merchant-orders-list-360-light-km.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន$19.00
-merchant-merchant-orders-detail-360-light-km.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន
-merchant-merchant-profile-360-light-km.png	Dr.life+	Mekong Home
-merchant-merchant-demands-360-light-km.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-360-light-km.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-360-light-km.png	Dr.life+	ការកំណត់ជូនដំណឹង
-merchant-home-360-dark-zh.png	Dr.life+	商品管理
-merchant-merchant-orders-list-360-dark-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit 已发货，配送中$19.00
-merchant-merchant-orders-detail-360-dark-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit 已发货，配送中
-merchant-merchant-profile-360-dark-zh.png	Dr.life+	Mekong Home
-merchant-merchant-demands-360-dark-zh.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-360-dark-zh.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-360-dark-zh.png	Dr.life+	消息通知设置
-merchant-home-360-dark-en.png	Dr.life+	Products
-merchant-merchant-orders-list-360-dark-en.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit shipped, in delivery$19.00
-merchant-merchant-orders-detail-360-dark-en.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit shipped, in delivery
-merchant-merchant-profile-360-dark-en.png	Dr.life+	Mekong Home
-merchant-merchant-demands-360-dark-en.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-360-dark-en.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-360-dark-en.png	Dr.life+	Notification settings
-merchant-home-360-dark-km.png	Dr.life+	ទំនិញ
-merchant-merchant-orders-list-360-dark-km.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន$19.00
-merchant-merchant-orders-detail-360-dark-km.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន
-merchant-merchant-profile-360-dark-km.png	Dr.life+	Mekong Home
-merchant-merchant-demands-360-dark-km.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-360-dark-km.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-360-dark-km.png	Dr.life+	ការកំណត់ជូនដំណឹង
-merchant-home-430-light-zh.png	Dr.life+	商品管理
-merchant-merchant-orders-list-430-light-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit 已发货，配送中$19.00
-merchant-merchant-orders-detail-430-light-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit 已发货，配送中
-merchant-merchant-profile-430-light-zh.png	Dr.life+	Mekong Home
-merchant-merchant-demands-430-light-zh.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-430-light-zh.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-430-light-zh.png	Dr.life+	消息通知设置
-merchant-home-430-light-en.png	Dr.life+	Products
-merchant-merchant-orders-list-430-light-en.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit shipped, in delivery$19.00
-merchant-merchant-orders-detail-430-light-en.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit shipped, in delivery
-merchant-merchant-profile-430-light-en.png	Dr.life+	Mekong Home
-merchant-merchant-demands-430-light-en.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-430-light-en.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-430-light-en.png	Dr.life+	Notification settings
-merchant-home-430-light-km.png	Dr.life+	ទំនិញ
-merchant-merchant-orders-list-430-light-km.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន$19.00
-merchant-merchant-orders-detail-430-light-km.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន
-merchant-merchant-profile-430-light-km.png	Dr.life+	Mekong Home
-merchant-merchant-demands-430-light-km.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-430-light-km.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-430-light-km.png	Dr.life+	ការកំណត់ជូនដំណឹង
-merchant-home-430-dark-zh.png	Dr.life+	商品管理
-merchant-merchant-orders-list-430-dark-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit 已发货，配送中$19.00
-merchant-merchant-orders-detail-430-dark-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit 已发货，配送中
-merchant-merchant-profile-430-dark-zh.png	Dr.life+	Mekong Home
-merchant-merchant-demands-430-dark-zh.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-430-dark-zh.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-430-dark-zh.png	Dr.life+	消息通知设置
-merchant-home-430-dark-en.png	Dr.life+	Products
-merchant-merchant-orders-list-430-dark-en.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit shipped, in delivery$19.00
-merchant-merchant-orders-detail-430-dark-en.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit shipped, in delivery
-merchant-merchant-profile-430-dark-en.png	Dr.life+	Mekong Home
-merchant-merchant-demands-430-dark-en.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-430-dark-en.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-430-dark-en.png	Dr.life+	Notification settings
-merchant-home-430-dark-km.png	Dr.life+	ទំនិញ
-merchant-merchant-orders-list-430-dark-km.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន$19.00
-merchant-merchant-orders-detail-430-dark-km.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន
-merchant-merchant-profile-430-dark-km.png	Dr.life+	Mekong Home
-merchant-merchant-demands-430-dark-km.png	Dr.life+	Mekong Home
-merchant-merchant-warehouse-430-dark-km.png	Dr.life+	Mekong Home
-merchant-merchant-notifications-430-dark-km.png	Dr.life+	ការកំណត់ជូនដំណឹង
+head=bdc0e55902e0184f63cd4998e01da0a81a59ee53
+buyer-home-390-light-zh.png	Dr.life+	商品分类	width=390	height=900	sha256=b868bddd42d55d1a07d372367f14eac8336147711e779ca1328376517948112a	khmerFont=n/a
+buyer-profile-390-light-zh.png	Dr.life+	Sokha Trading	width=390	height=900	sha256=640b003eaccb4cfd5cf955a16981bbbcb0d86cfdae20384119c4002240c396dc	khmerFont=n/a
+buyer-wallet-390-light-zh.png	Dr.life+	钱包	width=390	height=900	sha256=d45a0255aa1ccb1430fa3aee9e055b5338005bbf854d4d49773ef9ff1266e356	khmerFont=n/a
+buyer-orders-list-390-light-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情	width=390	height=900	sha256=96d68dac69430e07f704d12b2632c5358962ec087bde2435c4cf00ccd107d1d9	khmerFont=n/a
+buyer-orders-detail-390-light-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）	width=390	height=900	sha256=0e6de26a5cb4ac558e34eb8a8d72f06387cdbbf9a54c72c0e77eceedd0ddab57	khmerFont=n/a
+buyer-notifications-390-light-zh.png	Dr.life+	通知	width=390	height=900	sha256=c15b9ecc59c0355365c3f1e403b7f8e5d20a73827c42794935c743982f24ea66	khmerFont=n/a
+buyer-home-390-light-en.png	Dr.life+	Categories	width=390	height=900	sha256=7294f3b19321721b56fb19b448b7f91036a319578dd133eb41a6b32c8b356bee	khmerFont=n/a
+buyer-profile-390-light-en.png	Dr.life+	Sokha Trading	width=390	height=900	sha256=4d6ba4a0c0891f1ecbea3461dbbed437b3c13f6ecb2a93dd58b613646d1ca12f	khmerFont=n/a
+buyer-wallet-390-light-en.png	Dr.life+	Wallet	width=390	height=900	sha256=8b52d5597bf570b98f1027393cb8a0b712dc5b529eb6a7db726c74c0bb9ff25d	khmerFont=n/a
+buyer-orders-list-390-light-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details	width=390	height=900	sha256=04c31ca897cedc6df38627c04a266b39877d24bc40afe1812e9bda14acf7eb96	khmerFont=n/a
+buyer-orders-detail-390-light-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)	width=390	height=981	sha256=f5f62170324033029a7ca6898795756920bad925c5533d93ee5bfbe249b40454	khmerFont=n/a
+buyer-notifications-390-light-en.png	Dr.life+	Notifications	width=390	height=900	sha256=0fd673414daa56f03c548028d6c1f5a58cda9132db4f2d3348f197b82f6ed447	khmerFont=n/a
+buyer-home-390-light-km.png	Dr.life+	ប្រភេទទំនិញ	width=390	height=902	sha256=6eff1a19d03526309faeb05384f5a1c42d796d5234144e1c18109198bea19438	khmerFont=loaded:true,width:164.453125
+buyer-profile-390-light-km.png	Dr.life+	Sokha Trading	width=390	height=900	sha256=01ec78a92240954a9d3b81b7d6deb70d91e98d39e5ab6011d68167e48362b3b3	khmerFont=loaded:true,width:164.453125
+buyer-wallet-390-light-km.png	Dr.life+	កាបូប	width=390	height=900	sha256=995e2a7655df458730d38fdabdd1514194d1f12765c7b17e3c282a45f621be0c	khmerFont=loaded:true,width:164.453125
+buyer-orders-list-390-light-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន	width=390	height=900	sha256=981187358730a91bee465e5ac8ea6b36b945f5232d2966b4da5552264c8ff9d2	khmerFont=loaded:true,width:164.453125
+buyer-orders-detail-390-light-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)	width=390	height=1128	sha256=1adbdc348016f3e0aadcaa598b919ae61983794ee6f5ce3998f2b4ac9160a163	khmerFont=loaded:true,width:164.453125
+buyer-notifications-390-light-km.png	Dr.life+	ការជូនដំណឹង	width=390	height=900	sha256=aba60fd9e3f7b9fe7e3e1a3d9b440e1576af90433f4f062f3ba50ec3ec844d0a	khmerFont=loaded:true,width:164.453125
+buyer-home-390-dark-zh.png	Dr.life+	商品分类	width=390	height=900	sha256=cb921e124748f08d102f3e7c719a5c94c7f218a4fd8a55c885a43dfccdb5be88	khmerFont=n/a
+buyer-profile-390-dark-zh.png	Dr.life+	Sokha Trading	width=390	height=900	sha256=a06e56ea3cd9d2ac266b961816675523ca89e19516cdecac1e5c5efe03156e2a	khmerFont=n/a
+buyer-wallet-390-dark-zh.png	Dr.life+	钱包	width=390	height=900	sha256=5ee4257af6d84cf4d0dbcb189ad83a8ecb43595253d45e451417ec578381fdc2	khmerFont=n/a
+buyer-orders-list-390-dark-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情	width=390	height=900	sha256=e4c4b3266cae579fbb12275f8c42c87dfab6e4deaceda19c1989cdfe63243bf1	khmerFont=n/a
+buyer-orders-detail-390-dark-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）	width=390	height=900	sha256=186f56273abf5e91916929f2f11dee73003afe807bf6c04bb41bd8ac7cd33e35	khmerFont=n/a
+buyer-notifications-390-dark-zh.png	Dr.life+	通知	width=390	height=900	sha256=d1d82c1d49b8cb6447a4b32e425f50c0a464849df87a6887fadb5bdd2ed0069d	khmerFont=n/a
+buyer-home-390-dark-en.png	Dr.life+	Categories	width=390	height=900	sha256=c0532a30371ea1c30e2f6d61ccf86fefc4a6df0a594e082e3bf07067c58b2114	khmerFont=n/a
+buyer-profile-390-dark-en.png	Dr.life+	Sokha Trading	width=390	height=900	sha256=4578f3d5e927af5c49b75981eb6ad4c159e9d1f6cb1c80266284c95e94d6b744	khmerFont=n/a
+buyer-wallet-390-dark-en.png	Dr.life+	Wallet	width=390	height=900	sha256=bc71735b0c8d4d449788ae6752d528839e704d48164091cc53e141db9b5c8234	khmerFont=n/a
+buyer-orders-list-390-dark-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details	width=390	height=900	sha256=23b78b914cd2ac2ab7c05b9679fc48efc1767165d0f03f6dd9c8c0e5738f0fec	khmerFont=n/a
+buyer-orders-detail-390-dark-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)	width=390	height=981	sha256=fee5bacf74061f1d83ae6a00a1716fdcb841feb52ed1470144b647cc70b18284	khmerFont=n/a
+buyer-notifications-390-dark-en.png	Dr.life+	Notifications	width=390	height=900	sha256=4d908ade9fef40abb82b249f2a0882d9cd7e4d16f5f2e99e12dd241bfeae96c7	khmerFont=n/a
+buyer-home-390-dark-km.png	Dr.life+	ប្រភេទទំនិញ	width=390	height=902	sha256=a2d608dcd70ef607bea5ab4bdecfc63073500b68472264eaf4a5bb34bba141ee	khmerFont=loaded:true,width:164.453125
+buyer-profile-390-dark-km.png	Dr.life+	Sokha Trading	width=390	height=900	sha256=e8af49e81886b0815c46e96a84bc3171af30759ad2806a9b0d682826a4471d7e	khmerFont=loaded:true,width:164.453125
+buyer-wallet-390-dark-km.png	Dr.life+	កាបូប	width=390	height=900	sha256=28a57023d1be8b56bef6dd2896ee79785d4cd475be5e70bd4fd22745199b8e73	khmerFont=loaded:true,width:164.453125
+buyer-orders-list-390-dark-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន	width=390	height=900	sha256=3a2a6e475ea9dd26e9a8cbb5b3217d0ee45b68971c84b06f0808c97563325654	khmerFont=loaded:true,width:164.453125
+buyer-orders-detail-390-dark-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)	width=390	height=1128	sha256=b02f0ed8d045bdb741a5462fb7369cb77ba80d441658f75c3d8a841b5ead1987	khmerFont=loaded:true,width:164.453125
+buyer-notifications-390-dark-km.png	Dr.life+	ការជូនដំណឹង	width=390	height=900	sha256=10c03c8888e230b89ccef0bbfedec39e12ad8ded64a6d414bdee7df7ac5d316a	khmerFont=loaded:true,width:164.453125
+buyer-home-1440-light-zh.png	Dr.life+	商品分类	width=1440	height=900	sha256=8f7b4c58e5b92b37888686e367992c515470bbab8893a24025ef6a87e63a3af4	khmerFont=n/a
+buyer-profile-1440-light-zh.png	Dr.life+	Sokha Trading	width=1440	height=900	sha256=40e55eb6e9077400ebc55e40dc82e5326be34902d73da34a075fe3ea14a0dcc6	khmerFont=n/a
+buyer-wallet-1440-light-zh.png	Dr.life+	钱包	width=1440	height=900	sha256=dea8cdd29b06ef49a42bd16e4db7d7dd7219deb533939947a960119bff69df04	khmerFont=n/a
+buyer-orders-list-1440-light-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情	width=1440	height=900	sha256=80df8245c812653ac0d6df99e42949fadc30330783b82234432e21bd8622d02a	khmerFont=n/a
+buyer-orders-detail-1440-light-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）	width=1440	height=900	sha256=ea7b01ecae5c729f811d3b4e261076f4da33e54c02af3b987ae95bd3eb52ce7c	khmerFont=n/a
+buyer-notifications-1440-light-zh.png	Dr.life+	通知	width=1440	height=900	sha256=2a67a22a8c0bffc332f1f38efbd54160b44771d80afde9574ec561dd39bf25e9	khmerFont=n/a
+buyer-home-1440-light-en.png	Dr.life+	Categories	width=1440	height=900	sha256=9603fa0c5bed073ad517ad1a0fb5c93d22697fb3d17616f58d7db63f50f4444c	khmerFont=n/a
+buyer-profile-1440-light-en.png	Dr.life+	Sokha Trading	width=1440	height=900	sha256=00024a1c20fc0f27fe19b83113070b7c8e225529fbc5a407c980ae7697ddd4f4	khmerFont=n/a
+buyer-wallet-1440-light-en.png	Dr.life+	Wallet	width=1440	height=900	sha256=ba7fa0986c4e742caf47df0c71023b277f8cd442ef6d15d341b3976207de179a	khmerFont=n/a
+buyer-orders-list-1440-light-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details	width=1440	height=900	sha256=e45d37712c80bc71d837fd94493a56e0fbdd39e47188afbe620e661b5299e6e1	khmerFont=n/a
+buyer-orders-detail-1440-light-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)	width=1440	height=900	sha256=e6ca798a0a22fd5ac4eef982e61b991fff79392afc51f047396ed4465b2768a8	khmerFont=n/a
+buyer-notifications-1440-light-en.png	Dr.life+	Notifications	width=1440	height=900	sha256=ec361b9996809d9a9c4c736584002a04c601fbf514f87c5f99764a3c57648b41	khmerFont=n/a
+buyer-home-1440-light-km.png	Dr.life+	ប្រភេទទំនិញ	width=1440	height=900	sha256=c666e1be3d4a0e2e9152a0670f12f2e3f5e0f5d708a08391b96d2207f47202e1	khmerFont=loaded:true,width:164.453125
+buyer-profile-1440-light-km.png	Dr.life+	Sokha Trading	width=1440	height=900	sha256=600f00a1015ecbafcf052fe554f4f3e889d90152518ec003bcd07fffc60bfc07	khmerFont=loaded:true,width:164.453125
+buyer-wallet-1440-light-km.png	Dr.life+	កាបូប	width=1440	height=900	sha256=c86a177f0736c2d91fc3fd2786f474e8fe0c2f7517a77aed244f428560f67a2b	khmerFont=loaded:true,width:164.453125
+buyer-orders-list-1440-light-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន	width=1440	height=900	sha256=f9a3b0d94d32a40cb2f0d9ccd8430624cfb6d2266ccf2af14f7cd2a385d053fb	khmerFont=loaded:true,width:164.453125
+buyer-orders-detail-1440-light-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)	width=1440	height=900	sha256=37dcf5d1a89f1bf8e12734ad8bd1e8512fb5dabfb1d970e409928c996b1a6044	khmerFont=loaded:true,width:164.453125
+buyer-notifications-1440-light-km.png	Dr.life+	ការជូនដំណឹង	width=1440	height=900	sha256=d0576ee82c5679c704777098e25c02eab29e034fe36877dfebd80e6334e18c3b	khmerFont=loaded:true,width:164.453125
+buyer-home-1440-dark-zh.png	Dr.life+	商品分类	width=1440	height=900	sha256=c0fcf8bb992733323d4466127a64c1aa83cd5364f7056c95170090b7b475bc40	khmerFont=n/a
+buyer-profile-1440-dark-zh.png	Dr.life+	Sokha Trading	width=1440	height=900	sha256=9082a4e7308d2b72dba4cf47834b119ee9da0175765eee05d3a1bcadb7c1e3b2	khmerFont=n/a
+buyer-wallet-1440-dark-zh.png	Dr.life+	钱包	width=1440	height=900	sha256=66880b15083c49e654e97fabd20d4c8477930616859a44516195504e47ee6daf	khmerFont=n/a
+buyer-orders-list-1440-dark-zh.png	Dr.life+	2026/11/14 16:00已付款，仓库处理中商家1 个商家子订单 · 1 项商品$19.002026/11/14 16:00查看详情	width=1440	height=900	sha256=afffcd8b961392b172a1ec598193b76295addf604a1042990e94d108899562cb	khmerFont=n/a
+buyer-orders-detail-1440-dark-zh.png	Dr.life+	订单详情父订单（按商家显示子订单）	width=1440	height=900	sha256=533fe4bc343caf3759976d216a8958b14c6fc6e29c4d0010b79a08f420a57172	khmerFont=n/a
+buyer-notifications-1440-dark-zh.png	Dr.life+	通知	width=1440	height=900	sha256=77725be701ea7ea321c064b5b22207a6a273f556554f674949b98cfaf38ed52d	khmerFont=n/a
+buyer-home-1440-dark-en.png	Dr.life+	Categories	width=1440	height=900	sha256=dd7bfb5e99b98e5d07cd679437567653cb3a2531cb867fda028f0d91d88f6c66	khmerFont=n/a
+buyer-profile-1440-dark-en.png	Dr.life+	Sokha Trading	width=1440	height=900	sha256=160f8efa7794a7875e395c73319938f605b093ac9f9f022cf93eaaa116c6fb70	khmerFont=n/a
+buyer-wallet-1440-dark-en.png	Dr.life+	Wallet	width=1440	height=900	sha256=e6e8e6693c977c72c8554d1e087565018ca8c4ea3ec020650a4b7a710af045e1	khmerFont=n/a
+buyer-orders-list-1440-dark-en.png	Dr.life+	11/14/26, 4:00 PMPaid, warehouse processingMerchant1 merchant sub-order(s) · 1 item$19.0011/14/26, 4:00 PMView details	width=1440	height=900	sha256=1010715d008a6d07bf7ac02937f2859e8611c19e6d029b4472c9ae35db867222	khmerFont=n/a
+buyer-orders-detail-1440-dark-en.png	Dr.life+	Order detailsParent order (sub-orders by merchant)	width=1440	height=900	sha256=97bcd23d6517b2a63c7cafb88a2dfb5b4f2d27fbd3b7f9a99c516d04494118b6	khmerFont=n/a
+buyer-notifications-1440-dark-en.png	Dr.life+	Notifications	width=1440	height=900	sha256=b0cbcdb33457002dc136dafc24b727f5966059d3faaa4f8d2bf9b30e9c5f233e	khmerFont=n/a
+buyer-home-1440-dark-km.png	Dr.life+	ប្រភេទទំនិញ	width=1440	height=900	sha256=dbfb145fe75addf71522567a02279ec3a3d5f39f5f8b8a7030ee423e49cccc49	khmerFont=loaded:true,width:164.453125
+buyer-profile-1440-dark-km.png	Dr.life+	Sokha Trading	width=1440	height=900	sha256=ddc31eab3914b8906282f845d35ea3293e945205912bfaf77c67f209b80c0872	khmerFont=loaded:true,width:164.453125
+buyer-wallet-1440-dark-km.png	Dr.life+	កាបូប	width=1440	height=900	sha256=13476ae136fe637132879ee73339fc1e9fc699f387ba66db55d0e2e658e3de54	khmerFont=loaded:true,width:164.453125
+buyer-orders-list-1440-dark-km.png	Dr.life+	11/14/26, 4:00 PMបានបង់ប្រាក់ កំពុងដំណើរការនៅឃ្លាំងអ្នកលក់ការបញ្ជាទិញរងរបស់អ្នកលក់ 1 · ទំនិញ 1 មុខ$19.0011/14/26, 4:00 PMមើលព័ត៌មាន	width=1440	height=900	sha256=7998823dccad698d09824c4d3905a46ca004deb1ba72874f14ea7a9d8915d35b	khmerFont=loaded:true,width:164.453125
+buyer-orders-detail-1440-dark-km.png	Dr.life+	ព័ត៌មានការបញ្ជាទិញការបញ្ជាទិញមេ (បែងចែកតាមអ្នកលក់)	width=1440	height=900	sha256=64e2d597a5d2692cd455671e3ca66df8318b312a508b0f73b06ca9af766a16e6	khmerFont=loaded:true,width:164.453125
+buyer-notifications-1440-dark-km.png	Dr.life+	ការជូនដំណឹង	width=1440	height=900	sha256=640e45c4e1976862b20b95a565ffa4430953e764f044430d0172912eb803b4cb	khmerFont=loaded:true,width:164.453125
+merchant-home-390-light-zh.png	Dr.life+	商品管理	width=390	height=900	sha256=82f41d2398dac77c9347efe741a3509164092108403f033da2f84230ae614218	khmerFont=n/a
+merchant-merchant-orders-list-390-light-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit 已发货，配送中$19.00	width=390	height=900	sha256=4f25afbcafca2477b1fc7bac4c09de28a5a1bff7e28406097707e8a2f01ec0aa	khmerFont=n/a
+merchant-merchant-orders-detail-390-light-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit 已发货，配送中	width=390	height=930	sha256=93a437311b95bf67979af2d5e6c8f47576757f6658757a3f313c9822dd4d58ed	khmerFont=n/a
+merchant-merchant-profile-390-light-zh.png	Dr.life+	Mekong Home	width=390	height=1135	sha256=d533dac329c62d4194e3f9f8c0835788b1d1653bf3c0f915a004e71349defeba	khmerFont=n/a
+merchant-merchant-demands-390-light-zh.png	Dr.life+	Mekong Home	width=390	height=956	sha256=fe678b3a53a7d8d79a79f384b7ba8cf32faa4e8ba011ca6662120319a0382031	khmerFont=n/a
+merchant-merchant-warehouse-390-light-zh.png	Dr.life+	Mekong Home	width=390	height=1090	sha256=0cb0cf0610fce3d9c9733a7a649649f7e5a6a5033dd6eaacf6c53e81a4eadcef	khmerFont=n/a
+merchant-merchant-notifications-390-light-zh.png	Dr.life+	消息通知设置	width=390	height=956	sha256=d843bf02adc2feff809eb40cba2bbb877681d67c4b69fcdc46f65ce49eb11076	khmerFont=n/a
+merchant-home-390-light-en.png	Dr.life+	Products	width=390	height=900	sha256=918b02676d7f43f3414408276015178d2492a4f2ea5d871f4d6aae33c24ca9d1	khmerFont=n/a
+merchant-merchant-orders-list-390-light-en.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit shipped, in delivery$19.00	width=390	height=900	sha256=548b7df883b7893f591b9f188734a9ad75381659238466908e1b8175b4cdd56e	khmerFont=n/a
+merchant-merchant-orders-detail-390-light-en.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit shipped, in delivery	width=390	height=985	sha256=820fc04b8cb55e48f27cfd21f028be3c6a783b74222cb6c1bf9ec280ecf1ccc3	khmerFont=n/a
+merchant-merchant-profile-390-light-en.png	Dr.life+	Mekong Home	width=390	height=1190	sha256=af8f6ffa29fdba96ffd1654ef61a68223fbb7e9e14ab6c75ce662dbf3277dc6d	khmerFont=n/a
+merchant-merchant-demands-390-light-en.png	Dr.life+	Mekong Home	width=390	height=995	sha256=9c1ad1e4010b4e61f3a5cd219b032163520d56d737ebdac31dc99cb3aaee57e2	khmerFont=n/a
+merchant-merchant-warehouse-390-light-en.png	Dr.life+	Mekong Home	width=390	height=1118	sha256=1c25561a9af62cc42bed0159d40a0ac37971c6dc3a4b94eacf0f57db0bc9c4c9	khmerFont=n/a
+merchant-merchant-notifications-390-light-en.png	Dr.life+	Notification settings	width=390	height=956	sha256=876ec81d9b4fbdce34e6b3c67f79e9ab75910a461df6e0f25a57cc1af53c52d2	khmerFont=n/a
+merchant-home-390-light-km.png	Dr.life+	ទំនិញ	width=390	height=900	sha256=35913c06ce89ef118062904c2819b1cd5f05509467a3d2891900fa43c6f53032	khmerFont=loaded:true,width:164.453125
+merchant-merchant-orders-list-390-light-km.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន$19.00	width=390	height=900	sha256=effc9dfba77994d36d42220387207d6a3a2b79b9d12be72baaaf910bed377c0c	khmerFont=loaded:true,width:164.453125
+merchant-merchant-orders-detail-390-light-km.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន	width=390	height=1025	sha256=76a939475f4a167b55a21a08578c579ad78835cbb0bb5b4184936f7dce58acff	khmerFont=loaded:true,width:164.453125
+merchant-merchant-profile-390-light-km.png	Dr.life+	Mekong Home	width=390	height=1296	sha256=d70c48956fe0efa5df9824d4df8da2f4bd8321c8d807902e0dfda3722079f9c0	khmerFont=loaded:true,width:164.453125
+merchant-merchant-demands-390-light-km.png	Dr.life+	Mekong Home	width=390	height=1197	sha256=b6dfddfba7ed78c19b74aabfc2bc496af638bd0c5b641bbc12c2aa8023c9b3eb	khmerFont=loaded:true,width:164.453125
+merchant-merchant-warehouse-390-light-km.png	Dr.life+	Mekong Home	width=390	height=1123	sha256=64e16099220b0aac81e43ad494495be18b22e37abbb9ba2787a3819ea1564295	khmerFont=loaded:true,width:164.453125
+merchant-merchant-notifications-390-light-km.png	Dr.life+	ការកំណត់ជូនដំណឹង	width=390	height=1023	sha256=68f3912ca75538cd4df3488946e334063c8f5e79c71507ac89306059797abea2	khmerFont=loaded:true,width:164.453125
+merchant-home-390-dark-zh.png	Dr.life+	商品管理	width=390	height=900	sha256=fd2756c386c68c554ee2d14e5e8bdcacce464824154f52a2c6ba99ea87d588d4	khmerFont=n/a
+merchant-merchant-orders-list-390-dark-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit 已发货，配送中$19.00	width=390	height=900	sha256=85a1797ecb05d07db145cc0d00d7dcc798e65eafdbadd057259325b48be9cf81	khmerFont=n/a
+merchant-merchant-orders-detail-390-dark-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit 已发货，配送中	width=390	height=930	sha256=568f369b3ffef0bd4ef761b81d371ac009a7b55b1aaed60cc7242d9f67ec0849	khmerFont=n/a
+merchant-merchant-profile-390-dark-zh.png	Dr.life+	Mekong Home	width=390	height=1135	sha256=5fbd999a6e33afe2f9dfc503533ab4d24afd3702f32bebdf639d9ac2ef9eec41	khmerFont=n/a
+merchant-merchant-demands-390-dark-zh.png	Dr.life+	Mekong Home	width=390	height=956	sha256=4247a24e484b23d4c1591978c4d8d08f8e34ac6d7d4d7c5c63b3d96e90473cad	khmerFont=n/a
+merchant-merchant-warehouse-390-dark-zh.png	Dr.life+	Mekong Home	width=390	height=1090	sha256=6cd5877f8a0e3ad7fd774e4967cda7a454804b2075673bd1687d69c8dd000f82	khmerFont=n/a
+merchant-merchant-notifications-390-dark-zh.png	Dr.life+	消息通知设置	width=390	height=956	sha256=280e3f8b37b9079ebf60c88323e4d1a9b0b4a55e77cd435a0762b979dc6e5ac9	khmerFont=n/a
+merchant-home-390-dark-en.png	Dr.life+	Products	width=390	height=900	sha256=6d6bc065b850ba2b33a560b175ef26d7c0a378543bef095717d249b6951e52c2	khmerFont=n/a
+merchant-merchant-orders-list-390-dark-en.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit shipped, in delivery$19.00	width=390	height=900	sha256=696089506ed8588f0029802e623417d0eefb98cdcc203f1ee2f455ddfa87b89e	khmerFont=n/a
+merchant-merchant-orders-detail-390-dark-en.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit shipped, in delivery	width=390	height=985	sha256=130b562ff7442724c067f1dcc0c1308e578efb75a688ee9c9efac38509c8ec5c	khmerFont=n/a
+merchant-merchant-profile-390-dark-en.png	Dr.life+	Mekong Home	width=390	height=1190	sha256=fe3bf66c84080b9ee231c1aa24f4cd29773ce4b5ba19ca6e39a6811a5458cc4c	khmerFont=n/a
+merchant-merchant-demands-390-dark-en.png	Dr.life+	Mekong Home	width=390	height=995	sha256=d8466b56f67d9ee8a16d304f066e28f791dd06024d1ce0e13227d9b3243d870d	khmerFont=n/a
+merchant-merchant-warehouse-390-dark-en.png	Dr.life+	Mekong Home	width=390	height=1118	sha256=68119290294f86c29cea3f7b5e1144397a40e496cdc9519eef0334ed9def95db	khmerFont=n/a
+merchant-merchant-notifications-390-dark-en.png	Dr.life+	Notification settings	width=390	height=956	sha256=861d05292eb6d180fbdc2184dfaec48f75149e152a2b91b1a3d16c02dc5a6757	khmerFont=n/a
+merchant-home-390-dark-km.png	Dr.life+	ទំនិញ	width=390	height=900	sha256=a4c3bec4819fc7bec094e77c51b118d9674b161a551b650ffdf894c1456af147	khmerFont=loaded:true,width:164.453125
+merchant-merchant-orders-list-390-dark-km.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន$19.00	width=390	height=900	sha256=f6b706e628ff865e231be49f5dad9b4a061d4585fc88f54f361023fcda14fb4a	khmerFont=loaded:true,width:164.453125
+merchant-merchant-orders-detail-390-dark-km.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន	width=390	height=1025	sha256=08d3a95ba0b01cd4fb443d2043719a6411bbcac89dc58a1f1437a636a7a7386b	khmerFont=loaded:true,width:164.453125
+merchant-merchant-profile-390-dark-km.png	Dr.life+	Mekong Home	width=390	height=1296	sha256=ed3dcd72a35935b0577e531770d609c306380d5faa0b6e528d63138478cacccf	khmerFont=loaded:true,width:164.453125
+merchant-merchant-demands-390-dark-km.png	Dr.life+	Mekong Home	width=390	height=1197	sha256=a0434984cd22f49e3360c1b52762fb7b3922b9b0d435c4cb00d2c5f8a0b77551	khmerFont=loaded:true,width:164.453125
+merchant-merchant-warehouse-390-dark-km.png	Dr.life+	Mekong Home	width=390	height=1123	sha256=acfc80b3e25b693957594ddfa8666fa37066e3b745f6f41b8df613d04c0f24df	khmerFont=loaded:true,width:164.453125
+merchant-merchant-notifications-390-dark-km.png	Dr.life+	ការកំណត់ជូនដំណឹង	width=390	height=1023	sha256=4c8c26e7f7fdd951c3c61f9966300c03b59bfcd647f71fb997282b0ad1364994	khmerFont=loaded:true,width:164.453125
+merchant-home-1440-light-zh.png	Dr.life+	商品管理	width=1440	height=900	sha256=ca02bb39fe23a9cd1ea9d1b697ad0a1130f9a32ce1c729f0703ad26459b4ba44	khmerFont=n/a
+merchant-merchant-orders-list-1440-light-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit 已发货，配送中$19.00	width=1440	height=900	sha256=c380f5a33e20011b2d5209586488c15d536d1c8289087fc021fd922f06a92836	khmerFont=n/a
+merchant-merchant-orders-detail-1440-light-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit 已发货，配送中	width=1440	height=900	sha256=b8b42fc4b386d6a6117d7a9e32c447683c8ab54ea3ea35fa7a5ff3743379b9fe	khmerFont=n/a
+merchant-merchant-profile-1440-light-zh.png	Dr.life+	Mekong Home	width=1440	height=1111	sha256=313ab920dd120f041d8d7461816f2ca3fe152c00fa64c58ec2cba2099ea9c040	khmerFont=n/a
+merchant-merchant-demands-1440-light-zh.png	Dr.life+	Mekong Home	width=1440	height=956	sha256=c798eec59be536e8e6d94034c04adc199002416f201badebe5c9c38509386813	khmerFont=n/a
+merchant-merchant-warehouse-1440-light-zh.png	Dr.life+	Mekong Home	width=1440	height=1061	sha256=41fbb458f39132d5a7acd081d5b70c702eba566405e719e7186f8fde9b55ac01	khmerFont=n/a
+merchant-merchant-notifications-1440-light-zh.png	Dr.life+	消息通知设置	width=1440	height=956	sha256=0b858cdbf1981291475952b7a47ff3551acf520f5d02c24bbb6f0682f2db1a8f	khmerFont=n/a
+merchant-home-1440-light-en.png	Dr.life+	Products	width=1440	height=900	sha256=fc94e136ad0093afb8d08aeafc3db8af63a3bfec63382e6dab6b12ab0a62c763	khmerFont=n/a
+merchant-merchant-orders-list-1440-light-en.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit shipped, in delivery$19.00	width=1440	height=900	sha256=458d7e9d37b6b086f10d4da195f0ea44630553e177adc1ad69cc1da9f2ba5278	khmerFont=n/a
+merchant-merchant-orders-detail-1440-light-en.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit shipped, in delivery	width=1440	height=900	sha256=8646fec25cd709fda600fa84490a60b4dba755cb298358aa637366bc889071e2	khmerFont=n/a
+merchant-merchant-profile-1440-light-en.png	Dr.life+	Mekong Home	width=1440	height=1111	sha256=68e65d60650b1c6546495604dee2fca834ba8b7e8f7675ccb0ccd032151d4b89	khmerFont=n/a
+merchant-merchant-demands-1440-light-en.png	Dr.life+	Mekong Home	width=1440	height=956	sha256=b867d10adc51ce962e4b6f5fc330a3af1f82a6498f6a3971fbdbb2b649d8bba3	khmerFont=n/a
+merchant-merchant-warehouse-1440-light-en.png	Dr.life+	Mekong Home	width=1440	height=1061	sha256=3d7b2d9d057e8b44c61e5d59c58056d1992b6308126ae173f83c37c07187a6c9	khmerFont=n/a
+merchant-merchant-notifications-1440-light-en.png	Dr.life+	Notification settings	width=1440	height=956	sha256=ff0a9cee50c89278ccd2a5f5e744dc00b7ad8571efbb747ef20821c225212af5	khmerFont=n/a
+merchant-home-1440-light-km.png	Dr.life+	ទំនិញ	width=1440	height=900	sha256=fc1ae5810ec123b51f693b7809f4feac1978ef5b5fac587cdc7bc3558b4edaec	khmerFont=loaded:true,width:164.453125
+merchant-merchant-orders-list-1440-light-km.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន$19.00	width=1440	height=900	sha256=de2056ea8521e44e19fb75c85324961924061fa4853c911a5bc9096525d8dcc4	khmerFont=loaded:true,width:164.453125
+merchant-merchant-orders-detail-1440-light-km.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន	width=1440	height=937	sha256=5d655d1ea0255636db76317bd916182d324c3bcea1132f0f33519699767cd948	khmerFont=loaded:true,width:164.453125
+merchant-merchant-profile-1440-light-km.png	Dr.life+	Mekong Home	width=1440	height=1123	sha256=b0dbd587ccf8a754f1d081221ec3b3fbee3214a41cd522eb8d5bb42f00517b84	khmerFont=loaded:true,width:164.453125
+merchant-merchant-demands-1440-light-km.png	Dr.life+	Mekong Home	width=1440	height=1027	sha256=8562a28b92248a1c19d0bf3dbed3abc3e321764d315598eeccefd0d02d7a7532	khmerFont=loaded:true,width:164.453125
+merchant-merchant-warehouse-1440-light-km.png	Dr.life+	Mekong Home	width=1440	height=1067	sha256=a1383aa6dd43f5d0c8a81a809f6d18807bb3666161ea141ee53360b25257466f	khmerFont=loaded:true,width:164.453125
+merchant-merchant-notifications-1440-light-km.png	Dr.life+	ការកំណត់ជូនដំណឹង	width=1440	height=956	sha256=31de35757351b66d4f63cb8bef4cf9aa87b44ac8b4e9095a2b243aa6e7eebadd	khmerFont=loaded:true,width:164.453125
+merchant-home-1440-dark-zh.png	Dr.life+	商品管理	width=1440	height=900	sha256=d6b2fe546b0ed88253d15832960e0bd3478d9891840723222eb004d2e5e7bc43	khmerFont=n/a
+merchant-merchant-orders-list-1440-dark-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit 已发货，配送中$19.00	width=1440	height=900	sha256=0964432283a5b1f34cdf0361340b8d82450087af36b1df75d51bd4d6cea2b440	khmerFont=n/a
+merchant-merchant-orders-detail-1440-dark-zh.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit 已发货，配送中	width=1440	height=900	sha256=b28bbe9c119f833e29f6bc1b772c741e416629475c6e846add7c04ec3a5a15fb	khmerFont=n/a
+merchant-merchant-profile-1440-dark-zh.png	Dr.life+	Mekong Home	width=1440	height=1111	sha256=1385bcb67006de103d65ce373fc474c3efc9fc22a9b79d371dea4327289893c8	khmerFont=n/a
+merchant-merchant-demands-1440-dark-zh.png	Dr.life+	Mekong Home	width=1440	height=956	sha256=841ae5acb294b0e43f0028f308dff420b9fe0bd3385ded9983906531084b82d1	khmerFont=n/a
+merchant-merchant-warehouse-1440-dark-zh.png	Dr.life+	Mekong Home	width=1440	height=1061	sha256=b48013ad39d92b6dc088922ff0c65fbb1f907b33179c765b92108796e9bef45d	khmerFont=n/a
+merchant-merchant-notifications-1440-dark-zh.png	Dr.life+	消息通知设置	width=1440	height=956	sha256=0fed965a651c49f1dfc70e43f71bdfe30b0fefe292d523712d34f444c7d9f711	khmerFont=n/a
+merchant-home-1440-dark-en.png	Dr.life+	Products	width=1440	height=900	sha256=0c73b333a33b3e1aa1aed2eda7bc605d2608d354daa5cec0a5dda60148b9676b	khmerFont=n/a
+merchant-merchant-orders-list-1440-dark-en.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit shipped, in delivery$19.00	width=1440	height=900	sha256=ba89d23249d17a82319e8068f291bcdcd03417a2b930a6637c497f59aa9af58d	khmerFont=n/a
+merchant-merchant-orders-detail-1440-dark-en.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit shipped, in delivery	width=1440	height=900	sha256=158c69917377c7f1fa2751703ab40154e742d43dc58770044d924d0af03a24bd	khmerFont=n/a
+merchant-merchant-profile-1440-dark-en.png	Dr.life+	Mekong Home	width=1440	height=1111	sha256=3946d7f7df9059ce401d9799b7463814cd9ed3b3ebe2a9272d69e110a78ecab6	khmerFont=n/a
+merchant-merchant-demands-1440-dark-en.png	Dr.life+	Mekong Home	width=1440	height=956	sha256=defa2bbfc25b99ac22ed69274f33d53a3208cadf92598e04cb4fa5ff8994fe6f	khmerFont=n/a
+merchant-merchant-warehouse-1440-dark-en.png	Dr.life+	Mekong Home	width=1440	height=1061	sha256=6815e27fa9956d9c3d7604c85a3423237ef31114d2e737047e2935895aba09ac	khmerFont=n/a
+merchant-merchant-notifications-1440-dark-en.png	Dr.life+	Notification settings	width=1440	height=956	sha256=e03e23fef7b425cb6881f38063bd9eb425080190eeaff7a40adb71a1544e8e57	khmerFont=n/a
+merchant-home-1440-dark-km.png	Dr.life+	ទំនិញ	width=1440	height=900	sha256=7e22151edf396bbd0ab24d447d4434ded50a55318ea2d777dd7d416e296cc6e0	khmerFont=loaded:true,width:164.453125
+merchant-merchant-orders-list-1440-dark-km.png	Dr.life+	01EVIDENCEMERCHANTORDERSKU-1 × 2 · ****1234RouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន$19.00	width=1440	height=900	sha256=8a66afb0d320ae393caacd049a51c2d52b56f1682ffcd28d859d92d1cd3e70c3	khmerFont=loaded:true,width:164.453125
+merchant-merchant-orders-detail-1440-dark-km.png	Dr.life+	01EVIDENCEMERCHANTORDERRouteFit បានផ្ញើ កំពុងដឹកជញ្ជូន	width=1440	height=937	sha256=fd2f21c316b8d8609fbf3f2d9c6649b056826ebb60740142b4f58a2f74d54bba	khmerFont=loaded:true,width:164.453125
+merchant-merchant-profile-1440-dark-km.png	Dr.life+	Mekong Home	width=1440	height=1123	sha256=669fc00d7f3d5ccac1a135652d76e8df073ea584b5e92a821c29b52df35730d9	khmerFont=loaded:true,width:164.453125
+merchant-merchant-demands-1440-dark-km.png	Dr.life+	Mekong Home	width=1440	height=1027	sha256=2c7b30216552266e262386c176e2dbd740240e712ac0e1ec8a5c4af4f36b7092	khmerFont=loaded:true,width:164.453125
+merchant-merchant-warehouse-1440-dark-km.png	Dr.life+	Mekong Home	width=1440	height=1067	sha256=a9762d8c18cfced45666081bd7f5f79092488c2a4193de5f9fdcdeec8ee09397	khmerFont=loaded:true,width:164.453125
+merchant-merchant-notifications-1440-dark-km.png	Dr.life+	ការកំណត់ជូនដំណឹង	width=1440	height=956	sha256=da3c523441c42d2d879be5bbd07fb77696b5711e7f99273cac6b4bfd6798a3af	khmerFont=loaded:true,width:164.453125
