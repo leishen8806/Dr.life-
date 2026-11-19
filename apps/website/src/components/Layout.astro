@@ -35,7 +35,6 @@ const localizedHref = (locale: "en" | "km") => `${SITE_URL}/${locale}${pagePath 
     <link rel="alternate" hreflang="km" href={localizedHref("km")} />
     <link rel="alternate" hreflang="x-default" href={`${SITE_URL}${pagePath || "/"}`} />
     {homepageSource && <>
-      <link rel="stylesheet" href="/fonts/fonts.css" />
       <link rel="preload" media="(max-width: 700px)" as="image" href="/images/source-2-894517c7d5-640.webp" type="image/webp" fetchpriority="high" />
       <link rel="preload" media="(min-width: 701px)" as="image" href="/images/source-2-894517c7d5-1280.webp" type="image/webp" fetchpriority="high" />
     </>}
@@ -56,7 +55,6 @@ const localizedHref = (locale: "en" | "km") => `${SITE_URL}/${locale}${pagePath 
     <link rel="preload" href="/fonts/noto-sans-khmer-ijwCs5roRME5LLRxjsRb-gssOenAyendxrgV2c-Zw-9vR1kFeg.woff2" as="font" type="font/woff2" crossorigin />
     <script is:inline>
       window.addEventListener("load", () => {
-        if (document.body.classList.contains("homepage-source-page")) return;
         const link = document.createElement("link");
         link.rel = "stylesheet";
         link.href = "/fonts/fonts.css";
