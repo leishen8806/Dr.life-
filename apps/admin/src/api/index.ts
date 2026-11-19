@@ -2,6 +2,12 @@ import type { AdminApi, AdminUserRecord, AuditRecord, OrderRecord, RecordStatus,
 
 let accessToken: string | undefined;
 
+function requestUrl(path: string): string {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, "") ?? "";
+  if (!baseUrl && !import.meta.env.DEV) throw new Error("VITE_API_BASE_URL is required outside development");
+  return `${baseUrl}${path}`;
+}
+
 export class AdminApiError extends Error {
   constructor(public status: number, message: string, public retryAfter?: string) { super(message); }
 }
@@ -9,7 +15,7 @@ export class AdminApiError extends Error {
 async function request<T>(path: string, init: RequestInit = {}, authenticated = true, retried = false): Promise<T> {
   const headers = new Headers(init.headers); headers.set("Content-Type", "application/json");
   if (authenticated && accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
-  const response = await fetch(path, { ...init, headers, credentials: "include" });
+  const response = await fetch(requestUrl(path), { ...init, headers, credentials: "include" });
   if (response.status === 401 && authenticated && !retried && path !== "/v1/admin/auth/refresh") {
     try {
       const refresh = await request<{ access_token: string }>("/v1/admin/auth/refresh", { method: "POST", headers: { "X-Requested-With": "drlife" } }, false);
