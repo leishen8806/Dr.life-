@@ -218,17 +218,29 @@ try {
           if ([1280, 1440, 1920].includes(width) && homepageGeometry.navOverlap) {
             throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);
           }
-          if ([1440, 1920].includes(width)) {
-            const navLink = page.locator(".nav a").first();
+          if ([1280, 1440, 1920].includes(width)) {
+            const navLink = page.locator(".nav > a").first();
             const appLink = page.locator(".nav-apps");
             if (!(await navLink.isVisible()) || !(await appLink.isVisible())) {
               throw new Error(`Desktop navigation or App entry is hidden at ${width}px (${language})`);
             }
-          } else if (width === 1280) {
+          } else if (width <= 700 && pageDefinition.name === "home") {
             const menuToggle = page.locator(".menu-toggle");
-            if (!(await menuToggle.isVisible())) {
-              throw new Error(`Compact navigation toggle is hidden at ${width}px (${language})`);
+            const menuToggleBox = await menuToggle.boundingBox();
+            if (!menuToggleBox || menuToggleBox.width <= 0 || menuToggleBox.height <= 0
+              || menuToggleBox.x < 0 || menuToggleBox.x + menuToggleBox.width > width) {
+              throw new Error(`Mobile menu button is not visible in the viewport at ${width}px (${language})`);
             }
+            await menuToggle.click();
+            const openNav = page.locator("#site-nav[data-open='true']");
+            if (!(await openNav.isVisible())) throw new Error(`Mobile navigation did not open at ${width}px (${language})`);
+            const appLink = openNav.locator("a.nav-apps");
+            const mainLinks = openNav.locator("a:not(.nav-apps):not(.nav-cta)");
+            if (!(await appLink.isVisible()) || await mainLinks.count() < 4) {
+              throw new Error(`Mobile navigation lacks the main navigation items or App entry at ${width}px (${language})`);
+            }
+            await menuToggle.click();
+            if (await openNav.isVisible()) throw new Error(`Mobile navigation did not close at ${width}px (${language})`);
           }
           if (width >= 1441) {
             const desktopNav = page.locator(".nav a").first();
@@ -265,6 +277,15 @@ try {
           }
           if ([1440, 1920].includes(width) && homepageGeometry.partnerGap < 64) {
             throw new Error(`Partner cards touch the app section at ${width}px (${language}): ${homepageGeometry.partnerGap}px gap`);
+          }
+          const contactLinks = page.locator('.partner-grid .partner a[href="/contact"]');
+          if (await contactLinks.count() !== 4) {
+            throw new Error(`Expected four partner contact links at ${width}px (${language})`);
+          }
+          for (let index = 0; index < await contactLinks.count(); index += 1) {
+            if (!(await contactLinks.nth(index).isVisible())) {
+              throw new Error(`Partner contact link ${index + 1} is not visible at ${width}px (${language})`);
+            }
           }
         }
         await page.waitForTimeout(150);
