@@ -13,7 +13,7 @@ docker run --rm \
   --add-host merchant:127.0.0.1 \
   --add-host admin:127.0.0.1 \
   -v "$(pwd)/deploy/staging/nginx/staging.conf:/etc/nginx/conf.d/default.conf:ro" \
-  -v "$(pwd)/deploy/staging/nginx/cloudflare-real-ip.conf:/etc/nginx/conf.d/cloudflare-real-ip.conf:ro" \
+  -v "$(pwd)/deploy/staging/nginx/cloudflare-real-ip.conf.example:/etc/nginx/conf.d/cloudflare-real-ip.conf:ro" \
   -v "$(pwd)/deploy/staging/nginx/proxy_params:/etc/nginx/proxy_params:ro" \
   -v "$root/origin.crt:/etc/nginx/tls/origin.crt:ro" \
   -v "$root/origin.key:/etc/nginx/tls/origin.key:ro" \
