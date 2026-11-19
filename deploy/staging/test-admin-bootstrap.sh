@@ -11,6 +11,10 @@ if [[ $* == *' exec '* ]]; then cat >> "${FAKE_SQL:?}"; else printf '%s\n' 'user
 FAKE
 chmod +x "$fake_bin/docker"
 export FAKE_DOCKER_LOG="$root/docker.log" FAKE_SQL="$root/sql"
+if DOCKER_BIN="$fake_bin/docker" STAGING_ENV_FILE="$root/env" STAGING_COMPOSE_FILE="$root/compose.yaml" "$script_dir/admin-bootstrap.sh" --username 'Test Admin' >/dev/null 2>&1; then
+  echo 'missing email was accepted' >&2
+  exit 1
+fi
 DOCKER_BIN="$fake_bin/docker" STAGING_ENV_FILE="$root/env" STAGING_COMPOSE_FILE="$root/compose.yaml" "$script_dir/admin-bootstrap.sh" --username 'Test Admin' --email 'owner@example.invalid' >/dev/null
 test "$(grep -c 'DROP ROLE IF EXISTS' "$root/sql")" -eq 1
 test "$(grep -c 'CREATE ROLE' "$root/sql")" -eq 1
