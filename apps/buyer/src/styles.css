@@ -104,46 +104,6 @@
   border-bottom: 1px solid var(--drl-color-border);
 }
 
-.buyer-notification-setting input[type="checkbox"],
-.merchant-v7__switch input[type="checkbox"] {
-  appearance: none;
-  flex: 0 0 auto;
-  width: 38px;
-  height: 22px;
-  margin: 0;
-  border: 1px solid var(--drl-color-border-strong);
-  border-radius: 999px;
-  background: var(--drl-color-surface-raised);
-  cursor: pointer;
-}
-
-.buyer-notification-setting input[type="checkbox"]::after,
-.merchant-v7__switch input[type="checkbox"]::after {
-  display: block;
-  width: 16px;
-  height: 16px;
-  margin: 2px;
-  border-radius: 50%;
-  background: var(--drl-color-text-muted);
-  content: "";
-  transition: transform 120ms ease;
-}
-
-.buyer-notification-setting input[type="checkbox"]:checked,
-.merchant-v7__switch input[type="checkbox"]:checked {
-  background: var(--drl-color-brand);
-}
-
-.buyer-notification-setting input[type="checkbox"]:checked::after,
-.merchant-v7__switch input[type="checkbox"]:checked::after {
-  background: var(--drl-color-surface);
-  transform: translateX(16px);
-}
-
-.merchant-v7__switch input[type="checkbox"]:disabled {
-  cursor: not-allowed;
-  opacity: .58;
-}
 
 .buyer-search {
   display: grid;

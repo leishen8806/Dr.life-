@@ -73,12 +73,14 @@ export function ListItem({
   title,
   description,
   trailing,
-  onClick
+  onClick,
+  testId
 }: {
   title: string;
   description?: string;
   trailing?: ReactNode;
   onClick?: () => void;
+  testId?: string;
 }) {
   const content = (
     <>
@@ -90,11 +92,18 @@ export function ListItem({
     </>
   );
   return onClick ? (
-    <button type="button" className="drl-list-item" onClick={onClick}>
+    <button
+      type="button"
+      className="drl-list-item"
+      data-testid={testId}
+      onClick={onClick}
+    >
       {content}
     </button>
   ) : (
-    <div className="drl-list-item">{content}</div>
+    <div className="drl-list-item" data-testid={testId}>
+      {content}
+    </div>
   );
 }
 
@@ -102,25 +111,73 @@ export function NotificationBell({
   label,
   unreadCount,
   onClick,
-  className
+  className,
+  testId
 }: {
   label: string;
   unreadCount: number;
   onClick: () => void;
   className?: string;
+  testId?: string;
 }) {
   return (
     <button
       type="button"
-      className={['drl-notification-bell', className].filter(Boolean).join(' ')}
+      className={["drl-notification-bell", className].filter(Boolean).join(" ")}
+      data-testid={testId}
       aria-label={label}
       onClick={onClick}
     >
-      <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" focusable="false">
-        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        focusable="false"
+      >
+        <path
+          d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
-      {unreadCount > 0 && <span className="drl-notification-bell__badge">{unreadCount}</span>}
+      {unreadCount > 0 && (
+        <span className="drl-notification-bell__badge">{unreadCount}</span>
+      )}
     </button>
+  );
+}
+
+export function Switch({
+  checked,
+  onChange,
+  label,
+  disabled = false
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      className="drl-switch"
+      aria-label={label}
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onChange(!checked);
+        }
+      }}
+    />
   );
 }
 
@@ -145,7 +202,9 @@ export function NotificationList({
   return (
     <div className="drl-notification-list">
       <div className="drl-notification-list__toolbar">
-        <Button variant="secondary" onClick={onMarkAllRead}>{markAllLabel}</Button>
+        <Button variant="secondary" onClick={onMarkAllRead}>
+          {markAllLabel}
+        </Button>
       </div>
       {items.map((item) => (
         <ListItem
@@ -189,7 +248,9 @@ export function StatusTag({
   children: ReactNode;
   tone?: "neutral" | "success" | "warning" | "danger";
 }) {
-  return <span className={`drl-status-tag drl-status-tag--${tone}`}>{children}</span>;
+  return (
+    <span className={`drl-status-tag drl-status-tag--${tone}`}>{children}</span>
+  );
 }
 
 function closeOnEscape(event: KeyboardEvent<HTMLElement>, onClose: () => void) {
@@ -223,7 +284,12 @@ export function BottomSheet({
       >
         <header>
           <h2>{title}</h2>
-          <button type="button" aria-label={closeLabel} autoFocus onClick={onClose}>
+          <button
+            type="button"
+            aria-label={closeLabel}
+            autoFocus
+            onClick={onClose}
+          >
             ×
           </button>
         </header>
@@ -241,8 +307,14 @@ export function Loading({
   skeleton?: boolean;
 }) {
   return (
-    <div className={`drl-loading${skeleton ? " drl-loading--skeleton" : ""}`} role="status" aria-live="polite">
-      <span className="drl-loading__mark" aria-hidden="true">+</span>
+    <div
+      className={`drl-loading${skeleton ? " drl-loading--skeleton" : ""}`}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="drl-loading__mark" aria-hidden="true">
+        +
+      </span>
       <span>{label}</span>
     </div>
   );
@@ -260,7 +332,11 @@ export function EmptyState({
   return (
     <section className="drl-state" role="status">
       <p>{title}</p>
-      {actionLabel && onAction && <Button variant="secondary" onClick={onAction}>{actionLabel}</Button>}
+      {actionLabel && onAction && (
+        <Button variant="secondary" onClick={onAction}>
+          {actionLabel}
+        </Button>
+      )}
     </section>
   );
 }
@@ -280,7 +356,11 @@ export function ErrorState({
     <section className="drl-state drl-state--error" role="alert">
       <strong>{title}</strong>
       <p>{description}</p>
-      {retryLabel && onRetry && <button type="button" onClick={onRetry}>{retryLabel}</button>}
+      {retryLabel && onRetry && (
+        <button type="button" onClick={onRetry}>
+          {retryLabel}
+        </button>
+      )}
     </section>
   );
 }
@@ -317,8 +397,16 @@ export function ConfirmDialog({
         <h2>{title}</h2>
         <p>{description}</p>
         <footer>
-          <button type="button" autoFocus onClick={onCancel}>{cancelLabel}</button>
-          <button type="button" className="drl-button--danger" onClick={onConfirm}>{confirmLabel}</button>
+          <button type="button" autoFocus onClick={onCancel}>
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            className="drl-button--danger"
+            onClick={onConfirm}
+          >
+            {confirmLabel}
+          </button>
         </footer>
       </section>
     </div>
@@ -327,15 +415,73 @@ export function ConfirmDialog({
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "text";
 
-export function Button({ children, variant = "primary", loading = false, disabled = false, type = "button", onClick, className, ariaPressed, ariaLabel, title, lang }: {
-  children: ReactNode; variant?: ButtonVariant; loading?: boolean; disabled?: boolean;
-  type?: "button" | "submit" | "reset"; onClick?: () => void; className?: string; ariaPressed?: boolean; ariaLabel?: string; title?: string; lang?: string;
+export function Button({
+  children,
+  variant = "primary",
+  loading = false,
+  disabled = false,
+  type = "button",
+  onClick,
+  className,
+  ariaPressed,
+  ariaLabel,
+  title,
+  lang,
+  testId
+}: {
+  children: ReactNode;
+  variant?: ButtonVariant;
+  loading?: boolean;
+  disabled?: boolean;
+  type?: "button" | "submit" | "reset";
+  onClick?: () => void;
+  className?: string;
+  ariaPressed?: boolean;
+  ariaLabel?: string;
+  title?: string;
+  lang?: string;
+  testId?: string;
 }) {
-  return <button type={type} className={["drl-button", `drl-button--${variant}`, className].filter(Boolean).join(" ")} lang={lang} disabled={disabled || loading} aria-busy={loading || undefined} aria-pressed={ariaPressed} aria-label={ariaLabel} title={title} onClick={onClick}>{children}</button>;
+  return (
+    <button
+      type={type}
+      className={["drl-button", `drl-button--${variant}`, className]
+        .filter(Boolean)
+        .join(" ")}
+      data-testid={testId}
+      lang={lang}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      aria-pressed={ariaPressed}
+      aria-label={ariaLabel}
+      title={title}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
 }
 
-export function FormField({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
-  return <label className="drl-form-field"><span>{label}</span>{children}{error && <small className="drl-form-field__error" role="alert">{error}</small>}</label>;
+export function FormField({
+  label,
+  error,
+  children
+}: {
+  label: string;
+  error?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="drl-form-field">
+      <span>{label}</span>
+      {children}
+      {error && (
+        <small className="drl-form-field__error" role="alert">
+          {error}
+        </small>
+      )}
+    </label>
+  );
 }
 
 export function parseMoneyE4(value: bigint | string): bigint | undefined {
@@ -351,7 +497,11 @@ export function parseMoneyE4(value: bigint | string): bigint | undefined {
 
 export function formatMoneyE4(
   value: bigint | string,
-  { invalidLabel, currencySymbol, language }: { invalidLabel: string; currencySymbol: string; language: Language }
+  {
+    invalidLabel,
+    currencySymbol,
+    language
+  }: { invalidLabel: string; currencySymbol: string; language: Language }
 ): string {
   const amount = parseMoneyE4(value);
   if (amount === undefined) return invalidLabel;
@@ -363,7 +513,10 @@ export function formatMoneyE4(
 
 export function formatMoneyE4WithI18n(
   value: bigint | string,
-  { language, translate }: { language: Language; translate: (key: TranslationKey) => string }
+  {
+    language,
+    translate
+  }: { language: Language; translate: (key: TranslationKey) => string }
 ): string {
   return formatMoneyE4(value, {
     language,
@@ -392,12 +545,27 @@ function documentLanguage(): Language {
 }
 
 export function Money(props: LegacyMoneyProps | LocalizedMoneyProps) {
-  const { value, invalidLabel, currencySymbol, language } = "translate" in props
-    ? { value: props.value, invalidLabel: props.translate("common.invalidAmount"), currencySymbol: props.translate("common.currencyUsd"), language: props.language ?? documentLanguage() }
-    : props;
+  const { value, invalidLabel, currencySymbol, language } =
+    "translate" in props
+      ? {
+          value: props.value,
+          invalidLabel: props.translate("common.invalidAmount"),
+          currencySymbol: props.translate("common.currencyUsd"),
+          language: props.language ?? documentLanguage()
+        }
+      : props;
   const amount = parseMoneyE4(value);
-  if (amount === undefined) return <span className="drl-money drl-money--error" role="alert">{invalidLabel}</span>;
-  return <span className="drl-money" data-e4={amount.toString()}>{formatMoneyE4(value, { invalidLabel, currencySymbol, language })}</span>;
+  if (amount === undefined)
+    return (
+      <span className="drl-money drl-money--error" role="alert">
+        {invalidLabel}
+      </span>
+    );
+  return (
+    <span className="drl-money" data-e4={amount.toString()}>
+      {formatMoneyE4(value, { invalidLabel, currencySymbol, language })}
+    </span>
+  );
 }
 
 export function MoneyWithI18n({
@@ -412,40 +580,170 @@ export function MoneyWithI18n({
   return <Money value={value} language={language} translate={translate} />;
 }
 
-export function TieredPrice({ tiers, invalidLabel, currencySymbol, language }: { tiers: readonly { label: string; value: bigint | string }[]; invalidLabel: string; currencySymbol: string; language: Language }) {
-  return <ul className="drl-tiered-price">{tiers.map((tier) => <li key={tier.label}><span>{tier.label}</span><Money value={tier.value} invalidLabel={invalidLabel} currencySymbol={currencySymbol} language={language} /></li>)}</ul>;
+export function TieredPrice({
+  tiers,
+  invalidLabel,
+  currencySymbol,
+  language
+}: {
+  tiers: readonly { label: string; value: bigint | string }[];
+  invalidLabel: string;
+  currencySymbol: string;
+  language: Language;
+}) {
+  return (
+    <ul className="drl-tiered-price">
+      {tiers.map((tier) => (
+        <li key={tier.label}>
+          <span>{tier.label}</span>
+          <Money
+            value={tier.value}
+            invalidLabel={invalidLabel}
+            currencySymbol={currencySymbol}
+            language={language}
+          />
+        </li>
+      ))}
+    </ul>
+  );
 }
 
-export function ProductCard({ imageUrl, imageAlt, name, price, badge, onClick }: { imageUrl?: string; imageAlt: string; name: string; price: ReactNode; badge?: ReactNode; onClick?: () => void }) {
-  const content = <><ImagePlaceholder src={imageUrl} alt={imageAlt} /><span className="drl-product-card__body"><h3>{name}</h3><span>{price}</span></span>{badge && <Badge>{badge}</Badge>}</>;
-  return onClick ? <button type="button" className="drl-product-card" onClick={onClick}>{content}</button> : <article className="drl-product-card">{content}</article>;
+export function ProductCard({
+  imageUrl,
+  imageAlt,
+  name,
+  price,
+  badge,
+  onClick
+}: {
+  imageUrl?: string;
+  imageAlt: string;
+  name: string;
+  price: ReactNode;
+  badge?: ReactNode;
+  onClick?: () => void;
+}) {
+  const content = (
+    <>
+      <ImagePlaceholder src={imageUrl} alt={imageAlt} />
+      <span className="drl-product-card__body">
+        <h3>{name}</h3>
+        <span>{price}</span>
+      </span>
+      {badge && <Badge>{badge}</Badge>}
+    </>
+  );
+  return onClick ? (
+    <button type="button" className="drl-product-card" onClick={onClick}>
+      {content}
+    </button>
+  ) : (
+    <article className="drl-product-card">{content}</article>
+  );
 }
 
-export function Tabs({ tabs, activeId, onChange, ariaLabel }: { tabs: readonly { id: string; label: string }[]; activeId: string; onChange: (id: string) => void; ariaLabel: string }) {
+export function Tabs({
+  tabs,
+  activeId,
+  onChange,
+  ariaLabel
+}: {
+  tabs: readonly { id: string; label: string }[];
+  activeId: string;
+  onChange: (id: string) => void;
+  ariaLabel: string;
+}) {
   const tabRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
-  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const offset = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : event.key === "Home" ? -index : event.key === "End" ? tabs.length - index - 1 : 0;
+  const handleKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    index: number
+  ) => {
+    const offset =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : event.key === "Home"
+            ? -index
+            : event.key === "End"
+              ? tabs.length - index - 1
+              : 0;
     if (!offset || tabs.length === 0) return;
     event.preventDefault();
     const nextIndex = (index + offset + tabs.length) % tabs.length;
     onChange(tabs[nextIndex]!.id);
     tabRefs.current[nextIndex]?.focus();
   };
-  return <div className="drl-tabs" role="tablist" aria-label={ariaLabel}>{tabs.map((tab, index) => <button ref={(element) => { tabRefs.current[index] = element; }} key={tab.id} type="button" role="tab" aria-selected={tab.id === activeId} tabIndex={tab.id === activeId ? 0 : -1} onKeyDown={(event) => handleKeyDown(event, index)} onClick={() => onChange(tab.id)}>{tab.label}</button>)}</div>;
+  return (
+    <div className="drl-tabs" role="tablist" aria-label={ariaLabel}>
+      {tabs.map((tab, index) => (
+        <button
+          ref={(element) => {
+            tabRefs.current[index] = element;
+          }}
+          key={tab.id}
+          type="button"
+          role="tab"
+          aria-selected={tab.id === activeId}
+          tabIndex={tab.id === activeId ? 0 : -1}
+          onKeyDown={(event) => handleKeyDown(event, index)}
+          onClick={() => onChange(tab.id)}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
 }
 
-export function Toast({ children, role = "status" }: { children: ReactNode; role?: "status" | "alert" }) {
-  return <div className="drl-toast" role={role} aria-live={role === "status" ? "polite" : undefined}>{children}</div>;
+export function Toast({
+  children,
+  role = "status"
+}: {
+  children: ReactNode;
+  role?: "status" | "alert";
+}) {
+  return (
+    <div
+      className="drl-toast"
+      role={role}
+      aria-live={role === "status" ? "polite" : undefined}
+    >
+      {children}
+    </div>
+  );
 }
 
-export function Skeleton({ width = "100%", height = "1em" }: { width?: string; height?: string }) {
-  return <span className="drl-skeleton" aria-hidden="true" style={{ width, height }} />;
+export function Skeleton({
+  width = "100%",
+  height = "1em"
+}: {
+  width?: string;
+  height?: string;
+}) {
+  return (
+    <span
+      className="drl-skeleton"
+      aria-hidden="true"
+      style={{ width, height }}
+    />
+  );
 }
 
 export function ImagePlaceholder({ src, alt }: { src?: string; alt: string }) {
   const [failed, setFailed] = React.useState(false);
-  if (!src || failed) return <span className="drl-image-placeholder" role="img" aria-label={alt} />;
-  return <img className="drl-image-placeholder" src={src} alt={alt} onError={() => setFailed(true)} />;
+  if (!src || failed)
+    return (
+      <span className="drl-image-placeholder" role="img" aria-label={alt} />
+    );
+  return (
+    <img
+      className="drl-image-placeholder"
+      src={src}
+      alt={alt}
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 export function Badge({ children }: { children: ReactNode }) {

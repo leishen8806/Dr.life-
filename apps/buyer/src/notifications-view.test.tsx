@@ -45,9 +45,9 @@ describe("Buyer V7 NotificationView", () => {
   it("renders default settings and sends read-all and setting updates", async () => {
     const client = fakeClient();
     render(<I18nProvider initialLanguage="en"><NotificationView client={client} language="en" t={(key, params) => translate(key, params, "en")} onBack={vi.fn()} onNavigate={vi.fn()} /></I18nProvider>);
-    await screen.findByRole("checkbox", { name: /Payment confirmed/i });
-    const orderSetting = screen.getAllByRole("checkbox", { name: /Payment confirmed/i }).at(-1)! as HTMLInputElement;
-    expect(screen.getAllByRole("checkbox").length).toBeGreaterThan(1);
+    await screen.findByRole("switch", { name: /Payment confirmed/i });
+    const orderSetting = screen.getAllByRole("switch", { name: /Payment confirmed/i }).at(-1)!;
+    expect(screen.getAllByRole("switch").length).toBeGreaterThan(1);
     fireEvent.click(screen.getAllByRole("button", { name: "Mark all read" }).at(-1)!);
     await waitFor(() => expect(client.POST).toHaveBeenCalledWith("/v1/buyer/me/notifications/read-all", expect.anything()));
     const readAllRequest = (client.POST as unknown as ReturnType<typeof vi.fn>).mock.calls.find(([path]) => path === "/v1/buyer/me/notifications/read-all")?.[1] as { params: { header: { "Idempotency-Key": string } } };
@@ -57,8 +57,8 @@ describe("Buyer V7 NotificationView", () => {
     await waitFor(() => expect(client.PUT).toHaveBeenCalledWith("/v1/buyer/me/notification-settings", expect.anything()));
     const settingRequest = (client.PUT as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[1] as { params: { header: { "Idempotency-Key": string } } };
     expect(settingRequest.params.header["Idempotency-Key"]).toMatch(/^[A-Za-z0-9_-]{1,64}$/);
-    await waitFor(() => expect(orderSetting.checked).toBe(false));
-    expect(screen.getAllByRole("checkbox").slice(-5)).toHaveLength(5);
+    await waitFor(() => expect(orderSetting.getAttribute("aria-checked")).toBe("false"));
+    expect(screen.getAllByRole("switch").slice(-5)).toHaveLength(5);
     expect(screen.queryByText("Withdrawal settled")).toBeNull();
     expect(screen.queryByText("Settlement settled")).toBeNull();
   });

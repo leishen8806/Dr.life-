@@ -36,7 +36,13 @@ interface Editing {
   draft: ProductDraft;
 }
 
-export function ProductScreen({ api, client }: { api: MerchantProductApi; client?: ReturnType<typeof createApiClient> }) {
+export function ProductScreen({
+  api,
+  client
+}: {
+  api: MerchantProductApi;
+  client?: ReturnType<typeof createApiClient>;
+}) {
   const { language, t } = useI18n();
   const [products, setProducts] = useState<Product[]>();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -47,7 +53,9 @@ export function ProductScreen({ api, client }: { api: MerchantProductApi; client
   const [busy, setBusy] = useState(false);
   const [subordersOpen, setSubordersOpen] = useState(false);
   const [suborders, setSuborders] = useState<MerchantSuborder[]>([]);
-  const [subordersNextCursor, setSubordersNextCursor] = useState<string | null>(null);
+  const [subordersNextCursor, setSubordersNextCursor] = useState<string | null>(
+    null
+  );
   const [subordersLoading, setSubordersLoading] = useState(false);
   const [subordersError, setSubordersError] = useState(false);
   const [selectedSuborder, setSelectedSuborder] = useState<MerchantSuborder>();
@@ -58,9 +66,13 @@ export function ProductScreen({ api, client }: { api: MerchantProductApi; client
   const v4Api = useMemo(() => createMerchantV4Api(), []);
   useEffect(() => {
     if (!client) return;
-    void client.GET("/v1/merchant/me/notifications", { params: { query: { limit: 1 } } }).then((result) => {
-      if (result.data?.data) setNotificationUnreadCount(result.data.data.unread_count);
-    }).catch(() => undefined);
+    void client
+      .GET("/v1/merchant/me/notifications", { params: { query: { limit: 1 } } })
+      .then((result) => {
+        if (result.data?.data)
+          setNotificationUnreadCount(result.data.data.unread_count);
+      })
+      .catch(() => undefined);
   }, [client]);
 
   const reload = useCallback(async () => {
@@ -70,7 +82,9 @@ export function ProductScreen({ api, client }: { api: MerchantProductApi; client
       const [items, enabled, suborderPage] = await Promise.all([
         api.list("all"),
         api.listCategories(),
-        api.listSuborders ? api.listSuborders() : Promise.resolve({ items: [], nextCursor: null })
+        api.listSuborders
+          ? api.listSuborders()
+          : Promise.resolve({ items: [], nextCursor: null })
       ]);
       setProducts(items);
       setCategories(enabled);
@@ -149,101 +163,173 @@ export function ProductScreen({ api, client }: { api: MerchantProductApi; client
       setSelectedSuborder(order);
       return;
     }
-    void api.getSuborder(order.public_id).then(setSelectedSuborder).catch((error) => {
-      setFailure(productErrorKey(error, "load"));
-    });
+    void api
+      .getSuborder(order.public_id)
+      .then(setSelectedSuborder)
+      .catch((error) => {
+        setFailure(productErrorKey(error, "load"));
+      });
   };
 
   const startCreating = () => setEditing({ draft: emptyProductDraft() });
 
   return (
     <main className="mini-shell">
-      {v7Open ? <MerchantV7View language={language} t={t} client={client} unreadCount={notificationUnreadCount} onBack={() => setV7Open(false)} /> : v4Open ? <MerchantV4View api={v4Api} language={language} t={t} onBack={() => setV4Open(false)} /> : <>
-      <AppHeader slogan={t("brand.slogan")} actions={<>
-        <LanguageSwitcher />
-        <NotificationBell label={t("merchant.notificationSettings")} unreadCount={notificationUnreadCount} onClick={() => setV7Open(true)} />
-        <Button variant="secondary" className="merchant-orders-action" onClick={() => { setSubordersOpen(true); setSelectedSuborder(undefined); }}>{t("order.suborders")}</Button>
-        <Button variant="secondary" onClick={() => setV4Open(true)}>{t("merchant.profileLabel")}</Button>
-        <Button variant="secondary" className="merchant-v7-action" onClick={() => setV7Open(true)}>{t("merchant.dashboard")}</Button>
-      </>} />
-      {subordersOpen ? (
-        selectedSuborder ? (
-          <SuborderDetailView order={selectedSuborder} language={language} translate={t} onBack={() => setSelectedSuborder(undefined)} />
-        ) : (
-          <>
-            <Button variant="secondary" className="merchant-back" onClick={() => setSubordersOpen(false)}>{t("common.back")}</Button>
-            <h1>{t("order.suborders")}</h1>
-            <SuborderListView language={language} translate={t} orders={suborders} selected={suborderStatus} onSelectStatus={setSuborderStatus} onOpen={openSuborder} loading={subordersLoading} error={subordersError} onRetry={() => void reload()} hasMore={subordersNextCursor !== null} onLoadMore={() => void loadMoreSuborders()} />
-          </>
-        )
-      ) : null}
-      {!subordersOpen && <>
-      <h1>{t("product.list.title")}</h1>
-      {failure && (
-        <ErrorState
-          title={t("common.failure")}
-          description={t(failure)}
-          retryLabel={t("common.retry")}
-          onRetry={() => void reload()}
-        />
-      )}
-      {products === undefined ? (
-        <Loading label={t("common.loading")} skeleton />
-      ) : editing ? (
-        <ProductFormView
-          mode={editing.product ? "edit" : "create"}
-          draft={editing.draft}
-          errors={errors}
-          categories={categories}
+      {v7Open ? (
+        <MerchantV7View
           language={language}
-          translate={t}
-          busy={busy}
-          onChange={(draft) => setEditing({ ...editing, draft })}
-          onSubmit={save}
-          onCancel={closeForm}
+          t={t}
+          client={client}
+          unreadCount={notificationUnreadCount}
+          onBack={() => setV7Open(false)}
+        />
+      ) : v4Open ? (
+        <MerchantV4View
+          api={v4Api}
+          language={language}
+          t={t}
+          onBack={() => setV4Open(false)}
         />
       ) : (
         <>
-          <Button
-            variant="primary"
-            className="merchant-create"
-            onClick={startCreating}
-          >
-            {t("product.list.create")}
-          </Button>
-          <ProductListView
-            products={products}
-            language={language}
-            translate={t}
-            onCreate={startCreating}
-            onEdit={(product) =>
-              setEditing({ product, draft: draftFromProduct(product) })
+          <AppHeader
+            slogan={t("brand.slogan")}
+            actions={
+              <>
+                <LanguageSwitcher />
+                <NotificationBell
+                  label={t("merchant.notificationSettings")}
+                  unreadCount={notificationUnreadCount}
+                  onClick={() => setV7Open(true)}
+                />
+                <Button
+                  variant="secondary"
+                  className="merchant-orders-action"
+                  onClick={() => {
+                    setSubordersOpen(true);
+                    setSelectedSuborder(undefined);
+                  }}
+                >
+                  {t("order.suborders")}
+                </Button>
+                <Button variant="secondary" onClick={() => setV4Open(true)}>
+                  {t("merchant.profileLabel")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  testId="merchant-v7"
+                  className="merchant-v7-action"
+                  onClick={() => setV7Open(true)}
+                >
+                  {t("merchant.dashboard")}
+                </Button>
+              </>
             }
-            onPublish={(product) =>
-              void run("publish", () => api.publish(product.public_id))
-            }
-            onUnpublish={setUnpublishing}
           />
+          {subordersOpen ? (
+            selectedSuborder ? (
+              <SuborderDetailView
+                order={selectedSuborder}
+                language={language}
+                translate={t}
+                onBack={() => setSelectedSuborder(undefined)}
+              />
+            ) : (
+              <>
+                <Button
+                  variant="secondary"
+                  className="merchant-back"
+                  onClick={() => setSubordersOpen(false)}
+                >
+                  {t("common.back")}
+                </Button>
+                <h1>{t("order.suborders")}</h1>
+                <SuborderListView
+                  language={language}
+                  translate={t}
+                  orders={suborders}
+                  selected={suborderStatus}
+                  onSelectStatus={setSuborderStatus}
+                  onOpen={openSuborder}
+                  loading={subordersLoading}
+                  error={subordersError}
+                  onRetry={() => void reload()}
+                  hasMore={subordersNextCursor !== null}
+                  onLoadMore={() => void loadMoreSuborders()}
+                />
+              </>
+            )
+          ) : null}
+          {!subordersOpen && (
+            <>
+              <h1>{t("product.list.title")}</h1>
+              {failure && (
+                <ErrorState
+                  title={t("common.failure")}
+                  description={t(failure)}
+                  retryLabel={t("common.retry")}
+                  onRetry={() => void reload()}
+                />
+              )}
+              {products === undefined ? (
+                <Loading label={t("common.loading")} skeleton />
+              ) : editing ? (
+                <ProductFormView
+                  mode={editing.product ? "edit" : "create"}
+                  draft={editing.draft}
+                  errors={errors}
+                  categories={categories}
+                  language={language}
+                  translate={t}
+                  busy={busy}
+                  onChange={(draft) => setEditing({ ...editing, draft })}
+                  onSubmit={save}
+                  onCancel={closeForm}
+                />
+              ) : (
+                <>
+                  <Button
+                    variant="primary"
+                    className="merchant-create"
+                    onClick={startCreating}
+                  >
+                    {t("product.list.create")}
+                  </Button>
+                  <ProductListView
+                    products={products}
+                    language={language}
+                    translate={t}
+                    onCreate={startCreating}
+                    onEdit={(product) =>
+                      setEditing({ product, draft: draftFromProduct(product) })
+                    }
+                    onPublish={(product) =>
+                      void run("publish", () => api.publish(product.public_id))
+                    }
+                    onUnpublish={setUnpublishing}
+                  />
+                </>
+              )}
+              <ConfirmDialog
+                open={unpublishing !== undefined}
+                title={t("product.unpublish.title")}
+                description={t("product.unpublish.description")}
+                cancelLabel={t("common.cancel")}
+                confirmLabel={t("product.action.unpublish")}
+                onCancel={() => setUnpublishing(undefined)}
+                onConfirm={() => {
+                  const product = unpublishing;
+                  if (!product) return;
+                  setUnpublishing(undefined);
+                  void run("unpublish", () =>
+                    api.update(product.public_id, unpublishPatch())
+                  );
+                }}
+              />
+            </>
+          )}
         </>
       )}
-      <ConfirmDialog
-        open={unpublishing !== undefined}
-        title={t("product.unpublish.title")}
-        description={t("product.unpublish.description")}
-        cancelLabel={t("common.cancel")}
-        confirmLabel={t("product.action.unpublish")}
-        onCancel={() => setUnpublishing(undefined)}
-        onConfirm={() => {
-          const product = unpublishing;
-          if (!product) return;
-          setUnpublishing(undefined);
-          void run("unpublish", () =>
-            api.update(product.public_id, unpublishPatch())
-          );
-        }}
-      />
-      </>}
-      </>}
     </main>
   );
 }

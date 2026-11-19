@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type TranslationKey, useI18n } from "@drlife/i18n";
-import { Button, LanguageSwitcher, NotificationBell, useBackButton } from "@drlife/ui";
+import {
+  Button,
+  LanguageSwitcher,
+  NotificationBell,
+  useBackButton
+} from "@drlife/ui";
 import {
   type BuyerApiClient,
   type BuyerOrderPage,
@@ -12,8 +17,19 @@ import {
 } from "./api";
 import { appendFeed, firstFeed, nextPage, type ProductFeed } from "./feed";
 import type { BuyerOrder } from "./orders";
-import { createMockPaymentAttempt, createPaymentIdempotencyKey, pendingPaymentAttempt, type PaymentAttempt } from "./payment";
-import { addProduct, cartCount, stepQuantity, updateQuantity, type CartItem } from "./cart";
+import {
+  createMockPaymentAttempt,
+  createPaymentIdempotencyKey,
+  pendingPaymentAttempt,
+  type PaymentAttempt
+} from "./payment";
+import {
+  addProduct,
+  cartCount,
+  stepQuantity,
+  updateQuantity,
+  type CartItem
+} from "./cart";
 import { errorMessageKey, type Resource } from "./resource";
 import type { Category, Product } from "./types";
 import { CategoryView } from "./views/category-view";
@@ -24,9 +40,13 @@ import { OrderDetailView } from "./views/order-detail-view";
 import { OrderListView } from "./views/order-list-view";
 import { PaymentView } from "./views/payment-view";
 import { SearchView, useProductSearch } from "./views/search-view";
-import { createBuyerProfileApi, type BuyerProfile } from "./profile/profile-api";
+import {
+  createBuyerProfileApi,
+  type BuyerProfile
+} from "./profile/profile-api";
 import { BuyerProfileView, BuyerWalletView } from "./profile/profile-views";
-import { AftercareView, DecorView, NotificationView } from "./v7-views";
+import { DecorView, NotificationView } from "./v7-views";
+import { AftercareView as SplitAftercareView } from "./v7-aftercare-view";
 
 type Route =
   | { name: "home" }
@@ -66,7 +86,11 @@ function useLoaded<T>(
     attempt: -1,
     resource: { status: "loading" }
   });
-  const requestMatches = loaded.key === key && loaded.load === keyedLoad && loaded.enabled === enabled && loaded.attempt === attempt;
+  const requestMatches =
+    loaded.key === key &&
+    loaded.load === keyedLoad &&
+    loaded.enabled === enabled &&
+    loaded.attempt === attempt;
   const resource = requestMatches
     ? loaded.resource
     : { status: "loading" as const };
@@ -76,17 +100,36 @@ function useLoaded<T>(
       // The keyed resource must not expose the previous activation after a
       // route leaves the page; the next enabled render then starts loading.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoaded({ key, load: keyedLoad, enabled, attempt, resource: { status: "loading" } });
+      setLoaded({
+        key,
+        load: keyedLoad,
+        enabled,
+        attempt,
+        resource: { status: "loading" }
+      });
       return;
     }
     const controller = new AbortController();
     keyedLoad(controller.signal).then(
       (value) => {
-        if (!controller.signal.aborted) setLoaded({ key, load: keyedLoad, enabled, attempt, resource: { status: "ready", value } });
+        if (!controller.signal.aborted)
+          setLoaded({
+            key,
+            load: keyedLoad,
+            enabled,
+            attempt,
+            resource: { status: "ready", value }
+          });
       },
       (error: unknown) => {
         if (!controller.signal.aborted)
-          setLoaded({ key, load: keyedLoad, enabled, attempt, resource: { status: "error", messageKey: errorMessageKey(error) } });
+          setLoaded({
+            key,
+            load: keyedLoad,
+            enabled,
+            attempt,
+            resource: { status: "error", messageKey: errorMessageKey(error) }
+          });
       }
     );
     return () => controller.abort();
@@ -117,7 +160,11 @@ interface MorePages {
  * Exported for `feed-hook.test.tsx`: both guards below are out of reach of the
  * rendered markup, so they are driven through the hook itself.
  */
-export function useProductFeed(client: BuyerApiClient, code?: string, language?: string) {
+export function useProductFeed(
+  client: BuyerApiClient,
+  code?: string,
+  language?: string
+) {
   const loader = useCallback<FeedLoader>(
     (signal) =>
       loadProducts(client, { category: code }, signal).then(firstFeed),
@@ -182,7 +229,11 @@ interface MoreOrders {
 }
 
 /** Orders are paged independently from the first response and reset on language changes. */
-export function useOrderFeed(client: BuyerApiClient, language: string, enabled = true) {
+export function useOrderFeed(
+  client: BuyerApiClient,
+  language: string,
+  enabled = true
+) {
   const loadOrders = useCallback(
     (signal: AbortSignal) => loadBuyerOrders(client, undefined, signal),
     [client, language]
@@ -196,9 +247,12 @@ export function useOrderFeed(client: BuyerApiClient, language: string, enabled =
   useEffect(() => () => moreOrdersRequest.current?.abort(), [language]);
 
   const loadMore = useCallback(() => {
-    const current = orders.status === "ready" && moreOrders?.baseItems === orders.value.items && moreOrders.language === language
-      ? moreOrders
-      : undefined;
+    const current =
+      orders.status === "ready" &&
+      moreOrders?.baseItems === orders.value.items &&
+      moreOrders.language === language
+        ? moreOrders
+        : undefined;
     // The old first page remains visible while the language-keyed request is in flight.
     if (orders.status !== "ready" || current?.loading) return;
     const currentItems = current?.items ?? orders.value.items;
@@ -207,7 +261,13 @@ export function useOrderFeed(client: BuyerApiClient, language: string, enabled =
     moreOrdersRequest.current?.abort();
     const controller = new AbortController();
     moreOrdersRequest.current = controller;
-    setMoreOrders({ baseItems: orders.value.items, language, items: currentItems, nextCursor: cursor, loading: true });
+    setMoreOrders({
+      baseItems: orders.value.items,
+      language,
+      items: currentItems,
+      nextCursor: cursor,
+      loading: true
+    });
     loadBuyerOrders(client, cursor, controller.signal).then(
       (page: BuyerOrderPage) => {
         if (controller.signal.aborted) return;
@@ -216,11 +276,14 @@ export function useOrderFeed(client: BuyerApiClient, language: string, enabled =
           language,
           items: [
             ...currentItems,
-            ...page.items.filter((item) => !currentItems.some((existing) =>
-              item.dataError
-                ? existing.dataErrorPublicId === item.dataErrorPublicId
-                : existing.publicId === item.publicId
-            ))
+            ...page.items.filter(
+              (item) =>
+                !currentItems.some((existing) =>
+                  item.dataError
+                    ? existing.dataErrorPublicId === item.dataErrorPublicId
+                    : existing.publicId === item.publicId
+                )
+            )
           ],
           nextCursor: page.nextCursor,
           loading: false
@@ -245,27 +308,50 @@ export function useOrderFeed(client: BuyerApiClient, language: string, enabled =
     setMoreOrders(undefined);
     retryOrders();
   }, [retryOrders]);
-  const current = orders.status === "ready" && moreOrders?.baseItems === orders.value.items && moreOrders.language === language
-    ? moreOrders
-    : undefined;
-  const resource = useMemo<Resource<BuyerOrder[]>>(() => orders.status === "ready"
-    ? { status: "ready" as const, value: current?.items ?? orders.value.items }
-    : orders.status === "error"
-      ? { status: "error" as const, messageKey: orders.messageKey, previous: orders.previous?.items }
-      : orders, [current, orders]);
+  const current =
+    orders.status === "ready" &&
+    moreOrders?.baseItems === orders.value.items &&
+    moreOrders.language === language
+      ? moreOrders
+      : undefined;
+  const resource = useMemo<Resource<BuyerOrder[]>>(
+    () =>
+      orders.status === "ready"
+        ? {
+            status: "ready" as const,
+            value: current?.items ?? orders.value.items
+          }
+        : orders.status === "error"
+          ? {
+              status: "error" as const,
+              messageKey: orders.messageKey,
+              previous: orders.previous?.items
+            }
+          : orders,
+    [current, orders]
+  );
   return {
     resource,
     retry,
     loadMore,
     loadingMore: current?.loading ?? false,
     moreMessageKey: current?.messageKey,
-    nextCursor: current?.nextCursor ?? (orders.status === "ready" ? orders.value.nextCursor : null)
+    nextCursor:
+      current?.nextCursor ??
+      (orders.status === "ready" ? orders.value.nextCursor : null)
   };
 }
 
 /** Loads one order detail and reloads it whenever the active language changes. */
-export function useOrderDetail(client: BuyerApiClient, publicId: string, language: string) {
-  const [loaded, setLoaded] = useState<{ key: string; resource: Resource<BuyerOrder> }>({
+export function useOrderDetail(
+  client: BuyerApiClient,
+  publicId: string,
+  language: string
+) {
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    resource: Resource<BuyerOrder>;
+  }>({
     key: "",
     resource: { status: "loading" }
   });
@@ -279,10 +365,15 @@ export function useOrderDetail(client: BuyerApiClient, publicId: string, languag
     setLoaded({ key, resource: { status: "loading" } });
     loadBuyerOrder(client, publicId, controller.signal).then(
       (value) => {
-        if (!controller.signal.aborted) setLoaded({ key, resource: { status: "ready", value } });
+        if (!controller.signal.aborted)
+          setLoaded({ key, resource: { status: "ready", value } });
       },
       (error: unknown) => {
-        if (!controller.signal.aborted) setLoaded({ key, resource: { status: "error", messageKey: errorMessageKey(error) } });
+        if (!controller.signal.aborted)
+          setLoaded({
+            key,
+            resource: { status: "error", messageKey: errorMessageKey(error) }
+          });
       }
     );
   }, [client, key, publicId]);
@@ -297,7 +388,11 @@ export function useOrderDetail(client: BuyerApiClient, publicId: string, languag
     return () => request.current?.abort();
   }, [load, language, publicId]);
 
-  return { resource: loaded.key === key ? loaded.resource : { status: "loading" as const }, retry: load };
+  return {
+    resource:
+      loaded.key === key ? loaded.resource : { status: "loading" as const },
+    retry: load
+  };
 }
 
 function CategoryPage({
@@ -340,14 +435,31 @@ function CategoryPage({
   );
 }
 
-export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: BuyerApiClient }) {
+export function BuyerApp({
+  isTelegram,
+  client
+}: {
+  isTelegram: boolean;
+  client: BuyerApiClient;
+}) {
   const { language, t } = useI18n();
 
-  const [stack, setStack] = useState<Route[]>([{ name: "home" }]);
+  const [stack, setStack] = useState<Route[]>(() =>
+    import.meta.env.DEV &&
+    (window.location.hash === "#aftercare" ||
+      window.location.search.includes("evidence=aftercare"))
+      ? [{ name: "aftercare" }]
+      : [{ name: "home" }]
+  );
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [cartError, setCartError] = useState<ReturnType<typeof addProduct>["error"]>();
-  const [paymentAttempts, setPaymentAttempts] = useState<Record<string, PaymentAttempt>>({});
-  const [paymentSequences, setPaymentSequences] = useState<Record<string, number>>({});
+  const [cartError, setCartError] =
+    useState<ReturnType<typeof addProduct>["error"]>();
+  const [paymentAttempts, setPaymentAttempts] = useState<
+    Record<string, PaymentAttempt>
+  >({});
+  const [paymentSequences, setPaymentSequences] = useState<
+    Record<string, number>
+  >({});
   const route = stack[stack.length - 1] ?? { name: "home" };
   const profileApi = useMemo(() => createBuyerProfileApi(), []);
   const push = useCallback(
@@ -358,25 +470,31 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     (next: Route) => setStack((current) => [...current.slice(0, -1), next]),
     []
   );
-  const back = useCallback(
-    () => {
-      setStack((current) => (current.length > 1 ? current.slice(0, -1) : current));
-    },
-    []
-  );
+  const back = useCallback(() => {
+    setStack((current) =>
+      current.length > 1 ? current.slice(0, -1) : current
+    );
+  }, []);
   useBackButton(back, isTelegram && stack.length > 1);
 
   const loadAllCategories = useCallback(
     (signal: AbortSignal) => loadCategories(client, signal),
     [client, language]
   );
-  const [categories, retryCategories] = useLoaded(`categories:${language}`, loadAllCategories);
+  const [categories, retryCategories] = useLoaded(
+    `categories:${language}`,
+    loadAllCategories
+  );
   const loadFeatured = useCallback(
     async (signal: AbortSignal) =>
-      (await loadProducts(client, { pageSize: featuredPageSize }, signal)).items,
+      (await loadProducts(client, { pageSize: featuredPageSize }, signal))
+        .items,
     [client, language]
   );
-  const [featured, retryFeatured] = useLoaded(`featured:${language}`, loadFeatured);
+  const [featured, retryFeatured] = useLoaded(
+    `featured:${language}`,
+    loadFeatured
+  );
 
   const openCategory = useCallback(
     (code?: string) => push({ name: "category", code }),
@@ -392,107 +510,224 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     [push]
   );
   const openOrders = useCallback(() => push({ name: "orders" }), [push]);
-  const { resource: orders, retry: retryOrders, loadMore: loadMoreOrders, loadingMore, moreMessageKey: moreOrdersMessageKey, nextCursor: nextOrderCursor } =
-    useOrderFeed(client, language, route.name === "orders");
+  const {
+    resource: orders,
+    retry: retryOrders,
+    loadMore: loadMoreOrders,
+    loadingMore,
+    moreMessageKey: moreOrdersMessageKey,
+    nextCursor: nextOrderCursor
+  } = useOrderFeed(client, language, route.name === "orders");
   const search = useProductSearch(client, language);
   const orderList = orders;
-  const openOrder = useCallback((order: BuyerOrder) => {
-    push({ name: "order", publicId: order.publicId });
-  }, [push]);
-  const openPayment = useCallback((order: BuyerOrder) => {
-    const idempotencyKey = paymentAttempts[order.publicId]?.idempotencyKey ?? createPaymentIdempotencyKey();
-    push({
-      name: "payment",
-      order,
-      attempt: paymentAttempts[order.publicId] ?? pendingPaymentAttempt(order, idempotencyKey)
-    });
-  }, [paymentAttempts, push]);
-  const payOrder = useCallback((order: BuyerOrder) => {
-    const idempotencyKey = paymentAttempts[order.publicId]?.idempotencyKey ?? createPaymentIdempotencyKey();
-    const attemptNumber = (paymentSequences[order.publicId] ?? 0) + 1;
-    const attempt = createMockPaymentAttempt(order, idempotencyKey, attemptNumber);
-    setPaymentAttempts((current) => ({ ...current, [order.publicId]: attempt }));
-    setPaymentSequences((current) => ({ ...current, [order.publicId]: attemptNumber }));
-    setStack((current) => current.map((item, index) =>
-      index === current.length - 1 && item.name === "payment" ? { ...item, attempt } : item
-    ));
-    if (isTelegram && typeof window !== "undefined") {
-      const openLink = (window as unknown as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } }).Telegram?.WebApp?.openLink;
-      openLink?.(attempt.paymentLink!);
-    }
-  }, [isTelegram, paymentAttempts, paymentSequences]);
-  const refreshPayment = useCallback((order: BuyerOrder) => {
-    const current = paymentAttempts[order.publicId];
-    if (!current || current.status !== "confirming") return;
-    const attempt = { ...current, status: "succeeded" as const };
-    setPaymentAttempts((items) => ({ ...items, [order.publicId]: attempt }));
-    setStack((items) => items.map((item, index) =>
-      index === items.length - 1 && item.name === "payment"
-        ? { ...item, attempt, order: { ...item.order, paymentStatus: "succeeded" } }
-          : item
-    ));
-  }, [paymentAttempts]);
+  const openOrder = useCallback(
+    (order: BuyerOrder) => {
+      push({ name: "order", publicId: order.publicId });
+    },
+    [push]
+  );
+  const openPayment = useCallback(
+    (order: BuyerOrder) => {
+      const idempotencyKey =
+        paymentAttempts[order.publicId]?.idempotencyKey ??
+        createPaymentIdempotencyKey();
+      push({
+        name: "payment",
+        order,
+        attempt:
+          paymentAttempts[order.publicId] ??
+          pendingPaymentAttempt(order, idempotencyKey)
+      });
+    },
+    [paymentAttempts, push]
+  );
+  const payOrder = useCallback(
+    (order: BuyerOrder) => {
+      const idempotencyKey =
+        paymentAttempts[order.publicId]?.idempotencyKey ??
+        createPaymentIdempotencyKey();
+      const attemptNumber = (paymentSequences[order.publicId] ?? 0) + 1;
+      const attempt = createMockPaymentAttempt(
+        order,
+        idempotencyKey,
+        attemptNumber
+      );
+      setPaymentAttempts((current) => ({
+        ...current,
+        [order.publicId]: attempt
+      }));
+      setPaymentSequences((current) => ({
+        ...current,
+        [order.publicId]: attemptNumber
+      }));
+      setStack((current) =>
+        current.map((item, index) =>
+          index === current.length - 1 && item.name === "payment"
+            ? { ...item, attempt }
+            : item
+        )
+      );
+      if (isTelegram && typeof window !== "undefined") {
+        const openLink = (
+          window as unknown as {
+            Telegram?: { WebApp?: { openLink?: (url: string) => void } };
+          }
+        ).Telegram?.WebApp?.openLink;
+        openLink?.(attempt.paymentLink!);
+      }
+    },
+    [isTelegram, paymentAttempts, paymentSequences]
+  );
+  const refreshPayment = useCallback(
+    (order: BuyerOrder) => {
+      const current = paymentAttempts[order.publicId];
+      if (!current || current.status !== "confirming") return;
+      const attempt = { ...current, status: "succeeded" as const };
+      setPaymentAttempts((items) => ({ ...items, [order.publicId]: attempt }));
+      setStack((items) =>
+        items.map((item, index) =>
+          index === items.length - 1 && item.name === "payment"
+            ? {
+                ...item,
+                attempt,
+                order: { ...item.order, paymentStatus: "succeeded" }
+              }
+            : item
+        )
+      );
+    },
+    [paymentAttempts]
+  );
   const retryPayment = useCallback((order: BuyerOrder) => {
     const idempotencyKey = createPaymentIdempotencyKey();
     const attempt = pendingPaymentAttempt(order, idempotencyKey);
-    setPaymentAttempts((current) => ({ ...current, [order.publicId]: attempt }));
-    setStack((current) => current.map((item, index) =>
-      index === current.length - 1 && item.name === "payment" ? { ...item, attempt } : item
-    ));
+    setPaymentAttempts((current) => ({
+      ...current,
+      [order.publicId]: attempt
+    }));
+    setStack((current) =>
+      current.map((item, index) =>
+        index === current.length - 1 && item.name === "payment"
+          ? { ...item, attempt }
+          : item
+      )
+    );
   }, []);
-  const orderDetail = useOrderDetail(client, route.name === "order" ? route.publicId : "", language);
-  const loadProfile = useCallback(() => profileApi.loadProfile(language), [language, profileApi]);
-  const [profile, retryProfile] = useLoaded<BuyerProfile>(language, async () => loadProfile(), true);
+  const orderDetail = useOrderDetail(
+    client,
+    route.name === "order" ? route.publicId : "",
+    language
+  );
+  const loadProfile = useCallback(
+    () => profileApi.loadProfile(language),
+    [language, profileApi]
+  );
+  const [profile, retryProfile] = useLoaded<BuyerProfile>(
+    language,
+    async () => loadProfile(),
+    true
+  );
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   useEffect(() => {
-    void client.GET("/v1/buyer/me/notifications", { params: { query: { limit: 1 } } }).then((result) => {
-      if (result.data?.data) setNotificationUnreadCount(result.data.data.unread_count);
-    }).catch(() => undefined);
+    void client
+      .GET("/v1/buyer/me/notifications", { params: { query: { limit: 1 } } })
+      .then((result) => {
+        if (result.data?.data)
+          setNotificationUnreadCount(result.data.data.unread_count);
+      })
+      .catch(() => undefined);
   }, [client]);
 
-  const addToCart = useCallback((product: Product) => {
-    const result = addProduct(cart, product);
-    setCart(result.cart);
-    setCartError(result.error);
-  }, [cart]);
+  const addToCart = useCallback(
+    (product: Product) => {
+      const result = addProduct(cart, product);
+      setCart(result.cart);
+      setCartError(result.error);
+    },
+    [cart]
+  );
   const openCart = useCallback(() => push({ name: "cart" }), [push]);
   const openProfile = useCallback(() => push({ name: "profile" }), [push]);
   const openWallet = useCallback(() => push({ name: "wallet" }), [push]);
   const openDecor = useCallback(() => push({ name: "decor" }), [push]);
-  const openNotifications = useCallback(() => push({ name: "notifications" }), [push]);
-  const updateCartQuantity = useCallback((item: CartItem, quantity: string) => {
-    const result = updateQuantity(cart, item.product.public_id, quantity);
-    setCart(result.cart);
-    setCartError(result.error);
-  }, [cart]);
-  const stepCartQuantity = useCallback((item: CartItem, delta: -1 | 1) => {
-    const result = stepQuantity(cart, item.product.public_id, delta);
-    setCart(result.cart);
-    setCartError(result.error);
-  }, [cart]);
+  const openNotifications = useCallback(
+    () => push({ name: "notifications" }),
+    [push]
+  );
+  const updateCartQuantity = useCallback(
+    (item: CartItem, quantity: string) => {
+      const result = updateQuantity(cart, item.product.public_id, quantity);
+      setCart(result.cart);
+      setCartError(result.error);
+    },
+    [cart]
+  );
+  const stepCartQuantity = useCallback(
+    (item: CartItem, delta: -1 | 1) => {
+      const result = stepQuantity(cart, item.product.public_id, delta);
+      setCart(result.cart);
+      setCartError(result.error);
+    },
+    [cart]
+  );
   const removeFromCart = useCallback((item: CartItem) => {
-    setCart((current) => current.filter((entry) => entry.product.public_id !== item.product.public_id));
+    setCart((current) =>
+      current.filter(
+        (entry) => entry.product.public_id !== item.product.public_id
+      )
+    );
     setCartError(undefined);
   }, []);
 
   const actions = (
     <>
       <LanguageSwitcher />
-      <Button variant="secondary" className="buyer-orders-action" onClick={openOrders}>
+      <Button
+        variant="secondary"
+        className="buyer-orders-action"
+        onClick={openOrders}
+      >
         {t("order.pageTitle")}
       </Button>
-      <Button variant="secondary" className="buyer-cart-action" onClick={openCart}>
-        {t("mall.cart")} <span aria-label={t("mall.cartCount", { count: cartCount(cart) })}>{cartCount(cart)}</span>
+      <Button
+        variant="secondary"
+        className="buyer-cart-action"
+        onClick={openCart}
+      >
+        {t("mall.cart")}{" "}
+        <span aria-label={t("mall.cartCount", { count: cartCount(cart) })}>
+          {cartCount(cart)}
+        </span>
       </Button>
-      <Button variant="secondary" className="buyer-profile-action" onClick={openProfile}>
+      <Button
+        variant="secondary"
+        className="buyer-profile-action"
+        onClick={openProfile}
+      >
         {t("nav.profile")}
       </Button>
-      <Button variant="secondary" className="buyer-decor-action" onClick={openDecor}>{t("buyer.findDecor")}</Button>
-      <NotificationBell label={t("buyer.notifications")} unreadCount={notificationUnreadCount} onClick={openNotifications} className="buyer-notifications-bell" />
+      <Button
+        variant="secondary"
+        testId="buyer-decor"
+        className="buyer-decor-action"
+        onClick={openDecor}
+      >
+        {t("buyer.findDecor")}
+      </Button>
+      <NotificationBell
+        testId="buyer-notifications"
+        label={t("buyer.notifications")}
+        unreadCount={notificationUnreadCount}
+        onClick={openNotifications}
+        className="buyer-notifications-bell"
+      />
     </>
   );
   const knownCategories = categories.status === "ready" ? categories.value : [];
-  const detailOrder = orderDetail.resource.status === "ready" ? orderDetail.resource.value : undefined;
+  const detailOrder =
+    orderDetail.resource.status === "ready"
+      ? orderDetail.resource.value
+      : undefined;
   const openPaymentFromDetail = detailOrder
     ? () => openPayment(detailOrder)
     : undefined;
@@ -561,19 +796,60 @@ export function BuyerApp({ isTelegram, client }: { isTelegram: boolean; client: 
     );
 
   if (route.name === "wallet")
-    return <BuyerWalletView entries={profile.status === "ready" ? { status: "ready", value: profile.value.entries } : profile.status === "error" ? { status: "error", messageKey: profile.messageKey } : profile} language={language} t={t} onBack={back} onRetry={retryProfile} />;
+    return (
+      <BuyerWalletView
+        entries={
+          profile.status === "ready"
+            ? { status: "ready", value: profile.value.entries }
+            : profile.status === "error"
+              ? { status: "error", messageKey: profile.messageKey }
+              : profile
+        }
+        language={language}
+        t={t}
+        onBack={back}
+        onRetry={retryProfile}
+      />
+    );
 
   if (route.name === "notifications")
-    return <NotificationView client={client} language={language} t={t} onBack={back} onNavigate={(target) => target === "orders" ? openOrders() : openProfile()} onUnreadCountChange={setNotificationUnreadCount} />;
+    return (
+      <NotificationView
+        client={client}
+        language={language}
+        t={t}
+        onBack={back}
+        onNavigate={(target) =>
+          target === "orders" ? openOrders() : openProfile()
+        }
+        onUnreadCountChange={setNotificationUnreadCount}
+      />
+    );
 
   if (route.name === "profile")
-    return <BuyerProfileView profile={profile} language={language} t={t} onOpenWallet={openWallet} onOpenOrders={openOrders} onRetry={retryProfile} />;
+    return (
+      <BuyerProfileView
+        profile={profile}
+        language={language}
+        t={t}
+        onOpenWallet={openWallet}
+        onOpenOrders={openOrders}
+        onRetry={retryProfile}
+      />
+    );
 
   if (route.name === "decor")
-    return <DecorView language={language} t={t} onBack={back} onOpenNotifications={openNotifications} />;
+    return (
+      <DecorView
+        language={language}
+        t={t}
+        onBack={back}
+        onOpenNotifications={openNotifications}
+      />
+    );
 
   if (route.name === "aftercare")
-    return <AftercareView t={t} onBack={back} />;
+    return <SplitAftercareView t={t} onBack={back} />;
 
   if (route.name === "search")
     return (

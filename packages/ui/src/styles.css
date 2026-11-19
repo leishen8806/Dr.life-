@@ -67,10 +67,42 @@ body {
 .drl-khmer {
   font-family:
     "Noto Sans Khmer", "Khmer UI", "Leelawadee UI", system-ui, sans-serif;
-  font-size: max(1em, var(--drl-khmer-font-size));
   line-height: var(--drl-khmer-line-height);
   overflow: visible;
 }
+
+:lang(km) :where(p, li, small, label, dt, dd, button, input, textarea, select),
+.drl-khmer {
+  font-size: max(1em, var(--drl-khmer-font-size));
+}
+
+.drl-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--drl-color-border-strong);
+  border-radius: 999px;
+  color: inherit;
+  background: var(--drl-color-surface-raised);
+  cursor: pointer;
+}
+
+.drl-switch::after {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 2px;
+  border-radius: 50%;
+  background: var(--drl-color-text-muted);
+  content: "";
+  transition: transform 120ms ease;
+}
+
+.drl-switch[aria-checked="true"] { background: var(--drl-color-brand); }
+.drl-switch[aria-checked="true"]::after { background: var(--drl-color-surface); transform: translateX(16px); }
+.drl-switch:disabled { cursor: not-allowed; opacity: .58; }
 
 :lang(km) h1,
 :lang(km) h2,
