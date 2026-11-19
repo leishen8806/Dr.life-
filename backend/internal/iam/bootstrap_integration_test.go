@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -15,7 +16,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	platformaudit "github.com/leishen8806/Dr.life-/backend/internal/platform/audit"
+	"github.com/leishen8806/Dr.life-/backend/internal/platform/ids"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/secrets"
+	"github.com/pquerna/otp/totp"
 	"github.com/pressly/goose/v3"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -77,37 +80,51 @@ func TestBootstrapIntegrationAtomicConcurrencyAndSecretBoundaries(t *testing.T) 
 		t.Fatal("bootstrap login can directly update audit chain head")
 	}
 
-	results := make(chan error, 2)
+	type bootstrapCall struct {
+		result BootstrapAdminResult
+		err    error
+	}
+	results := make(chan bootstrapCall, 2)
 	var group sync.WaitGroup
 	for range 2 {
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			_, callErr := service.CreateFirstSuper(ctx, "bootstrap-owner")
-			results <- callErr
+			result, callErr := service.CreateFirstSuper(ctx, "bootstrap-owner", "Owner@Example.test")
+			results <- bootstrapCall{result: result, err: callErr}
 		}()
 	}
 	group.Wait()
 	close(results)
 	var successes int
-	for callErr := range results {
-		if callErr != nil {
-			t.Logf("bootstrap call failed: %v", callErr)
+	var bootstrapResult BootstrapAdminResult
+	for call := range results {
+		if call.err != nil {
+			t.Logf("bootstrap call failed: %v", call.err)
 		}
-		if callErr == nil {
+		if call.err == nil {
 			successes++
+			bootstrapResult = call.result
 		}
 	}
 	if successes != 1 {
 		t.Fatalf("bootstrap successes=%d, want exactly one", successes)
 	}
 	var adminID int64
-	var storedHash, storedTOTP string
-	if err := pool.QueryRow(ctx, `SELECT id,password_hash,encode(totp_secret_enc,'hex') FROM iam.admin_user WHERE name=$1`, "bootstrap-owner").Scan(&adminID, &storedHash, &storedTOTP); err != nil {
+	var storedHash string
+	var storedTOTP []byte
+	if err := pool.QueryRow(ctx, `SELECT id,password_hash,totp_secret_enc FROM iam.admin_user WHERE name=$1`, "bootstrap-owner").Scan(&adminID, &storedHash, &storedTOTP); err != nil {
 		t.Fatal(err)
 	}
-	if storedHash == "" || storedTOTP == "" {
+	if storedHash == "" || len(storedTOTP) == 0 {
 		t.Fatal("bootstrap credentials were not persisted as hash and ciphertext")
+	}
+	var storedEmail string
+	if err := pool.QueryRow(ctx, `SELECT email FROM iam.admin_user WHERE id=$1`, adminID).Scan(&storedEmail); err != nil {
+		t.Fatal(err)
+	}
+	if storedEmail != "owner@example.test" || bootstrapResult.Admin.Email != storedEmail {
+		t.Fatalf("bootstrap email=%q result=%q, want normalized owner@example.test", storedEmail, bootstrapResult.Admin.Email)
 	}
 	var action, detail string
 	if err := pool.QueryRow(ctx, `SELECT action,detail::text FROM audit.log WHERE actor_id=$1 ORDER BY id DESC LIMIT 1`, adminID).Scan(&action, &detail); err != nil {
@@ -122,6 +139,64 @@ func TestBootstrapIntegrationAtomicConcurrencyAndSecretBoundaries(t *testing.T) 
 	}
 	if _, ok := fields["password"]; ok {
 		t.Fatal("bootstrap audit detail contains password")
+	}
+
+	// Exercise the legacy repair path, including duplicate rejection and the
+	// end-to-end password/TOTP login using the repaired address.
+	legacyEmail := "legacy-owner@bootstrap.invalid"
+	if _, err := pool.Exec(ctx, `UPDATE iam.admin_user SET email=$1 WHERE id=$2`, legacyEmail, adminID); err != nil {
+		t.Fatal(err)
+	}
+	otherID, err := ids.NewULID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherHash, err := HashPassword("unused-test-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherSecret, err := EncryptTOTPSecret(ctx, envelope, otherID, "JBSWY3DPEHPK3PXP")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO iam.admin_user(public_id,name,email,password_hash,totp_secret_enc,role,status) VALUES($1,'Other Super','other@example.test',$2,$3,'super','active')`, otherID, otherHash, otherSecret); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.FixSuperEmail(ctx, "bootstrap-owner", "other@example.test"); err == nil {
+		t.Fatal("repair accepted an email already used by another administrator")
+	}
+	if err := service.FixSuperEmail(ctx, "bootstrap-owner", "Owner@Example.test"); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.FixSuperEmail(ctx, "bootstrap-owner", "owner@example.test"); err != nil {
+		t.Fatal("idempotent repair failed: ", err)
+	}
+	var repairedEmail string
+	if err := pool.QueryRow(ctx, `SELECT email FROM iam.admin_user WHERE id=$1`, adminID).Scan(&repairedEmail); err != nil {
+		t.Fatal(err)
+	}
+	if repairedEmail != "owner@example.test" {
+		t.Fatalf("repaired email=%q", repairedEmail)
+	}
+	var repairDetail string
+	if err := pool.QueryRow(ctx, `SELECT detail::text FROM audit.log WHERE target=$1 ORDER BY id DESC LIMIT 1`, "admin:"+bootstrapResult.Admin.PublicID).Scan(&repairDetail); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(repairDetail, "email 已修正") || strings.Contains(repairDetail, "owner@example.test") {
+		t.Fatalf("repair audit detail=%q", repairDetail)
+	}
+	secret, err := envelope.Decrypt(ctx, storedTOTP, fmt.Sprintf("admin_totp:%s", bootstrapResult.Admin.PublicID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, err := totp.GenerateCode(string(secret), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminLogin := &AdminLoginService{DB: pool, Tokens: TokenManager{Keys: ring, AccessTTL: 10 * time.Minute}, Cipher: envelope, RefreshTTL: 8 * time.Hour, IdleTTL: 15 * time.Minute, Security: &testAdminSecurity{}}
+	loginResult, err := adminLogin.Login(ctx, AdminLoginInput{Email: "owner@example.test", Password: bootstrapResult.InitialPassword, TOTPCode: code, IP: "198.51.100.40", DeviceID: "web:bootstrap", RequestID: "bootstrap-login-test"})
+	if err != nil || loginResult.AccessToken == "" || loginResult.RefreshToken == "" {
+		t.Fatalf("repaired bootstrap login result=%+v err=%v", loginResult, err)
 	}
 
 	if err := service.RegisterBot(ctx, BootstrapBotInput{End: "buyer", Username: "bootstrap-buyer", Actor: "", Token: "test-bot-token-1234"}); err == nil {
