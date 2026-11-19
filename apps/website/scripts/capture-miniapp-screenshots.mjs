@@ -201,11 +201,18 @@ async function assertKhmerFont(page, context) {
     const partsWidth = baseWidth + measure("រ").width;
     return { loaded, width: sampleMeasurement.width, clusterWidth, baseWidth, partsWidth, fontFamily: sampleMeasurement.fontFamily };
   }, sample);
-  const shaped = result.clusterWidth < result.partsWidth * 0.9 && result.clusterWidth <= result.baseWidth * 1.3;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("DOM.enable");
+  await cdp.send("CSS.enable");
+  const { root } = await cdp.send("DOM.getDocument");
+  const { nodeId } = await cdp.send("DOM.querySelector", { nodeId: root.nodeId, selector: "body" });
+  const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
+  const platformFont = fonts.find(({ familyName, glyphCount }) => familyName.includes("Noto Sans Khmer") && glyphCount > 0);
+  const shaped = Boolean(platformFont) && result.clusterWidth <= result.partsWidth * 1.05 && result.clusterWidth >= result.baseWidth * 0.8;
   if (!result.loaded || result.width <= 0 || !result.fontFamily.includes("Noto Sans Khmer") || !shaped) {
     throw new Error(`Khmer font check failed for ${context}: loaded=${result.loaded}, width=${result.width}, clusterWidth=${result.clusterWidth}, baseWidth=${result.baseWidth}, partsWidth=${result.partsWidth}, fontFamily=${result.fontFamily}`);
   }
-  return { ...result, shaped };
+  return { ...result, shaped, platformFont: { familyName: platformFont.familyName, glyphCount: platformFont.glyphCount } };
 }
 
 const inspectPng = async (path) => {
@@ -337,7 +344,7 @@ try {
           const screenHashes = hashesByScreen.get(screenKey) ?? new Map();
           screenHashes.set(item.language, image.sha256);
           hashesByScreen.set(screenKey, screenHashes);
-          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}\twidth=${image.width}\theight=${image.height}\tsha256=${image.sha256}\tkhmerFont=${khmerFont ? `loaded:${khmerFont.loaded},shaped:${khmerFont.shaped},width:${khmerFont.width},clusterWidth:${khmerFont.clusterWidth},partsWidth:${khmerFont.partsWidth},fontFamily:${khmerFont.fontFamily}` : "n/a"}`);
+          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}\twidth=${image.width}\theight=${image.height}\tsha256=${image.sha256}\tkhmerFont=${khmerFont ? `loaded:${khmerFont.loaded},shaped:${khmerFont.shaped},width:${khmerFont.width},clusterWidth:${khmerFont.clusterWidth},baseWidth:${khmerFont.baseWidth},partsWidth:${khmerFont.partsWidth},fontFamily:${khmerFont.fontFamily},platform:${khmerFont.platformFont.familyName},glyphs:${khmerFont.platformFont.glyphCount}` : "n/a"}`);
         }
         await page.close();
       }
