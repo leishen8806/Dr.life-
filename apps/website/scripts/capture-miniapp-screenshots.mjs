@@ -144,7 +144,7 @@ async function installMockApi(page, language, app) {
       await route.fulfill(json({ items: [merchantOrder], next_cursor: null }));
       return;
     }
-    if (path === "/v1/merchant/suborders/01EVIDENCEMERCHANTORDER" && request.method() === "GET") {
+    if (path === "/v1/merchant/suborders/01evidencemerchantorder" && request.method() === "GET") {
       await route.fulfill(json(merchantOrder));
       return;
     }
