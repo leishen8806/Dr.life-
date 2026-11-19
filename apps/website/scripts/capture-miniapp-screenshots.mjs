@@ -196,6 +196,12 @@ async function assertKhmerFont(page, context) {
       return { width, fontFamily };
     };
     const sampleMeasurement = measure(text);
+    const platformProbe = document.createElement("span");
+    platformProbe.id = "khmer-font-probe";
+    platformProbe.lang = "km";
+    platformProbe.textContent = text;
+    platformProbe.style.cssText = "position:absolute;left:-9999px;white-space:nowrap;font:16px \"Noto Sans Khmer\", sans-serif";
+    document.body.append(platformProbe);
     const clusterWidth = measure("ក្រ").width;
     const baseWidth = measure("ក").width;
     const partsWidth = baseWidth + measure("រ").width;
@@ -205,12 +211,13 @@ async function assertKhmerFont(page, context) {
   await cdp.send("DOM.enable");
   await cdp.send("CSS.enable");
   const { root } = await cdp.send("DOM.getDocument");
-  const { nodeId } = await cdp.send("DOM.querySelector", { nodeId: root.nodeId, selector: "body" });
+  const { nodeId } = await cdp.send("DOM.querySelector", { nodeId: root.nodeId, selector: "#khmer-font-probe" });
   const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
   const platformFont = fonts.find(({ familyName, glyphCount }) => familyName.includes("Noto Sans Khmer") && glyphCount > 0);
   const shaped = Boolean(platformFont) && result.clusterWidth <= result.partsWidth * 1.05 && result.clusterWidth >= result.baseWidth * 0.8;
+  await page.evaluate(() => document.querySelector("#khmer-font-probe")?.remove());
   if (!result.loaded || result.width <= 0 || !result.fontFamily.includes("Noto Sans Khmer") || !shaped) {
-    throw new Error(`Khmer font check failed for ${context}: loaded=${result.loaded}, width=${result.width}, clusterWidth=${result.clusterWidth}, baseWidth=${result.baseWidth}, partsWidth=${result.partsWidth}, fontFamily=${result.fontFamily}`);
+    throw new Error(`Khmer font check failed for ${context}: loaded=${result.loaded}, width=${result.width}, clusterWidth=${result.clusterWidth}, baseWidth=${result.baseWidth}, partsWidth=${result.partsWidth}, fontFamily=${result.fontFamily}, platformFonts=${fonts.map(({ familyName, glyphCount }) => `${familyName}:${glyphCount}`).join("|")}`);
   }
   return { ...result, shaped, platformFont: { familyName: platformFont.familyName, glyphCount: platformFont.glyphCount } };
 }
