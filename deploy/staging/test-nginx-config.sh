@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+grep -Fq 'proxy_set_header CF-Connecting-IP $http_cf_connecting_ip;' deploy/staging/nginx/proxy_params
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
