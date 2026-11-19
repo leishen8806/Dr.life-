@@ -49,15 +49,20 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	service := &iam.BootstrapService{DB: pool, Cipher: envelope, Audit: &platformaudit.Store{DB: pool}}
 	switch args[0] {
 	case "super":
-		if len(args) != 3 || args[1] != "--username" {
-			return errors.New("usage: admininit super --username <name>")
+		if len(args) != 5 || args[1] != "--username" || args[3] != "--email" {
+			return errors.New("usage: admininit super --username <name> --email <email>")
 		}
-		result, err := service.CreateFirstSuper(ctx, args[2])
+		result, err := service.CreateFirstSuper(ctx, args[2], args[4])
 		if err != nil {
 			return err
 		}
 		fmt.Fprintf(stdout, "username=%s\npassword=%s\ntotp=%s\n", result.Admin.Name, result.InitialPassword, result.TOTPProvisioningURI)
 		return nil
+	case "super-email":
+		if len(args) != 5 || args[1] != "--username" || args[3] != "--email" {
+			return errors.New("usage: admininit super-email --username <name> --email <email>")
+		}
+		return service.FixSuperEmail(ctx, args[2], args[4])
 	case "bot":
 		if len(args) != 7 || args[1] != "--end" || args[3] != "--username" || args[5] != "--actor" {
 			return errors.New("usage: admininit bot --end buyer|merchant --username <name> --actor <super public id>")
