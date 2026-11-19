@@ -95,6 +95,62 @@ application directory (`buyer`, `merchant`, or `admin`), then run
 three applications with a temporary root. Database migration is deliberately
 separate and must succeed before the application release is switched.
 
+### Frontend build and release
+
+The buyer, merchant, and admin bundles are Vite builds and must be compiled
+with the staging API origin. Run these commands from a clean checkout after
+copying `deploy/staging/env.example` to a local, untracked environment file:
+
+```bash
+export VITE_API_BASE_URL=https://test-api.drlifeplus.com
+pnpm --filter @drlife/buyer build
+pnpm --filter @drlife/merchant build
+pnpm --filter @drlife/admin build
+```
+
+Upload each generated `apps/<app>/dist/` directory to the matching
+`incoming/<release-id>/` directory below `STAGING_SITE_ROOT`, then publish it
+with `publish-release.sh <app> <release-id>`. `VITE_API_BASE_URL` is a
+build-time value, not a secret and not a substitute for the runtime `.env`.
+The `VITE_API_BASE_URL` line in `env.example` records the approved staging
+value for release operators; it must not be replaced with a production URL in
+this template.
+
+The admin build uses the cross-origin API mode: its requests resolve against
+`VITE_API_BASE_URL` instead of the admin page origin. The API `.env` therefore
+keeps the exact `test-admin` origin in `CORS_ADMIN_ORIGINS` and sets
+`CORS_CREDENTIAL_PATHS=/v1/admin/auth/refresh`. The frontend sends
+`credentials: include` and `X-Requested-With`; the gateway allowlist already
+includes that header. The refresh cookie remains host-only, `Secure`, and
+`SameSite=Strict` on `test-api`, with no `Domain` attribute. The four test
+hosts are same-site subdomains, so the cookie is eligible while CORS still
+requires the explicit credential path. Do not add a wildcard origin or a
+cookie domain.
+
+### Browser smoke check
+
+`smoke.sh` first checks HTTP 200 and the app root, then invokes the required
+`SMOKE_BROWSER_COMMAND` for each frontend. The command must be an executable
+wrapper around `deploy/staging/smoke-browser.mjs`, with Playwright and its
+Chromium binary available. The helper waits for network idle, asserts that a
+main JavaScript bundle loaded, checks visible text, and fails on browser
+console errors, page errors, or failed resource requests. For a checkout with
+the website workspace dependencies installed, a minimal wrapper is:
+
+```bash
+cat >/tmp/drlife-smoke-browser <<'SH'
+#!/bin/sh
+exec pnpm --filter @drlife/website exec node \
+  "$PWD/deploy/staging/smoke-browser.mjs" "$@"
+SH
+chmod +x /tmp/drlife-smoke-browser
+SMOKE_BROWSER_COMMAND=/tmp/drlife-smoke-browser deploy/staging/smoke.sh
+```
+
+`deploy/staging/test-smoke.sh` uses a stub browser command to verify that the
+shell smoke gate invokes all three frontend render checks; it does not claim
+to be a real browser run. The real Playwright helper is the acceptance check.
+
 ## E-01 domain direct-connection configuration
 
 This is a template only. Do not put real domains, certificate material,
