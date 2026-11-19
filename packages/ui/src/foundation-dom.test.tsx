@@ -37,12 +37,12 @@ describe("foundation DOM acceptance", () => {
     expect(tabs[1]?.getAttribute("tabindex")).toBe("-1");
     fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
     expect(change).toHaveBeenCalledWith("b");
-    expect(tabs[1]).toHaveFocus();
+    expect(document.activeElement).toBe(tabs[1]);
     fireEvent.keyDown(tabs[0]!, { key: "Home" });
     fireEvent.keyDown(tabs[0]!, { key: "End" });
     fireEvent.keyDown(tabs[0]!, { key: "ArrowLeft" });
     expect(change).toHaveBeenCalledWith("b");
-    expect(tabs[1]).toHaveFocus();
+    expect(document.activeElement).toBe(tabs[1]);
     fireEvent.keyDown(tabs[0]!, { key: "End" });
     expect(change).toHaveBeenCalledWith("b");
     fireEvent.keyDown(tabs[1]!, { key: "Home" });
