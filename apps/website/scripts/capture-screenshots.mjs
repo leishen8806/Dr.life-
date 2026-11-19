@@ -157,6 +157,7 @@ try {
           if (geometry.partnerMinWidth < 260) throw new Error(`Partner cards are too narrow: ${geometry.partnerMinWidth}px`);
           if (Math.abs(geometry.partnerLeftDelta) > 2) throw new Error(`Partner section is not aligned: ${geometry.partnerLeftDelta}px`);
           const partnerGridIsPacked = (geometry.partnerColumns === 5 && geometry.partnerTopRows === 1)
+            || (geometry.partnerColumns === 6 && geometry.partnerTopRows === 2)
             || (geometry.partnerColumns === 3 && geometry.partnerTopRows === 2);
           if (!partnerGridIsPacked || geometry.partnerBackground !== "rgba(0, 0, 0, 0)") throw new Error(`Partner grid has an empty slot: ${geometry.partnerColumns} columns / ${geometry.partnerTopRows} rows / ${geometry.partnerBackground}`);
           if (Math.abs(geometry.accessLeftDelta) > 2) throw new Error(`Access grid is not aligned: ${geometry.accessLeftDelta}px`);
