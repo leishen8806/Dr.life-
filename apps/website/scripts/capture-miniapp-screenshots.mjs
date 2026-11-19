@@ -49,6 +49,20 @@ const json = (data) => ({
 });
 
 async function installMockApi(page, language, app) {
+  const merchantOrder = {
+    public_id: "01EVIDENCEMERCHANTORDER",
+    parent_public_id: "01EVIDENCEORDER",
+    status: "shipped",
+    items: [{ sku_public_id: "SKU-1", quantity: 2, unit_price_e4: 95000, line_total_e4: 190000 }],
+    shipping_address_public_id: "01EVIDENCEADDRESS",
+    shipping_address: { recipient_name: "Buyer", address_text: "Phnom Penh", phone: "****1234" },
+    goods_amount_e4: 190000,
+    shipping_amount_e4: 0,
+    payable_amount_e4: 190000,
+    shipping_quote_expires_at: "2026-11-15T10:00:00Z",
+    created_at: "2026-11-14T09:00:00Z",
+    updated_at: "2026-11-14T09:01:00Z"
+  };
   await page.route("**/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -127,20 +141,11 @@ async function installMockApi(page, language, app) {
       return;
     }
     if (path === "/v1/merchant/suborders" && request.method() === "GET") {
-      await route.fulfill(json({ items: [{
-        public_id: "01EVIDENCEMERCHANTORDER",
-        parent_public_id: "01EVIDENCEORDER",
-        status: "shipped",
-        items: [{ sku_public_id: "SKU-1", quantity: 2, unit_price_e4: 95000, line_total_e4: 190000 }],
-        shipping_address_public_id: "01EVIDENCEADDRESS",
-        shipping_address: { recipient_name: "Buyer", address_text: "Phnom Penh", phone: "****1234" },
-        goods_amount_e4: 190000,
-        shipping_amount_e4: 0,
-        payable_amount_e4: 190000,
-        shipping_quote_expires_at: "2026-11-15T10:00:00Z",
-        created_at: "2026-11-14T09:00:00Z",
-        updated_at: "2026-11-14T09:01:00Z"
-      }], next_cursor: null }));
+      await route.fulfill(json({ items: [merchantOrder], next_cursor: null }));
+      return;
+    }
+    if (path === "/v1/merchant/suborders/01EVIDENCEMERCHANTORDER" && request.method() === "GET") {
+      await route.fulfill(json(merchantOrder));
       return;
     }
     if (path.endsWith("/me/notifications") && request.method() === "GET") {
