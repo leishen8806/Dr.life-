@@ -281,7 +281,7 @@ try {
           if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
           const headingSelector = app === "buyer"
             ? (target.name === "home" ? ".buyer-section__title" : target.name === "profile" ? ".profile-hero h1" : target.name === "wallet" ? ".wallet-page h1" : target.name === "notifications" ? ".buyer-section__title" : ".buyer-order-list, .buyer-order-detail__heading")
-            : target.name === "home" ? "h1" : target.name === "merchant-notifications" ? ".merchant-v7 h1" : ".merchant-v4 h1, .merchant-v4__section h2";
+            : target.name === "home" ? "h1" : target.name === "merchant-notifications" ? ".merchant-v7 h1" : target.name.startsWith("merchant-orders-") ? ".merchant-orders, .merchant-order-detail__heading" : ".merchant-v4 h1, .merchant-v4__section h2";
           const pageHeading = await page.locator(headingSelector).first().textContent();
           if (!pageHeading?.trim()) throw new Error(`missing business page heading for ${app}-${target.name}-${item.language}`);
           const name = `${app}-${target.name}-${item.width}-${item.theme}-${item.language}.png`;
