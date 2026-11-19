@@ -109,7 +109,10 @@ function mapSuborder(suborder: ApiSuborder): BuyerSubOrder {
     totalE4,
     shippingAmountE4,
     shippingQuoteExpiresAt: suborder.shipping_quote_expires_at,
-    events: []
+    events: suborder.events.map((event) => ({
+      label: mapOrderStatus(event.status),
+      at: event.occurred_at
+    }))
   };
 }
 

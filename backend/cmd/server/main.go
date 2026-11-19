@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -153,10 +154,49 @@ func main() {
 	catalogStore := catalog.NewPgStore(database)
 	catalogService := catalog.New(catalogStore, catalog.Options{Merchants: directory})
 	catalogReviewService := catalog.NewReviewService(catalogStore)
+	tradeStore := trade.NewPostgresStore(database)
+	serviceLevel := strings.TrimSpace(os.Getenv("ROUTEFIT_DEFAULT_SERVICE_LEVEL"))
+	if serviceLevel == "" {
+		serviceLevel = "S2"
+	}
+	tradeStore.SetFulfillmentEnqueuer(func(ctx context.Context, tx pgx.Tx, order trade.FulfillmentOrder, requestedServiceLevel string) (bool, error) {
+		lines := make([]logistics.FulfillmentLine, len(order.Lines))
+		for i, line := range order.Lines {
+			lines[i] = logistics.FulfillmentLine{SKU: line.SKU, Quantity: line.Quantity}
+		}
+		if requestedServiceLevel == "" {
+			requestedServiceLevel = serviceLevel
+		}
+		return logistics.EnqueuePaidFulfillmentTx(ctx, tx, logistics.FulfillmentOrder{
+			MerchantOrderPublicID: order.MerchantOrderPublicID,
+			ExternalOrderID:       order.ExternalOrderID,
+			OwnerRef:              order.OwnerRef,
+			Lines:                 lines,
+		}, requestedServiceLevel)
+	})
 	routeFitReceiver := logistics.RouteFitReceiver{
 		Verifier: logistics.RouteFitWebhookVerifier{Secrets: logistics.RouteFitSecrets(cfg.RouteFitEventSecrets)},
 		Record: func(r *http.Request, event logistics.RouteFitEvent, body []byte) error {
-			return (logistics.RouteFitEventRecorder{DB: database}).Record(r.Context(), event, body)
+			recorder := logistics.RouteFitEventRecorder{
+				DB:       database,
+				Handlers: map[string]logistics.RouteFitEventHandler{},
+			}
+			for _, eventType := range []string{
+				"fulfillment.accepted", "fulfillment.rejected", "fulfillment.picked", "fulfillment.packed",
+				"fulfillment.shipped", "fulfillment.delivery_reported", "fulfillment.delivered_verified",
+				"fulfillment.delivery_failed", "fulfillment.cancelled", "fulfillment.returned",
+			} {
+				recorder.Handlers[eventType] = func(ctx context.Context, tx pgx.Tx, received logistics.RouteFitEvent) error {
+					update, err := logistics.ProjectRouteFitEvent(received, time.Now().UTC(), 24*time.Hour)
+					if err != nil {
+						return err
+					}
+					return logistics.ApplyFulfillmentUpdateTx(ctx, tx, update, received.EventID, func(ctx context.Context, tx pgx.Tx, update logistics.FulfillmentUpdate, sourceRef string) error {
+						return tradeStore.ApplyFulfillmentEventTx(ctx, tx, update.ExternalOrderID, update.State, sourceRef)
+					})
+				}
+			}
+			return recorder.Record(r.Context(), event, body)
 		},
 	}
 	var auditStore *platformaudit.Store

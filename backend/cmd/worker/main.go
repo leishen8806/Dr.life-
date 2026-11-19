@@ -20,6 +20,7 @@ import (
 	iamTelegram "github.com/leishen8806/Dr.life-/backend/internal/iam/telegram"
 	"github.com/leishen8806/Dr.life-/backend/internal/ledger"
 	"github.com/leishen8806/Dr.life-/backend/internal/logistics"
+	"github.com/leishen8806/Dr.life-/backend/internal/logistics/routefit"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/config"
 	platformdb "github.com/leishen8806/Dr.life-/backend/internal/platform/db"
 	"github.com/leishen8806/Dr.life-/backend/internal/platform/logx"
@@ -110,6 +111,28 @@ func main() {
 	if err := logistics.RegisterRouteFitReconciliationTask(registry); err != nil {
 		fmt.Fprintln(os.Stderr, "RouteFit reconciliation queue registration error:", err)
 		os.Exit(1)
+	}
+	if routefitBaseURL, routefitToken := os.Getenv("ROUTEFIT_BASE_URL"), os.Getenv("ROUTEFIT_SERVICE_TOKEN"); routefitBaseURL != "" || routefitToken != "" {
+		routefitClient, routefitErr := routefit.New(routefit.Config{BaseURL: routefitBaseURL, ServiceToken: routefitToken, Timeout: 10 * time.Second})
+		if routefitErr != nil {
+			fmt.Fprintln(os.Stderr, "RouteFit fulfillment configuration error:", routefitErr)
+			os.Exit(1)
+		}
+		fulfillmentWorker := logistics.FulfillmentOutboxWorker{DB: database, Client: routefitClient, BatchSize: 20, Lease: 15 * time.Minute, MaxAttempts: 5, RetryDelay: 30 * time.Second}
+		go func() {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				if err := fulfillmentWorker.RunOnce(ctx); err != nil {
+					logger.Error("RouteFit fulfillment worker iteration failed", "error", err)
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+				}
+			}
+		}()
 	}
 	notificationWorker, err := buildNotificationWorker(cfg, database, notificationIAMDatabase, logger)
 	if err != nil {

@@ -2946,7 +2946,7 @@ components:
     BuyerSuborder:
       type: object
       additionalProperties: false
-      required: [public_id, merchant_public_id, status, items, goods_amount_e4, shipping_amount_e4, payable_amount_e4, shipping_quote_expires_at]
+      required: [public_id, merchant_public_id, status, items, events, goods_amount_e4, shipping_amount_e4, payable_amount_e4, shipping_quote_expires_at]
       properties:
         public_id:
           type: string
@@ -2972,6 +2972,20 @@ components:
           type: string
           format: date-time
           description: Expiry of the RouteFit quote used for the shipping snapshot.
+        events:
+          type: array
+          description: Append-only delivery/status history for this merchant suborder, ordered oldest first.
+          items: {$ref: "#/components/schemas/BuyerOrderEvent"}
+    BuyerOrderEvent:
+      type: object
+      additionalProperties: false
+      required: [status, occurred_at]
+      properties:
+        status: {$ref: "#/components/schemas/OrderStatus"}
+        occurred_at:
+          type: string
+          format: date-time
+          description: Time at which the suborder entered this status.
     BuyerOrder:
       type: object
       additionalProperties: false

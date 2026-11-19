@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -21,8 +22,23 @@ type tradeDB interface {
 
 // PostgresStore persists only trade-owned tables. Cross-module identifiers are
 // received as values by the service and are never joined here.
+type FulfillmentLine struct {
+	SKU      string
+	Quantity int64
+}
+
+type FulfillmentOrder struct {
+	MerchantOrderPublicID string
+	ExternalOrderID       string
+	OwnerRef              string
+	Lines                 []FulfillmentLine
+}
+
+type FulfillmentEnqueuer func(context.Context, pgx.Tx, FulfillmentOrder, string) (mappingMissing bool, err error)
+
 type PostgresStore struct {
-	db tradeDB
+	db          tradeDB
+	fulfillment FulfillmentEnqueuer
 	// NotificationWriter is invoked inside the order transaction before commit.
 	// It is optional so the trade package stays usable in isolated tests and
 	// deployments that have not enabled notification delivery yet.
@@ -38,6 +54,10 @@ var _ Store = (*PostgresStore)(nil)
 var _ OrderReader = (*PostgresStore)(nil)
 
 func NewPostgresStore(db tradeDB) *PostgresStore { return &PostgresStore{db: db} }
+
+func (s *PostgresStore) SetFulfillmentEnqueuer(enqueuer FulfillmentEnqueuer) {
+	s.fulfillment = enqueuer
+}
 
 func (s *PostgresStore) SetNotificationWriter(writer func(context.Context, pgx.Tx, CreateOrder) error) {
 	s.NotificationWriter = writer
@@ -452,6 +472,64 @@ func (s *PostgresStore) Advance(ctx context.Context, merchantOrderID int64, from
 	return true, tx.Commit(ctx)
 }
 
+// ApplyFulfillmentEventTx applies a verified RouteFit transition inside the
+// caller-owned inbox transaction. Trade owns the status machine and all trade
+// table writes; logistics only supplies the projected event values.
+func (s *PostgresStore) ApplyFulfillmentEventTx(ctx context.Context, tx pgx.Tx, externalOrderID, state, sourceRef string) error {
+	if tx == nil || strings.TrimSpace(externalOrderID) == "" || strings.TrimSpace(sourceRef) == "" {
+		return ErrEventSourceRequired
+	}
+	target := OrderStatus(state)
+	var merchantOrderID, buyerOrderID int64
+	var current string
+	if err := tx.QueryRow(ctx, `SELECT id, buyer_order_id, status FROM trade.merchant_order WHERE external_order_id=$1 FOR UPDATE`, externalOrderID).Scan(&merchantOrderID, &buyerOrderID, &current); err != nil {
+		return err
+	}
+	source := EventSource{Type: SourceRouteFitEvent, Reference: sourceRef}
+	if _, err := Advance(OrderStatus(current), target, source); err != nil {
+		return err
+	}
+	var refundRequired, reservationCommitted bool
+	if err := tx.QueryRow(ctx, `SELECT refund_required_at IS NOT NULL,reservation_committed_at IS NOT NULL FROM trade.buyer_order WHERE id=$1 FOR UPDATE`, buyerOrderID).Scan(&refundRequired, &reservationCommitted); err != nil {
+		return err
+	}
+	if refundRequired && OrderStatus(current) == Paid && target == Submitted {
+		return ErrReservationReleased
+	}
+	if !reservationCommitted && OrderStatus(current) == Paid && target == Submitted {
+		return ErrInvalidTransition
+	}
+	var seenFrom, seenTo string
+	err := tx.QueryRow(ctx, `SELECT from_status,to_status FROM trade.order_event WHERE merchant_order_id=$1 AND source_type=$2 AND source_ref=$3`, merchantOrderID, string(source.Type), source.Reference).Scan(&seenFrom, &seenTo)
+	if err == nil {
+		if OrderStatus(seenFrom) == OrderStatus(current) && OrderStatus(seenTo) == target {
+			return nil
+		}
+		return ErrInvalidTransition
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	if OrderStatus(current) == target {
+		return nil
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref) VALUES ($1,$2,$3) ON CONFLICT (source_type,source_ref) DO NOTHING`, buyerOrderID, string(source.Type), source.Reference); err != nil {
+		return err
+	}
+	var sourceBuyerOrderID int64
+	if err := tx.QueryRow(ctx, `SELECT buyer_order_id FROM trade.order_event_source WHERE source_type=$1 AND source_ref=$2`, string(source.Type), source.Reference).Scan(&sourceBuyerOrderID); err != nil {
+		return err
+	}
+	if sourceBuyerOrderID != buyerOrderID {
+		return ErrInvalidTransition
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) VALUES ($1,$2,$3,$4,$5,$6)`, merchantOrderID, buyerOrderID, current, target, string(source.Type), source.Reference); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `UPDATE trade.merchant_order SET status=$2,version=version+1,updated_at=clock_timestamp() WHERE id=$1 AND status=$3`, merchantOrderID, string(target), current)
+	return err
+}
+
 // ConfirmPayment delegates the parent-wide payment transition to the only
 // database entry point allowed to mark child orders paid.
 func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID string, paidAmountE4 int64, source EventSource) (string, bool, error) {
@@ -460,16 +538,90 @@ func (s *PostgresStore) ConfirmPayment(ctx context.Context, buyerOrderPublicID s
 	}
 	var key, errorCode string
 	var applied, reconciliationRequired bool
-	err := s.db.QueryRow(ctx, `SELECT reservation_key,applied,reconciliation_required,error_code FROM trade.confirm_order_payment($1,$2,$3)`, buyerOrderPublicID, source.Reference, paidAmountE4).Scan(&key, &applied, &reconciliationRequired, &errorCode)
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return "", false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	err = tx.QueryRow(ctx, `SELECT reservation_key,applied,reconciliation_required,error_code FROM trade.confirm_order_payment($1,$2,$3)`, buyerOrderPublicID, source.Reference, paidAmountE4).Scan(&key, &applied, &reconciliationRequired, &errorCode)
 	if err == nil {
 		switch errorCode {
 		case "TR001":
+			if commitErr := tx.Commit(ctx); commitErr != nil {
+				return "", false, commitErr
+			}
 			return key, false, ErrReservationReleased
 		case "TR002":
+			if commitErr := tx.Commit(ctx); commitErr != nil {
+				return "", false, commitErr
+			}
 			return key, false, ErrPaymentAmount
 		}
 		if reconciliationRequired {
+			if commitErr := tx.Commit(ctx); commitErr != nil {
+				return "", false, commitErr
+			}
 			return key, false, ErrPaymentReconciliation
+		}
+		if applied && s.fulfillment != nil {
+			rows, queryErr := tx.Query(ctx, `
+				SELECT child.public_id, COALESCE(child.merchant_public_id,''), line.sku_public_id, line.quantity
+				FROM trade.merchant_order child
+				JOIN trade.order_line line ON line.merchant_order_id = child.id
+				WHERE child.buyer_order_id=(SELECT id FROM trade.buyer_order WHERE public_id=$1)
+				ORDER BY child.id, line.id`, buyerOrderPublicID)
+			if queryErr != nil {
+				return "", false, queryErr
+			}
+			orders := make([]FulfillmentOrder, 0)
+			orderIndex := make(map[string]int)
+			for rows.Next() {
+				var orderID, ownerRef, sku string
+				var quantity int64
+				if scanErr := rows.Scan(&orderID, &ownerRef, &sku, &quantity); scanErr != nil {
+					rows.Close()
+					return "", false, scanErr
+				}
+				idx, ok := orderIndex[orderID]
+				if !ok {
+					idx = len(orders)
+					orderIndex[orderID] = idx
+					orders = append(orders, FulfillmentOrder{MerchantOrderPublicID: orderID, ExternalOrderID: "DRL-" + orderID, OwnerRef: ownerRef})
+				}
+				orders[idx].Lines = append(orders[idx].Lines, FulfillmentLine{SKU: sku, Quantity: quantity})
+			}
+			if rowsErr := rows.Err(); rowsErr != nil {
+				rows.Close()
+				return "", false, rowsErr
+			}
+			rows.Close()
+			for _, order := range orders {
+				missing, enqueueErr := s.fulfillment(ctx, tx, order, "")
+				if enqueueErr != nil {
+					return "", false, enqueueErr
+				}
+				if missing {
+					sourceRef := "SKU_MAPPING_MISSING:" + order.MerchantOrderPublicID
+					if _, sourceErr := tx.Exec(ctx, `
+						INSERT INTO trade.order_event_source (buyer_order_id,source_type,source_ref)
+						SELECT buyer_order_id,'system',$2 FROM trade.merchant_order WHERE public_id=$1
+						ON CONFLICT (source_type,source_ref) DO NOTHING`, order.MerchantOrderPublicID, sourceRef); sourceErr != nil {
+						return "", false, sourceErr
+					}
+					if _, eventErr := tx.Exec(ctx, `INSERT INTO trade.order_event (merchant_order_id,buyer_order_id,from_status,to_status,source_type,source_ref) SELECT id,buyer_order_id,'paid','exception','system',$2 FROM trade.merchant_order WHERE public_id=$1 AND status='paid'`, order.MerchantOrderPublicID, sourceRef); eventErr != nil {
+						return "", false, eventErr
+					}
+					if _, updateErr := tx.Exec(ctx, `UPDATE trade.merchant_order SET status='exception',version=version+1,updated_at=clock_timestamp() WHERE public_id=$1 AND status='paid'`, order.MerchantOrderPublicID); updateErr != nil {
+						return "", false, updateErr
+					}
+				}
+			}
+			if rowsErr := rows.Err(); rowsErr != nil {
+				return "", false, rowsErr
+			}
+		}
+		if commitErr := tx.Commit(ctx); commitErr != nil {
+			return "", false, commitErr
 		}
 		return key, applied, nil
 	}
@@ -694,6 +846,10 @@ func (s *PostgresStore) findMerchantOrder(ctx context.Context, merchantID int64,
 		return MerchantOrderView{}, err
 	}
 	order.TotalE4 = order.GoodsAmountE4
+	order.Events, err = loadOrderEvents(ctx, s.db, publicID)
+	if err != nil {
+		return MerchantOrderView{}, err
+	}
 	rows, err := s.db.Query(ctx, `SELECT sku_public_id,quantity,unit_price_e4,line_total_e4 FROM trade.order_line WHERE merchant_order_id=(SELECT id FROM trade.merchant_order WHERE public_id=$1) ORDER BY id`, publicID)
 	if err != nil {
 		return MerchantOrderView{}, err
@@ -707,6 +863,25 @@ func (s *PostgresStore) findMerchantOrder(ctx context.Context, merchantID int64,
 		order.Lines = append(order.Lines, line)
 	}
 	return order, rows.Err()
+}
+
+func loadOrderEvents(ctx context.Context, db interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}, publicID string) ([]OrderEventView, error) {
+	rows, err := db.Query(ctx, `SELECT to_status,created_at FROM trade.order_event WHERE merchant_order_id=(SELECT id FROM trade.merchant_order WHERE public_id=$1) ORDER BY created_at,id`, publicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var events []OrderEventView
+	for rows.Next() {
+		var event OrderEventView
+		if err := rows.Scan(&event.Status, &event.OccurredAt); err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, rows.Err()
 }
 
 func (s *PostgresStore) ClaimBuyerReservationRelease(ctx context.Context, buyerID int64, publicID string) (Reservation, bool, error) {

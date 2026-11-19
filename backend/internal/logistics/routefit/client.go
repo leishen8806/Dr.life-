@@ -49,11 +49,36 @@ type CreateShipmentCmd struct {
 }
 
 type Result struct {
-	FulfillmentID   string `json:"fulfillmentId"`
-	Version         int64  `json:"version"`
-	ExternalOrderID string `json:"externalOrderId"`
-	State           string `json:"state"`
-	Duplicate       bool   `json:"duplicate"`
+	FulfillmentID   string    `json:"fulfillmentId"`
+	Version         int64     `json:"version"`
+	ExternalOrderID string    `json:"externalOrderId"`
+	State           string    `json:"state"`
+	Duplicate       bool      `json:"duplicate"`
+	QuoteID         string    `json:"quoteId"`
+	Total           Money     `json:"total"`
+	ExpiresAt       time.Time `json:"expiresAt"`
+}
+
+type QuoteCmd struct {
+	OwnerRef     string          `json:"ownerRef"`
+	WarehouseID  string          `json:"warehouseId"`
+	Lines        []Line          `json:"lines"`
+	Delivery     json.RawMessage `json:"delivery"`
+	ServiceLevel string          `json:"serviceLevel"`
+}
+
+type Quote struct {
+	QuoteID   string    `json:"quoteId"`
+	Version   int64     `json:"version"`
+	Total     Money     `json:"total"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+type CancelCmd struct {
+	FulfillmentID string
+	ReasonCode    string `json:"reasonCode"`
+	Note          string `json:"note,omitempty"`
+	Version       int64
 }
 
 type Error struct {
@@ -127,7 +152,47 @@ func (c *Client) Deliver(ctx context.Context, cmd CreateShipmentCmd) (Result, er
 	return Result{}, errors.New("routefit retry loop exhausted")
 }
 
+// Quote asks RouteFit for a read-only delivery price. Callers may surface an
+// error as "shipping pending" without blocking product browsing or checkout.
+func (c *Client) Quote(ctx context.Context, cmd QuoteCmd) (Quote, error) {
+	if err := validateQuote(cmd); err != nil {
+		return Quote{}, err
+	}
+	body, err := json.Marshal(cmd)
+	if err != nil {
+		return Quote{}, fmt.Errorf("encode RouteFit quote command: %w", err)
+	}
+	response, err := c.request(ctx, http.MethodPost, "/api/platform/v1/quotes", body, "")
+	if err != nil {
+		return Quote{}, err
+	}
+	return Quote{QuoteID: response.QuoteID, Version: response.Version, Total: response.Total, ExpiresAt: response.ExpiresAt}, nil
+}
+
+// Cancel requests cancellation and relies on RouteFit's idempotency contract.
+// A 409 INVALID_TRANSITION is returned to the caller for domain handling.
+func (c *Client) Cancel(ctx context.Context, cmd CancelCmd) (Result, error) {
+	if strings.TrimSpace(cmd.FulfillmentID) == "" || strings.TrimSpace(cmd.ReasonCode) == "" || cmd.Version <= 0 {
+		return Result{}, errors.New("invalid RouteFit cancellation command")
+	}
+	body, err := json.Marshal(struct {
+		ReasonCode string `json:"reasonCode"`
+		Note       string `json:"note,omitempty"`
+	}{cmd.ReasonCode, cmd.Note})
+	if err != nil {
+		return Result{}, fmt.Errorf("encode RouteFit cancellation command: %w", err)
+	}
+	path := "/api/platform/v1/fulfillments/" + url.PathEscape(cmd.FulfillmentID) + "/actions/cancel"
+	return c.requestWithHeaders(ctx, http.MethodPost, path, body, idempotencyKey("routefit.cancel:v1:"+cmd.FulfillmentID+":"+cmd.ReasonCode), cmd.Version)
+}
+
 func (c *Client) create(ctx context.Context, cmd CreateShipmentCmd, key string) (Result, bool, error) {
+	// The fulfillment command is persisted in the outbox as jsonb. PostgreSQL
+	// may reorder object keys while round-tripping json.RawMessage values, so
+	// canonicalize nested JSON before encoding the request. This keeps the
+	// request body stable for RouteFit's idempotency contract across retries.
+	cmd.Delivery = canonicalJSON(cmd.Delivery)
+	cmd.RequestedDeliveryWindow = canonicalJSON(cmd.RequestedDeliveryWindow)
 	body, err := json.Marshal(struct {
 		CreateShipmentCmd
 		ExternalRevision int64  `json:"externalRevision"`
@@ -144,12 +209,31 @@ func (c *Client) create(ctx context.Context, cmd CreateShipmentCmd, key string) 
 	return response, false, nil
 }
 
+func canonicalJSON(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return raw
+	}
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return raw
+	}
+	canonical, err := json.Marshal(value)
+	if err != nil {
+		return raw
+	}
+	return canonical
+}
+
 func (c *Client) lookup(ctx context.Context, externalOrderID string) (Result, error) {
 	path := "/api/platform/v1/fulfillments?externalOrderId=" + url.QueryEscape(externalOrderID)
 	return c.request(ctx, http.MethodGet, path, nil, "")
 }
 
 func (c *Client) request(parent context.Context, method, path string, body []byte, key string) (Result, error) {
+	return c.requestWithHeaders(parent, method, path, body, key, 0)
+}
+
+func (c *Client) requestWithHeaders(parent context.Context, method, path string, body []byte, key string, version int64) (Result, error) {
 	ctx, cancel := context.WithTimeout(parent, c.timeout)
 	defer cancel()
 	endpoint := c.baseURL
@@ -168,6 +252,9 @@ func (c *Client) request(parent context.Context, method, path string, body []byt
 	}
 	if key != "" {
 		request.Header.Set("Idempotency-Key", key)
+	}
+	if version > 0 {
+		request.Header.Set("If-Match", fmt.Sprintf("\"%d\"", version))
 	}
 	response, err := c.http.Do(request)
 	if err != nil {
@@ -205,6 +292,18 @@ func validate(cmd CreateShipmentCmd) error {
 	for _, line := range cmd.Lines {
 		if line.Ref == "" || line.SKU == "" || line.Quantity <= 0 {
 			return errors.New("invalid RouteFit shipment line")
+		}
+	}
+	return nil
+}
+
+func validateQuote(cmd QuoteCmd) error {
+	if cmd.OwnerRef == "" || cmd.WarehouseID == "" || len(cmd.Lines) == 0 || len(cmd.Delivery) == 0 || !json.Valid(cmd.Delivery) || cmd.ServiceLevel == "" {
+		return errors.New("invalid RouteFit quote command")
+	}
+	for _, line := range cmd.Lines {
+		if line.Ref == "" || line.SKU == "" || line.Quantity <= 0 {
+			return errors.New("invalid RouteFit quote line")
 		}
 	}
 	return nil

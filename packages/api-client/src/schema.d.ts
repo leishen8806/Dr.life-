@@ -2115,6 +2115,16 @@ export interface components {
              * @description Expiry of the RouteFit quote used for the shipping snapshot.
              */
             shipping_quote_expires_at: string;
+            /** @description Append-only delivery/status history for this merchant suborder, ordered oldest first. */
+            events: components["schemas"]["BuyerOrderEvent"][];
+        };
+        BuyerOrderEvent: {
+            status: components["schemas"]["OrderStatus"];
+            /**
+             * Format: date-time
+             * @description Time at which the suborder entered this status.
+             */
+            occurred_at: string;
         };
         BuyerOrder: {
             public_id: string;

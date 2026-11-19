@@ -588,6 +588,10 @@ func TestOrderEventsAreAppendOnlyAndIdempotentUnderConcurrency(t *testing.T) {
 	if _, err := db.Exec(`UPDATE trade.merchant_order SET status='awaiting_payment' WHERE id=1`); err == nil {
 		t.Fatal("direct status rollback unexpectedly succeeded")
 	}
+	assertPGCode(t, func() error {
+		_, err := db.Exec(`UPDATE trade.merchant_order SET goods_amount_e4=99 WHERE id=1`)
+		return err
+	}(), "55000")
 	if _, applied, err := store.ConfirmPayment(ctx, "01ARZ3NDEKTSV4RRFFQ69G5FAV", 100, source); err != nil || applied {
 		t.Fatalf("replay after state rollback applied=%v err=%v", applied, err)
 	}
@@ -1671,7 +1675,7 @@ func assertTransitionMatrix(t *testing.T, ctx context.Context, pool *pgxpool.Poo
 	t.Helper()
 	statuses := []OrderStatus{AwaitingPayment, Paid, Submitted, Accepted, InFulfillment, Shipped, DeliveredVerified, Settled, Rejected, Cancelled, DeliveryFailed, Returning, Returned, Exception}
 	allowed := map[[2]OrderStatus]bool{
-		{Paid, Submitted}: true, {Submitted, Accepted}: true, {Submitted, Rejected}: true,
+		{Paid, Submitted}: true, {Paid, Exception}: true, {Submitted, Accepted}: true, {Submitted, Rejected}: true,
 		{Accepted, InFulfillment}: true, {InFulfillment, Shipped}: true,
 		{Shipped, DeliveredVerified}: true, {DeliveredVerified, Settled}: true,
 	}

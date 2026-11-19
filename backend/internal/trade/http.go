@@ -82,6 +82,11 @@ type OrderLineView struct {
 	Quantity, UnitPriceE4, TotalE4 int64
 }
 
+type OrderEventView struct {
+	Status     string
+	OccurredAt time.Time
+}
+
 type BuyerOrderView struct {
 	PublicID, Status, PaymentStatus string
 	BuyerAccountID                  int64
@@ -106,6 +111,7 @@ type MerchantOrderView struct {
 	ShippingAddress                  AddressSnapshot
 	CreatedAt, UpdatedAt             time.Time
 	Lines                            []OrderLineView
+	Events                           []OrderEventView
 }
 
 func (s *Service) ConfigureHTTP(addresses AddressBook, quotes ShippingQuoter, payments PaymentCreator) {
