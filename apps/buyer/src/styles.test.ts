@@ -37,5 +37,8 @@ describe("buyer mall styles", () => {
     expect(ruleFor(".buyer-order-detail__items-title")).toContain("margin-top");
     expect(ruleFor(".buyer-order-detail__delivery-title")).toContain("margin-top");
     expect(ruleFor('.buyer-order-events[lang="km"] small')).toContain("text-align: end");
+    expect(ruleFor(".buyer-order-events li")).toContain("flex-wrap: nowrap");
+    expect(ruleFor(".buyer-order-events li strong")).toContain("min-width: 0");
+    expect(ruleFor(".buyer-order-events small")).toContain("white-space: nowrap");
   });
 });
