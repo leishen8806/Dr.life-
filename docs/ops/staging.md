@@ -130,6 +130,23 @@ on refresh; the proxies preserve the client header without adding or
 overriding it. The API still checks the exact Origin, and the marker is not a
 credential.
 
+### API proxy trust and admin access
+
+The staging request path is Cloudflare to the host nginx real-IP module, then
+the host proxy to the edge, then the edge to the API. The host proxy forwards
+the real client address in the configured Cloudflare header; the API accepts
+that header only when the direct peer belongs to the edge Docker network.
+TRUSTED_PROXY_HEADER must therefore be CF-Connecting-IP and
+TRUSTED_PROXY_CIDRS must contain only the edge Docker network CIDR. Never use
+0.0.0.0/0 as a trusted proxy range.
+
+ADMIN_ALLOWED_CIDRS is supplied by the owner for the approved administrator
+egress address or CIDR. It is written only to the server's untracked .env,
+never to this repository, an Issue, or a PR. An empty list intentionally
+fail-closes non-development /v1/admin/* and /v1/wms/* requests. Until the
+owner provides this value, an admin refresh 403 is an AdminAccess allowlist
+failure, not a successful unauthenticated refresh.
+
 ### Browser smoke check
 
 `smoke.sh` first checks HTTP 200 and the app root, then invokes the required
