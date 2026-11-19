@@ -320,7 +320,7 @@ try {
             await page.locator(".merchant-orders").waitFor({ state: "visible", timeout: 5_000 });
             await page.locator(".merchant-order-item").first().click();
             await page.locator(".merchant-order-detail__heading").waitFor({ state: "visible", timeout: 5_000 });
-          } },
+          }, assertMerchantBackSpacing: true },
           { name: "merchant-profile", open: async () => {
             await page.getByRole("button", { name: /profile|workspace|我的|商家工作台|កន្លែងធ្វើការអ្នកលក់|โปรไฟล์/i }).last().click();
             await page.locator(".merchant-v4").waitFor({ state: "visible", timeout: 5_000 });
@@ -348,7 +348,7 @@ try {
           await page.goto(url, { waitUntil: "networkidle" });
           await waitForBusinessPage(page, app);
           if (target.open) await target.open();
-          const merchantBackSpacing = app === "merchant" && target.name === "merchant-orders-detail"
+          const merchantBackSpacing = app === "merchant" && target.assertMerchantBackSpacing
             ? await assertMerchantBackSpacing(page, `${app}-${item.width}-${item.theme}`)
             : null;
           const title = await page.title();
