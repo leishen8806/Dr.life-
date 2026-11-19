@@ -125,7 +125,9 @@ includes that header. The refresh cookie remains host-only, `Secure`, and
 `SameSite=Strict` on `test-api`, with no `Domain` attribute. The four test
 hosts are same-site subdomains, so the cookie is eligible while CORS still
 requires the explicit credential path. Do not add a wildcard origin or a
-cookie domain.
+cookie domain. The staging edge also supplies the fixed `X-Requested-With:
+drlife` CSRF marker on `/v1/admin/auth/*` before proxying to the API; the API
+still checks the exact Origin, and the marker is not a credential.
 
 ### Browser smoke check
 
