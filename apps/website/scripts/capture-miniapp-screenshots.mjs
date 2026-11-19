@@ -179,21 +179,32 @@ async function waitForBusinessPage(page, app) {
 async function assertKhmerFont(page, context) {
   const sample = "ខ្មែរ សូមស្វាគមន៍";
   const result = await page.evaluate(async (text) => {
+    const font = '16px "Noto Sans Khmer"';
+    await document.fonts.load(font, text);
+    await document.fonts.load(font, "ក្រ");
     await document.fonts.ready;
-    const loaded = document.fonts.check('16px "Noto Sans Khmer"', text);
-    const probe = document.createElement("span");
-    probe.lang = "km";
-    probe.textContent = text;
-    probe.style.cssText = "position:absolute;left:-9999px;white-space:nowrap;font:16px \"Noto Sans Khmer\", sans-serif";
-    document.body.append(probe);
-    const width = probe.getBoundingClientRect().width;
-    probe.remove();
-    return { loaded, width };
+    const loaded = document.fonts.check(font, text) && document.fonts.check(font, "ក្រ");
+    const measure = (value) => {
+      const probe = document.createElement("span");
+      probe.lang = "km";
+      probe.textContent = value;
+      probe.style.cssText = "position:absolute;left:-9999px;white-space:nowrap;font:16px \"Noto Sans Khmer\", sans-serif";
+      document.body.append(probe);
+      const width = probe.getBoundingClientRect().width;
+      const fontFamily = getComputedStyle(probe).fontFamily;
+      probe.remove();
+      return { width, fontFamily };
+    };
+    const sampleMeasurement = measure(text);
+    const clusterWidth = measure("ក្រ").width;
+    const partsWidth = measure("ក").width + measure("្").width + measure("រ").width;
+    return { loaded, width: sampleMeasurement.width, clusterWidth, partsWidth, fontFamily: sampleMeasurement.fontFamily };
   }, sample);
-  if (!result.loaded || result.width <= 0) {
-    throw new Error(`Khmer font check failed for ${context}: loaded=${result.loaded}, width=${result.width}`);
+  const shaped = result.clusterWidth < result.partsWidth * 0.95;
+  if (!result.loaded || result.width <= 0 || !result.fontFamily.includes("Noto Sans Khmer") || !shaped) {
+    throw new Error(`Khmer font check failed for ${context}: loaded=${result.loaded}, width=${result.width}, clusterWidth=${result.clusterWidth}, partsWidth=${result.partsWidth}, fontFamily=${result.fontFamily}`);
   }
-  return result;
+  return { ...result, shaped };
 }
 
 const inspectPng = async (path) => {
@@ -315,7 +326,7 @@ try {
           const screenHashes = hashesByScreen.get(screenKey) ?? new Map();
           screenHashes.set(item.language, image.sha256);
           hashesByScreen.set(screenKey, screenHashes);
-          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}\twidth=${image.width}\theight=${image.height}\tsha256=${image.sha256}\tkhmerFont=${khmerFont ? `loaded:${khmerFont.loaded},width:${khmerFont.width}` : "n/a"}`);
+          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}\twidth=${image.width}\theight=${image.height}\tsha256=${image.sha256}\tkhmerFont=${khmerFont ? `loaded:${khmerFont.loaded},shaped:${khmerFont.shaped},width:${khmerFont.width},clusterWidth:${khmerFont.clusterWidth},partsWidth:${khmerFont.partsWidth},fontFamily:${khmerFont.fontFamily}` : "n/a"}`);
         }
         await page.close();
       }
