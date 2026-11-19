@@ -157,6 +157,25 @@ async function waitForBusinessPage(page, app) {
   await page.locator(app === "buyer" ? ".buyer-page" : ".mini-shell").waitFor({ state: "visible", timeout: 10_000 });
 }
 
+async function assertKhmerFont(page, context) {
+  const sample = "ខ្មែរ សូមស្វាគមន៍";
+  const result = await page.evaluate(async (text) => {
+    await document.fonts.ready;
+    const loaded = document.fonts.check('16px "Noto Sans Khmer"', text);
+    const probe = document.createElement("span");
+    probe.lang = "km";
+    probe.textContent = text;
+    probe.style.cssText = "position:absolute;left:-9999px;white-space:nowrap;font:16px \"Noto Sans Khmer\", sans-serif";
+    document.body.append(probe);
+    const width = probe.getBoundingClientRect().width;
+    probe.remove();
+    return { loaded, width };
+  }, sample);
+  if (!result.loaded || result.width <= 0) {
+    throw new Error(`Khmer font check failed for ${context}: loaded=${result.loaded}, width=${result.width}`);
+  }
+}
+
 await mkdir(output, { recursive: true });
 const servers = [start("buyer", 5173), start("merchant", 5174)];
 try {
@@ -173,6 +192,7 @@ try {
         const url = `http://127.0.0.1:${port}/${launchParams(item.theme, item.language)}`;
         await page.goto(url, { waitUntil: "networkidle" });
         await waitForBusinessPage(page, app);
+        if (item.language === "km") await assertKhmerFont(page, `${app}-${item.width}-${item.theme}`);
         const bodyBackground = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
         const expectedBackground = item.theme === "dark" ? "rgb(17, 18, 16)" : "rgb(246, 242, 233)";
         if (bodyBackground !== expectedBackground) {
