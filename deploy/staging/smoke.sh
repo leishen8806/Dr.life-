@@ -7,6 +7,7 @@ require_env() { local name="$1"; [[ -n "${!name:-}" ]] || die "$name is required
 for required in SMOKE_API_BASE_URL SMOKE_BUYER_URL SMOKE_MERCHANT_URL SMOKE_SHOP_URL; do
   require_env "$required"
 done
+require_env SMOKE_BROWSER_COMMAND
 command -v curl >/dev/null 2>&1 || die "curl is required"
 
 normalise_url() { printf '%s' "${1%/}"; }
@@ -38,6 +39,7 @@ check_frontend() {
     die "$label returned no app root"
   fi
   rm -f "$body"
+  "$SMOKE_BROWSER_COMMAND" --label "$label" --url "$url" || die "$label browser render check failed"
   printf 'PASS: %s %s\n' "$label" "$url"
 }
 

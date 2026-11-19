@@ -129,6 +129,82 @@ application directory (`buyer`, `merchant`, or `admin`), then run
 three applications with a temporary root. Database migration is deliberately
 separate and must succeed before the application release is switched.
 
+### Frontend build and release
+
+The buyer, merchant, and admin bundles are Vite builds and must be compiled
+with the staging API origin. Run these commands from a clean checkout after
+copying `deploy/staging/env.example` to a local, untracked environment file:
+
+```bash
+export VITE_API_BASE_URL=https://test-api.drlifeplus.com
+pnpm --filter @drlife/buyer build
+pnpm --filter @drlife/merchant build
+pnpm --filter @drlife/admin build
+```
+
+Upload each generated `apps/<app>/dist/` directory to the matching
+`incoming/<release-id>/` directory below `STAGING_SITE_ROOT`, then publish it
+with `publish-release.sh <app> <release-id>`. `VITE_API_BASE_URL` is a
+build-time value, not a secret and not a substitute for the runtime `.env`.
+The `VITE_API_BASE_URL` line in `env.example` records the approved staging
+value for release operators; it must not be replaced with a production URL in
+this template.
+
+The admin build uses the cross-origin API mode: its requests resolve against
+`VITE_API_BASE_URL` instead of the admin page origin. The API `.env` therefore
+keeps the exact `test-admin` origin in `CORS_ADMIN_ORIGINS` and sets
+`CORS_CREDENTIAL_PATHS=/v1/admin/auth/refresh`. The frontend sends
+`credentials: include` and `X-Requested-With`; the gateway allowlist already
+includes that header. The refresh cookie remains host-only, `Secure`, and
+`SameSite=Strict` on `test-api`, with no `Domain` attribute. The four test
+hosts are same-site subdomains, so the cookie is eligible while CORS still
+requires the explicit credential path. Do not add a wildcard origin or a
+cookie domain. The browser supplies the X-Requested-With: drlife CSRF marker
+on refresh; the proxies preserve the client header without adding or
+overriding it. The API still checks the exact Origin, and the marker is not a
+credential.
+
+### API proxy trust and admin access
+
+The staging request path is Cloudflare to the host nginx real-IP module, then
+the host proxy to the edge, then the edge to the API. The host proxy forwards
+the real client address in the configured Cloudflare header; the API accepts
+that header only when the direct peer belongs to the edge Docker network.
+TRUSTED_PROXY_HEADER must therefore be CF-Connecting-IP and
+TRUSTED_PROXY_CIDRS must contain only the edge Docker network CIDR. Never use
+0.0.0.0/0 as a trusted proxy range.
+
+ADMIN_ALLOWED_CIDRS is supplied by the owner for the approved administrator
+egress address or CIDR. It is written only to the server's untracked .env,
+never to this repository, an Issue, or a PR. An empty list intentionally
+fail-closes non-development /v1/admin/* and /v1/wms/* requests. Until the
+owner provides this value, an admin refresh 403 is an AdminAccess allowlist
+failure, not a successful unauthenticated refresh.
+
+### Browser smoke check
+
+`smoke.sh` first checks HTTP 200 and the app root, then invokes the required
+`SMOKE_BROWSER_COMMAND` for each frontend. The command must be an executable
+wrapper around `deploy/staging/smoke-browser.mjs`, with Playwright and its
+Chromium binary available. The helper waits for DOM content and a short
+settling window, asserts that a main JavaScript bundle loaded, checks visible text, and fails on browser
+console errors, page errors, or failed resource requests. For a checkout with
+the website workspace dependencies installed, a minimal wrapper is:
+
+```bash
+cat >/tmp/drlife-smoke-browser <<'SH'
+#!/bin/sh
+exec pnpm --filter @drlife/website exec node \
+  "$PWD/deploy/staging/smoke-browser.mjs" "$@"
+SH
+chmod +x /tmp/drlife-smoke-browser
+SMOKE_BROWSER_COMMAND=/tmp/drlife-smoke-browser deploy/staging/smoke.sh
+```
+
+`deploy/staging/test-smoke.sh` uses a stub browser command to verify that the
+shell smoke gate invokes all three frontend render checks; it does not claim
+to be a real browser run. The real Playwright helper is the acceptance check.
+
 ## E-01 domain direct-connection configuration
 
 This is a template only. Do not put real domains, certificate material,
@@ -226,6 +302,24 @@ bootstrap audit entry in the same transaction, and is idempotent. The owner
 must keep all credentials private and report only that the repair command
 completed; do not paste email addresses, passwords, TOTP links, or server
 addresses into an Issue.
+
+### 登记 Telegram Bot
+
+After the first super administrator exists, register the buyer and merchant
+BotFather usernames from the staging project directory. The token is read from
+standard input only; the script does not accept it as an argument or
+environment variable, and does not print it. Use a 1Password CLI pipe so the
+token is not written to disk:
+
+```sh
+op read "op://<保险库>/<条目>/凭据" | ssh <别名> "cd /srv/drlifeplus-staging && sh ./admin-bootstrap.sh --bot buyer --bot-username '<BotFather 用户名>' --actor-username '<超管用户名>'"
+op read "op://<保险库>/<条目>/凭据" | ssh <别名> "cd /srv/drlifeplus-staging && sh ./admin-bootstrap.sh --bot merchant --bot-username '<BotFather 用户名>' --actor-username '<超管用户名>'"
+```
+
+Replace only the placeholders with owner-managed values. The actor username
+must match an active super administrator; the script resolves its `public_id`
+inside PostgreSQL and passes only that public ID to `admininit`. Do not paste
+the commands, token, command output, or screenshots into an issue or chat.
 
 For E-09.4, first run `deploy/staging/worker-healthcheck.sh` to confirm that
 the asynq v0.26 worker heartbeat exists in the `asynq:servers` ZSET and that
