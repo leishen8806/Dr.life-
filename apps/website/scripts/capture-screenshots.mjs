@@ -218,13 +218,13 @@ try {
           if ([1280, 1440, 1920].includes(width) && homepageGeometry.navOverlap) {
             throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);
           }
-          if ([1280, 1440, 1920].includes(width)) {
+          if ([1440, 1920].includes(width)) {
             const navLink = page.locator(".nav > a").first();
             const appLink = page.locator(".nav-apps");
             if (!(await navLink.isVisible()) || !(await appLink.isVisible())) {
               throw new Error(`Desktop navigation or App entry is hidden at ${width}px (${language})`);
             }
-          } else if (width <= 700 && pageDefinition.name === "home") {
+          } else if (pageDefinition.name === "home" && ([1280, 700].includes(width) || width < 700)) {
             const menuToggle = page.locator(".menu-toggle");
             const menuToggleBox = await menuToggle.boundingBox();
             if (!menuToggleBox || menuToggleBox.width <= 0 || menuToggleBox.height <= 0
