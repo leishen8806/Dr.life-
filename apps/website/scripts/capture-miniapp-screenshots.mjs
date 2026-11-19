@@ -197,12 +197,13 @@ async function assertKhmerFont(page, context) {
     };
     const sampleMeasurement = measure(text);
     const clusterWidth = measure("ក្រ").width;
-    const partsWidth = measure("ក").width + measure("្").width + measure("រ").width;
-    return { loaded, width: sampleMeasurement.width, clusterWidth, partsWidth, fontFamily: sampleMeasurement.fontFamily };
+    const baseWidth = measure("ក").width;
+    const partsWidth = baseWidth + measure("រ").width;
+    return { loaded, width: sampleMeasurement.width, clusterWidth, baseWidth, partsWidth, fontFamily: sampleMeasurement.fontFamily };
   }, sample);
-  const shaped = result.clusterWidth < result.partsWidth * 0.95;
+  const shaped = result.clusterWidth < result.partsWidth * 0.9 && result.clusterWidth <= result.baseWidth * 1.3;
   if (!result.loaded || result.width <= 0 || !result.fontFamily.includes("Noto Sans Khmer") || !shaped) {
-    throw new Error(`Khmer font check failed for ${context}: loaded=${result.loaded}, width=${result.width}, clusterWidth=${result.clusterWidth}, partsWidth=${result.partsWidth}, fontFamily=${result.fontFamily}`);
+    throw new Error(`Khmer font check failed for ${context}: loaded=${result.loaded}, width=${result.width}, clusterWidth=${result.clusterWidth}, baseWidth=${result.baseWidth}, partsWidth=${result.partsWidth}, fontFamily=${result.fontFamily}`);
   }
   return { ...result, shaped };
 }
@@ -229,6 +230,10 @@ try {
       const port = app === "buyer" ? 5173 : 5174;
       for (const item of matrix) {
         const page = await browser.newPage({ viewport: { width: item.width, height: 900 }, colorScheme: item.theme });
+        const khmerFontResponses = [];
+        page.on("response", (response) => {
+          if (response.url().includes("noto-sans-khmer")) khmerFontResponses.push(response);
+        });
         await page.addInitScript((language) => localStorage.setItem("drlife_lang", language), item.language);
         await installMockApi(page, item.language, app);
         const url = `http://127.0.0.1:${port}/${launchParams(item.theme, item.language)}`;
@@ -237,6 +242,12 @@ try {
         const khmerFont = item.language === "km"
           ? await assertKhmerFont(page, `${app}-${item.width}-${item.theme}`)
           : null;
+        if (item.language === "km") {
+          const response = khmerFontResponses.find((entry) => entry.url().includes("IFeh7j.woff2"));
+          if (!response || response.status() !== 200) {
+            throw new Error(`Khmer font resource check failed for ${app}-${item.width}-${item.theme}: expected IFeh7j.woff2 HTTP 200`);
+          }
+        }
         const bodyBackground = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
         const expectedBackground = item.theme === "dark" ? "rgb(17, 18, 16)" : "rgb(246, 242, 233)";
         if (bodyBackground !== expectedBackground) {
