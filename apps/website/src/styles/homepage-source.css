@@ -369,15 +369,25 @@ body.homepage-source-page.homepage-source-page .partner-grid .partner:nth-child(
 body.homepage-source-page.homepage-source-page .partner-grid .partner:nth-child(n+4) { grid-column: span 3; }
 @media(max-width:760px) {
   body.homepage-source-page.homepage-source-page .partner-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  body.homepage-source-page.homepage-source-page .partner-grid .partner { grid-column: auto; }
+  body.homepage-source-page.homepage-source-page .partner-grid .partner,
+  body.homepage-source-page.homepage-source-page .partner-grid .partner:nth-child(-n+3),
+  body.homepage-source-page.homepage-source-page .partner-grid .partner:nth-child(n+4) { grid-column: auto; }
 }
 @media(max-width:520px) {
   body.homepage-source-page.homepage-source-page .partner-grid { grid-template-columns: 1fr; }
+  body.homepage-source-page.homepage-source-page .partner-grid .partner,
+  body.homepage-source-page.homepage-source-page .partner-grid .partner:nth-child(-n+3),
+  body.homepage-source-page.homepage-source-page .partner-grid .partner:nth-child(n+4) { grid-column: auto; }
 }
 body.homepage-source-page.homepage-source-page .access-grid { background: transparent; }
 body.homepage-source-page.homepage-source-page .section.partners { padding-block: clamp(60px, 8vw, 122px); }
 body.homepage-source-page.homepage-source-page .section.partners > .container {
   width: min(calc(100% - 2 * var(--pad)), var(--content));
+}
+body.homepage-source-page.homepage-source-page[data-lang="km"] {
+  --sans: "Noto Sans Khmer", sans-serif;
+  --serif: "Noto Sans Khmer", sans-serif;
+  font-family: "Noto Sans Khmer", sans-serif;
 }
 body.homepage-source-page.homepage-source-page[data-lang="km"] .eyebrow,
 body.homepage-source-page.homepage-source-page[data-lang="km"] .hero-caption,
