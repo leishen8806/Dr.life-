@@ -338,9 +338,9 @@ func (s *AdminManagementService) prepareAdminCreate(ctx context.Context, input A
 	if s == nil || s.DB == nil || s.Cipher == nil || strings.TrimSpace(input.Name) == "" || !validAdminRole(input.Role) {
 		return preparedAdminCreate{}, errors.New("iam: invalid administrator creation input")
 	}
-	email := strings.ToLower(strings.TrimSpace(input.Email))
-	if !strings.Contains(email, "@") || len(email) > 320 {
-		return preparedAdminCreate{}, errors.New("iam: invalid administrator email")
+	email, err := normalizeAdminEmail(input.Email)
+	if err != nil {
+		return preparedAdminCreate{}, err
 	}
 	publicID, err := ids.NewULID()
 	if err != nil {
@@ -366,6 +366,14 @@ func (s *AdminManagementService) prepareAdminCreate(ctx context.Context, input A
 		input.DataScope = []string{}
 	}
 	return preparedAdminCreate{publicID: publicID, name: strings.TrimSpace(input.Name), email: email, passwordHash: hash, password: password, provisioningURI: key.URL(), totpSecretEnc: enc, role: input.Role, dataScope: input.DataScope, at: s.now()}, nil
+}
+
+func normalizeAdminEmail(value string) (string, error) {
+	email := strings.ToLower(strings.TrimSpace(value))
+	if email == "" || strings.ContainsAny(email, "\r\n") || strings.Count(email, "@") != 1 || len(email) > 320 {
+		return "", errors.New("iam: invalid administrator email")
+	}
+	return email, nil
 }
 
 func insertPreparedAdmin(ctx context.Context, tx pgx.Tx, prepared preparedAdminCreate) (AdminUser, error) {

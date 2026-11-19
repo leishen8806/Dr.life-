@@ -5,7 +5,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export PATH
 
 usage() {
   printf '%s\n' \
-    'usage: admin-bootstrap.sh --username <name>' \
+    'usage: admin-bootstrap.sh --username <name> --email <email>' \
+    '       admin-bootstrap.sh --repair-email --username <name> --email <email>' \
     '       admin-bootstrap.sh --bot buyer|merchant --bot-username <name> --actor-username <name>' >&2
   exit 2
 }
@@ -13,8 +14,15 @@ usage() {
 mode=${1:-}
 case "$mode" in
   --username)
-    [ -n "${2:-}" ] && [ "$#" -eq 2 ] || usage
+    [ -n "${2:-}" ] && [ "${3:-}" = "--email" ] && [ -n "${4:-}" ] && [ "$#" -eq 4 ] || usage
     username=$2
+    email=$4
+    ;;
+  --repair-email)
+    shift
+    [ "${1:-}" = "--username" ] && [ -n "${2:-}" ] && [ "${3:-}" = "--email" ] && [ -n "${4:-}" ] && [ "$#" -eq 4 ] || usage
+    username=$2
+    email=$4
     ;;
   --bot)
     [ "$#" -eq 6 ] && [ -n "${2:-}" ] && [ "$3" = "--bot-username" ] && [ -n "${4:-}" ] && [ "$5" = "--actor-username" ] && [ -n "${6:-}" ] || usage
@@ -72,7 +80,9 @@ SQL
 iam_database_url="postgres://${bootstrap_role}:${bootstrap_password}@postgres:5432/${POSTGRES_DB:-drlife_staging}?sslmode=disable"
 export IAM_DATABASE_URL="$iam_database_url"
 if [ "$mode" = "--username" ]; then
-  docker_cmd compose --env-file "$env_file" -f "$compose_file" run --rm --no-deps -T --entrypoint /admininit -e IAM_DATABASE_URL api super --username "$username"
+  docker_cmd compose --env-file "$env_file" -f "$compose_file" run --rm --no-deps -T --entrypoint /admininit -e IAM_DATABASE_URL api super --username "$username" --email "$email"
+elif [ "$mode" = "--repair-email" ]; then
+  docker_cmd compose --env-file "$env_file" -f "$compose_file" run --rm --no-deps -T --entrypoint /admininit -e IAM_DATABASE_URL api super-email --username "$username" --email "$email"
 else
   actor_public_ids=$(docker_cmd compose --env-file "$env_file" -f "$compose_file" exec -T postgres psql -At -v ON_ERROR_STOP=1 -v actor_username="$actor_username" -U "${POSTGRES_ADMIN_USER:-postgres}" -d "${POSTGRES_DB:-drlife_staging}" <<'SQL'
 SELECT public_id FROM iam.admin_user WHERE name=:'actor_username' AND role='super' AND status='active' LIMIT 2;

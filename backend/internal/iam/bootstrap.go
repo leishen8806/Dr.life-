@@ -34,12 +34,12 @@ type BootstrapAdminResult struct {
 // CreateFirstSuper creates the first active super administrator. The advisory
 // transaction lock makes two concurrent invocations deterministic without a
 // migration or a process-local mutex.
-func (s *BootstrapService) CreateFirstSuper(ctx context.Context, username string) (BootstrapAdminResult, error) {
+func (s *BootstrapService) CreateFirstSuper(ctx context.Context, username, email string) (BootstrapAdminResult, error) {
 	username = strings.TrimSpace(username)
 	if s == nil || s.DB == nil || s.Cipher == nil || s.Audit == nil || username == "" || strings.ContainsAny(username, "\r\n") {
 		return BootstrapAdminResult{}, errors.New("iam: invalid bootstrap configuration")
 	}
-	input := AdminCreateInput{Name: username, Email: username + "@bootstrap.invalid", Role: RoleSuper}
+	input := AdminCreateInput{Name: username, Email: email, Role: RoleSuper}
 	prepared, err := (&AdminManagementService{DB: s.DB, Cipher: s.Cipher}).prepareAdminCreate(ctx, input)
 	if err != nil {
 		return BootstrapAdminResult{}, err
@@ -78,6 +78,58 @@ func (s *BootstrapService) CreateFirstSuper(ctx context.Context, username string
 		return BootstrapAdminResult{}, err
 	}
 	return BootstrapAdminResult{Admin: created, InitialPassword: prepared.password, TOTPProvisioningURI: prepared.provisioningURI}, nil
+}
+
+// FixSuperEmail repairs the placeholder address written by older bootstrap
+// versions. It is intentionally narrow and idempotent: only an active super
+// whose name matches and whose current email is the legacy placeholder can be
+// changed. The audit entry is committed in the same transaction as the email.
+func (s *BootstrapService) FixSuperEmail(ctx context.Context, username, email string) error {
+	username = strings.TrimSpace(username)
+	normalizedEmail, err := normalizeAdminEmail(email)
+	if err != nil {
+		return err
+	}
+	if s == nil || s.DB == nil || s.Audit == nil || username == "" || strings.ContainsAny(username, "\r\n") {
+		return errors.New("iam: invalid bootstrap configuration")
+	}
+	tx, err := s.DB.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, bootstrapAdvisoryLock); err != nil {
+		return err
+	}
+	var admin AdminUser
+	if err := tx.QueryRow(ctx, `SELECT public_id,name,email,role,data_scope,status,last_login_at,created_at FROM iam.admin_user WHERE name=$1 AND role='super' AND status='active' FOR UPDATE`, username).Scan(&admin.PublicID, &admin.Name, &admin.Email, &admin.Role, &admin.DataScope, &admin.Status, &admin.LastLoginAt, &admin.CreatedAt); err != nil {
+		return errors.New("iam: active super administrator not found")
+	}
+	if admin.Email == normalizedEmail {
+		return nil
+	}
+	if !strings.HasSuffix(strings.ToLower(admin.Email), "@bootstrap.invalid") {
+		return errors.New("iam: administrator email is not a bootstrap placeholder")
+	}
+	var duplicate bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM iam.admin_user WHERE email=$1 AND public_id<>$2)`, normalizedEmail, admin.PublicID).Scan(&duplicate); err != nil {
+		return err
+	}
+	if duplicate {
+		return errors.New("iam: administrator email is already in use")
+	}
+	if _, err := tx.Exec(ctx, `UPDATE iam.admin_user SET email=$1,updated_at=now() WHERE public_id=$2`, normalizedEmail, admin.PublicID); err != nil {
+		return err
+	}
+	var actorID int64
+	if err := tx.QueryRow(ctx, `SELECT id FROM iam.admin_user WHERE public_id=$1`, admin.PublicID).Scan(&actorID); err != nil {
+		return err
+	}
+	detail := []byte(`{"message":"email 已修正"}`)
+	if _, err := s.Audit.AppendTx(ctx, tx, platformaudit.Entry{ActorID: actorID, ActorRole: "system_bootstrap", Action: platformaudit.ActionAdminBootstrap, Target: "admin:" + admin.PublicID, Detail: detail, RequestID: "admininit:super-email:" + admin.PublicID}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 type BootstrapBotInput struct {
