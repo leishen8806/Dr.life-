@@ -1,4 +1,4 @@
-head=2d6ad93818a07816ccd89765b0671c4b98454fe0
+head=0f4d4094c9fc25dc602b25c42aeb283177223e42
 buyer-home-390-light-zh.png	Dr.life+	商品分类	width=390	height=900	sha256=b868bddd42d55d1a07d372367f14eac8336147711e779ca1328376517948112a	khmerFont=n/a	merchantBackSpacing=n/a
 buyer-profile-390-light-zh.png	Dr.life+	Sokha Trading	width=390	height=900	sha256=640b003eaccb4cfd5cf955a16981bbbcb0d86cfdae20384119c4002240c396dc	khmerFont=n/a	merchantBackSpacing=n/a
 buyer-wallet-390-light-zh.png	Dr.life+	钱包	width=390	height=900	sha256=d45a0255aa1ccb1430fa3aee9e055b5338005bbf854d4d49773ef9ff1266e356	khmerFont=n/a	merchantBackSpacing=n/a
