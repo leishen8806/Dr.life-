@@ -11,7 +11,7 @@ if [[ $* == *' exec '* ]]; then cat >> "${FAKE_SQL:?}"; else printf '%s\n' 'user
 FAKE
 chmod +x "$fake_bin/docker"
 export FAKE_DOCKER_LOG="$root/docker.log" FAKE_SQL="$root/sql"
-DOCKER_BIN="$fake_bin/docker" STAGING_ENV_FILE="$root/env" STAGING_COMPOSE_FILE="$root/compose.yaml" "$script_dir/admin-bootstrap.sh" --username 'Test Admin' >/dev/null
+DOCKER_BIN="$fake_bin/docker" STAGING_ENV_FILE="$root/env" STAGING_COMPOSE_FILE="$root/compose.yaml" "$script_dir/admin-bootstrap.sh" --username 'Test Admin' --email 'owner@example.invalid' >/dev/null
 test "$(grep -c 'DROP ROLE IF EXISTS' "$root/sql")" -eq 1
 test "$(grep -c 'CREATE ROLE' "$root/sql")" -eq 1
 grep -q -- '--entrypoint /admininit' "$root/docker.log"
@@ -44,8 +44,9 @@ if [[ -n ${IAM_DATABASE_URL-} ]]; then printf '%s\n' present > "${SUDO_IAM_MARKE
 if [[ $* == *' exec '* ]]; then cat >> "${SUDO_SQL:?}"; else printf '%s\n' 'username=Test Admin' 'password=printed-only-by-admininit' 'totp=otpauth://totp/test'; fi
 FAKE_DOCKER_SUDO
 chmod +x "$fake_bin/docker-sudo"
-DOCKER_BIN="$fake_bin/docker-sudo" SUDO_BIN="$sudo_bin" DOCKER_USE_SUDO=1 STAGING_ENV_FILE="$root/env" STAGING_COMPOSE_FILE="$root/compose.yaml" SUDO_DOCKER_LOG="$sudo_log" SUDO_SQL="$sudo_sql" SUDO_IAM_MARKER="$sudo_marker" "$script_dir/admin-bootstrap.sh" --username 'Test Admin' >/dev/null
+DOCKER_BIN="$fake_bin/docker-sudo" SUDO_BIN="$sudo_bin" DOCKER_USE_SUDO=1 STAGING_ENV_FILE="$root/env" STAGING_COMPOSE_FILE="$root/compose.yaml" SUDO_DOCKER_LOG="$sudo_log" SUDO_SQL="$sudo_sql" SUDO_IAM_MARKER="$sudo_marker" "$script_dir/admin-bootstrap.sh" --repair-email --username 'Test Admin' --email 'owner@example.invalid' >/dev/null
 grep -qx present "$sudo_marker"
+grep -q -- 'super-email' "$sudo_log"
 ! grep -q 'printed-only-by-admininit' "$sudo_log"
 ! grep -q 'postgres://[^ ]*:[^ ]+@' "$sudo_log"
 echo 'admin bootstrap script: PASS'

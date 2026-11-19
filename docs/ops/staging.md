@@ -194,7 +194,7 @@ credentials, or firewall data in the repository.
 
 ```sh
 STAGING_COMPOSE_FILE=compose.yaml DOCKER_USE_SUDO=1 \
-  deploy/staging/admin-bootstrap.sh --username '<owner-chosen-name>'
+  deploy/staging/admin-bootstrap.sh --username '<owner-chosen-name>' --email '<owner@example.invalid>'
 ```
 
 Run this from the staging project directory containing `compose.yaml`. The
@@ -210,6 +210,22 @@ once per week in the approved environment. Check `docker compose ps`, API
 health, worker logs, Redis disk/AOF health, and PostgreSQL backup freshness.
 Do not paste credentials, tunnel tokens, customer data, or server addresses in
 logs or issues. Escalate incidents to `leishen8806`.
+
+If a super administrator was created by an older image with a placeholder
+address, use the narrow repair mode after deploying the fixed image:
+
+```sh
+STAGING_COMPOSE_FILE=compose.yaml DOCKER_USE_SUDO=1 \
+  deploy/staging/admin-bootstrap.sh --repair-email \
+  --username '<owner-chosen-name>' --email '<owner@example.invalid>'
+```
+
+This mode only accepts an active `super` whose current address ends in
+`@bootstrap.invalid`, rejects duplicate addresses, records a non-sensitive
+bootstrap audit entry in the same transaction, and is idempotent. The owner
+must keep all credentials private and report only that the repair command
+completed; do not paste email addresses, passwords, TOTP links, or server
+addresses into an Issue.
 
 For E-09.4, first run `deploy/staging/worker-healthcheck.sh` to confirm that
 the asynq v0.26 worker heartbeat exists in the `asynq:servers` ZSET and that

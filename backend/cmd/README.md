@@ -7,7 +7,11 @@
 ## `admininit`
 
 Owner-operated bootstrap utility for an empty IAM database. Run `super
---username <name>` once to create the first super administrator, or `bot
+--username <name> --email <email>` once to create the first super administrator,
+or `super-email --username <name> --email <email>` to repair the legacy
+`@bootstrap.invalid` address of an already-created active super administrator.
+The repair command changes no other record, writes one non-sensitive audit entry,
+and is safe to repeat. Or run `bot
 --end buyer|merchant --username <name> --actor <super public id>` with the bot
 token supplied as one line on standard input. It prints bootstrap credentials
 only for the direct `super` invocation; it never accepts passwords or tokens as

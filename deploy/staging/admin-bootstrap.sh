@@ -3,9 +3,12 @@ set -eu
 umask 077
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export PATH
 
-usage() { printf '%s\n' 'usage: admin-bootstrap.sh --username <name>' >&2; exit 2; }
-[ "${1:-}" = "--username" ] && [ -n "${2:-}" ] && [ "$#" -eq 2 ] || usage
+usage() { printf '%s\n' 'usage: admin-bootstrap.sh --username <name> --email <email> | --repair-email --username <name> --email <email>' >&2; exit 2; }
+mode=super
+if [ "${1:-}" = "--repair-email" ]; then mode=super-email; shift; fi
+[ "${1:-}" = "--username" ] && [ -n "${2:-}" ] && [ "${3:-}" = "--email" ] && [ -n "${4:-}" ] && [ "$#" -eq 4 ] || usage
 username=$2
+email=$4
 compose_file=${STAGING_COMPOSE_FILE:-compose.yaml}
 env_file=${STAGING_ENV_FILE:-.env}
 docker_bin=${DOCKER_BIN:-docker}
@@ -38,4 +41,4 @@ SQL
 
 iam_database_url="postgres://${bootstrap_role}:${bootstrap_password}@postgres:5432/${POSTGRES_DB:-drlife_staging}?sslmode=disable"
 export IAM_DATABASE_URL="$iam_database_url"
-docker_cmd compose --env-file "$env_file" -f "$compose_file" run --rm --no-deps -T --entrypoint /admininit -e IAM_DATABASE_URL api super --username "$username"
+docker_cmd compose --env-file "$env_file" -f "$compose_file" run --rm --no-deps -T --entrypoint /admininit -e IAM_DATABASE_URL api "$mode" --username "$username" --email "$email"
