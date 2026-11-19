@@ -502,6 +502,14 @@
   margin: var(--drl-space-2) 0 0;
 }
 
+.buyer-order-detail__items-title {
+  margin-top: var(--drl-space-4);
+}
+
+.buyer-order-detail__delivery-title {
+  margin-top: var(--drl-space-4);
+}
+
 .buyer-cart-action span {
   min-width: 1.5em;
   padding: 0 var(--drl-space-1);
@@ -576,6 +584,10 @@
 
 .buyer-order-events small {
   color: var(--drl-color-text-muted);
+}
+
+.buyer-order-events[lang="km"] small {
+  text-align: end;
 }
 
 .buyer-cart-line__controls {

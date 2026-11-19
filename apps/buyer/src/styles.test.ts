@@ -32,4 +32,10 @@ describe("buyer mall styles", () => {
     expect(ruleFor(".buyer-category-grid")).toContain("minmax(");
     expect(ruleFor(".buyer-category-rail")).toContain("min-width: 0");
   });
+
+  it("separates order detail sections and aligns Khmer timeline dates", () => {
+    expect(ruleFor(".buyer-order-detail__items-title")).toContain("margin-top");
+    expect(ruleFor(".buyer-order-detail__delivery-title")).toContain("margin-top");
+    expect(ruleFor('.buyer-order-events[lang="km"] small')).toContain("text-align: end");
+  });
 });
