@@ -278,13 +278,14 @@ try {
           if ([1440, 1920].includes(width) && homepageGeometry.partnerGap < 64) {
             throw new Error(`Partner cards touch the app section at ${width}px (${language}): ${homepageGeometry.partnerGap}px gap`);
           }
-          const contactLinks = page.locator('.partner-grid .partner a[href="/contact"]');
-          if (await contactLinks.count() !== 4) {
-            throw new Error(`Expected four partner contact links at ${width}px (${language})`);
+          const partnerLinks = page.locator('.partner-grid .partner .text-link');
+          if (await partnerLinks.count() < 4) {
+            throw new Error(`Expected at least four partner contact links at ${width}px (${language})`);
           }
-          for (let index = 0; index < await contactLinks.count(); index += 1) {
-            if (!(await contactLinks.nth(index).isVisible())) {
-              throw new Error(`Partner contact link ${index + 1} is not visible at ${width}px (${language})`);
+          for (let index = 0; index < 4; index += 1) {
+            const partnerLink = partnerLinks.nth(index);
+            if (!(await partnerLink.isVisible()) || !String(await partnerLink.getAttribute("href")).endsWith("/contact")) {
+              throw new Error(`Partner contact link ${index + 1} is missing or points away from /contact at ${width}px (${language})`);
             }
           }
         }
