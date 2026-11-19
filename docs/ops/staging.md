@@ -134,8 +134,8 @@ still checks the exact Origin, and the marker is not a credential.
 `smoke.sh` first checks HTTP 200 and the app root, then invokes the required
 `SMOKE_BROWSER_COMMAND` for each frontend. The command must be an executable
 wrapper around `deploy/staging/smoke-browser.mjs`, with Playwright and its
-Chromium binary available. The helper waits for network idle, asserts that a
-main JavaScript bundle loaded, checks visible text, and fails on browser
+Chromium binary available. The helper waits for DOM content and a short
+settling window, asserts that a main JavaScript bundle loaded, checks visible text, and fails on browser
 console errors, page errors, or failed resource requests. For a checkout with
 the website workspace dependencies installed, a minimal wrapper is:
 

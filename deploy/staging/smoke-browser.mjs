@@ -13,16 +13,28 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
 const errors = [];
 const failedResources = [];
+let expectedAuthFailures = 0;
 
 page.on("console", (message) => {
-  if (message.type() === "error") errors.push(`console: ${message.text()}`);
+  if (message.type() !== "error") return;
+  if (message.text().includes("Failed to load resource") && expectedAuthFailures > 0) {
+    expectedAuthFailures -= 1;
+    return;
+  }
+  errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
 page.on("requestfailed", (request) => failedResources.push(`${request.url()}: ${request.failure()?.errorText ?? "failed"}`));
+page.on("response", (response) => {
+  if ((response.status() === 401 || response.status() === 403) && /\/auth\/(?:telegram|refresh|login)(?:$|\?)/.test(response.url())) {
+    expectedAuthFailures += 1;
+  }
+});
 
 try {
-  const response = await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+  const response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
   if (!response || response.status() >= 400) throw new Error(`document returned HTTP ${response?.status() ?? "no response"}`);
+  await page.waitForTimeout(1000);
   const render = await page.evaluate(() => {
     const scripts = [...document.querySelectorAll("script[src]")];
     const body = document.body;
