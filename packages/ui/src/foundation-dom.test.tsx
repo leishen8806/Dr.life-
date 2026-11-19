@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { Money, ProductCard, Tabs, TieredPrice, Toast } from "./index";
+import { Money, MoneyWithI18n, ProductCard, Tabs, TieredPrice, Toast } from "./index";
 
 const moneyProps = { invalidLabel: "Invalid amount", currencySymbol: "$", language: "en" as const };
 
@@ -25,6 +25,8 @@ describe("foundation DOM acceptance", () => {
     document.documentElement.lang = "en";
     const localized = render(<Money value="12500" translate={(key) => key === "common.currencyUsd" ? "$" : "Invalid amount"} />);
     expect(localized.container.textContent).toBe("$1.25");
+    const thinWrapper = render(<MoneyWithI18n value="25000" language="en" translate={(key) => key === "common.currencyUsd" ? "$" : "Invalid amount"} />);
+    expect(thinWrapper.container.textContent).toBe("$2.50");
   });
 
   it("keeps tabs keyboard navigable and alerts out of aria-live", () => {
@@ -35,10 +37,12 @@ describe("foundation DOM acceptance", () => {
     expect(tabs[1]?.getAttribute("tabindex")).toBe("-1");
     fireEvent.keyDown(tabs[0]!, { key: "ArrowRight" });
     expect(change).toHaveBeenCalledWith("b");
+    expect(tabs[1]).toHaveFocus();
     fireEvent.keyDown(tabs[0]!, { key: "Home" });
     fireEvent.keyDown(tabs[0]!, { key: "End" });
     fireEvent.keyDown(tabs[0]!, { key: "ArrowLeft" });
     expect(change).toHaveBeenCalledWith("b");
+    expect(tabs[1]).toHaveFocus();
     fireEvent.keyDown(tabs[0]!, { key: "End" });
     expect(change).toHaveBeenCalledWith("b");
     fireEvent.keyDown(tabs[1]!, { key: "Home" });
