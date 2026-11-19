@@ -1,12 +1,13 @@
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const output = fileURLToPath(new URL("../screenshots-miniapp/", import.meta.url));
-const matrix = [360, 430].flatMap((width) =>
+const matrix = [390, 1440].flatMap((width) =>
   ["light", "dark"].flatMap((theme) =>
     ["zh", "en", "km"].map((language) => ({ width, theme, language }))
   )
@@ -192,7 +193,18 @@ async function assertKhmerFont(page, context) {
   if (!result.loaded || result.width <= 0) {
     throw new Error(`Khmer font check failed for ${context}: loaded=${result.loaded}, width=${result.width}`);
   }
+  return result;
 }
+
+const inspectPng = async (path) => {
+  const bytes = await readFile(path);
+  if (bytes.toString("ascii", 1, 4) !== "PNG") throw new Error(`not a PNG: ${path}`);
+  return {
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20),
+    sha256: createHash("sha256").update(bytes).digest("hex")
+  };
+};
 
 await mkdir(output, { recursive: true });
 const servers = [start("buyer", 5173), start("merchant", 5174)];
@@ -200,6 +212,7 @@ try {
   await Promise.all(servers.map(({ port }) => waitFor(port)));
   const browser = await chromium.launch();
   const manifest = [];
+  const hashesByScreen = new Map();
   try {
     for (const app of ["buyer", "merchant"]) {
       const port = app === "buyer" ? 5173 : 5174;
@@ -210,7 +223,9 @@ try {
         const url = `http://127.0.0.1:${port}/${launchParams(item.theme, item.language)}`;
         await page.goto(url, { waitUntil: "networkidle" });
         await waitForBusinessPage(page, app);
-        if (item.language === "km") await assertKhmerFont(page, `${app}-${item.width}-${item.theme}`);
+        const khmerFont = item.language === "km"
+          ? await assertKhmerFont(page, `${app}-${item.width}-${item.theme}`)
+          : null;
         const bodyBackground = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
         const expectedBackground = item.theme === "dark" ? "rgb(17, 18, 16)" : "rgb(246, 242, 233)";
         if (bodyBackground !== expectedBackground) {
@@ -290,13 +305,27 @@ try {
           const pageHeading = await page.locator(headingSelector).first().textContent();
           if (!pageHeading?.trim()) throw new Error(`missing business page heading for ${app}-${target.name}-${item.language}`);
           const name = `${app}-${target.name}-${item.width}-${item.theme}-${item.language}.png`;
-          await page.screenshot({ path: join(output, name), fullPage: true });
-          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}`);
+          const screenshotPath = join(output, name);
+          await page.screenshot({ path: screenshotPath, fullPage: true });
+          const image = await inspectPng(screenshotPath);
+          if (item.width === 390 && image.width !== 390) {
+            throw new Error(`390px evidence has wrong width for ${name}: ${image.width}`);
+          }
+          const screenKey = `${app}-${target.name}-${item.width}-${item.theme}`;
+          const screenHashes = hashesByScreen.get(screenKey) ?? new Map();
+          screenHashes.set(item.language, image.sha256);
+          hashesByScreen.set(screenKey, screenHashes);
+          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}\twidth=${image.width}\theight=${image.height}\tsha256=${image.sha256}\tkhmerFont=${khmerFont ? `loaded:${khmerFont.loaded},width:${khmerFont.width}` : "n/a"}`);
         }
         await page.close();
       }
     }
   } finally { await browser.close(); }
+  for (const [screenKey, hashes] of hashesByScreen) {
+    if (hashes.size !== 3 || new Set(hashes.values()).size !== 3) {
+      throw new Error(`localized screenshot hashes must differ for ${screenKey}`);
+    }
+  }
   const head = process.env.EVIDENCE_HEAD;
   await writeFile(join(output, "manifest.txt"), `${head ? `head=${head}\n` : ""}${manifest.join("\n")}\n`);
   console.log(`Captured ${manifest.length} Mini App screenshots in ${output}`);
