@@ -98,22 +98,43 @@ grep -q -- '--end merchant --username MerchantBot --actor 01ACTORPUBLICID' "$roo
 ! grep -R -q -- "$merchant_token" "$root/merchant-error" "$root/merchant-docker.log" "$root/merchant-sql"
 grep -q -- 'DROP ROLE IF EXISTS' "$root/merchant-sql"
 
+crlf_token='123456:crlf-token-must-stay-on-stdin'
+printf '%s\r\n' "$crlf_token" | \
+  FAKE_ACTOR_ID='01ACTORPUBLICID' FAKE_STDIN="$root/crlf-stdin" \
+  DOCKER_BIN="$fake_bin/docker" STAGING_ENV_FILE="$root/env" STAGING_COMPOSE_FILE="$root/compose.yaml" \
+  FAKE_DOCKER_LOG="$root/crlf-docker.log" FAKE_SQL="$root/crlf-sql" \
+  "$script_dir/admin-bootstrap.sh" --bot buyer --bot-username 'BuyerBot' --actor-username 'Test Admin' \
+  >/dev/null 2>"$root/crlf-error"
+grep -qx "$crlf_token" "$root/crlf-stdin"
+
+if FAKE_ACTOR_ID=$'01ACTORPUBLICID\n02ACTORPUBLICID' FAKE_STDIN="$root/duplicate-stdin" \
+  DOCKER_BIN="$fake_bin/docker" STAGING_ENV_FILE="$root/env" STAGING_COMPOSE_FILE="$root/compose.yaml" \
+  FAKE_DOCKER_LOG="$root/duplicate-docker.log" FAKE_SQL="$root/duplicate-sql" \
+  "$script_dir/admin-bootstrap.sh" --bot buyer --bot-username 'BuyerBot' --actor-username 'Duplicate Admin' \
+  >/dev/null 2>"$root/duplicate-error" <<'EOF'
+123456:token-for-duplicate-actor
+EOF
+then
+  exit 1
+fi
+grep -q -- 'exactly one active super administrator was required' "$root/duplicate-error"
+
 if "$script_dir/admin-bootstrap.sh" --bot >/dev/null 2>"$root/missing-args"; then exit 1; fi
 if "$script_dir/admin-bootstrap.sh" --bot driver --bot-username 'BadBot' --actor-username 'Test Admin' </dev/null >/dev/null 2>"$root/bad-end"; then exit 1; fi
 grep -q -- 'usage:' "$root/missing-args"
 grep -q -- 'usage:' "$root/bad-end"
-if "$script_dir/admin-bootstrap.sh" --bot buyer --bot-username 'BuyerBot' --actor-username 'Missing Admin' </dev/null >/dev/null 2>"$root/missing-actor"; then exit 1; fi
-grep -q -- 'bot token is required' "$root/missing-actor"
+if "$script_dir/admin-bootstrap.sh" --bot buyer --bot-username 'BuyerBot' --actor-username 'Missing Admin' </dev/null >/dev/null 2>"$root/missing-token"; then exit 1; fi
+grep -q -- 'bot token is required' "$root/missing-token"
 
 if FAKE_ACTOR_ID='' FAKE_STDIN="$root/missing-actor-stdin" \
   DOCKER_BIN="$fake_bin/docker" STAGING_ENV_FILE="$root/env" STAGING_COMPOSE_FILE="$root/compose.yaml" \
   FAKE_DOCKER_LOG="$root/missing-actor-docker.log" FAKE_SQL="$root/missing-actor-sql" \
   "$script_dir/admin-bootstrap.sh" --bot buyer --bot-username 'BuyerBot' --actor-username 'Missing Admin' \
-  >/dev/null 2>"$root/missing-actor" <<'EOF'
+  >/dev/null 2>"$root/missing-super" <<'EOF'
 123456:token-for-missing-actor
 EOF
 then
   exit 1
 fi
-grep -q -- 'active super administrator was not found' "$root/missing-actor"
+grep -q -- 'exactly one active super administrator was required' "$root/missing-super"
 echo 'admin bootstrap script: PASS'
