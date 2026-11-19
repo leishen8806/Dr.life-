@@ -79,6 +79,9 @@ body {
   color: var(--text);
   font-family: var(--font-sans);
 }
+:lang(km) {
+  font-family: "Noto Sans Khmer", sans-serif;
+}
 h1,
 h2,
 h3,

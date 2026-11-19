@@ -190,6 +190,7 @@ try {
             const accessGrid = document.querySelector(".access-grid");
             const partnerCards = [...document.querySelectorAll(".partner-grid .partner")];
             const partnerGridStyles = getComputedStyle(partnerGrid);
+            const khmerLanguageLink = document.querySelector('.language-switch a[data-language="km"], .languages a[data-language="km"]');
             return {
               sections,
               partnerLeftDelta: (partnerContainer?.getBoundingClientRect().x ?? 0) - (businessContainer?.getBoundingClientRect().x ?? 0),
@@ -209,6 +210,7 @@ try {
               ,partnerColumns: partnerGridStyles.gridTemplateColumns.split(" ").length
               ,partnerTopRows: new Set(partnerCards.map((item) => Math.round(item.getBoundingClientRect().top))).size
               ,partnerWidths: partnerCards.map((item) => Math.round(item.getBoundingClientRect().width))
+              ,khmerLanguageFontFamily: khmerLanguageLink ? getComputedStyle(khmerLanguageLink).fontFamily : ""
             };
           });
           const expectedPartnerLayout = width >= 768
@@ -221,6 +223,9 @@ try {
           }
           if (width <= 760 && new Set(homepageGeometry.partnerWidths).size !== 1) {
             throw new Error(`Partner cards are not equal width at ${width}px (${language}): ${homepageGeometry.partnerWidths.join(",")}`);
+          }
+          if (["zh", "en"].includes(language) && !/Noto Sans Khmer/i.test(homepageGeometry.khmerLanguageFontFamily)) {
+            throw new Error(`Khmer language switch is not using Noto Sans Khmer at ${width}px (${language}): ${homepageGeometry.khmerLanguageFontFamily}`);
           }
           for (const section of homepageGeometry.sections) {
             if (section.left > 1 || section.right < width - 1) throw new Error(`Homepage section is not full-bleed at ${width}px (${language}): ${section.selector} ${section.left}..${section.right}`);
