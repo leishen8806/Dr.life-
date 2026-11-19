@@ -241,11 +241,11 @@ try {
         ] : [
           { name: "home" },
           { name: "merchant-orders-list", open: async () => {
-            await page.getByTestId("merchant-orders").click();
+            await page.locator(".merchant-orders-action").click();
             await page.locator(".merchant-orders").waitFor({ state: "visible", timeout: 5_000 });
           } },
           { name: "merchant-orders-detail", open: async () => {
-            await page.getByTestId("merchant-orders").click();
+            await page.locator(".merchant-orders-action").click();
             await page.locator(".merchant-orders").waitFor({ state: "visible", timeout: 5_000 });
             await page.locator(".merchant-order-item").first().click();
             await page.locator(".merchant-order-detail__heading").waitFor({ state: "visible", timeout: 5_000 });
