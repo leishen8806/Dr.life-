@@ -1,0 +1,226 @@
+[
+  {
+    "width": 360,
+    "path": "/km/",
+    "documentFontsStatus": "loaded",
+    "notoSansKhmer": [
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      }
+    ],
+    "bodyFontFamily": "\"Noto Sans Khmer\", sans-serif"
+  },
+  {
+    "width": 390,
+    "path": "/km/",
+    "documentFontsStatus": "loaded",
+    "notoSansKhmer": [
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      }
+    ],
+    "bodyFontFamily": "\"Noto Sans Khmer\", sans-serif"
+  },
+  {
+    "width": 640,
+    "path": "/km/",
+    "documentFontsStatus": "loaded",
+    "notoSansKhmer": [
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      }
+    ],
+    "bodyFontFamily": "\"Noto Sans Khmer\", sans-serif"
+  },
+  {
+    "width": 768,
+    "path": "/km/",
+    "documentFontsStatus": "loaded",
+    "notoSansKhmer": [
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      }
+    ],
+    "bodyFontFamily": "\"Noto Sans Khmer\", sans-serif"
+  },
+  {
+    "width": 1280,
+    "path": "/km/",
+    "documentFontsStatus": "loaded",
+    "notoSansKhmer": [
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      }
+    ],
+    "bodyFontFamily": "\"Noto Sans Khmer\", sans-serif"
+  },
+  {
+    "width": 1440,
+    "path": "/km/",
+    "documentFontsStatus": "loaded",
+    "notoSansKhmer": [
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      }
+    ],
+    "bodyFontFamily": "\"Noto Sans Khmer\", sans-serif"
+  },
+  {
+    "width": 1920,
+    "path": "/km/",
+    "documentFontsStatus": "loaded",
+    "notoSansKhmer": [
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "400",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      },
+      {
+        "family": "Noto Sans Khmer",
+        "status": "loaded",
+        "weight": "600",
+        "style": "normal"
+      }
+    ],
+    "bodyFontFamily": "\"Noto Sans Khmer\", sans-serif"
+  }
+]
