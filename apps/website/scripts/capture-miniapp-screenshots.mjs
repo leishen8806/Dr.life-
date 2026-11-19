@@ -127,7 +127,20 @@ async function installMockApi(page, language, app) {
       return;
     }
     if (path === "/v1/merchant/suborders" && request.method() === "GET") {
-      await route.fulfill(json({ items: [], next_cursor: null }));
+      await route.fulfill(json({ items: [{
+        public_id: "01EVIDENCEMERCHANTORDER",
+        parent_public_id: "01EVIDENCEORDER",
+        status: "shipped",
+        items: [{ sku_public_id: "SKU-1", quantity: 2, unit_price_e4: 95000, line_total_e4: 190000 }],
+        shipping_address_public_id: "01EVIDENCEADDRESS",
+        shipping_address: { recipient_name: "Buyer", address_text: "Phnom Penh", phone: "****1234" },
+        goods_amount_e4: 190000,
+        shipping_amount_e4: 0,
+        payable_amount_e4: 190000,
+        shipping_quote_expires_at: "2026-11-15T10:00:00Z",
+        created_at: "2026-11-14T09:00:00Z",
+        updated_at: "2026-11-14T09:01:00Z"
+      }], next_cursor: null }));
       return;
     }
     if (path.endsWith("/me/notifications") && request.method() === "GET") {
@@ -227,6 +240,16 @@ try {
           } }
         ] : [
           { name: "home" },
+          { name: "merchant-orders-list", open: async () => {
+            await page.getByTestId("merchant-orders").click();
+            await page.locator(".merchant-orders").waitFor({ state: "visible", timeout: 5_000 });
+          } },
+          { name: "merchant-orders-detail", open: async () => {
+            await page.getByTestId("merchant-orders").click();
+            await page.locator(".merchant-orders").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".merchant-order-item").first().click();
+            await page.locator(".merchant-order-detail__heading").waitFor({ state: "visible", timeout: 5_000 });
+          } },
           { name: "merchant-profile", open: async () => {
             await page.getByRole("button", { name: /profile|workspace|我的|商家工作台|កន្លែងធ្វើការអ្នកលក់|โปรไฟล์/i }).last().click();
             await page.locator(".merchant-v4").waitFor({ state: "visible", timeout: 5_000 });
