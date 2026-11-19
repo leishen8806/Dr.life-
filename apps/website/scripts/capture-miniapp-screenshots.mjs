@@ -222,6 +222,21 @@ async function assertKhmerFont(page, context) {
   return { ...result, shaped, platformFont: { familyName: platformFont.familyName, glyphCount: platformFont.glyphCount } };
 }
 
+async function assertMerchantBackSpacing(page, context) {
+  const spacing = await page.evaluate(() => {
+    const header = document.querySelector(".drl-app-header");
+    const back = document.querySelector(".merchant-back");
+    if (!header || !back) return null;
+    const headerRect = header.getBoundingClientRect();
+    const backRect = back.getBoundingClientRect();
+    return { gap: backRect.top - headerRect.bottom };
+  });
+  if (!spacing || spacing.gap < 8 || spacing.gap > 12) {
+    throw new Error(`Merchant back spacing failed for ${context}: gap=${spacing?.gap ?? "missing"}`);
+  }
+  return spacing;
+}
+
 const inspectPng = async (path) => {
   const bytes = await readFile(path);
   if (bytes.toString("ascii", 1, 4) !== "PNG") throw new Error(`not a PNG: ${path}`);
@@ -333,6 +348,9 @@ try {
           await page.goto(url, { waitUntil: "networkidle" });
           await waitForBusinessPage(page, app);
           if (target.open) await target.open();
+          const merchantBackSpacing = app === "merchant" && target.name === "merchant-orders-detail"
+            ? await assertMerchantBackSpacing(page, `${app}-${item.width}-${item.theme}`)
+            : null;
           const title = await page.title();
           if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
           const headingSelector = app === "buyer"
@@ -351,7 +369,7 @@ try {
           const screenHashes = hashesByScreen.get(screenKey) ?? new Map();
           screenHashes.set(item.language, image.sha256);
           hashesByScreen.set(screenKey, screenHashes);
-          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}\twidth=${image.width}\theight=${image.height}\tsha256=${image.sha256}\tkhmerFont=${khmerFont ? `loaded:${khmerFont.loaded},shaped:${khmerFont.shaped},width:${khmerFont.width},clusterWidth:${khmerFont.clusterWidth},baseWidth:${khmerFont.baseWidth},partsWidth:${khmerFont.partsWidth},fontFamily:${khmerFont.fontFamily},platform:${khmerFont.platformFont.familyName},glyphs:${khmerFont.platformFont.glyphCount}` : "n/a"}`);
+          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}\twidth=${image.width}\theight=${image.height}\tsha256=${image.sha256}\tkhmerFont=${khmerFont ? `loaded:${khmerFont.loaded},shaped:${khmerFont.shaped},width:${khmerFont.width},clusterWidth:${khmerFont.clusterWidth},baseWidth:${khmerFont.baseWidth},partsWidth:${khmerFont.partsWidth},fontFamily:${khmerFont.fontFamily},platform:${khmerFont.platformFont.familyName},glyphs:${khmerFont.platformFont.glyphCount}` : "n/a"}\tmerchantBackSpacing=${merchantBackSpacing ? `gap:${merchantBackSpacing.gap}` : "n/a"}`);
         }
         await page.close();
       }

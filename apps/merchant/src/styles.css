@@ -203,7 +203,7 @@ footer {
 
 .merchant-back {
   display: block;
-  margin-block-end: var(--drl-space-3);
+  margin-block: var(--drl-space-3);
 }
 
 .merchant-order-filters > * {
