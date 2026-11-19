@@ -33,5 +33,8 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header CF-Connecting-IP $remote_addr;
+        # Preserve the API's admin refresh CSRF marker across the host proxy;
+        # the API still validates the exact Origin and cookie.
+        proxy_set_header X-Requested-With drlife;
     }
 }
