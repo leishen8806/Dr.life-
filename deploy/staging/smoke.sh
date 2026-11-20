@@ -46,12 +46,50 @@ request_200() {
   die "$label did not return HTTP 200"
 }
 
+check_public_categories() {
+  local label="$1" url="$2" body status
+  body="$(mktemp)"
+  status="$(curl --silent --show-error --location --max-time 10 \
+    --output "$body" --write-out '%{http_code}' "$url")" || true
+  if [[ "$status" != "200" ]]; then
+    rm -f "$body"
+    die "$label did not return HTTP 200 (got $status)"
+  fi
+  if ! grep -Eq '"items"[[:space:]]*:[[:space:]]*\[' "$body"; then
+    rm -f "$body"
+    die "$label returned HTTP 200 but not an items array"
+  fi
+  rm -f "$body"
+  printf 'PASS: %s returned HTTP 200 with an items array\n' "$label"
+}
+
+check_empty_products() {
+  local label="$1" url="$2" body status
+  body="$(mktemp)"
+  status="$(curl --silent --show-error --location --max-time 10 \
+    --output "$body" --write-out '%{http_code}' "$url")" || true
+  if [[ "$status" != "200" ]]; then
+    rm -f "$body"
+    die "$label did not return HTTP 200 (got $status)"
+  fi
+  if ! grep -Eq '"items"[[:space:]]*:[[:space:]]*\[\][[:space:]]*[,}]' "$body" || ! grep -Eq '"total"[[:space:]]*:[[:space:]]*0([,}])' "$body"; then
+    rm -f "$body"
+    die "$label returned HTTP 200 but not an empty list"
+  fi
+  rm -f "$body"
+  printf 'PASS: %s returned HTTP 200 with an empty list\n' "$label"
+}
+
 api_base="$(normalise_url "$SMOKE_API_BASE_URL")"
 check_api_image_release
 api_body="$(mktemp)"
 request_200 "API health" "${api_base}/healthz" "$api_body"
 rm -f "$api_body"
 printf 'PASS: API %s/healthz returned HTTP 200\n' "$api_base"
+if [[ "${SMOKE_EXPECT_EMPTY_CATALOG:-}" == "1" ]]; then
+  check_public_categories "public categories" "${api_base}/v1/public/categories"
+  check_empty_products "public products" "${api_base}/v1/public/products?limit=1"
+fi
 
 check_frontend() {
   local label="$1" url="$2" body

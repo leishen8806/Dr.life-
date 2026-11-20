@@ -8,14 +8,20 @@ cat >"$root/bin/curl" <<'EOF'
 #!/bin/sh
 set -eu
 output=
+url=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --output) output=$2; shift 2;;
+    --url) url=$2; shift 2;;
     --write-out) shift 2;;
+    http*) url=$1; shift;;
     *) shift;;
   esac
 done
-[ -n "$output" ] && printf '%s\n' '<html><body><div id="app">stub</div><script src="/assets/main.js"></script></body></html>' >"$output"
+[ -n "$output" ] && case "$url" in
+  *'/v1/public/categories'*|*'/v1/public/products'*) printf '%s\n' '{"ok":true,"data":{"items":[],"total":0},"request_id":"smoke"}' >"$output" ;;
+  *) printf '%s\n' '<html><body><div id="app">stub</div><script src="/assets/main.js"></script></body></html>' >"$output" ;;
+esac
 printf '200'
 EOF
 cat >"$root/bin/browser-stub" <<'EOF'
@@ -53,6 +59,7 @@ printf '%s\n' 'APP_RELEASE=test-release' >"$root/env"
 : >"$root/browser.log"
 PATH="$root/bin:$PATH" DOCKER_BIN="$root/bin/docker" SMOKE_ENV_FILE="$root/env" \
   SMOKE_COMPOSE_FILE="$root/compose.yaml" SMOKE_BROWSER_LOG="$root/browser.log" \
+  SMOKE_EXPECT_EMPTY_CATALOG=1 \
   SMOKE_API_BASE_URL=https://api.test SMOKE_BUYER_URL=https://buyer.test \
   SMOKE_MERCHANT_URL=https://merchant.test SMOKE_SHOP_URL=https://shop.test \
   SMOKE_BROWSER_COMMAND="$root/bin/browser-stub" "$script_dir/smoke.sh" >/dev/null
