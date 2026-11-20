@@ -11,7 +11,7 @@
     "lint": "eslint src",
     "test": "vitest run",
     "capture:screenshots": "node scripts/capture-screenshots.mjs",
-    "test:e2e": "node e2e/admin-api.playwright.mjs"
+    "test:e2e": "node e2e/admin-api.playwright.mjs && node e2e/admin-cors.playwright.mjs"
   },
   "dependencies": {
     "@drlife/i18n": "workspace:*",

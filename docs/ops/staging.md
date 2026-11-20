@@ -156,9 +156,11 @@ this template.
 The admin build uses the cross-origin API mode: its requests resolve against
 `VITE_API_BASE_URL` instead of the admin page origin. The API `.env` therefore
 keeps the exact `test-admin` origin in `CORS_ADMIN_ORIGINS` and sets
-`CORS_CREDENTIAL_PATHS=/v1/admin/auth/refresh`. The frontend sends
-`credentials: include` and `X-Requested-With`; the gateway allowlist already
-includes that header. The refresh cookie remains host-only, `Secure`, and
+`CORS_CREDENTIAL_PATHS=/v1/admin/auth/login,/v1/admin/auth/refresh`. The
+frontend sends `credentials: include` only for login and refresh so the
+refresh cookie can be established and sent; other admin requests use
+`credentials: omit` and the in-memory bearer token. The gateway allowlist
+requires these exact credential paths. The refresh cookie remains host-only, `Secure`, and
 `SameSite=Strict` on `test-api`, with no `Domain` attribute. The four test
 hosts are same-site subdomains, so the cookie is eligible while CORS still
 requires the explicit credential path. Do not add a wildcard origin or a

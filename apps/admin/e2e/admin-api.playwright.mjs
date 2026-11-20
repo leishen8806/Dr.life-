@@ -1,5 +1,6 @@
 import { chromium } from "../../website/node_modules/playwright/index.mjs";
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 
 const server = spawn("pnpm", ["exec", "vite", "--host", "127.0.0.1", "--port", "5176", "--strictPort"], {
   cwd: new URL("../", import.meta.url).pathname,
@@ -20,7 +21,8 @@ const waitForServer = async () => {
 };
 
 await waitForServer();
-const browser = await chromium.launch();
+const chromePath = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const browser = await chromium.launch(existsSync(chromePath) ? { executablePath: chromePath } : {});
 try {
   const page = await browser.newPage();
   await page.route(/\/v1\/admin\/auth\/refresh/, (route) => route.fulfill({ json: { data: { access_token: "e2e-token" } } }));
