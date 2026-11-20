@@ -27,12 +27,45 @@ case "$*" in
   *) exit 1;;
 esac
 EOF
-chmod +x "$root/bin/curl" "$root/bin/browser-stub"
+cat >"$root/bin/docker" <<'EOF'
+#!/bin/sh
+set -eu
+case "${1:-}" in
+  ps)
+    exit 0
+    ;;
+  compose)
+    shift
+    case " $* " in
+      *" ps -q api "*) printf '%s\n' api-container ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  inspect)
+    printf '%s\n' "${FAKE_API_IMAGE:-drlife-api:test-release}"
+    ;;
+  *) exit 0 ;;
+esac
+EOF
+chmod +x "$root/bin/curl" "$root/bin/browser-stub" "$root/bin/docker"
+: >"$root/compose.yaml"
+printf '%s\n' 'APP_RELEASE=test-release' >"$root/env"
 : >"$root/browser.log"
-PATH="$root/bin:$PATH" SMOKE_BROWSER_LOG="$root/browser.log" \
+PATH="$root/bin:$PATH" DOCKER_BIN="$root/bin/docker" SMOKE_ENV_FILE="$root/env" \
+  SMOKE_COMPOSE_FILE="$root/compose.yaml" SMOKE_BROWSER_LOG="$root/browser.log" \
   SMOKE_API_BASE_URL=https://api.test SMOKE_BUYER_URL=https://buyer.test \
   SMOKE_MERCHANT_URL=https://merchant.test SMOKE_SHOP_URL=https://shop.test \
   SMOKE_BROWSER_COMMAND="$root/bin/browser-stub" "$script_dir/smoke.sh" >/dev/null
 test "$(wc -l <"$root/browser.log" | tr -d ' ')" -eq 3
 grep -q -- '--label buyer --url https://buyer.test' "$root/browser.log"
+if PATH="$root/bin:$PATH" DOCKER_BIN="$root/bin/docker" SMOKE_ENV_FILE="$root/env" \
+  SMOKE_COMPOSE_FILE="$root/compose.yaml" SMOKE_BROWSER_LOG="$root/browser.log" \
+  FAKE_API_IMAGE=drlife-api:old SMOKE_API_BASE_URL=https://api.test \
+  SMOKE_BUYER_URL=https://buyer.test SMOKE_MERCHANT_URL=https://merchant.test \
+  SMOKE_SHOP_URL=https://shop.test SMOKE_BROWSER_COMMAND="$root/bin/browser-stub" \
+  "$script_dir/smoke.sh" >/dev/null 2>"$root/mismatch.log"; then
+  printf '%s\n' 'expected image mismatch to fail' >&2
+  exit 1
+fi
+grep -q 'does not match APP_RELEASE test-release' "$root/mismatch.log"
 printf '%s\n' 'staging smoke browser contract: PASS'

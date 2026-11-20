@@ -76,6 +76,13 @@ would create a `default_server` conflict.
    by `db-bootstrap`. In the test environment, the worker uses the dedicated
    `app_ledger` database role via `WORKER_DATABASE_URL`; the production design
    remains pending owner approval.
+   When publishing a new image, update the owner-managed `.env` `APP_RELEASE`
+   to that release identifier before recreating the stack; do not rely on a
+   one-off command-line override. Run `deploy/staging/smoke.sh` from the
+   staging project directory with `STAGING_ENV_FILE=.env` and
+   `STAGING_COMPOSE_FILE=compose.yaml`. If `.env` is present, the smoke checks
+   also compare the running `api` container image (`drlife-api:<release>`)
+   with `.env`'s `APP_RELEASE` and fail on a mismatch.
 
 ### Host nginx change procedure (方案 b)
 
