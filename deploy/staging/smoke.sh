@@ -12,6 +12,28 @@ command -v curl >/dev/null 2>&1 || die "curl is required"
 
 normalise_url() { printf '%s' "${1%/}"; }
 
+check_api_image_release() {
+  local env_file compose_file expected container_id actual
+  env_file=${SMOKE_ENV_FILE:-${STAGING_ENV_FILE:-.env}}
+  [[ -f "$env_file" ]] || return 0
+  compose_file=${SMOKE_COMPOSE_FILE:-${STAGING_COMPOSE_FILE:-compose.yaml}}
+  [[ -f "$compose_file" ]] || die "staging compose file is missing: $compose_file"
+  expected="$(awk -F= '$1 == "APP_RELEASE" { value=$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+#.*$/, "", value); gsub(/^"|"$/, "", value); print value; exit }' "$env_file")"
+  [[ -n "$expected" ]] || die "APP_RELEASE is required in $env_file"
+  if [[ -n "${DOCKER_BIN:-}" ]]; then
+    docker_cmd=("$DOCKER_BIN")
+  elif docker ps >/dev/null 2>&1; then
+    docker_cmd=(docker)
+  else
+    docker_cmd=(sudo docker)
+  fi
+  container_id="$("${docker_cmd[@]}" compose --env-file "$env_file" -f "$compose_file" ps -q api | sed -n '1p')"
+  [[ -n "$container_id" ]] || die 'running api container is required for image release check'
+  actual="$("${docker_cmd[@]}" inspect --format '{{.Config.Image}}' "$container_id")"
+  [[ "$actual" == "drlife-api:$expected" ]] || die "running api image $actual does not match APP_RELEASE $expected"
+  printf 'PASS: running api image matches APP_RELEASE %s\n' "$expected"
+}
+
 request_200() {
   local label="$1" url="$2" body="$3" attempt status
   for ((attempt = 1; attempt <= 3; attempt++)); do
@@ -25,6 +47,7 @@ request_200() {
 }
 
 api_base="$(normalise_url "$SMOKE_API_BASE_URL")"
+check_api_image_release
 api_body="$(mktemp)"
 request_200 "API health" "${api_base}/healthz" "$api_body"
 rm -f "$api_body"
