@@ -6,10 +6,20 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 describe("admin request refresh", () => {
   it("uses the staging API origin when the build variable is set", async () => {
     vi.stubEnv("VITE_API_BASE_URL", "https://test-api.drlifeplus.com/");
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { ok: true } }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const fetchMock = vi.fn().mockImplementation(() => new Response(JSON.stringify({ data: { ok: true } }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     await expect(requestForTest<{ ok: boolean }>("/v1/admin/audit")).resolves.toEqual({ ok: true });
     expect(fetchMock.mock.calls[0][0]).toBe("https://test-api.drlifeplus.com/v1/admin/audit");
+    expect(fetchMock.mock.calls[0][1].credentials).toBe("omit");
+  });
+
+  it("credentials cookies only for login and refresh endpoints", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => new Response(JSON.stringify({ data: { ok: true } }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    await requestForTest("/v1/admin/auth/login", { method: "POST" }, false);
+    await requestForTest("/v1/admin/auth/refresh", { method: "POST" }, false);
+    await requestForTest("/v1/admin/admins");
+    expect(fetchMock.mock.calls.map((call) => call[1].credentials)).toEqual(["include", "include", "omit"]);
   });
 
   it("refreshes once and retries a 401 request", async () => {

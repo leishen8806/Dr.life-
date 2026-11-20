@@ -15,7 +15,8 @@ export class AdminApiError extends Error {
 async function request<T>(path: string, init: RequestInit = {}, authenticated = true, retried = false): Promise<T> {
   const headers = new Headers(init.headers); headers.set("Content-Type", "application/json");
   if (authenticated && accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
-  const response = await fetch(requestUrl(path), { ...init, headers, credentials: "include" });
+  const credentials = path === "/v1/admin/auth/login" || path === "/v1/admin/auth/refresh" ? "include" : "omit";
+  const response = await fetch(requestUrl(path), { ...init, headers, credentials });
   if (response.status === 401 && authenticated && !retried && path !== "/v1/admin/auth/refresh") {
     try {
       const refresh = await request<{ access_token: string }>("/v1/admin/auth/refresh", { method: "POST", headers: { "X-Requested-With": "drlife" } }, false);
