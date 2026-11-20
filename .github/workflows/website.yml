@@ -147,7 +147,7 @@ jobs:
           {
             echo '## Website screenshot evidence'
             echo
-            echo 'Matrix: 11 widths × 3 languages × 2 pages = 66 screenshots.'
+            echo 'Matrix: 7 widths × 3 languages × 2 pages = 42 screenshots.'
             echo
             echo '```text'
             test -f apps/website/screenshots/manifest.txt && cat apps/website/screenshots/manifest.txt || true

@@ -55,7 +55,6 @@ const localizedHref = (locale: "en" | "km") => `${SITE_URL}/${locale}${pagePath 
     <link rel="preload" href="/fonts/noto-sans-khmer-ijwCs5roRME5LLRxjsRb-gssOenAyendxrgV2c-Zw-9vR1kFeg.woff2" as="font" type="font/woff2" crossorigin />
     <script is:inline>
       window.addEventListener("load", () => {
-        if (document.body.classList.contains("homepage-source-page")) return;
         const link = document.createElement("link");
         link.rel = "stylesheet";
         link.href = "/fonts/fonts.css";

@@ -7,7 +7,7 @@ import { chromium } from "playwright";
 
 const root = fileURLToPath(new URL("../dist/", import.meta.url));
 const output = fileURLToPath(new URL("../screenshots/", import.meta.url));
-const widths = [360, 390, 768, 1280, 1440, 1920];
+const widths = [360, 390, 640, 768, 1280, 1440, 1920];
 const languages = ["zh", "en", "km"];
 const pages = [{ name: "home", path: "/" }, { name: "merchant", path: "/merchant/" }];
 const sectionShots = [
@@ -55,6 +55,7 @@ await mkdir(output, { recursive: true });
 const { server, origin } = await serve();
 const browser = await chromium.launch();
 const manifest = [];
+const fontDiagnostics = [];
 
 try {
   for (const width of widths) {
@@ -87,6 +88,7 @@ try {
         });
         await page.waitForFunction(() => [...document.images].every((image) => image.complete));
         await page.evaluate(() => Promise.all([...document.images].map((image) => image.decode?.().catch(() => undefined))));
+        await page.evaluate(() => document.fonts?.ready);
         if (failedResources.length > 0) {
           throw new Error(`Screenshot page loaded failed static resources: ${failedResources.join(", ")}`);
         }
@@ -156,9 +158,7 @@ try {
           if (!geometry.navVisible || geometry.navWidth <= 0) throw new Error("Main navigation is not visible at 1920px");
           if (geometry.partnerMinWidth < 260) throw new Error(`Partner cards are too narrow: ${geometry.partnerMinWidth}px`);
           if (Math.abs(geometry.partnerLeftDelta) > 2) throw new Error(`Partner section is not aligned: ${geometry.partnerLeftDelta}px`);
-          const partnerGridIsPacked = (geometry.partnerColumns === 5 && geometry.partnerTopRows === 1)
-            || (geometry.partnerColumns === 3 && geometry.partnerTopRows === 2);
-          if (!partnerGridIsPacked || geometry.partnerBackground !== "rgba(0, 0, 0, 0)") throw new Error(`Partner grid has an empty slot: ${geometry.partnerColumns} columns / ${geometry.partnerTopRows} rows / ${geometry.partnerBackground}`);
+          if (geometry.partnerColumns !== 6 || geometry.partnerTopRows !== 2 || geometry.partnerBackground !== "rgba(0, 0, 0, 0)") throw new Error(`Partner grid has an unexpected desktop layout: ${geometry.partnerColumns} columns / ${geometry.partnerTopRows} rows / ${geometry.partnerBackground}`);
           if (Math.abs(geometry.accessLeftDelta) > 2) throw new Error(`Access grid is not aligned: ${geometry.accessLeftDelta}px`);
           if (geometry.accessColumns !== 3 || geometry.accessTopRows !== 1) throw new Error(`Access grid has an empty slot: ${geometry.accessColumns} columns / ${geometry.accessTopRows} rows`);
           if (geometry.channelMarginTop < 24) throw new Error(`Official channels lack vertical separation: ${geometry.channelMarginTop}px`);
@@ -188,6 +188,9 @@ try {
             const values = document.querySelector(".values");
             const accessSection = document.querySelector(".access-section");
             const accessGrid = document.querySelector(".access-grid");
+            const partnerCards = [...document.querySelectorAll(".partner-grid .partner")];
+            const partnerGridStyles = getComputedStyle(partnerGrid);
+            const khmerLanguageLink = document.querySelector('.language-switch a[data-language="km"], .languages a[data-language="km"]');
             return {
               sections,
               partnerLeftDelta: (partnerContainer?.getBoundingClientRect().x ?? 0) - (businessContainer?.getBoundingClientRect().x ?? 0),
@@ -204,8 +207,26 @@ try {
               valuesBackground: values ? getComputedStyle(values).backgroundColor : "",
               accessBackground: accessSection ? getComputedStyle(accessSection).backgroundColor : "",
               accessGridBackground: accessGrid ? getComputedStyle(accessGrid).backgroundColor : ""
+              ,partnerColumns: partnerGridStyles.gridTemplateColumns.split(" ").length
+              ,partnerTopRows: new Set(partnerCards.map((item) => Math.round(item.getBoundingClientRect().top))).size
+              ,partnerWidths: partnerCards.map((item) => Math.round(item.getBoundingClientRect().width))
+              ,khmerLanguageFontFamily: khmerLanguageLink ? getComputedStyle(khmerLanguageLink).fontFamily : ""
             };
           });
+          const expectedPartnerLayout = width >= 768
+            ? { columns: 6, rows: 2 }
+            : width > 520
+              ? { columns: 2, rows: 3 }
+              : { columns: 1, rows: 5 };
+          if (homepageGeometry.partnerColumns !== expectedPartnerLayout.columns || homepageGeometry.partnerTopRows !== expectedPartnerLayout.rows) {
+            throw new Error(`Partner grid layout mismatch at ${width}px (${language}): expected ${expectedPartnerLayout.columns} columns / ${expectedPartnerLayout.rows} rows, got ${homepageGeometry.partnerColumns} / ${homepageGeometry.partnerTopRows}`);
+          }
+          if (width <= 760 && new Set(homepageGeometry.partnerWidths).size !== 1) {
+            throw new Error(`Partner cards are not equal width at ${width}px (${language}): ${homepageGeometry.partnerWidths.join(",")}`);
+          }
+          if (["zh", "en"].includes(language) && !/Noto Sans Khmer/i.test(homepageGeometry.khmerLanguageFontFamily)) {
+            throw new Error(`Khmer language switch is not using Noto Sans Khmer at ${width}px (${language}): ${homepageGeometry.khmerLanguageFontFamily}`);
+          }
           for (const section of homepageGeometry.sections) {
             if (section.left > 1 || section.right < width - 1) throw new Error(`Homepage section is not full-bleed at ${width}px (${language}): ${section.selector} ${section.left}..${section.right}`);
           }
@@ -219,16 +240,28 @@ try {
             throw new Error(`Header navigation overlaps actions at ${width}px (${language})`);
           }
           if ([1440, 1920].includes(width)) {
-            const navLink = page.locator(".nav a").first();
+            const navLink = page.locator(".nav > a").first();
             const appLink = page.locator(".nav-apps");
             if (!(await navLink.isVisible()) || !(await appLink.isVisible())) {
               throw new Error(`Desktop navigation or App entry is hidden at ${width}px (${language})`);
             }
-          } else if (width === 1280) {
+          } else if (pageDefinition.name === "home" && ([1280, 700].includes(width) || width < 700)) {
             const menuToggle = page.locator(".menu-toggle");
-            if (!(await menuToggle.isVisible())) {
-              throw new Error(`Compact navigation toggle is hidden at ${width}px (${language})`);
+            const menuToggleBox = await menuToggle.boundingBox();
+            if (!menuToggleBox || menuToggleBox.width <= 0 || menuToggleBox.height <= 0
+              || menuToggleBox.x < 0 || menuToggleBox.x + menuToggleBox.width > width) {
+              throw new Error(`Mobile menu button is not visible in the viewport at ${width}px (${language})`);
             }
+            await menuToggle.click();
+            const openNav = page.locator("#site-nav[data-open='true']");
+            if (!(await openNav.isVisible())) throw new Error(`Mobile navigation did not open at ${width}px (${language})`);
+            const appLink = openNav.locator("a.nav-apps");
+            const mainLinks = openNav.locator("a:not(.nav-apps):not(.nav-cta)");
+            if (!(await appLink.isVisible()) || await mainLinks.count() < 4) {
+              throw new Error(`Mobile navigation lacks the main navigation items or App entry at ${width}px (${language})`);
+            }
+            await menuToggle.click();
+            if (await openNav.isVisible()) throw new Error(`Mobile navigation did not close at ${width}px (${language})`);
           }
           if (width >= 1441) {
             const desktopNav = page.locator(".nav a").first();
@@ -266,6 +299,29 @@ try {
           if ([1440, 1920].includes(width) && homepageGeometry.partnerGap < 64) {
             throw new Error(`Partner cards touch the app section at ${width}px (${language}): ${homepageGeometry.partnerGap}px gap`);
           }
+          const partnerLinks = page.locator('.partner-grid .partner .text-link');
+          if (await partnerLinks.count() < 4) {
+            throw new Error(`Expected at least four partner contact links at ${width}px (${language})`);
+          }
+          for (let index = 0; index < 4; index += 1) {
+            const partnerLink = partnerLinks.nth(index);
+            if (!(await partnerLink.isVisible()) || !String(await partnerLink.getAttribute("href")).endsWith("/contact")) {
+              throw new Error(`Partner contact link ${index + 1} is missing or points away from /contact at ${width}px (${language})`);
+            }
+          }
+        }
+        if (pageDefinition.name === "home" && language === "km") {
+          const khmerFont = await page.evaluate(() => ({
+            documentFontsStatus: document.fonts.status,
+            notoSansKhmer: [...document.fonts]
+              .filter((font) => /Noto Sans Khmer/i.test(font.family))
+              .map((font) => ({ family: font.family, status: font.status, weight: font.weight, style: font.style })),
+            bodyFontFamily: getComputedStyle(document.body).fontFamily
+          }));
+          fontDiagnostics.push({ width, path: url.pathname, ...khmerFont });
+          if (!khmerFont.notoSansKhmer.some((font) => font.status === "loaded") || !/Noto Sans Khmer/i.test(khmerFont.bodyFontFamily)) {
+            throw new Error(`Khmer font is not active at ${width}px: ${JSON.stringify(khmerFont)}`);
+          }
         }
         await page.waitForTimeout(150);
         const relative = posix.join(String(width), language, `${pageDefinition.name}.png`);
@@ -292,6 +348,7 @@ try {
 
 const evidenceHead = process.env.EVIDENCE_HEAD;
 await writeFile(join(output, "manifest.txt"), `${evidenceHead ? `head=${evidenceHead}\n` : ""}${manifest.join("\n")}\n`, "utf8");
+await writeFile(join(output, "font-diagnostics.json"), `${JSON.stringify(fontDiagnostics, null, 2)}\n`, "utf8");
 const expected = widths.length * languages.length * pages.length + 2 * languages.length * sectionShots.length;
 if (manifest.length !== expected) throw new Error(`Expected ${expected} screenshots, captured ${manifest.length}`);
 console.log(`Captured ${manifest.length} screenshots in ${output}`);
