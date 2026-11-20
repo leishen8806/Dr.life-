@@ -66,3 +66,19 @@ func TestFileWorkerLoginUsesOnlyThePromotionRole(t *testing.T) {
 		t.Fatalf("file worker role = %+v, want ops_file_worker / FILE_WORKER_DB_PASSWORD", *found)
 	}
 }
+
+func TestServerLoginUsesOnlyTheCmdServerRole(t *testing.T) {
+	var found *role
+	for i := range roles {
+		if roles[i].login == "app_server" {
+			found = &roles[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("app_server login is not provisioned")
+	}
+	if *found != (role{login: "app_server", permission: "server_rw", passwordEnv: "SERVER_DB_PASSWORD"}) {
+		t.Fatalf("server login role = %+v, want server_rw / SERVER_DB_PASSWORD", *found)
+	}
+}

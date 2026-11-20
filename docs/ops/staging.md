@@ -75,15 +75,17 @@ would create a `default_server` conflict.
    PostgreSQL migration credential in `.env`; application URLs use roles created
    by `db-bootstrap`. The current `cmd/server` main pool behind `DATABASE_URL`
    is shared by catalog, trade, `ops.file`/`ops.file_reference`, and comms,
-   so a single design role does not cover every schema. `app_catalog` is only
-   sufficient for the catalog projection; the test environment's temporary
-   `app_ops` grants must remain until the owner chooses the final design. Do not
-   switch `.env` to `app_catalog` or revoke the temporary `app_ops` grants until
-   that decision is recorded. The two options are separate module pools (as
-   with `IAM_DATABASE_URL`) or a dedicated `cmd/server` role with the minimum
-   privileges for all four schema areas. In the test environment, the worker
-   uses the dedicated `app_ledger` database role via `WORKER_DATABASE_URL`; the
-   production design remains pending owner approval.
+   so a single module role does not cover every schema. The owner selected
+   option B: `DATABASE_URL` uses the dedicated `app_server` role, whose
+   `server_rw` membership covers only the catalog, trade,
+   `ops.file`/`ops.file_reference`, and comms paths used by `cmd/server`; it has
+   no ledger or iam access. In the test environment, switch `.env` to
+   `app_server` only after rebuilding `api` and `worker` from the merged release
+   and rerunning the smoke checks. Revoke the temporary `app_ops` grants only as
+   the final step. If any rebuild or smoke check fails, restore the previous
+   `.env` value and keep the temporary grants until the owner reviews the
+   failure. The worker uses the dedicated `app_ledger` database role via
+   `WORKER_DATABASE_URL`.
    When publishing a new image, update the owner-managed `.env` `APP_RELEASE`
    to that release identifier before recreating the stack; do not rely on a
    one-off command-line override. Run `deploy/staging/smoke.sh` from the

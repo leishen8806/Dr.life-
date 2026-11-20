@@ -281,7 +281,7 @@ func TestHTTPClientCircuitAllowsOneHalfOpenProbe(t *testing.T) {
 	})
 	config := validConfig(CreateServiceLower)
 	config.CircuitFailures = 1
-	config.CircuitOpenFor = time.Millisecond
+	config.CircuitOpenFor = 200 * time.Millisecond
 	client, err := NewHTTPClient(config, &http.Client{Transport: transport})
 	if err != nil {
 		t.Fatal(err)
@@ -289,7 +289,7 @@ func TestHTTPClientCircuitAllowsOneHalfOpenProbe(t *testing.T) {
 	intent := Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"}
 	_, _ = client.Create(context.Background(), intent)
 	_, _ = client.Create(context.Background(), intent)
-	time.Sleep(5 * time.Millisecond)
+	time.Sleep(250 * time.Millisecond)
 	if _, err := client.Create(context.Background(), intent); err != nil {
 		t.Fatalf("half-open probe error = %v", err)
 	}
