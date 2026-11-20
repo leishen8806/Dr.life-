@@ -73,7 +73,9 @@ would create a `default_server` conflict.
 5. Start the stack. The API health check is `/healthz`; worker and routefitmock
    are separate processes. The migration connection uses the owner-managed
    PostgreSQL migration credential in `.env`; application URLs use roles created
-   by `db-bootstrap`. In the test environment, the worker uses the dedicated
+   by `db-bootstrap`. `DATABASE_URL` uses the `app_catalog` role because
+   `cmd/server` serves catalog reads/writes and its narrow IAM projection;
+   `app_ops` is reserved for the ops schema. In the test environment, the worker uses the dedicated
    `app_ledger` database role via `WORKER_DATABASE_URL`; the production design
    remains pending owner approval.
    When publishing a new image, update the owner-managed `.env` `APP_RELEASE`
@@ -82,7 +84,9 @@ would create a `default_server` conflict.
    staging project directory with `STAGING_ENV_FILE=.env` and
    `STAGING_COMPOSE_FILE=compose.yaml`. If `.env` is present, the smoke checks
    also compare the running `api` container image (`drlife-api:<release>`)
-   with `.env`'s `APP_RELEASE` and fail on a mismatch.
+   with `.env`'s `APP_RELEASE` and fail on a mismatch. For a freshly migrated
+   empty database, set `SMOKE_EXPECT_EMPTY_CATALOG=1`; the smoke then asserts
+   both public catalog endpoints return HTTP 200 with `items: []` and `total: 0`.
 
 ### Host nginx change procedure (方案 b)
 
