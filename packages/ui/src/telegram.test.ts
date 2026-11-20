@@ -18,7 +18,7 @@ vi.mock("@telegram-apps/sdk", () => ({
 import { getTelegramEnvironment, resolveMiniAppColorScheme, watchTelegramTheme } from "./telegram";
 
 describe("Telegram theme mapping", () => {
-  it("returns a no-op cleanup when the Telegram theme subscription is unavailable", () => {
+  it("returns a no-op cleanup outside Telegram before SDK initialization", () => {
     const listener = vi.fn();
     mocks.isDark.sub.mockReturnValueOnce(undefined);
     const cleanup = watchTelegramTheme(listener);

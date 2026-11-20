@@ -1,12 +1,13 @@
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const output = fileURLToPath(new URL("../screenshots-miniapp/", import.meta.url));
-const matrix = [360, 430].flatMap((width) =>
+const matrix = [390, 1440].flatMap((width) =>
   ["light", "dark"].flatMap((theme) =>
     ["zh", "en", "km"].map((language) => ({ width, theme, language }))
   )
@@ -49,6 +50,20 @@ const json = (data) => ({
 });
 
 async function installMockApi(page, language, app) {
+  const merchantOrder = {
+    public_id: "01EVIDENCEMERCHANTORDER",
+    parent_public_id: "01EVIDENCEORDER",
+    status: "shipped",
+    items: [{ sku_public_id: "SKU-1", quantity: 2, unit_price_e4: 95000, line_total_e4: 190000 }],
+    shipping_address_public_id: "01EVIDENCEADDRESS",
+    shipping_address: { recipient_name: "Buyer", address_text: "Phnom Penh", phone: "****1234" },
+    goods_amount_e4: 190000,
+    shipping_amount_e4: 0,
+    payable_amount_e4: 190000,
+    shipping_quote_expires_at: "2026-11-15T10:00:00Z",
+    created_at: "2026-11-14T09:00:00Z",
+    updated_at: "2026-11-14T09:01:00Z"
+  };
   await page.route("**/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -127,7 +142,11 @@ async function installMockApi(page, language, app) {
       return;
     }
     if (path === "/v1/merchant/suborders" && request.method() === "GET") {
-      await route.fulfill(json({ items: [], next_cursor: null }));
+      await route.fulfill(json({ items: [merchantOrder], next_cursor: null }));
+      return;
+    }
+    if (path === "/v1/merchant/suborders/01evidencemerchantorder" && request.method() === "GET") {
+      await route.fulfill(json(merchantOrder));
       return;
     }
     if (path.endsWith("/me/notifications") && request.method() === "GET") {
@@ -157,22 +176,107 @@ async function waitForBusinessPage(page, app) {
   await page.locator(app === "buyer" ? ".buyer-page" : ".mini-shell").waitFor({ state: "visible", timeout: 10_000 });
 }
 
+async function assertKhmerFont(page, context) {
+  const sample = "ខ្មែរ សូមស្វាគមន៍";
+  const result = await page.evaluate(async (text) => {
+    const font = '16px "Noto Sans Khmer"';
+    await document.fonts.load(font, text);
+    await document.fonts.load(font, "ក្រ");
+    await document.fonts.ready;
+    const loaded = document.fonts.check(font, text) && document.fonts.check(font, "ក្រ");
+    const measure = (value) => {
+      const probe = document.createElement("span");
+      probe.lang = "km";
+      probe.textContent = value;
+      probe.style.cssText = "position:absolute;left:-9999px;white-space:nowrap;font:16px \"Noto Sans Khmer\", sans-serif";
+      document.body.append(probe);
+      const width = probe.getBoundingClientRect().width;
+      const fontFamily = getComputedStyle(probe).fontFamily;
+      probe.remove();
+      return { width, fontFamily };
+    };
+    const sampleMeasurement = measure(text);
+    const platformProbe = document.createElement("span");
+    platformProbe.id = "khmer-font-probe";
+    platformProbe.lang = "km";
+    platformProbe.textContent = text;
+    platformProbe.style.cssText = "position:absolute;left:-9999px;white-space:nowrap;font:16px \"Noto Sans Khmer\", sans-serif";
+    document.body.append(platformProbe);
+    const clusterWidth = measure("ក្រ").width;
+    const baseWidth = measure("ក").width;
+    const partsWidth = baseWidth + measure("រ").width;
+    return { loaded, width: sampleMeasurement.width, clusterWidth, baseWidth, partsWidth, fontFamily: sampleMeasurement.fontFamily };
+  }, sample);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("DOM.enable");
+  await cdp.send("CSS.enable");
+  const { root } = await cdp.send("DOM.getDocument");
+  const { nodeId } = await cdp.send("DOM.querySelector", { nodeId: root.nodeId, selector: "#khmer-font-probe" });
+  const { fonts } = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
+  const platformFont = fonts.find(({ familyName, glyphCount }) => familyName.includes("Noto Sans Khmer") && glyphCount > 0);
+  const shaped = Boolean(platformFont) && result.clusterWidth <= result.partsWidth * 1.05 && result.clusterWidth >= result.baseWidth * 0.8;
+  await page.evaluate(() => document.querySelector("#khmer-font-probe")?.remove());
+  if (!result.loaded || result.width <= 0 || !result.fontFamily.includes("Noto Sans Khmer") || !shaped) {
+    throw new Error(`Khmer font check failed for ${context}: loaded=${result.loaded}, width=${result.width}, clusterWidth=${result.clusterWidth}, baseWidth=${result.baseWidth}, partsWidth=${result.partsWidth}, fontFamily=${result.fontFamily}, platformFonts=${fonts.map(({ familyName, glyphCount }) => `${familyName}:${glyphCount}`).join("|")}`);
+  }
+  return { ...result, shaped, platformFont: { familyName: platformFont.familyName, glyphCount: platformFont.glyphCount } };
+}
+
+async function assertMerchantBackSpacing(page, context) {
+  const spacing = await page.evaluate(() => {
+    const header = document.querySelector(".drl-app-header");
+    const back = document.querySelector(".merchant-back");
+    if (!header || !back) return null;
+    const headerRect = header.getBoundingClientRect();
+    const backRect = back.getBoundingClientRect();
+    return { gap: backRect.top - headerRect.bottom };
+  });
+  if (!spacing || spacing.gap < 8 || spacing.gap > 12) {
+    throw new Error(`Merchant back spacing failed for ${context}: gap=${spacing?.gap ?? "missing"}`);
+  }
+  return spacing;
+}
+
+const inspectPng = async (path) => {
+  const bytes = await readFile(path);
+  if (bytes.toString("ascii", 1, 4) !== "PNG") throw new Error(`not a PNG: ${path}`);
+  return {
+    width: bytes.readUInt32BE(16),
+    height: bytes.readUInt32BE(20),
+    sha256: createHash("sha256").update(bytes).digest("hex")
+  };
+};
+
 await mkdir(output, { recursive: true });
 const servers = [start("buyer", 5173), start("merchant", 5174)];
 try {
   await Promise.all(servers.map(({ port }) => waitFor(port)));
   const browser = await chromium.launch();
   const manifest = [];
+  const hashesByScreen = new Map();
   try {
     for (const app of ["buyer", "merchant"]) {
       const port = app === "buyer" ? 5173 : 5174;
       for (const item of matrix) {
         const page = await browser.newPage({ viewport: { width: item.width, height: 900 }, colorScheme: item.theme });
+        const khmerFontResponses = [];
+        page.on("response", (response) => {
+          if (response.url().includes("noto-sans-khmer")) khmerFontResponses.push(response);
+        });
         await page.addInitScript((language) => localStorage.setItem("drlife_lang", language), item.language);
         await installMockApi(page, item.language, app);
         const url = `http://127.0.0.1:${port}/${launchParams(item.theme, item.language)}`;
         await page.goto(url, { waitUntil: "networkidle" });
         await waitForBusinessPage(page, app);
+        const khmerFont = item.language === "km"
+          ? await assertKhmerFont(page, `${app}-${item.width}-${item.theme}`)
+          : null;
+        if (item.language === "km") {
+          const response = khmerFontResponses.find((entry) => entry.url().includes("IFeh7j.woff2"));
+          if (!response || response.status() !== 200) {
+            throw new Error(`Khmer font resource check failed for ${app}-${item.width}-${item.theme}: expected IFeh7j.woff2 HTTP 200`);
+          }
+        }
         const bodyBackground = await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
         const expectedBackground = item.theme === "dark" ? "rgb(17, 18, 16)" : "rgb(246, 242, 233)";
         if (bodyBackground !== expectedBackground) {
@@ -207,6 +311,16 @@ try {
           } }
         ] : [
           { name: "home" },
+          { name: "merchant-orders-list", open: async () => {
+            await page.locator(".merchant-orders-action").click();
+            await page.locator(".merchant-orders").waitFor({ state: "visible", timeout: 5_000 });
+          } },
+          { name: "merchant-orders-detail", open: async () => {
+            await page.locator(".merchant-orders-action").click();
+            await page.locator(".merchant-orders").waitFor({ state: "visible", timeout: 5_000 });
+            await page.locator(".merchant-order-item").first().click();
+            await page.locator(".merchant-order-detail__heading").waitFor({ state: "visible", timeout: 5_000 });
+          }, assertMerchantBackSpacing: true },
           { name: "merchant-profile", open: async () => {
             await page.getByRole("button", { name: /profile|workspace|我的|商家工作台|កន្លែងធ្វើការអ្នកលក់|โปรไฟล์/i }).last().click();
             await page.locator(".merchant-v4").waitFor({ state: "visible", timeout: 5_000 });
@@ -234,21 +348,38 @@ try {
           await page.goto(url, { waitUntil: "networkidle" });
           await waitForBusinessPage(page, app);
           if (target.open) await target.open();
+          const merchantBackSpacing = app === "merchant" && target.assertMerchantBackSpacing
+            ? await assertMerchantBackSpacing(page, `${app}-${item.width}-${item.theme}`)
+            : null;
           const title = await page.title();
           if (/login|error|invalid/i.test(title)) throw new Error(`unexpected Mini App title: ${title}`);
           const headingSelector = app === "buyer"
             ? (target.name === "home" ? ".buyer-section__title" : target.name === "profile" ? ".profile-hero h1" : target.name === "wallet" ? ".wallet-page h1" : target.name === "notifications" ? ".buyer-section__title" : ".buyer-order-list, .buyer-order-detail__heading")
-            : target.name === "home" ? "h1" : target.name === "merchant-notifications" ? ".merchant-v7 h1" : ".merchant-v4 h1, .merchant-v4__section h2";
+            : target.name === "home" ? "h1" : target.name === "merchant-notifications" ? ".merchant-v7 h1" : target.name.startsWith("merchant-orders-") ? ".merchant-orders, .merchant-order-detail__heading" : ".merchant-v4 h1, .merchant-v4__section h2";
           const pageHeading = await page.locator(headingSelector).first().textContent();
           if (!pageHeading?.trim()) throw new Error(`missing business page heading for ${app}-${target.name}-${item.language}`);
           const name = `${app}-${target.name}-${item.width}-${item.theme}-${item.language}.png`;
-          await page.screenshot({ path: join(output, name), fullPage: true });
-          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}`);
+          const screenshotPath = join(output, name);
+          await page.screenshot({ path: screenshotPath, fullPage: true });
+          const image = await inspectPng(screenshotPath);
+          if (item.width === 390 && image.width !== 390) {
+            throw new Error(`390px evidence has wrong width for ${name}: ${image.width}`);
+          }
+          const screenKey = `${app}-${target.name}-${item.width}-${item.theme}`;
+          const screenHashes = hashesByScreen.get(screenKey) ?? new Map();
+          screenHashes.set(item.language, image.sha256);
+          hashesByScreen.set(screenKey, screenHashes);
+          manifest.push(`${name}\t${title || "untitled"}\t${pageHeading.trim()}\twidth=${image.width}\theight=${image.height}\tsha256=${image.sha256}\tkhmerFont=${khmerFont ? `loaded:${khmerFont.loaded},shaped:${khmerFont.shaped},width:${khmerFont.width},clusterWidth:${khmerFont.clusterWidth},baseWidth:${khmerFont.baseWidth},partsWidth:${khmerFont.partsWidth},fontFamily:${khmerFont.fontFamily},platform:${khmerFont.platformFont.familyName},glyphs:${khmerFont.platformFont.glyphCount}` : "n/a"}\tmerchantBackSpacing=${merchantBackSpacing ? `gap:${merchantBackSpacing.gap}` : "n/a"}`);
         }
         await page.close();
       }
     }
   } finally { await browser.close(); }
+  for (const [screenKey, hashes] of hashesByScreen) {
+    if (hashes.size !== 3 || new Set(hashes.values()).size !== 3) {
+      throw new Error(`localized screenshot hashes must differ for ${screenKey}`);
+    }
+  }
   const head = process.env.EVIDENCE_HEAD;
   await writeFile(join(output, "manifest.txt"), `${head ? `head=${head}\n` : ""}${manifest.join("\n")}\n`);
   console.log(`Captured ${manifest.length} Mini App screenshots in ${output}`);

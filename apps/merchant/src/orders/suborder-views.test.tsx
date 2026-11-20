@@ -30,7 +30,8 @@ describe("merchant sub-order views", () => {
     const styles = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
     const start = styles.indexOf(".merchant-back");
     const block = styles.slice(start, styles.indexOf("}", start));
-    expect(block).toContain("margin-bottom: var(--drl-space-2)");
+    expect(block).toContain("display: block");
+    expect(block).toContain("margin-block: var(--drl-space-3)");
   });
 
   it("filters the interface-stub list by status", () => {

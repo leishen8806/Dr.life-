@@ -1,7 +1,6 @@
 #root {
   min-height: 100vh;
 }
-
 .merchant-v4 { display: grid; gap: var(--drl-space-3); }
 .merchant-v4__hero { display: grid; gap: var(--drl-space-1); padding: var(--drl-space-4); border-radius: var(--drl-radius-lg); color: var(--drl-color-text-on-brand); background: var(--drl-color-brand); }
 .merchant-v4__hero p, .merchant-v4__hero h1, .merchant-v4__hero span { margin: 0; overflow-wrap: anywhere; }
@@ -203,7 +202,8 @@ footer {
 }
 
 .merchant-back {
-  margin-bottom: var(--drl-space-2);
+  display: block;
+  margin-block: var(--drl-space-3);
 }
 
 .merchant-order-filters > * {
@@ -299,3 +299,22 @@ footer {
   border-top: 1px solid var(--drl-color-border);
   font-weight: 700;
 }
+
+@font-face {
+  font-family: "Noto Sans Khmer";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/noto-sans-khmer-ijwCs5roRME5LLRxjsRb-gssOenAyendxrgV2c-Zw-9vR1IFeh7j.woff2") format("woff2");
+  unicode-range: U+1780-17FF, U+19E0-19FF, U+200C-200D, U+25CC;
+}
+
+@font-face {
+  font-family: "Noto Sans Khmer";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/noto-sans-khmer-ijwCs5roRME5LLRxjsRb-gssOenAyendxrgV2c-Zw-9vR1kFeg.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+

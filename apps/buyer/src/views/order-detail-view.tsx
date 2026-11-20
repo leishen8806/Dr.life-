@@ -73,9 +73,9 @@ export function OrderDetailView({
               <span className="buyer-order-status">{t(`order.buyerStatus.${subOrder.status}` as const)}</span>
             </div>
             <p className="buyer-order-detail__meta">{t("order.subOrder")}</p>
-            <p className="buyer-order-detail__meta">{t("order.paymentStatus")}: {t(`order.payment.${order.value.paymentStatus}` as const)}</p>
+            <p className="buyer-order-detail__meta buyer-order-detail__payment-status">{t("order.paymentStatus")}: {t(`order.payment.${order.value.paymentStatus}` as const)}</p>
             {order.value.paymentStatus === "confirming" && <p className="buyer-order-warning">{t("order.paymentConfirming")}</p>}
-            <h3 className="buyer-section__title">{t("order.itemsTitle")}</h3>
+            <h3 className="buyer-section__title buyer-order-detail__items-title">{t("order.itemsTitle")}</h3>
             <div className="buyer-order-lines">
               {subOrder.lines.map((line, lineIndex) => (
                 <div className="buyer-order-line" key={line.publicId}>
@@ -101,12 +101,12 @@ export function OrderDetailView({
               </p>
             )}
             {subOrder.events.length > 0 && <>
-              <h3 className="buyer-section__title">{t("order.delivery")}</h3>
-              <ol className="buyer-order-events">
+              <h3 className="buyer-section__title buyer-order-detail__delivery-title">{t("order.delivery")}</h3>
+              <ol className="buyer-order-events" lang={language}>
                 {subOrder.events.map((event) => (
                   <li key={`${event.label}-${event.at}`}>
                     <strong>{t(`order.buyerStatus.${event.label}` as const)}</strong>
-                    <small>{event.at.slice(0, 10)}</small>
+                    <small lang={language}>{event.at.slice(0, 10)}</small>
                   </li>
                 ))}
               </ol>

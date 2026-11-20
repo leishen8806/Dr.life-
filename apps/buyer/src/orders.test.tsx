@@ -72,6 +72,33 @@ describe("buyer order views", () => {
     expect(text(markup)).toContain("配送进度");
   });
 
+  it("uses the complete three-language singular and plural item keys", () => {
+    const source = mockOrders[0]!;
+    const baseLine = source.subOrders[0]!.lines[0]!;
+    const pluralOrder = {
+      ...source,
+      subOrders: [{
+        ...source.subOrders[0]!,
+        lines: [
+          { ...baseLine, publicId: "one", quantity: "1", unit: "item" },
+          { ...baseLine, publicId: "many", quantity: "2", unit: "item" }
+        ]
+      }]
+    };
+    for (const language of ["zh", "en", "km"] as const) {
+      const rendered = text(renderToStaticMarkup(
+        <OrderDetailView
+          t={translator(language)}
+          language={language}
+          order={{ status: "ready", value: pluralOrder }}
+          onBack={() => undefined}
+        />
+      ));
+      expect(rendered).toContain(translate("order.unit.item.one", { count: 1 }, language));
+      expect(rendered).toContain(translate("order.unit.item.other", { count: 2 }, language));
+    }
+  });
+
   it("shows the confirming payment guard without a payment action", () => {
     const markup = renderToStaticMarkup(
       <OrderDetailView
