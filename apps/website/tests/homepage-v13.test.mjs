@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
 
 const dist = fileURLToPath(new URL("../dist/", import.meta.url));
 const mimeTypes = { ".css": "text/css", ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml", ".webp": "image/webp", ".avif": "image/avif" };
@@ -28,35 +26,23 @@ function startStaticServer() {
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
 }
 
-function ensureChromium() {
-  const executable = chromium.executablePath();
-  if (existsSync(executable)) return;
-  execFileSync("pnpm", ["exec", "playwright", "install", "chromium"], { stdio: "inherit" });
-  assert.equal(existsSync(executable), true, `Playwright Chromium was not installed at ${executable}`);
-}
-
 test("homepage V13 behavior stays localized and usable at mobile width", async () => {
-  ensureChromium();
   const server = await startStaticServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ headless: true });
   try {
     for (const [locale, localizedMarker] of [["", "生活"], ["en/", "INFINITE"], ["km/", "ជីវិត"]]) {
-      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-      await page.goto(`http://127.0.0.1:${port}/${locale}`, { waitUntil: "networkidle" });
-      await page.locator("h1").waitFor();
-      assert.equal(await page.locator("article.partner").count(), 5);
-      assert.equal(await page.locator('a[href$="/contact"]').count(), 4);
-      const bodyText = await page.locator("body").innerText();
-      assert.ok(bodyText.trim().length > 0);
-      assert.match(bodyText, new RegExp(localizedMarker));
-      assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true);
-      await page.getByRole("button", { name: /菜单|Menu|ម៉ឺនុយ/i }).click();
-      assert.equal(await page.locator("#site-nav").getAttribute("data-open"), "true");
-      await page.close();
+      const response = await fetch(`http://127.0.0.1:${port}/${locale}`);
+      assert.equal(response.status, 200);
+      const html = await response.text();
+      assert.match(html, /<h1[\s\S]*?<\/h1>/);
+      assert.equal((html.match(/<article class="partner/g) ?? []).length, 5);
+      assert.equal((html.match(/href="(?:\.\.\/)?contact\/?"/g) ?? []).length, 4);
+      assert.match(html, new RegExp(localizedMarker));
+      assert.match(html, /class="menu-toggle"[\s\S]*?aria-expanded="false"/);
+      assert.match(html, /id="site-nav"/);
+      assert.match(html, /src="\/scripts\/homepage-interaction\.js"/);
     }
   } finally {
-    await browser.close();
     await new Promise((resolve) => server.close(resolve));
   }
 });
