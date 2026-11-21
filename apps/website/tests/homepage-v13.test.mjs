@@ -41,7 +41,7 @@ test("homepage V13 behavior stays localized and usable at mobile width", async (
       const bodyText = await page.locator("body").innerText();
       assert.ok(bodyText.trim().length > 0);
       assert.match(bodyText, new RegExp(localizedMarker));
-      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+      assert.equal(await page.evaluate(() => globalThis.document.documentElement.scrollWidth <= globalThis.innerWidth), true);
       await page.getByRole("button", { name: /菜单|Menu|ម៉ឺនុយ/i }).click();
       assert.equal(await page.locator("#site-nav").getAttribute("data-open"), "true");
       await page.close();
