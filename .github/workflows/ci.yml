@@ -230,6 +230,7 @@ jobs:
         run: |
           if [[ -f pnpm-workspace.yaml ]]; then
             pnpm install --frozen-lockfile
+            pnpm --filter @drlife/website exec node "$GITHUB_WORKSPACE/deploy/staging/smoke-browser.mjs" --self-check
             pnpm -r typecheck
             pnpm -r build
             pnpm -r i18n:check
