@@ -289,7 +289,11 @@ func TestHTTPClientCircuitAllowsOneHalfOpenProbe(t *testing.T) {
 	intent := Intent{TradeNo: "DRL-01", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller"}
 	_, _ = client.Create(context.Background(), intent)
 	_, _ = client.Create(context.Background(), intent)
-	time.Sleep(250 * time.Millisecond)
+	// Expire the circuit explicitly instead of sleeping past the configured
+	// window. The test is about the half-open probe transition; depending on
+	// scheduler timing, a real-time sleep can either make the test needlessly
+	// slow or leave it racing the deadline under load.
+	client.openUntil = time.Now().Add(-time.Millisecond)
 	if _, err := client.Create(context.Background(), intent); err != nil {
 		t.Fatalf("half-open probe error = %v", err)
 	}
