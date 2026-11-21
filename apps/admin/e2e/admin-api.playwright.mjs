@@ -21,8 +21,8 @@ const waitForServer = async () => {
 };
 
 await waitForServer();
-const chromePath = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const browser = await chromium.launch(existsSync(chromePath) ? { executablePath: chromePath } : {});
+const chromePath = process.env.CHROME_PATH;
+const browser = await chromium.launch(chromePath && existsSync(chromePath) ? { executablePath: chromePath } : {});
 try {
   const page = await browser.newPage();
   await page.route(/\/v1\/admin\/auth\/refresh/, (route) => route.fulfill({ json: { data: { access_token: "e2e-token" } } }));
