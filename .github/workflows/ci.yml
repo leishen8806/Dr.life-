@@ -121,6 +121,13 @@ jobs:
         # an early process exit from reaping containers still used by a
         # sibling package.
         run: go test -race -count=1 -p 1 -skip '^TestDatabaseFramework$' ./...
+      - name: Repeat previously flaky tests
+        working-directory: backend
+        run: |
+          go test -count=20 -p 1 ./internal/catalog -run '^TestCatalogMigration$'
+          go test -count=20 -p 1 ./internal/comms/notifications -run '^TestPostgresRepositoryKeepsBuyerAndMerchantRecipientsIndependent$'
+          go test -count=20 -p 1 ./internal/files -run '^TestCleanupPostgresAndRustFS$'
+          go test -race -count=20 ./internal/trade/kess -run '^TestHTTPClientCircuitAllowsOneHalfOpenProbe$'
 
   backend-integration:
     needs: changes
