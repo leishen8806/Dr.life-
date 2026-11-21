@@ -4,6 +4,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; export PATH
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 script_dir=$(cd -- "$(dirname "$0")" && pwd)
+grep -q '^SERVER_DB_PASSWORD=CHANGE_ME$' "$script_dir/env.example"
 for app in buyer merchant admin; do
   mkdir -p "$root/$app/incoming/r1" "$root/$app/releases"
   printf '%s\n' "$app" > "$root/$app/incoming/r1/index.html"

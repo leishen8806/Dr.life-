@@ -17,7 +17,7 @@ describe("admin request refresh", () => {
     const fetchMock = vi.fn().mockImplementation(() => new Response(JSON.stringify({ data: { ok: true } }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     await requestForTest("/v1/admin/auth/login", { method: "POST" }, false);
-    await requestForTest("/v1/admin/auth/refresh", { method: "POST" }, false);
+    await requestForTest("/v1/admin/auth/refresh?source=retry", { method: "POST" }, false);
     await requestForTest("/v1/admin/admins");
     expect(fetchMock.mock.calls.map((call) => call[1].credentials)).toEqual(["include", "include", "omit"]);
   });

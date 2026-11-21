@@ -15,17 +15,33 @@ normalise_url() { printf '%s' "${1%/}"; }
 check_api_image_release() {
   local env_file compose_file expected container_id actual
   env_file=${SMOKE_ENV_FILE:-${STAGING_ENV_FILE:-.env}}
-  [[ -f "$env_file" ]] || return 0
+  if [[ ! -f "$env_file" ]]; then
+    [[ "${SMOKE_REQUIRE_RELEASE_CHECK:-}" == "1" ]] && die "APP_RELEASE check requires env file: $env_file"
+    return 0
+  fi
   compose_file=${SMOKE_COMPOSE_FILE:-${STAGING_COMPOSE_FILE:-compose.yaml}}
   [[ -f "$compose_file" ]] || die "staging compose file is missing: $compose_file"
-  expected="$(awk -F= '$1 == "APP_RELEASE" { value=$2; sub(/^[[:space:]]+/, "", value); sub(/[[:space:]]+#.*$/, "", value); gsub(/^"|"$/, "", value); print value; exit }' "$env_file")"
+  expected="$(awk -F= '
+    $1 ~ /^[[:space:]]*(export[[:space:]]+)?APP_RELEASE[[:space:]]*$/ {
+      value = $2
+      sub(/\r$/, "", value)
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+#.*$/, "", value)
+      if ((substr(value, 1, 1) == "\"" && substr(value, length(value), 1) == "\"") ||
+          (substr(value, 1, 1) == "\047" && substr(value, length(value), 1) == "\047")) {
+        value = substr(value, 2, length(value) - 2)
+      }
+      print value
+      exit
+    }
+  ' "$env_file")"
   [[ -n "$expected" ]] || die "APP_RELEASE is required in $env_file"
   if [[ -n "${DOCKER_BIN:-}" ]]; then
     docker_cmd=("$DOCKER_BIN")
   elif docker ps >/dev/null 2>&1; then
     docker_cmd=(docker)
   else
-    docker_cmd=(sudo docker)
+    docker_cmd=(sudo -n docker)
   fi
   container_id="$("${docker_cmd[@]}" compose --env-file "$env_file" -f "$compose_file" ps -q api | sed -n '1p')"
   [[ -n "$container_id" ]] || die 'running api container is required for image release check'

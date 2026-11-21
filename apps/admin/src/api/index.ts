@@ -1,6 +1,7 @@
 import type { AdminApi, AdminUserRecord, AuditRecord, OrderRecord, RecordStatus, ReviewList, ReviewRecord } from "./types";
 
 let accessToken: string | undefined;
+export const CREDENTIAL_PATHS = ["/v1/admin/auth/login", "/v1/admin/auth/refresh"] as const;
 
 function requestUrl(path: string): string {
   const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, "") ?? "";
@@ -15,7 +16,7 @@ export class AdminApiError extends Error {
 async function request<T>(path: string, init: RequestInit = {}, authenticated = true, retried = false): Promise<T> {
   const headers = new Headers(init.headers); headers.set("Content-Type", "application/json");
   if (authenticated && accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
-  const credentials = path === "/v1/admin/auth/login" || path === "/v1/admin/auth/refresh" ? "include" : "omit";
+  const credentials = CREDENTIAL_PATHS.includes(path.split("?", 1)[0] as typeof CREDENTIAL_PATHS[number]) ? "include" : "omit";
   const response = await fetch(requestUrl(path), { ...init, headers, credentials });
   if (response.status === 401 && authenticated && !retried && path !== "/v1/admin/auth/refresh") {
     try {
