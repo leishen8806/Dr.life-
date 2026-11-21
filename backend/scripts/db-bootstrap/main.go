@@ -25,6 +25,7 @@ var roles = []role{
 	{"app_ai", "ai_rw", "AI_DB_PASSWORD"},
 	{"app_ops", "ops_rw", "OPS_DB_PASSWORD"},
 	{"app_file_worker", "ops_file_worker", "FILE_WORKER_DB_PASSWORD"},
+	{"app_server", "server_rw", "SERVER_DB_PASSWORD"},
 	{"app_audit", "audit_writer", "AUDIT_DB_PASSWORD"},
 	{"app_report", "report_ro", "REPORT_DB_PASSWORD"},
 }

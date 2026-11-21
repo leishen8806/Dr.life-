@@ -55,7 +55,8 @@ check_public_categories() {
     rm -f "$body"
     die "$label did not return HTTP 200 (got $status)"
   fi
-  if ! grep -Eq '"items"[[:space:]]*:[[:space:]]*\[' "$body"; then
+  command -v jq >/dev/null 2>&1 || die "jq is required for catalog JSON checks"
+  if ! jq -e '((.data.items // .items) | type) == "array"' "$body" >/dev/null; then
     rm -f "$body"
     die "$label returned HTTP 200 but not an items array"
   fi
@@ -72,7 +73,8 @@ check_empty_products() {
     rm -f "$body"
     die "$label did not return HTTP 200 (got $status)"
   fi
-  if ! grep -Eq '"items"[[:space:]]*:[[:space:]]*\[\][[:space:]]*[,}]' "$body" || ! grep -Eq '"total"[[:space:]]*:[[:space:]]*0([,}])' "$body"; then
+  command -v jq >/dev/null 2>&1 || die "jq is required for catalog JSON checks"
+  if ! jq -e '((.data.items // .items) == []) and ((.data.total // .total) == 0)' "$body" >/dev/null; then
     rm -f "$body"
     die "$label returned HTTP 200 but not an empty list"
   fi
