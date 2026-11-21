@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createReadStream, existsSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { test } from "node:test";
@@ -27,7 +28,15 @@ function startStaticServer() {
   return new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(server)));
 }
 
+function ensureChromium() {
+  const executable = chromium.executablePath();
+  if (existsSync(executable)) return;
+  execFileSync("pnpm", ["exec", "playwright", "install", "chromium"], { stdio: "inherit" });
+  assert.equal(existsSync(executable), true, `Playwright Chromium was not installed at ${executable}`);
+}
+
 test("homepage V13 behavior stays localized and usable at mobile width", async () => {
+  ensureChromium();
   const server = await startStaticServer();
   const { port } = server.address();
   const browser = await chromium.launch({ headless: true });
