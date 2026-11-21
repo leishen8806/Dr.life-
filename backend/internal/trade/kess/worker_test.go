@@ -197,6 +197,23 @@ func TestRecoverUnknownKeepsMissingOrderBeforeRecoveryWindow(t *testing.T) {
 	}
 }
 
+func TestRecoverUnknownClosesExpiredIntentWithoutPaymentLink(t *testing.T) {
+	now := time.Date(2026, 11, 9, 9, 0, 0, 0, time.UTC)
+	sentAt := now.Add(-10 * time.Minute)
+	expiresAt := now.Add(-time.Minute)
+	intent := Intent{ID: 15, TradeNo: "DRL-ORDER-12-1", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller", Status: StatusUnknown, LastCreateSentAt: &sentAt, ExpiresAt: &expiresAt}
+	store := &memoryStore{intent: intent}
+	worker := newTestWorker(t, store, &queryClient{queryErr: ErrChannelMissing}, 24*time.Hour)
+	worker.now = func() time.Time { return now }
+
+	if err := worker.RecoverUnknown(context.Background(), intent.ID); err != nil {
+		t.Fatal(err)
+	}
+	if store.intent.Status != StatusClosed {
+		t.Fatalf("status = %q, want CLOSED", store.intent.Status)
+	}
+}
+
 func TestRecoverUnknownKeepsWaitingNotFoundInReviewAcrossRetries(t *testing.T) {
 	now := time.Date(2026, 11, 7, 9, 0, 0, 0, time.UTC)
 	sentAt := now.Add(-48 * time.Hour)
@@ -241,6 +258,20 @@ func TestRecoverReviewOnlyAcceptsConfirmedSuccess(t *testing.T) {
 	}
 }
 
+func TestRecoverInvalidatedDetectsLateSuccessWithoutReopeningOrder(t *testing.T) {
+	intent := Intent{ID: 16, TradeNo: "DRL-ORDER-13-1", AmountE4: 10000, Currency: "USD", ExpectedSellerCode: "seller", Status: StatusInvalidated}
+	store := &memoryStore{intent: intent}
+	client := &queryClient{result: ChannelOrder{TradeNo: intent.TradeNo, SellerCode: "seller", AmountE4: 10000, Currency: "USD", Status: "SUCCESS", TransactionID: "tx-invalidated"}}
+	worker := newTestWorker(t, store, client, 24*time.Hour)
+
+	if err := worker.RecoverUnknown(context.Background(), intent.ID); err != nil {
+		t.Fatal(err)
+	}
+	if store.intent.Status != StatusSuccess || store.intent.ChannelTransactionID != "tx-invalidated" {
+		t.Fatalf("intent = %+v, want SUCCESS with transaction id", store.intent)
+	}
+}
+
 func TestMemoryStoreExpiredClaimUsesOriginalClaimTime(t *testing.T) {
 	claimedAt := time.Date(2026, 11, 7, 8, 0, 0, 0, time.UTC)
 	store := &memoryStore{
@@ -275,9 +306,17 @@ func newTestWorker(t *testing.T, store Store, client Client, recoveryWindow time
 
 type memoryStore struct {
 	intent    Intent
+	due       []Intent
 	claimed   bool
 	claimedAt time.Time
 	now       func() time.Time
+}
+
+func (s *memoryStore) ListDue(_ context.Context, _ time.Time, limit int) ([]Intent, error) {
+	if limit < len(s.due) {
+		return s.due[:limit], nil
+	}
+	return s.due, nil
 }
 
 func (s *memoryStore) Intent(_ context.Context, id int64) (Intent, error) {
@@ -338,6 +377,9 @@ func (s *memoryStore) RecordChannelResult(_ context.Context, id int64, from Stat
 	}
 	s.claimed = false
 	s.intent.Status = result.Status
+	if result.TransactionID != "" {
+		s.intent.ChannelTransactionID = result.TransactionID
+	}
 	if result.CreateSent && s.intent.LastCreateSentAt == nil {
 		now := time.Now()
 		s.intent.LastCreateSentAt = &now
@@ -355,6 +397,8 @@ func validMemoryTransition(from, to Status) bool {
 		return to == StatusReview || to == StatusSuccess || to == StatusRefund
 	case StatusSuccess:
 		return to == StatusSuccess || to == StatusRefund
+	case StatusInvalidated:
+		return to == StatusInvalidated || to == StatusSuccess || to == StatusClosed || to == StatusRefund
 	case StatusFailed, StatusClosed, StatusRefund:
 		return to == from
 	default:
