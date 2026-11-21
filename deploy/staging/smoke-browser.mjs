@@ -1,4 +1,17 @@
-import { chromium } from "playwright";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+
+// Playwright is intentionally scoped to the website workspace.  Resolve it
+// from that package instead of adding a duplicate root dependency or relying
+// on NODE_PATH (which Node's ESM resolver does not use here).
+const websitePackage = fileURLToPath(new URL("../../apps/website/package.json", import.meta.url));
+const requireWebsite = createRequire(websitePackage);
+const { chromium } = requireWebsite("playwright");
+
+if (process.argv.includes("--self-check")) {
+  console.log("PASS: staging browser smoke resolved package-local playwright");
+  process.exit(0);
+}
 
 function option(name) {
   const index = process.argv.indexOf(name);

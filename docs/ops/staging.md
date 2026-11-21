@@ -220,7 +220,7 @@ the website workspace dependencies installed, a minimal wrapper is:
 ```bash
 cat >/tmp/drlife-smoke-browser <<'SH'
 #!/bin/sh
-exec pnpm --filter @drlife/website exec node \
+exec pnpm --filter @drlife/website exec -- node \
   "$PWD/deploy/staging/smoke-browser.mjs" "$@"
 SH
 chmod +x /tmp/drlife-smoke-browser
