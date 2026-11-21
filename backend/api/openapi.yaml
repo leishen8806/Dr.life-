@@ -1630,6 +1630,328 @@ paths:
         "409": {$ref: "#/components/responses/Conflict"}
         "500": {$ref: "#/components/responses/InternalServerError"}
         "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  # B11 design-only resources. These paths describe the reviewed contract;
+  # handlers, migrations, and generated clients are intentionally not part of
+  # this design PR.
+  /v1/buyer/me/addresses:
+    get:
+      tags: [buyer]
+      operationId: listBuyerAddresses
+      summary: List the buyer's saved delivery addresses
+      description: Phone values are masked in this resource; the order-owned snapshot remains a separate contract.
+      x-roles: [buyer]
+      x-privacy: buyer-owned address data; do not expose sibling accounts
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PageSize" }]
+      responses: {"200": {$ref: "#/components/responses/AddressListSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "429": {$ref: "#/components/responses/TooManyRequests"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    post:
+      tags: [buyer]
+      operationId: createBuyerAddress
+      summary: Add a saved delivery address
+      x-roles: [buyer]
+      x-audit: address.create
+      x-privacy: phone is stored privately and returned masked
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/AddressWriteRequest"}}}}
+      responses: {"201": {$ref: "#/components/responses/AddressSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "409": {$ref: "#/components/responses/Conflict"}, "429": {$ref: "#/components/responses/TooManyRequests"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/buyer/me/addresses/{public_id}:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    get:
+      tags: [buyer]
+      operationId: getBuyerAddress
+      summary: Read one saved delivery address
+      x-roles: [buyer]
+      x-privacy: buyer-owned address data; phone is masked
+      responses: {"200": {$ref: "#/components/responses/AddressSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    patch:
+      tags: [buyer]
+      operationId: updateBuyerAddress
+      summary: Edit a saved delivery address
+      x-roles: [buyer]
+      x-audit: address.update
+      x-privacy: buyer-owned address data
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/AddressPatchRequest"}}}}
+      responses: {"200": {$ref: "#/components/responses/AddressSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    delete:
+      tags: [buyer]
+      operationId: deleteBuyerAddress
+      summary: Delete a saved delivery address
+      x-roles: [buyer]
+      x-audit: address.delete
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses: {"204": {description: Address deleted.}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/merchant/me/addresses:
+    get:
+      tags: [merchant]
+      operationId: listMerchantAddresses
+      summary: List the merchant owner's saved delivery addresses
+      x-roles: [merchant]
+      x-privacy: merchant-owner address data; phone is masked
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PageSize" }]
+      responses: {"200": {$ref: "#/components/responses/AddressListSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "429": {$ref: "#/components/responses/TooManyRequests"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    post:
+      tags: [merchant]
+      operationId: createMerchantAddress
+      summary: Add a merchant-owner saved address
+      x-roles: [merchant]
+      x-audit: address.create
+      x-privacy: phone is stored privately and returned masked
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/AddressWriteRequest"}}}}
+      responses: {"201": {$ref: "#/components/responses/AddressSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/merchant/me/addresses/{public_id}:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    get:
+      tags: [merchant]
+      operationId: getMerchantAddress
+      summary: Read one merchant-owner saved address
+      x-roles: [merchant]
+      x-privacy: merchant-owner address data; phone is masked
+      responses: {"200": {$ref: "#/components/responses/AddressSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    patch:
+      tags: [merchant]
+      operationId: updateMerchantAddress
+      summary: Edit a merchant-owner saved address
+      x-roles: [merchant]
+      x-audit: address.update
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/AddressPatchRequest"}}}}
+      responses: {"200": {$ref: "#/components/responses/AddressSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    delete:
+      tags: [merchant]
+      operationId: deleteMerchantAddress
+      summary: Delete a merchant-owner saved address
+      x-roles: [merchant]
+      x-audit: address.delete
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses: {"204": {description: Address deleted.}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/public/contractors:
+    get:
+      tags: [public]
+      operationId: listPublicContractors
+      summary: List published contractor profiles
+      x-roles: ["none"]
+      security: []
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PageSize" }, { $ref: "#/components/parameters/CategoryCode" }]
+      responses: {"200": {$ref: "#/components/responses/ContractorListSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "429": {$ref: "#/components/responses/TooManyRequests"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/public/contractors/{public_id}:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    get:
+      tags: [public]
+      operationId: getPublicContractor
+      summary: Read one published contractor profile
+      x-roles: ["none"]
+      security: []
+      responses: {"200": {$ref: "#/components/responses/ContractorSucceeded"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/public/cases:
+    get:
+      tags: [public]
+      operationId: listPublicContractorCases
+      summary: List published contractor cases
+      x-roles: ["none"]
+      security: []
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PageSize" }, { $ref: "#/components/parameters/CategoryCode" }]
+      responses: {"200": {$ref: "#/components/responses/CaseListSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "429": {$ref: "#/components/responses/TooManyRequests"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/public/cases/{public_id}:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    get:
+      tags: [public]
+      operationId: getPublicContractorCase
+      summary: Read one published contractor case
+      x-roles: ["none"]
+      security: []
+      responses: {"200": {$ref: "#/components/responses/CaseSucceeded"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/buyer/contractor-inquiries:
+    get:
+      tags: [buyer]
+      operationId: listBuyerContractorInquiries
+      summary: List the buyer's contractor inquiries
+      x-roles: [buyer]
+      x-privacy: buyer-owned inquiry data
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PageSize" }]
+      responses: {"200": {$ref: "#/components/responses/InquiryListSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    post:
+      tags: [buyer]
+      operationId: createBuyerContractorInquiry
+      summary: Submit a contractor inquiry
+      x-roles: [buyer]
+      x-audit: contractor_inquiry.create
+      x-privacy: inquiry contact fields are buyer-owned and must not be public
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ContractorInquiryWriteRequest"}}}}
+      responses: {"201": {$ref: "#/components/responses/InquirySucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/buyer/contractor-inquiries/{public_id}:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    get:
+      tags: [buyer]
+      operationId: getBuyerContractorInquiry
+      summary: Read one buyer contractor inquiry and its status
+      x-roles: [buyer]
+      x-privacy: buyer-owned inquiry data
+      responses: {"200": {$ref: "#/components/responses/InquirySucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/merchant/contractor-demands:
+    get:
+      tags: [merchant]
+      operationId: listMerchantContractorDemands
+      summary: List contractor demands visible to the merchant
+      x-roles: [merchant]
+      x-privacy: scope by merchant service category; do not expose buyer contact data before an accepted quote
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PageSize" }]
+      responses: {"200": {$ref: "#/components/responses/DemandListSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/merchant/contractor-demands/{public_id}:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    get:
+      tags: [merchant]
+      operationId: getMerchantContractorDemand
+      summary: Read one scoped contractor demand
+      x-roles: [merchant]
+      x-privacy: buyer contact fields remain masked until the owner-approved state allows disclosure
+      responses: {"200": {$ref: "#/components/responses/DemandSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/merchant/contractor-demands/{public_id}/quotes:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    get:
+      tags: [merchant]
+      operationId: listMerchantContractorQuotes
+      summary: List quotes submitted for a contractor demand
+      x-roles: [merchant]
+      x-privacy: merchant-owned quote data
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PageSize" }]
+      responses: {"200": {$ref: "#/components/responses/QuoteListSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    post:
+      tags: [merchant]
+      operationId: createMerchantContractorQuote
+      summary: Submit a quote for a contractor demand
+      description: Money fields use e4 integer units; business rules for validity, tax, and acceptance remain owner-tbd.
+      x-roles: [merchant]
+      x-audit: contractor_quote.create
+      x-privacy: quote is visible only to the scoped demand participants
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/ContractorQuoteWriteRequest"}}}}
+      responses: {"201": {$ref: "#/components/responses/QuoteSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/merchant/contractor-demands/{public_id}/quotes/{quote_id}:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }, {name: quote_id, in: path, required: true, schema: {type: string, pattern: "^[0-9a-hjkmnp-tv-z]{26}$"}}]
+    get:
+      tags: [merchant]
+      operationId: getMerchantContractorQuote
+      summary: Read one merchant contractor quote
+      x-roles: [merchant]
+      x-privacy: merchant-owned quote data
+      responses: {"200": {$ref: "#/components/responses/QuoteSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/merchant/staff:
+    get:
+      tags: [merchant]
+      operationId: listMerchantStaff
+      summary: List merchant staff and their permission scopes
+      x-roles: [merchant]
+      x-privacy: merchant-owner only; staff phone and Telegram username are private
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PageSize" }]
+      responses: {"200": {$ref: "#/components/responses/StaffListSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    post:
+      tags: [merchant]
+      operationId: createMerchantStaff
+      summary: Create a merchant staff record
+      x-roles: [merchant]
+      x-audit: merchant_staff.create
+      x-privacy: staff contact data is private
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/MerchantStaffWriteRequest"}}}}
+      responses: {"201": {$ref: "#/components/responses/StaffSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/merchant/staff/invitations:
+    post:
+      tags: [merchant]
+      operationId: inviteMerchantStaff
+      summary: Invite staff by Telegram username or phone
+      x-roles: [merchant]
+      x-audit: merchant_staff.invite
+      x-privacy: invitation target is private and must not be returned to other staff
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/MerchantStaffInviteRequest"}}}}
+      responses: {"202": {$ref: "#/components/responses/StaffInvitationSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/merchant/staff/{public_id}:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    get:
+      tags: [merchant]
+      operationId: getMerchantStaff
+      summary: Read one merchant staff record
+      x-roles: [merchant]
+      x-privacy: merchant-owner only
+      responses: {"200": {$ref: "#/components/responses/StaffSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    patch:
+      tags: [merchant]
+      operationId: updateMerchantStaff
+      summary: Update a merchant staff role or permission scope
+      x-roles: [merchant]
+      x-audit: merchant_staff.update
+      x-privacy: merchant-owner only
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/MerchantStaffPatchRequest"}}}}
+      responses: {"200": {$ref: "#/components/responses/StaffSucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+    delete:
+      tags: [merchant]
+      operationId: deleteMerchantStaff
+      summary: Remove a merchant staff record
+      x-roles: [merchant]
+      x-audit: merchant_staff.delete
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses: {"204": {description: Staff record removed.}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/admin/policies:
+    get:
+      tags: [admin]
+      operationId: listAdminPolicies
+      summary: List policy documents and publication state
+      x-roles: [admin]
+      x-permissions: [admin.agreement.publish]
+      x-privacy: policy content is administrative data
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PageSize" }]
+      responses: {"200": {$ref: "#/components/responses/PolicyListSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/admin/policies/{public_id}:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    get:
+      tags: [admin]
+      operationId: getAdminPolicy
+      summary: Read one policy document
+      x-roles: [admin]
+      x-permissions: [admin.agreement.publish]
+      x-privacy: policy content is administrative data
+      responses: {"200": {$ref: "#/components/responses/PolicySucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/admin/policies/{public_id}/versions:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    get:
+      tags: [admin]
+      operationId: listAdminPolicyVersions
+      summary: List immutable policy publication history
+      x-roles: [admin]
+      x-permissions: [admin.agreement.publish]
+      x-audit: policy.version.read
+      parameters: [{ $ref: "#/components/parameters/Page" }, { $ref: "#/components/parameters/PageSize" }]
+      responses: {"200": {$ref: "#/components/responses/PolicyVersionListSucceeded"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/admin/policies/{public_id}/draft:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    put:
+      tags: [admin]
+      operationId: saveAdminPolicyDraft
+      summary: Save a three-language policy draft
+      x-roles: [admin]
+      x-permissions: [admin.agreement.publish]
+      x-audit: policy.draft.save
+      x-step-up: false
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/PolicyDraftRequest"}}}}
+      responses: {"200": {$ref: "#/components/responses/PolicySucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "409": {$ref: "#/components/responses/Conflict"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
+  /v1/admin/policies/{public_id}/publish:
+    parameters: [{ $ref: "#/components/parameters/PublicID" }]
+    post:
+      tags: [admin]
+      operationId: publishAdminPolicy
+      summary: Publish a reviewed three-language policy version
+      x-roles: [admin]
+      x-permissions: [admin.agreement.publish]
+      x-step-up: true
+      x-audit: policy.publish
+      x-privacy: policy publication is an auditable compliance action
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }, { $ref: "#/components/parameters/XStepUpToken" }]
+      requestBody: {required: true, content: {application/json: {schema: {$ref: "#/components/schemas/PolicyPublishRequest"}}}}
+      responses: {"200": {$ref: "#/components/responses/PolicySucceeded"}, "400": {$ref: "#/components/responses/BadRequest"}, "401": {$ref: "#/components/responses/Unauthorized"}, "403": {$ref: "#/components/responses/Forbidden"}, "404": {$ref: "#/components/responses/NotFound"}, "409": {$ref: "#/components/responses/Conflict"}, "429": {$ref: "#/components/responses/TooManyRequests"}, "500": {$ref: "#/components/responses/InternalServerError"}, "503": {$ref: "#/components/responses/ServiceUnavailable"}}
 components:
   securitySchemes:
     bearerAuth:
@@ -3260,7 +3582,407 @@ components:
         ok: {type: boolean, enum: [true]}
         data: {$ref: "#/components/schemas/LedgerReadData"}
         request_id: {type: string, minLength: 1}
+    AddressRecord:
+      type: object
+      additionalProperties: false
+      required: [public_id, recipient_name, address_text, phone, latitude, longitude, is_default, created_at, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        recipient_name: {type: string, minLength: 1, maxLength: 120}
+        address_text: {type: string, minLength: 1, maxLength: 500}
+        phone: {type: string, pattern: "^\\*{4}([0-9]{4})?$", description: Masked phone; the address book never returns the full number.}
+        latitude: {type: number, format: double, minimum: -90, maximum: 90}
+        longitude: {type: number, format: double, minimum: -180, maximum: 180}
+        is_default: {type: boolean}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    AddressWriteRequest:
+      type: object
+      additionalProperties: false
+      required: [recipient_name, address_text, phone, latitude, longitude]
+      properties:
+        recipient_name: {type: string, minLength: 1, maxLength: 120}
+        address_text: {type: string, minLength: 1, maxLength: 500}
+        phone: {type: string, minLength: 1, maxLength: 32, description: Full phone is accepted only for the owner write; every read is masked.}
+        latitude: {type: number, format: double, minimum: -90, maximum: 90}
+        longitude: {type: number, format: double, minimum: -180, maximum: 180}
+        is_default: {type: boolean, default: false}
+    AddressPatchRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: Partial update semantics are owner-tbd; omitted fields remain unchanged.
+      properties:
+        recipient_name: {type: string, minLength: 1, maxLength: 120}
+        address_text: {type: string, minLength: 1, maxLength: 500}
+        phone: {type: string, minLength: 1, maxLength: 32, description: Full phone is accepted only for the owner write; every read is masked.}
+        latitude: {type: number, format: double, minimum: -90, maximum: 90}
+        longitude: {type: number, format: double, minimum: -180, maximum: 180}
+        is_default: {type: boolean}
+    ContractorProfile:
+      type: object
+      additionalProperties: false
+      required: [public_id, name, categories, description, status]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        name: {$ref: "#/components/schemas/Messages"}
+        categories: {type: array, items: {type: string, minLength: 1, maxLength: 64}}
+        description: {$ref: "#/components/schemas/Messages"}
+        status: {type: string, enum: [published]}
+    ContractorCase:
+      type: object
+      additionalProperties: false
+      required: [public_id, contractor_public_id, title, body, image_file_public_ids, status, published_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        contractor_public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        title: {$ref: "#/components/schemas/Messages"}
+        body: {$ref: "#/components/schemas/Messages"}
+        image_file_public_ids: {type: array, items: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}}
+        status: {type: string, enum: [published]}
+        published_at: {type: string, format: date-time}
+    ContractorInquiry:
+      type: object
+      additionalProperties: false
+      required: [public_id, contractor_public_id, title, description, status, created_at, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        contractor_public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        title: {type: string, minLength: 1, maxLength: 160}
+        description: {type: string, minLength: 1, maxLength: 5000}
+        status: {type: string, enum: [submitted, matching, quoted, accepted, closed, cancelled]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ContractorInquiryWriteRequest:
+      type: object
+      additionalProperties: false
+      required: [title, description]
+      properties:
+        contractor_public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        title: {type: string, minLength: 1, maxLength: 160}
+        description: {type: string, minLength: 1, maxLength: 5000}
+        address_public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        image_file_public_ids: {type: array, items: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}}
+    ContractorDemand:
+      type: object
+      additionalProperties: false
+      required: [public_id, title, description, status, created_at, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        title: {type: string, minLength: 1, maxLength: 160}
+        description: {type: string, minLength: 1, maxLength: 5000}
+        status: {type: string, enum: [open, quoted, accepted, closed, cancelled]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ContractorQuote:
+      type: object
+      additionalProperties: false
+      required: [public_id, demand_public_id, amount_e4, description, status, created_at, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        demand_public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
+        description: {type: string, minLength: 1, maxLength: 5000}
+        status: {type: string, enum: [submitted, accepted, rejected, withdrawn, expired]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    ContractorQuoteWriteRequest:
+      type: object
+      additionalProperties: false
+      required: [amount_e4, description]
+      properties:
+        amount_e4: {$ref: "#/components/schemas/OrderMoneyE4"}
+        description: {type: string, minLength: 1, maxLength: 5000}
+        valid_until: {type: string, format: date-time, description: Owner-tbd validity semantics; the field is descriptive only in this design.}
+    MerchantStaff:
+      type: object
+      additionalProperties: false
+      required: [public_id, display_name, role, permission_scope, status, created_at, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        display_name: {type: string, minLength: 1, maxLength: 120}
+        role: {type: string, enum: [store_manager, warehouse_manager, customer_service, finance], description: Four examples only; owner-tbd role catalog.}
+        permission_scope: {type: array, items: {type: string, minLength: 1, maxLength: 128}, description: Owner-tbd permission identifiers and data scopes.}
+        status: {type: string, enum: [invited, active, disabled, removed]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    MerchantStaffWriteRequest:
+      type: object
+      additionalProperties: false
+      required: [display_name, role, permission_scope]
+      properties:
+        display_name: {type: string, minLength: 1, maxLength: 120}
+        role: {type: string, enum: [store_manager, warehouse_manager, customer_service, finance]}
+        permission_scope: {type: array, items: {type: string, minLength: 1, maxLength: 128}}
+    MerchantStaffPatchRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        display_name: {type: string, minLength: 1, maxLength: 120}
+        role: {type: string, enum: [store_manager, warehouse_manager, customer_service, finance]}
+        permission_scope: {type: array, items: {type: string, minLength: 1, maxLength: 128}}
+        status: {type: string, enum: [active, disabled]}
+    MerchantStaffInviteRequest:
+      type: object
+      additionalProperties: false
+      required: [role, permission_scope]
+      oneOf:
+        - required: [telegram_username]
+          properties: {telegram_username: {type: string, pattern: "^@[A-Za-z0-9_]{5,32}$"}}
+        - required: [phone]
+          properties: {phone: {type: string, minLength: 1, maxLength: 32}}
+      properties:
+        role: {type: string, enum: [store_manager, warehouse_manager, customer_service, finance]}
+        permission_scope: {type: array, items: {type: string, minLength: 1, maxLength: 128}}
+        telegram_username: {type: string, pattern: "^@[A-Za-z0-9_]{5,32}$"}
+        phone: {type: string, minLength: 1, maxLength: 32}
+    PolicyDocument:
+      type: object
+      additionalProperties: false
+      required: [public_id, kind, state, version, effective_date, content, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        kind: {type: string, enum: [privacy, terms, help]}
+        state: {type: string, enum: [draft, published]}
+        version: {type: string, minLength: 1, maxLength: 64}
+        effective_date: {type: string, format: date}
+        content: {$ref: "#/components/schemas/Messages"}
+        updated_at: {type: string, format: date-time}
+    PolicyDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [content]
+      properties:
+        content: {$ref: "#/components/schemas/Messages"}
+        effective_date: {type: string, format: date}
+    PolicyPublishRequest:
+      type: object
+      additionalProperties: false
+      required: [change_note, effective_date]
+      properties:
+        change_note: {type: string, minLength: 1, maxLength: 1000}
+        effective_date: {type: string, format: date}
+        expected_version: {type: string, minLength: 1, maxLength: 64}
+    PolicyVersion:
+      type: object
+      additionalProperties: false
+      required: [public_id, policy_public_id, version, change_note, published_at, effective_date]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        policy_public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        version: {type: string, minLength: 1, maxLength: 64}
+        change_note: {type: string, minLength: 1, maxLength: 1000}
+        published_at: {type: string, format: date-time}
+        effective_date: {type: string, format: date}
+    AddressListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/AddressRecord"}}
+        total: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    ContractorListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/ContractorProfile"}}
+        total: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    CaseListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/ContractorCase"}}
+        total: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    InquiryListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/ContractorInquiry"}}
+        total: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    DemandListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/ContractorDemand"}}
+        total: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    QuoteListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/ContractorQuote"}}
+        total: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    StaffListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/MerchantStaff"}}
+        total: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    PolicyListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/PolicyDocument"}}
+        total: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    PolicyVersionListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/PolicyVersion"}}
+        total: {type: integer, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
   responses:
+    AddressListSucceeded:
+      description: Paginated saved-address list with masked phone values.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/AddressListData"}}
+    AddressSucceeded:
+      description: Saved address with masked phone value.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/AddressRecord"}}
+    ContractorListSucceeded:
+      description: Published contractor profiles.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/ContractorListData"}}
+    ContractorSucceeded:
+      description: Published contractor profile.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/ContractorProfile"}}
+    CaseListSucceeded:
+      description: Published contractor cases.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/CaseListData"}}
+    CaseSucceeded:
+      description: Published contractor case.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/ContractorCase"}}
+    InquiryListSucceeded:
+      description: Buyer-owned contractor inquiries.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/InquiryListData"}}
+    InquirySucceeded:
+      description: Contractor inquiry state.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/ContractorInquiry"}}
+    DemandListSucceeded:
+      description: Merchant-scoped contractor demands.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/DemandListData"}}
+    DemandSucceeded:
+      description: Merchant-scoped contractor demand.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/ContractorDemand"}}
+    QuoteListSucceeded:
+      description: Merchant contractor quotes.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/QuoteListData"}}
+    QuoteSucceeded:
+      description: Merchant contractor quote.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/ContractorQuote"}}
+    StaffListSucceeded:
+      description: Merchant-scoped staff list.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/StaffListData"}}
+    StaffSucceeded:
+      description: Merchant staff record.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/MerchantStaff"}}
+    StaffInvitationSucceeded:
+      description: Staff invitation accepted for asynchronous delivery.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/MerchantStaff"}}
+    PolicyListSucceeded:
+      description: Administrative policy list.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/PolicyListData"}}
+    PolicySucceeded:
+      description: Administrative policy document.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/PolicyDocument"}}
+    PolicyVersionListSucceeded:
+      description: Immutable administrative policy publication history.
+      content:
+        application/json:
+          schema:
+            allOf: [{ $ref: "#/components/schemas/SuccessEnvelope" }]
+            properties: {data: {$ref: "#/components/schemas/PolicyVersionListData"}}
     NotificationListSucceeded:
       description: Notifications for the authenticated account.
       content:
