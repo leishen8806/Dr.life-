@@ -36,7 +36,7 @@ test("homepage V13 behavior stays localized and usable at mobile width", async (
       const html = await response.text();
       assert.match(html, /<h1[\s\S]*?<\/h1>/);
       assert.equal((html.match(/<article class="partner/g) ?? []).length, 5);
-      assert.equal((html.match(/href="(?:\.\.\/)?contact\/?"/g) ?? []).length, 4);
+      assert.equal((html.match(/href="[^"]*\/contact\/?"/g) ?? []).length, 4);
       assert.match(html, new RegExp(localizedMarker));
       assert.match(html, /class="menu-toggle"[\s\S]*?aria-expanded="false"/);
       assert.match(html, /id="site-nav"/);
