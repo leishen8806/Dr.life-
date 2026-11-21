@@ -74,11 +74,11 @@ func TestTradeOrderMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertTradeTables(t, db, true)
-	if err := goose.DownTo(db, migrations, 60); err != nil {
-		t.Fatalf("down 00061: %v", err)
+	if err := goose.DownTo(db, migrations, 69); err != nil {
+		t.Fatalf("down 00070: %v", err)
 	}
-	if err := goose.UpTo(db, migrations, 61); err != nil {
-		t.Fatalf("reapply 00061: %v", err)
+	if err := goose.UpTo(db, migrations, 70); err != nil {
+		t.Fatalf("reapply 00070: %v", err)
 	}
 }
 
