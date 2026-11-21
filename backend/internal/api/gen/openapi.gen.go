@@ -4,6 +4,7 @@
 package gen
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -469,16 +470,130 @@ func (e CategoryListSuccessResponseOk) Valid() bool {
 
 // Defines values for ConsentKind.
 const (
-	Privacy ConsentKind = "privacy"
-	Terms   ConsentKind = "terms"
+	ConsentKindPrivacy ConsentKind = "privacy"
+	ConsentKindTerms   ConsentKind = "terms"
 )
 
 // Valid indicates whether the value is a known member of the ConsentKind enum.
 func (e ConsentKind) Valid() bool {
 	switch e {
-	case Privacy:
+	case ConsentKindPrivacy:
 		return true
-	case Terms:
+	case ConsentKindTerms:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContractorCaseStatus.
+const (
+	ContractorCaseStatusPublished ContractorCaseStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the ContractorCaseStatus enum.
+func (e ContractorCaseStatus) Valid() bool {
+	switch e {
+	case ContractorCaseStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContractorDemandStatus.
+const (
+	ContractorDemandStatusAccepted  ContractorDemandStatus = "accepted"
+	ContractorDemandStatusCancelled ContractorDemandStatus = "cancelled"
+	ContractorDemandStatusClosed    ContractorDemandStatus = "closed"
+	ContractorDemandStatusOpen      ContractorDemandStatus = "open"
+	ContractorDemandStatusQuoted    ContractorDemandStatus = "quoted"
+)
+
+// Valid indicates whether the value is a known member of the ContractorDemandStatus enum.
+func (e ContractorDemandStatus) Valid() bool {
+	switch e {
+	case ContractorDemandStatusAccepted:
+		return true
+	case ContractorDemandStatusCancelled:
+		return true
+	case ContractorDemandStatusClosed:
+		return true
+	case ContractorDemandStatusOpen:
+		return true
+	case ContractorDemandStatusQuoted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContractorInquiryStatus.
+const (
+	ContractorInquiryStatusAccepted  ContractorInquiryStatus = "accepted"
+	ContractorInquiryStatusCancelled ContractorInquiryStatus = "cancelled"
+	ContractorInquiryStatusClosed    ContractorInquiryStatus = "closed"
+	ContractorInquiryStatusMatching  ContractorInquiryStatus = "matching"
+	ContractorInquiryStatusQuoted    ContractorInquiryStatus = "quoted"
+	ContractorInquiryStatusSubmitted ContractorInquiryStatus = "submitted"
+)
+
+// Valid indicates whether the value is a known member of the ContractorInquiryStatus enum.
+func (e ContractorInquiryStatus) Valid() bool {
+	switch e {
+	case ContractorInquiryStatusAccepted:
+		return true
+	case ContractorInquiryStatusCancelled:
+		return true
+	case ContractorInquiryStatusClosed:
+		return true
+	case ContractorInquiryStatusMatching:
+		return true
+	case ContractorInquiryStatusQuoted:
+		return true
+	case ContractorInquiryStatusSubmitted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContractorProfileStatus.
+const (
+	ContractorProfileStatusPublished ContractorProfileStatus = "published"
+)
+
+// Valid indicates whether the value is a known member of the ContractorProfileStatus enum.
+func (e ContractorProfileStatus) Valid() bool {
+	switch e {
+	case ContractorProfileStatusPublished:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContractorQuoteStatus.
+const (
+	ContractorQuoteStatusAccepted  ContractorQuoteStatus = "accepted"
+	ContractorQuoteStatusExpired   ContractorQuoteStatus = "expired"
+	ContractorQuoteStatusRejected  ContractorQuoteStatus = "rejected"
+	ContractorQuoteStatusSubmitted ContractorQuoteStatus = "submitted"
+	ContractorQuoteStatusWithdrawn ContractorQuoteStatus = "withdrawn"
+)
+
+// Valid indicates whether the value is a known member of the ContractorQuoteStatus enum.
+func (e ContractorQuoteStatus) Valid() bool {
+	switch e {
+	case ContractorQuoteStatusAccepted:
+		return true
+	case ContractorQuoteStatusExpired:
+		return true
+	case ContractorQuoteStatusRejected:
+		return true
+	case ContractorQuoteStatusSubmitted:
+		return true
+	case ContractorQuoteStatusWithdrawn:
 		return true
 	default:
 		return false
@@ -761,6 +876,144 @@ func (e LedgerReadSuccessResponseOk) Valid() bool {
 	}
 }
 
+// Defines values for MerchantStaffRole.
+const (
+	MerchantStaffRoleCustomerService  MerchantStaffRole = "customer_service"
+	MerchantStaffRoleFinance          MerchantStaffRole = "finance"
+	MerchantStaffRoleStoreManager     MerchantStaffRole = "store_manager"
+	MerchantStaffRoleWarehouseManager MerchantStaffRole = "warehouse_manager"
+)
+
+// Valid indicates whether the value is a known member of the MerchantStaffRole enum.
+func (e MerchantStaffRole) Valid() bool {
+	switch e {
+	case MerchantStaffRoleCustomerService:
+		return true
+	case MerchantStaffRoleFinance:
+		return true
+	case MerchantStaffRoleStoreManager:
+		return true
+	case MerchantStaffRoleWarehouseManager:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MerchantStaffStatus.
+const (
+	MerchantStaffStatusActive   MerchantStaffStatus = "active"
+	MerchantStaffStatusDisabled MerchantStaffStatus = "disabled"
+	MerchantStaffStatusInvited  MerchantStaffStatus = "invited"
+	MerchantStaffStatusRemoved  MerchantStaffStatus = "removed"
+)
+
+// Valid indicates whether the value is a known member of the MerchantStaffStatus enum.
+func (e MerchantStaffStatus) Valid() bool {
+	switch e {
+	case MerchantStaffStatusActive:
+		return true
+	case MerchantStaffStatusDisabled:
+		return true
+	case MerchantStaffStatusInvited:
+		return true
+	case MerchantStaffStatusRemoved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MerchantStaffInviteRequestRole.
+const (
+	MerchantStaffInviteRequestRoleCustomerService  MerchantStaffInviteRequestRole = "customer_service"
+	MerchantStaffInviteRequestRoleFinance          MerchantStaffInviteRequestRole = "finance"
+	MerchantStaffInviteRequestRoleStoreManager     MerchantStaffInviteRequestRole = "store_manager"
+	MerchantStaffInviteRequestRoleWarehouseManager MerchantStaffInviteRequestRole = "warehouse_manager"
+)
+
+// Valid indicates whether the value is a known member of the MerchantStaffInviteRequestRole enum.
+func (e MerchantStaffInviteRequestRole) Valid() bool {
+	switch e {
+	case MerchantStaffInviteRequestRoleCustomerService:
+		return true
+	case MerchantStaffInviteRequestRoleFinance:
+		return true
+	case MerchantStaffInviteRequestRoleStoreManager:
+		return true
+	case MerchantStaffInviteRequestRoleWarehouseManager:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MerchantStaffPatchRequestRole.
+const (
+	MerchantStaffPatchRequestRoleCustomerService  MerchantStaffPatchRequestRole = "customer_service"
+	MerchantStaffPatchRequestRoleFinance          MerchantStaffPatchRequestRole = "finance"
+	MerchantStaffPatchRequestRoleStoreManager     MerchantStaffPatchRequestRole = "store_manager"
+	MerchantStaffPatchRequestRoleWarehouseManager MerchantStaffPatchRequestRole = "warehouse_manager"
+)
+
+// Valid indicates whether the value is a known member of the MerchantStaffPatchRequestRole enum.
+func (e MerchantStaffPatchRequestRole) Valid() bool {
+	switch e {
+	case MerchantStaffPatchRequestRoleCustomerService:
+		return true
+	case MerchantStaffPatchRequestRoleFinance:
+		return true
+	case MerchantStaffPatchRequestRoleStoreManager:
+		return true
+	case MerchantStaffPatchRequestRoleWarehouseManager:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MerchantStaffPatchRequestStatus.
+const (
+	MerchantStaffPatchRequestStatusActive   MerchantStaffPatchRequestStatus = "active"
+	MerchantStaffPatchRequestStatusDisabled MerchantStaffPatchRequestStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the MerchantStaffPatchRequestStatus enum.
+func (e MerchantStaffPatchRequestStatus) Valid() bool {
+	switch e {
+	case MerchantStaffPatchRequestStatusActive:
+		return true
+	case MerchantStaffPatchRequestStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MerchantStaffWriteRequestRole.
+const (
+	MerchantStaffWriteRequestRoleCustomerService  MerchantStaffWriteRequestRole = "customer_service"
+	MerchantStaffWriteRequestRoleFinance          MerchantStaffWriteRequestRole = "finance"
+	MerchantStaffWriteRequestRoleStoreManager     MerchantStaffWriteRequestRole = "store_manager"
+	MerchantStaffWriteRequestRoleWarehouseManager MerchantStaffWriteRequestRole = "warehouse_manager"
+)
+
+// Valid indicates whether the value is a known member of the MerchantStaffWriteRequestRole enum.
+func (e MerchantStaffWriteRequestRole) Valid() bool {
+	switch e {
+	case MerchantStaffWriteRequestRoleCustomerService:
+		return true
+	case MerchantStaffWriteRequestRoleFinance:
+		return true
+	case MerchantStaffWriteRequestRoleStoreManager:
+		return true
+	case MerchantStaffWriteRequestRoleWarehouseManager:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MerchantSuborderListSuccessResponseOk.
 const (
 	MerchantSuborderListSuccessResponseOkTrue MerchantSuborderListSuccessResponseOk = true
@@ -1028,6 +1281,45 @@ const (
 func (e PingSuccessResponseOk) Valid() bool {
 	switch e {
 	case PingSuccessResponseOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PolicyDocumentKind.
+const (
+	PolicyDocumentKindHelp    PolicyDocumentKind = "help"
+	PolicyDocumentKindPrivacy PolicyDocumentKind = "privacy"
+	PolicyDocumentKindTerms   PolicyDocumentKind = "terms"
+)
+
+// Valid indicates whether the value is a known member of the PolicyDocumentKind enum.
+func (e PolicyDocumentKind) Valid() bool {
+	switch e {
+	case PolicyDocumentKindHelp:
+		return true
+	case PolicyDocumentKindPrivacy:
+		return true
+	case PolicyDocumentKindTerms:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PolicyDocumentState.
+const (
+	PolicyDocumentStateDraft     PolicyDocumentState = "draft"
+	PolicyDocumentStatePublished PolicyDocumentState = "published"
+)
+
+// Valid indicates whether the value is a known member of the PolicyDocumentState enum.
+func (e PolicyDocumentState) Valid() bool {
+	switch e {
+	case PolicyDocumentStateDraft:
+		return true
+	case PolicyDocumentStatePublished:
 		return true
 	default:
 		return false
@@ -1484,6 +1776,66 @@ func (e StatusFilter) Valid() bool {
 	}
 }
 
+// Defines values for AddressListSucceededOk.
+const (
+	AddressListSucceededOkTrue AddressListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the AddressListSucceededOk enum.
+func (e AddressListSucceededOk) Valid() bool {
+	switch e {
+	case AddressListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AddressSucceededOk.
+const (
+	AddressSucceededOkTrue AddressSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the AddressSucceededOk enum.
+func (e AddressSucceededOk) Valid() bool {
+	switch e {
+	case AddressSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CaseListSucceededOk.
+const (
+	CaseListSucceededOkTrue CaseListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the CaseListSucceededOk enum.
+func (e CaseListSucceededOk) Valid() bool {
+	switch e {
+	case CaseListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CaseSucceededOk.
+const (
+	CaseSucceededOkTrue CaseSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the CaseSucceededOk enum.
+func (e CaseSucceededOk) Valid() bool {
+	switch e {
+	case CaseSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ConsentStatusSucceededOk.
 const (
 	ConsentStatusSucceededOkTrue ConsentStatusSucceededOk = true
@@ -1493,6 +1845,96 @@ const (
 func (e ConsentStatusSucceededOk) Valid() bool {
 	switch e {
 	case ConsentStatusSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContractorListSucceededOk.
+const (
+	ContractorListSucceededOkTrue ContractorListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the ContractorListSucceededOk enum.
+func (e ContractorListSucceededOk) Valid() bool {
+	switch e {
+	case ContractorListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ContractorSucceededOk.
+const (
+	ContractorSucceededOkTrue ContractorSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the ContractorSucceededOk enum.
+func (e ContractorSucceededOk) Valid() bool {
+	switch e {
+	case ContractorSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DemandListSucceededOk.
+const (
+	DemandListSucceededOkTrue DemandListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the DemandListSucceededOk enum.
+func (e DemandListSucceededOk) Valid() bool {
+	switch e {
+	case DemandListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DemandSucceededOk.
+const (
+	DemandSucceededOkTrue DemandSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the DemandSucceededOk enum.
+func (e DemandSucceededOk) Valid() bool {
+	switch e {
+	case DemandSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InquiryListSucceededOk.
+const (
+	InquiryListSucceededOkTrue InquiryListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the InquiryListSucceededOk enum.
+func (e InquiryListSucceededOk) Valid() bool {
+	switch e {
+	case InquiryListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InquirySucceededOk.
+const (
+	InquirySucceededOkTrue InquirySucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the InquirySucceededOk enum.
+func (e InquirySucceededOk) Valid() bool {
+	switch e {
+	case InquirySucceededOkTrue:
 		return true
 	default:
 		return false
@@ -1559,6 +2001,126 @@ func (e NotificationSettingsSucceededOk) Valid() bool {
 	}
 }
 
+// Defines values for PolicyListSucceededOk.
+const (
+	PolicyListSucceededOkTrue PolicyListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the PolicyListSucceededOk enum.
+func (e PolicyListSucceededOk) Valid() bool {
+	switch e {
+	case PolicyListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PolicySucceededOk.
+const (
+	PolicySucceededOkTrue PolicySucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the PolicySucceededOk enum.
+func (e PolicySucceededOk) Valid() bool {
+	switch e {
+	case PolicySucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PolicyVersionListSucceededOk.
+const (
+	PolicyVersionListSucceededOkTrue PolicyVersionListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the PolicyVersionListSucceededOk enum.
+func (e PolicyVersionListSucceededOk) Valid() bool {
+	switch e {
+	case PolicyVersionListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for QuoteListSucceededOk.
+const (
+	QuoteListSucceededOkTrue QuoteListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the QuoteListSucceededOk enum.
+func (e QuoteListSucceededOk) Valid() bool {
+	switch e {
+	case QuoteListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for QuoteSucceededOk.
+const (
+	QuoteSucceededOkTrue QuoteSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the QuoteSucceededOk enum.
+func (e QuoteSucceededOk) Valid() bool {
+	switch e {
+	case QuoteSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StaffInvitationSucceededOk.
+const (
+	StaffInvitationSucceededOkTrue StaffInvitationSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the StaffInvitationSucceededOk enum.
+func (e StaffInvitationSucceededOk) Valid() bool {
+	switch e {
+	case StaffInvitationSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StaffListSucceededOk.
+const (
+	StaffListSucceededOkTrue StaffListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the StaffListSucceededOk enum.
+func (e StaffListSucceededOk) Valid() bool {
+	switch e {
+	case StaffListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StaffSucceededOk.
+const (
+	StaffSucceededOkTrue StaffSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the StaffSucceededOk enum.
+func (e StaffSucceededOk) Valid() bool {
+	switch e {
+	case StaffSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PostAdminAuthRefreshParamsXRequestedWith.
 const (
 	Drlife PostAdminAuthRefreshParamsXRequestedWith = "drlife"
@@ -1568,6 +2130,186 @@ const (
 func (e PostAdminAuthRefreshParamsXRequestedWith) Valid() bool {
 	switch e {
 	case Drlife:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListAdminPolicies200JSONResponseBodyOk.
+const (
+	ListAdminPolicies200JSONResponseBodyOkTrue ListAdminPolicies200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListAdminPolicies200JSONResponseBodyOk enum.
+func (e ListAdminPolicies200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListAdminPolicies200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetAdminPolicy200JSONResponseBodyOk.
+const (
+	GetAdminPolicy200JSONResponseBodyOkTrue GetAdminPolicy200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetAdminPolicy200JSONResponseBodyOk enum.
+func (e GetAdminPolicy200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetAdminPolicy200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SaveAdminPolicyDraft200JSONResponseBodyOk.
+const (
+	SaveAdminPolicyDraft200JSONResponseBodyOkTrue SaveAdminPolicyDraft200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the SaveAdminPolicyDraft200JSONResponseBodyOk enum.
+func (e SaveAdminPolicyDraft200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case SaveAdminPolicyDraft200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PublishAdminPolicy200JSONResponseBodyOk.
+const (
+	PublishAdminPolicy200JSONResponseBodyOkTrue PublishAdminPolicy200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the PublishAdminPolicy200JSONResponseBodyOk enum.
+func (e PublishAdminPolicy200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case PublishAdminPolicy200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListAdminPolicyVersions200JSONResponseBodyOk.
+const (
+	ListAdminPolicyVersions200JSONResponseBodyOkTrue ListAdminPolicyVersions200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListAdminPolicyVersions200JSONResponseBodyOk enum.
+func (e ListAdminPolicyVersions200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListAdminPolicyVersions200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListBuyerContractorInquiries200JSONResponseBodyOk.
+const (
+	ListBuyerContractorInquiries200JSONResponseBodyOkTrue ListBuyerContractorInquiries200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListBuyerContractorInquiries200JSONResponseBodyOk enum.
+func (e ListBuyerContractorInquiries200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListBuyerContractorInquiries200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateBuyerContractorInquiry201JSONResponseBodyOk.
+const (
+	CreateBuyerContractorInquiry201JSONResponseBodyOkTrue CreateBuyerContractorInquiry201JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the CreateBuyerContractorInquiry201JSONResponseBodyOk enum.
+func (e CreateBuyerContractorInquiry201JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case CreateBuyerContractorInquiry201JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetBuyerContractorInquiry200JSONResponseBodyOk.
+const (
+	GetBuyerContractorInquiry200JSONResponseBodyOkTrue GetBuyerContractorInquiry200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetBuyerContractorInquiry200JSONResponseBodyOk enum.
+func (e GetBuyerContractorInquiry200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetBuyerContractorInquiry200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListBuyerAddresses200JSONResponseBodyOk.
+const (
+	ListBuyerAddresses200JSONResponseBodyOkTrue ListBuyerAddresses200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListBuyerAddresses200JSONResponseBodyOk enum.
+func (e ListBuyerAddresses200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListBuyerAddresses200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateBuyerAddress201JSONResponseBodyOk.
+const (
+	CreateBuyerAddress201JSONResponseBodyOkTrue CreateBuyerAddress201JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the CreateBuyerAddress201JSONResponseBodyOk enum.
+func (e CreateBuyerAddress201JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case CreateBuyerAddress201JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetBuyerAddress200JSONResponseBodyOk.
+const (
+	GetBuyerAddress200JSONResponseBodyOkTrue GetBuyerAddress200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetBuyerAddress200JSONResponseBodyOk enum.
+func (e GetBuyerAddress200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetBuyerAddress200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateBuyerAddress200JSONResponseBodyOk.
+const (
+	UpdateBuyerAddress200JSONResponseBodyOkTrue UpdateBuyerAddress200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the UpdateBuyerAddress200JSONResponseBodyOk enum.
+func (e UpdateBuyerAddress200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case UpdateBuyerAddress200JSONResponseBodyOkTrue:
 		return true
 	default:
 		return false
@@ -1673,6 +2415,141 @@ const (
 func (e GetDriverMeConsents200JSONResponseBodyOk) Valid() bool {
 	switch e {
 	case GetDriverMeConsents200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListMerchantContractorDemands200JSONResponseBodyOk.
+const (
+	ListMerchantContractorDemands200JSONResponseBodyOkTrue ListMerchantContractorDemands200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListMerchantContractorDemands200JSONResponseBodyOk enum.
+func (e ListMerchantContractorDemands200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListMerchantContractorDemands200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetMerchantContractorDemand200JSONResponseBodyOk.
+const (
+	GetMerchantContractorDemand200JSONResponseBodyOkTrue GetMerchantContractorDemand200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetMerchantContractorDemand200JSONResponseBodyOk enum.
+func (e GetMerchantContractorDemand200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetMerchantContractorDemand200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListMerchantContractorQuotes200JSONResponseBodyOk.
+const (
+	ListMerchantContractorQuotes200JSONResponseBodyOkTrue ListMerchantContractorQuotes200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListMerchantContractorQuotes200JSONResponseBodyOk enum.
+func (e ListMerchantContractorQuotes200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListMerchantContractorQuotes200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateMerchantContractorQuote201JSONResponseBodyOk.
+const (
+	CreateMerchantContractorQuote201JSONResponseBodyOkTrue CreateMerchantContractorQuote201JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the CreateMerchantContractorQuote201JSONResponseBodyOk enum.
+func (e CreateMerchantContractorQuote201JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case CreateMerchantContractorQuote201JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetMerchantContractorQuote200JSONResponseBodyOk.
+const (
+	GetMerchantContractorQuote200JSONResponseBodyOkTrue GetMerchantContractorQuote200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetMerchantContractorQuote200JSONResponseBodyOk enum.
+func (e GetMerchantContractorQuote200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetMerchantContractorQuote200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListMerchantAddresses200JSONResponseBodyOk.
+const (
+	ListMerchantAddresses200JSONResponseBodyOkTrue ListMerchantAddresses200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListMerchantAddresses200JSONResponseBodyOk enum.
+func (e ListMerchantAddresses200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListMerchantAddresses200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateMerchantAddress201JSONResponseBodyOk.
+const (
+	CreateMerchantAddress201JSONResponseBodyOkTrue CreateMerchantAddress201JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the CreateMerchantAddress201JSONResponseBodyOk enum.
+func (e CreateMerchantAddress201JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case CreateMerchantAddress201JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetMerchantAddress200JSONResponseBodyOk.
+const (
+	GetMerchantAddress200JSONResponseBodyOkTrue GetMerchantAddress200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetMerchantAddress200JSONResponseBodyOk enum.
+func (e GetMerchantAddress200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetMerchantAddress200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateMerchantAddress200JSONResponseBodyOk.
+const (
+	UpdateMerchantAddress200JSONResponseBodyOkTrue UpdateMerchantAddress200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the UpdateMerchantAddress200JSONResponseBodyOk enum.
+func (e UpdateMerchantAddress200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case UpdateMerchantAddress200JSONResponseBodyOkTrue:
 		return true
 	default:
 		return false
@@ -1790,6 +2667,141 @@ func (e ListMerchantProductsParamsStatus) Valid() bool {
 	case ListMerchantProductsParamsStatusRejected:
 		return true
 	case ListMerchantProductsParamsStatusReview:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListMerchantStaff200JSONResponseBodyOk.
+const (
+	ListMerchantStaff200JSONResponseBodyOkTrue ListMerchantStaff200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListMerchantStaff200JSONResponseBodyOk enum.
+func (e ListMerchantStaff200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListMerchantStaff200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateMerchantStaff201JSONResponseBodyOk.
+const (
+	CreateMerchantStaff201JSONResponseBodyOkTrue CreateMerchantStaff201JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the CreateMerchantStaff201JSONResponseBodyOk enum.
+func (e CreateMerchantStaff201JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case CreateMerchantStaff201JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for InviteMerchantStaff202JSONResponseBodyOk.
+const (
+	InviteMerchantStaff202JSONResponseBodyOkTrue InviteMerchantStaff202JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the InviteMerchantStaff202JSONResponseBodyOk enum.
+func (e InviteMerchantStaff202JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case InviteMerchantStaff202JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetMerchantStaff200JSONResponseBodyOk.
+const (
+	GetMerchantStaff200JSONResponseBodyOkTrue GetMerchantStaff200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetMerchantStaff200JSONResponseBodyOk enum.
+func (e GetMerchantStaff200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetMerchantStaff200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UpdateMerchantStaff200JSONResponseBodyOk.
+const (
+	UpdateMerchantStaff200JSONResponseBodyOkTrue UpdateMerchantStaff200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the UpdateMerchantStaff200JSONResponseBodyOk enum.
+func (e UpdateMerchantStaff200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case UpdateMerchantStaff200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListPublicContractorCases200JSONResponseBodyOk.
+const (
+	ListPublicContractorCases200JSONResponseBodyOkTrue ListPublicContractorCases200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListPublicContractorCases200JSONResponseBodyOk enum.
+func (e ListPublicContractorCases200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListPublicContractorCases200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetPublicContractorCase200JSONResponseBodyOk.
+const (
+	GetPublicContractorCase200JSONResponseBodyOkTrue GetPublicContractorCase200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetPublicContractorCase200JSONResponseBodyOk enum.
+func (e GetPublicContractorCase200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetPublicContractorCase200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListPublicContractors200JSONResponseBodyOk.
+const (
+	ListPublicContractors200JSONResponseBodyOkTrue ListPublicContractors200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListPublicContractors200JSONResponseBodyOk enum.
+func (e ListPublicContractors200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListPublicContractors200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetPublicContractor200JSONResponseBodyOk.
+const (
+	GetPublicContractor200JSONResponseBodyOkTrue GetPublicContractor200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetPublicContractor200JSONResponseBodyOk enum.
+func (e GetPublicContractor200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetPublicContractor200JSONResponseBodyOkTrue:
 		return true
 	default:
 		return false
@@ -1966,6 +2978,53 @@ type ActionSuccessResponse struct {
 
 // ActionSuccessResponseOk defines model for ActionSuccessResponse.Ok.
 type ActionSuccessResponseOk bool
+
+// AddressListData defines model for AddressListData.
+type AddressListData struct {
+	Items    []AddressRecord `json:"items"`
+	Page     int             `json:"page"`
+	PageSize int             `json:"page_size"`
+	Total    int             `json:"total"`
+}
+
+// AddressPatchRequest Partial update semantics are owner-tbd; omitted fields remain unchanged.
+type AddressPatchRequest struct {
+	AddressText *string  `json:"address_text,omitempty"`
+	IsDefault   *bool    `json:"is_default,omitempty"`
+	Latitude    *float64 `json:"latitude,omitempty"`
+	Longitude   *float64 `json:"longitude,omitempty"`
+
+	// Phone Full phone is accepted only for the owner write; every read is masked.
+	Phone         *string `json:"phone,omitempty"`
+	RecipientName *string `json:"recipient_name,omitempty"`
+}
+
+// AddressRecord defines model for AddressRecord.
+type AddressRecord struct {
+	AddressText string    `json:"address_text"`
+	CreatedAt   time.Time `json:"created_at"`
+	IsDefault   bool      `json:"is_default"`
+	Latitude    float64   `json:"latitude"`
+	Longitude   float64   `json:"longitude"`
+
+	// Phone Masked phone; the address book never returns the full number.
+	Phone         string    `json:"phone"`
+	PublicId      string    `json:"public_id"`
+	RecipientName string    `json:"recipient_name"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// AddressWriteRequest defines model for AddressWriteRequest.
+type AddressWriteRequest struct {
+	AddressText string  `json:"address_text"`
+	IsDefault   *bool   `json:"is_default,omitempty"`
+	Latitude    float64 `json:"latitude"`
+	Longitude   float64 `json:"longitude"`
+
+	// Phone Full phone is accepted only for the owner write; every read is masked.
+	Phone         string `json:"phone"`
+	RecipientName string `json:"recipient_name"`
+}
 
 // AdminLoginData defines model for AdminLoginData.
 type AdminLoginData struct {
@@ -2263,6 +3322,14 @@ type BuyerSuborder struct {
 	Status OrderStatus `json:"status"`
 }
 
+// CaseListData defines model for CaseListData.
+type CaseListData struct {
+	Items    []ContractorCase `json:"items"`
+	Page     int              `json:"page"`
+	PageSize int              `json:"page_size"`
+	Total    int              `json:"total"`
+}
+
 // Category defines model for Category.
 type Category struct {
 	Code        string  `json:"code"`
@@ -2318,6 +3385,109 @@ type ConsentStatus struct {
 // ConsentStatusData defines model for ConsentStatusData.
 type ConsentStatusData struct {
 	Items []ConsentStatus `json:"items"`
+}
+
+// ContractorCase defines model for ContractorCase.
+type ContractorCase struct {
+	Body               Messages             `json:"body"`
+	ContractorPublicId string               `json:"contractor_public_id"`
+	ImageFilePublicIds []string             `json:"image_file_public_ids"`
+	PublicId           string               `json:"public_id"`
+	PublishedAt        time.Time            `json:"published_at"`
+	Status             ContractorCaseStatus `json:"status"`
+	Title              Messages             `json:"title"`
+}
+
+// ContractorCaseStatus defines model for ContractorCase.Status.
+type ContractorCaseStatus string
+
+// ContractorDemand defines model for ContractorDemand.
+type ContractorDemand struct {
+	CreatedAt   time.Time              `json:"created_at"`
+	Description string                 `json:"description"`
+	PublicId    string                 `json:"public_id"`
+	Status      ContractorDemandStatus `json:"status"`
+	Title       string                 `json:"title"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+}
+
+// ContractorDemandStatus defines model for ContractorDemand.Status.
+type ContractorDemandStatus string
+
+// ContractorInquiry defines model for ContractorInquiry.
+type ContractorInquiry struct {
+	ContractorPublicId string                  `json:"contractor_public_id"`
+	CreatedAt          time.Time               `json:"created_at"`
+	Description        string                  `json:"description"`
+	PublicId           string                  `json:"public_id"`
+	Status             ContractorInquiryStatus `json:"status"`
+	Title              string                  `json:"title"`
+	UpdatedAt          time.Time               `json:"updated_at"`
+}
+
+// ContractorInquiryStatus defines model for ContractorInquiry.Status.
+type ContractorInquiryStatus string
+
+// ContractorInquiryWriteRequest defines model for ContractorInquiryWriteRequest.
+type ContractorInquiryWriteRequest struct {
+	AddressPublicId    *string   `json:"address_public_id,omitempty"`
+	ContractorPublicId *string   `json:"contractor_public_id,omitempty"`
+	Description        string    `json:"description"`
+	ImageFilePublicIds *[]string `json:"image_file_public_ids,omitempty"`
+	Title              string    `json:"title"`
+}
+
+// ContractorListData defines model for ContractorListData.
+type ContractorListData struct {
+	Items    []ContractorProfile `json:"items"`
+	Page     int                 `json:"page"`
+	PageSize int                 `json:"page_size"`
+	Total    int                 `json:"total"`
+}
+
+// ContractorProfile defines model for ContractorProfile.
+type ContractorProfile struct {
+	Categories  []string                `json:"categories"`
+	Description Messages                `json:"description"`
+	Name        Messages                `json:"name"`
+	PublicId    string                  `json:"public_id"`
+	Status      ContractorProfileStatus `json:"status"`
+}
+
+// ContractorProfileStatus defines model for ContractorProfile.Status.
+type ContractorProfileStatus string
+
+// ContractorQuote defines model for ContractorQuote.
+type ContractorQuote struct {
+	// AmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	AmountE4       OrderMoneyE4          `json:"amount_e4"`
+	CreatedAt      time.Time             `json:"created_at"`
+	DemandPublicId string                `json:"demand_public_id"`
+	Description    string                `json:"description"`
+	PublicId       string                `json:"public_id"`
+	Status         ContractorQuoteStatus `json:"status"`
+	UpdatedAt      time.Time             `json:"updated_at"`
+}
+
+// ContractorQuoteStatus defines model for ContractorQuote.Status.
+type ContractorQuoteStatus string
+
+// ContractorQuoteWriteRequest defines model for ContractorQuoteWriteRequest.
+type ContractorQuoteWriteRequest struct {
+	// AmountE4 Amount in ten-thousandths of a US dollar. Unit prices, shipping charges and payable amounts must be whole cents (e4 % 100 = 0); the server rejects rather than rounds invalid amounts.
+	AmountE4    OrderMoneyE4 `json:"amount_e4"`
+	Description string       `json:"description"`
+
+	// ValidUntil Owner-tbd validity semantics; the field is descriptive only in this design.
+	ValidUntil *time.Time `json:"valid_until,omitempty"`
+}
+
+// DemandListData defines model for DemandListData.
+type DemandListData struct {
+	Items    []ContractorDemand `json:"items"`
+	Page     int                `json:"page"`
+	PageSize int                `json:"page_size"`
+	Total    int                `json:"total"`
 }
 
 // ErrorBody defines model for ErrorBody.
@@ -2451,6 +3621,14 @@ type FundsPosition struct {
 	UserAvailableE4  int64 `json:"user_available_e4"`
 }
 
+// InquiryListData defines model for InquiryListData.
+type InquiryListData struct {
+	Items    []ContractorInquiry `json:"items"`
+	Page     int                 `json:"page"`
+	PageSize int                 `json:"page_size"`
+	Total    int                 `json:"total"`
+}
+
 // LanguageUpdateRequest defines model for LanguageUpdateRequest.
 type LanguageUpdateRequest struct {
 	Lang LanguageUpdateRequestLang `json:"lang"`
@@ -2505,6 +3683,73 @@ type MerchantShippingAddressSnapshot struct {
 	Phone         string `json:"phone"`
 	RecipientName string `json:"recipient_name"`
 }
+
+// MerchantStaff defines model for MerchantStaff.
+type MerchantStaff struct {
+	CreatedAt   time.Time `json:"created_at"`
+	DisplayName string    `json:"display_name"`
+
+	// PermissionScope Owner-tbd permission identifiers and data scopes.
+	PermissionScope []string `json:"permission_scope"`
+	PublicId        string   `json:"public_id"`
+
+	// Role Four examples only; owner-tbd role catalog.
+	Role      MerchantStaffRole   `json:"role"`
+	Status    MerchantStaffStatus `json:"status"`
+	UpdatedAt time.Time           `json:"updated_at"`
+}
+
+// MerchantStaffRole Four examples only; owner-tbd role catalog.
+type MerchantStaffRole string
+
+// MerchantStaffStatus defines model for MerchantStaff.Status.
+type MerchantStaffStatus string
+
+// MerchantStaffInviteRequest defines model for MerchantStaffInviteRequest.
+type MerchantStaffInviteRequest struct {
+	PermissionScope  []string                       `json:"permission_scope"`
+	Phone            *string                        `json:"phone,omitempty"`
+	Role             MerchantStaffInviteRequestRole `json:"role"`
+	TelegramUsername *string                        `json:"telegram_username,omitempty"`
+	union            json.RawMessage
+}
+
+// MerchantStaffInviteRequestRole defines model for MerchantStaffInviteRequest.Role.
+type MerchantStaffInviteRequestRole string
+
+// MerchantStaffInviteRequest0 defines model for MerchantStaffInviteRequest.0.
+type MerchantStaffInviteRequest0 struct {
+	TelegramUsername string `json:"telegram_username"`
+}
+
+// MerchantStaffInviteRequest1 defines model for MerchantStaffInviteRequest.1.
+type MerchantStaffInviteRequest1 struct {
+	Phone string `json:"phone"`
+}
+
+// MerchantStaffPatchRequest defines model for MerchantStaffPatchRequest.
+type MerchantStaffPatchRequest struct {
+	DisplayName     *string                          `json:"display_name,omitempty"`
+	PermissionScope *[]string                        `json:"permission_scope,omitempty"`
+	Role            *MerchantStaffPatchRequestRole   `json:"role,omitempty"`
+	Status          *MerchantStaffPatchRequestStatus `json:"status,omitempty"`
+}
+
+// MerchantStaffPatchRequestRole defines model for MerchantStaffPatchRequest.Role.
+type MerchantStaffPatchRequestRole string
+
+// MerchantStaffPatchRequestStatus defines model for MerchantStaffPatchRequest.Status.
+type MerchantStaffPatchRequestStatus string
+
+// MerchantStaffWriteRequest defines model for MerchantStaffWriteRequest.
+type MerchantStaffWriteRequest struct {
+	DisplayName     string                        `json:"display_name"`
+	PermissionScope []string                      `json:"permission_scope"`
+	Role            MerchantStaffWriteRequestRole `json:"role"`
+}
+
+// MerchantStaffWriteRequestRole defines model for MerchantStaffWriteRequest.Role.
+type MerchantStaffWriteRequestRole string
 
 // MerchantSuborder One suborder scoped to the authenticated merchant; sibling merchant data is never included.
 type MerchantSuborder struct {
@@ -2710,6 +3955,62 @@ type PingSuccessResponse struct {
 // PingSuccessResponseOk defines model for PingSuccessResponse.Ok.
 type PingSuccessResponseOk bool
 
+// PolicyDocument defines model for PolicyDocument.
+type PolicyDocument struct {
+	Content       Messages            `json:"content"`
+	EffectiveDate openapi_types.Date  `json:"effective_date"`
+	Kind          PolicyDocumentKind  `json:"kind"`
+	PublicId      string              `json:"public_id"`
+	State         PolicyDocumentState `json:"state"`
+	UpdatedAt     time.Time           `json:"updated_at"`
+	Version       string              `json:"version"`
+}
+
+// PolicyDocumentKind defines model for PolicyDocument.Kind.
+type PolicyDocumentKind string
+
+// PolicyDocumentState defines model for PolicyDocument.State.
+type PolicyDocumentState string
+
+// PolicyDraftRequest defines model for PolicyDraftRequest.
+type PolicyDraftRequest struct {
+	Content       Messages            `json:"content"`
+	EffectiveDate *openapi_types.Date `json:"effective_date,omitempty"`
+}
+
+// PolicyListData defines model for PolicyListData.
+type PolicyListData struct {
+	Items    []PolicyDocument `json:"items"`
+	Page     int              `json:"page"`
+	PageSize int              `json:"page_size"`
+	Total    int              `json:"total"`
+}
+
+// PolicyPublishRequest defines model for PolicyPublishRequest.
+type PolicyPublishRequest struct {
+	ChangeNote      string             `json:"change_note"`
+	EffectiveDate   openapi_types.Date `json:"effective_date"`
+	ExpectedVersion *string            `json:"expected_version,omitempty"`
+}
+
+// PolicyVersion defines model for PolicyVersion.
+type PolicyVersion struct {
+	ChangeNote     string             `json:"change_note"`
+	EffectiveDate  openapi_types.Date `json:"effective_date"`
+	PolicyPublicId string             `json:"policy_public_id"`
+	PublicId       string             `json:"public_id"`
+	PublishedAt    time.Time          `json:"published_at"`
+	Version        string             `json:"version"`
+}
+
+// PolicyVersionListData defines model for PolicyVersionListData.
+type PolicyVersionListData struct {
+	Items    []PolicyVersion `json:"items"`
+	Page     int             `json:"page"`
+	PageSize int             `json:"page_size"`
+	Total    int             `json:"total"`
+}
+
 // Product defines model for Product.
 type Product struct {
 	CategoryCode string `json:"category_code"`
@@ -2845,6 +4146,14 @@ type ProductUpdateRequestOrigin string
 
 // ProductUpdateRequestStatus Merchants may move a product to draft, off, or submit it for administrative review; on is reached through publish.
 type ProductUpdateRequestStatus string
+
+// QuoteListData defines model for QuoteListData.
+type QuoteListData struct {
+	Items    []ContractorQuote `json:"items"`
+	Page     int               `json:"page"`
+	PageSize int               `json:"page_size"`
+	Total    int               `json:"total"`
+}
 
 // RefreshData defines model for RefreshData.
 type RefreshData struct {
@@ -2982,6 +4291,14 @@ type SkuSpecValue struct {
 	Value string `json:"value"`
 }
 
+// StaffListData defines model for StaffListData.
+type StaffListData struct {
+	Items    []MerchantStaff `json:"items"`
+	Page     int             `json:"page"`
+	PageSize int             `json:"page_size"`
+	Total    int             `json:"total"`
+}
+
 // SuccessEnvelope defines model for SuccessEnvelope.
 type SuccessEnvelope struct {
 	Data      interface{}       `json:"data"`
@@ -3099,6 +4416,26 @@ type AccountProfileSucceeded = AccountProfileSuccessResponse
 // ActionSucceeded defines model for ActionSucceeded.
 type ActionSucceeded = ActionSuccessResponse
 
+// AddressListSucceeded defines model for AddressListSucceeded.
+type AddressListSucceeded struct {
+	Data      AddressListData        `json:"data"`
+	Ok        AddressListSucceededOk `json:"ok"`
+	RequestId string                 `json:"request_id"`
+}
+
+// AddressListSucceededOk defines model for AddressListSucceeded.Ok.
+type AddressListSucceededOk bool
+
+// AddressSucceeded defines model for AddressSucceeded.
+type AddressSucceeded struct {
+	Data      AddressRecord      `json:"data"`
+	Ok        AddressSucceededOk `json:"ok"`
+	RequestId string             `json:"request_id"`
+}
+
+// AddressSucceededOk defines model for AddressSucceeded.Ok.
+type AddressSucceededOk bool
+
 // AdminRefreshSucceeded defines model for AdminRefreshSucceeded.
 type AdminRefreshSucceeded = AdminLoginSuccessResponse
 
@@ -3117,6 +4454,26 @@ type BuyerOrderDetailSucceeded = BuyerOrderSuccessResponse
 // BuyerOrderSucceeded defines model for BuyerOrderSucceeded.
 type BuyerOrderSucceeded = BuyerOrderListSuccessResponse
 
+// CaseListSucceeded defines model for CaseListSucceeded.
+type CaseListSucceeded struct {
+	Data      CaseListData        `json:"data"`
+	Ok        CaseListSucceededOk `json:"ok"`
+	RequestId string              `json:"request_id"`
+}
+
+// CaseListSucceededOk defines model for CaseListSucceeded.Ok.
+type CaseListSucceededOk bool
+
+// CaseSucceeded defines model for CaseSucceeded.
+type CaseSucceeded struct {
+	Data      ContractorCase  `json:"data"`
+	Ok        CaseSucceededOk `json:"ok"`
+	RequestId string          `json:"request_id"`
+}
+
+// CaseSucceededOk defines model for CaseSucceeded.Ok.
+type CaseSucceededOk bool
+
 // Conflict defines model for Conflict.
 type Conflict = ErrorEnvelope
 
@@ -3130,8 +4487,68 @@ type ConsentStatusSucceeded struct {
 // ConsentStatusSucceededOk defines model for ConsentStatusSucceeded.Ok.
 type ConsentStatusSucceededOk bool
 
+// ContractorListSucceeded defines model for ContractorListSucceeded.
+type ContractorListSucceeded struct {
+	Data      ContractorListData        `json:"data"`
+	Ok        ContractorListSucceededOk `json:"ok"`
+	RequestId string                    `json:"request_id"`
+}
+
+// ContractorListSucceededOk defines model for ContractorListSucceeded.Ok.
+type ContractorListSucceededOk bool
+
+// ContractorSucceeded defines model for ContractorSucceeded.
+type ContractorSucceeded struct {
+	Data      ContractorProfile     `json:"data"`
+	Ok        ContractorSucceededOk `json:"ok"`
+	RequestId string                `json:"request_id"`
+}
+
+// ContractorSucceededOk defines model for ContractorSucceeded.Ok.
+type ContractorSucceededOk bool
+
+// DemandListSucceeded defines model for DemandListSucceeded.
+type DemandListSucceeded struct {
+	Data      DemandListData        `json:"data"`
+	Ok        DemandListSucceededOk `json:"ok"`
+	RequestId string                `json:"request_id"`
+}
+
+// DemandListSucceededOk defines model for DemandListSucceeded.Ok.
+type DemandListSucceededOk bool
+
+// DemandSucceeded defines model for DemandSucceeded.
+type DemandSucceeded struct {
+	Data      ContractorDemand  `json:"data"`
+	Ok        DemandSucceededOk `json:"ok"`
+	RequestId string            `json:"request_id"`
+}
+
+// DemandSucceededOk defines model for DemandSucceeded.Ok.
+type DemandSucceededOk bool
+
 // Forbidden defines model for Forbidden.
 type Forbidden = ErrorEnvelope
+
+// InquiryListSucceeded defines model for InquiryListSucceeded.
+type InquiryListSucceeded struct {
+	Data      InquiryListData        `json:"data"`
+	Ok        InquiryListSucceededOk `json:"ok"`
+	RequestId string                 `json:"request_id"`
+}
+
+// InquiryListSucceededOk defines model for InquiryListSucceeded.Ok.
+type InquiryListSucceededOk bool
+
+// InquirySucceeded defines model for InquirySucceeded.
+type InquirySucceeded struct {
+	Data      ContractorInquiry  `json:"data"`
+	Ok        InquirySucceededOk `json:"ok"`
+	RequestId string             `json:"request_id"`
+}
+
+// InquirySucceededOk defines model for InquirySucceeded.Ok.
+type InquirySucceededOk bool
 
 // InternalServerError defines model for InternalServerError.
 type InternalServerError = ErrorEnvelope
@@ -3197,8 +4614,58 @@ type OrderBadRequest = ErrorEnvelope
 // OrderConflict defines model for OrderConflict.
 type OrderConflict = ErrorEnvelope
 
+// PolicyListSucceeded defines model for PolicyListSucceeded.
+type PolicyListSucceeded struct {
+	Data      PolicyListData        `json:"data"`
+	Ok        PolicyListSucceededOk `json:"ok"`
+	RequestId string                `json:"request_id"`
+}
+
+// PolicyListSucceededOk defines model for PolicyListSucceeded.Ok.
+type PolicyListSucceededOk bool
+
+// PolicySucceeded defines model for PolicySucceeded.
+type PolicySucceeded struct {
+	Data      PolicyDocument    `json:"data"`
+	Ok        PolicySucceededOk `json:"ok"`
+	RequestId string            `json:"request_id"`
+}
+
+// PolicySucceededOk defines model for PolicySucceeded.Ok.
+type PolicySucceededOk bool
+
+// PolicyVersionListSucceeded defines model for PolicyVersionListSucceeded.
+type PolicyVersionListSucceeded struct {
+	Data      PolicyVersionListData        `json:"data"`
+	Ok        PolicyVersionListSucceededOk `json:"ok"`
+	RequestId string                       `json:"request_id"`
+}
+
+// PolicyVersionListSucceededOk defines model for PolicyVersionListSucceeded.Ok.
+type PolicyVersionListSucceededOk bool
+
 // ProductSucceeded defines model for ProductSucceeded.
 type ProductSucceeded = ProductSuccessResponse
+
+// QuoteListSucceeded defines model for QuoteListSucceeded.
+type QuoteListSucceeded struct {
+	Data      QuoteListData        `json:"data"`
+	Ok        QuoteListSucceededOk `json:"ok"`
+	RequestId string               `json:"request_id"`
+}
+
+// QuoteListSucceededOk defines model for QuoteListSucceeded.Ok.
+type QuoteListSucceededOk bool
+
+// QuoteSucceeded defines model for QuoteSucceeded.
+type QuoteSucceeded struct {
+	Data      ContractorQuote  `json:"data"`
+	Ok        QuoteSucceededOk `json:"ok"`
+	RequestId string           `json:"request_id"`
+}
+
+// QuoteSucceededOk defines model for QuoteSucceeded.Ok.
+type QuoteSucceededOk bool
 
 // RefreshSucceeded defines model for RefreshSucceeded.
 type RefreshSucceeded = RefreshSuccessResponse
@@ -3211,6 +4678,36 @@ type ServiceUnavailable = ErrorEnvelope
 
 // SessionListSucceeded defines model for SessionListSucceeded.
 type SessionListSucceeded = SessionListSuccessResponse
+
+// StaffInvitationSucceeded defines model for StaffInvitationSucceeded.
+type StaffInvitationSucceeded struct {
+	Data      MerchantStaff              `json:"data"`
+	Ok        StaffInvitationSucceededOk `json:"ok"`
+	RequestId string                     `json:"request_id"`
+}
+
+// StaffInvitationSucceededOk defines model for StaffInvitationSucceeded.Ok.
+type StaffInvitationSucceededOk bool
+
+// StaffListSucceeded defines model for StaffListSucceeded.
+type StaffListSucceeded struct {
+	Data      StaffListData        `json:"data"`
+	Ok        StaffListSucceededOk `json:"ok"`
+	RequestId string               `json:"request_id"`
+}
+
+// StaffListSucceededOk defines model for StaffListSucceeded.Ok.
+type StaffListSucceededOk bool
+
+// StaffSucceeded defines model for StaffSucceeded.
+type StaffSucceeded struct {
+	Data      MerchantStaff    `json:"data"`
+	Ok        StaffSucceededOk `json:"ok"`
+	RequestId string           `json:"request_id"`
+}
+
+// StaffSucceededOk defines model for StaffSucceeded.Ok.
+type StaffSucceededOk bool
 
 // TooManyRequests defines model for TooManyRequests.
 type TooManyRequests = ErrorEnvelope
@@ -3334,11 +4831,122 @@ type ListAdminOrdersParams struct {
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
 
+// ListAdminPoliciesParams defines parameters for ListAdminPolicies.
+type ListAdminPoliciesParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListAdminPolicies200JSONResponseBodyOk defines parameters for ListAdminPolicies.
+type ListAdminPolicies200JSONResponseBodyOk bool
+
+// GetAdminPolicy200JSONResponseBodyOk defines parameters for GetAdminPolicy.
+type GetAdminPolicy200JSONResponseBodyOk bool
+
+// SaveAdminPolicyDraftParams defines parameters for SaveAdminPolicyDraft.
+type SaveAdminPolicyDraftParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// SaveAdminPolicyDraft200JSONResponseBodyOk defines parameters for SaveAdminPolicyDraft.
+type SaveAdminPolicyDraft200JSONResponseBodyOk bool
+
+// PublishAdminPolicyParams defines parameters for PublishAdminPolicy.
+type PublishAdminPolicyParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+
+	// XStepUpToken Single-use token scoped to a declared high-risk action and account.
+	XStepUpToken XStepUpToken `json:"X-Step-Up-Token"`
+}
+
+// PublishAdminPolicy200JSONResponseBodyOk defines parameters for PublishAdminPolicy.
+type PublishAdminPolicy200JSONResponseBodyOk bool
+
+// ListAdminPolicyVersionsParams defines parameters for ListAdminPolicyVersions.
+type ListAdminPolicyVersionsParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListAdminPolicyVersions200JSONResponseBodyOk defines parameters for ListAdminPolicyVersions.
+type ListAdminPolicyVersions200JSONResponseBodyOk bool
+
 // PostBuyerAuthLogoutParams defines parameters for PostBuyerAuthLogout.
 type PostBuyerAuthLogoutParams struct {
 	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
+
+// ListBuyerContractorInquiriesParams defines parameters for ListBuyerContractorInquiries.
+type ListBuyerContractorInquiriesParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListBuyerContractorInquiries200JSONResponseBodyOk defines parameters for ListBuyerContractorInquiries.
+type ListBuyerContractorInquiries200JSONResponseBodyOk bool
+
+// CreateBuyerContractorInquiryParams defines parameters for CreateBuyerContractorInquiry.
+type CreateBuyerContractorInquiryParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateBuyerContractorInquiry201JSONResponseBodyOk defines parameters for CreateBuyerContractorInquiry.
+type CreateBuyerContractorInquiry201JSONResponseBodyOk bool
+
+// GetBuyerContractorInquiry200JSONResponseBodyOk defines parameters for GetBuyerContractorInquiry.
+type GetBuyerContractorInquiry200JSONResponseBodyOk bool
+
+// ListBuyerAddressesParams defines parameters for ListBuyerAddresses.
+type ListBuyerAddressesParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListBuyerAddresses200JSONResponseBodyOk defines parameters for ListBuyerAddresses.
+type ListBuyerAddresses200JSONResponseBodyOk bool
+
+// CreateBuyerAddressParams defines parameters for CreateBuyerAddress.
+type CreateBuyerAddressParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateBuyerAddress201JSONResponseBodyOk defines parameters for CreateBuyerAddress.
+type CreateBuyerAddress201JSONResponseBodyOk bool
+
+// DeleteBuyerAddressParams defines parameters for DeleteBuyerAddress.
+type DeleteBuyerAddressParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// GetBuyerAddress200JSONResponseBodyOk defines parameters for GetBuyerAddress.
+type GetBuyerAddress200JSONResponseBodyOk bool
+
+// UpdateBuyerAddressParams defines parameters for UpdateBuyerAddress.
+type UpdateBuyerAddressParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateBuyerAddress200JSONResponseBodyOk defines parameters for UpdateBuyerAddress.
+type UpdateBuyerAddress200JSONResponseBodyOk bool
 
 // GetBuyerMeConsents200JSONResponseBodyOk defines parameters for GetBuyerMeConsents.
 type GetBuyerMeConsents200JSONResponseBodyOk bool
@@ -3483,6 +5091,84 @@ type PostMerchantAuthLogoutParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ListMerchantContractorDemandsParams defines parameters for ListMerchantContractorDemands.
+type ListMerchantContractorDemandsParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListMerchantContractorDemands200JSONResponseBodyOk defines parameters for ListMerchantContractorDemands.
+type ListMerchantContractorDemands200JSONResponseBodyOk bool
+
+// GetMerchantContractorDemand200JSONResponseBodyOk defines parameters for GetMerchantContractorDemand.
+type GetMerchantContractorDemand200JSONResponseBodyOk bool
+
+// ListMerchantContractorQuotesParams defines parameters for ListMerchantContractorQuotes.
+type ListMerchantContractorQuotesParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListMerchantContractorQuotes200JSONResponseBodyOk defines parameters for ListMerchantContractorQuotes.
+type ListMerchantContractorQuotes200JSONResponseBodyOk bool
+
+// CreateMerchantContractorQuoteParams defines parameters for CreateMerchantContractorQuote.
+type CreateMerchantContractorQuoteParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateMerchantContractorQuote201JSONResponseBodyOk defines parameters for CreateMerchantContractorQuote.
+type CreateMerchantContractorQuote201JSONResponseBodyOk bool
+
+// GetMerchantContractorQuote200JSONResponseBodyOk defines parameters for GetMerchantContractorQuote.
+type GetMerchantContractorQuote200JSONResponseBodyOk bool
+
+// ListMerchantAddressesParams defines parameters for ListMerchantAddresses.
+type ListMerchantAddressesParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListMerchantAddresses200JSONResponseBodyOk defines parameters for ListMerchantAddresses.
+type ListMerchantAddresses200JSONResponseBodyOk bool
+
+// CreateMerchantAddressParams defines parameters for CreateMerchantAddress.
+type CreateMerchantAddressParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateMerchantAddress201JSONResponseBodyOk defines parameters for CreateMerchantAddress.
+type CreateMerchantAddress201JSONResponseBodyOk bool
+
+// DeleteMerchantAddressParams defines parameters for DeleteMerchantAddress.
+type DeleteMerchantAddressParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// GetMerchantAddress200JSONResponseBodyOk defines parameters for GetMerchantAddress.
+type GetMerchantAddress200JSONResponseBodyOk bool
+
+// UpdateMerchantAddressParams defines parameters for UpdateMerchantAddress.
+type UpdateMerchantAddressParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateMerchantAddress200JSONResponseBodyOk defines parameters for UpdateMerchantAddress.
+type UpdateMerchantAddress200JSONResponseBodyOk bool
+
 // GetMerchantMeConsents200JSONResponseBodyOk defines parameters for GetMerchantMeConsents.
 type GetMerchantMeConsents200JSONResponseBodyOk bool
 
@@ -3596,6 +5282,54 @@ type PublishMerchantProductParams struct {
 	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
 }
 
+// ListMerchantStaffParams defines parameters for ListMerchantStaff.
+type ListMerchantStaffParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListMerchantStaff200JSONResponseBodyOk defines parameters for ListMerchantStaff.
+type ListMerchantStaff200JSONResponseBodyOk bool
+
+// CreateMerchantStaffParams defines parameters for CreateMerchantStaff.
+type CreateMerchantStaffParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateMerchantStaff201JSONResponseBodyOk defines parameters for CreateMerchantStaff.
+type CreateMerchantStaff201JSONResponseBodyOk bool
+
+// InviteMerchantStaffParams defines parameters for InviteMerchantStaff.
+type InviteMerchantStaffParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// InviteMerchantStaff202JSONResponseBodyOk defines parameters for InviteMerchantStaff.
+type InviteMerchantStaff202JSONResponseBodyOk bool
+
+// DeleteMerchantStaffParams defines parameters for DeleteMerchantStaff.
+type DeleteMerchantStaffParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// GetMerchantStaff200JSONResponseBodyOk defines parameters for GetMerchantStaff.
+type GetMerchantStaff200JSONResponseBodyOk bool
+
+// UpdateMerchantStaffParams defines parameters for UpdateMerchantStaff.
+type UpdateMerchantStaffParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// UpdateMerchantStaff200JSONResponseBodyOk defines parameters for UpdateMerchantStaff.
+type UpdateMerchantStaff200JSONResponseBodyOk bool
+
 // ListMerchantSubordersParams defines parameters for ListMerchantSuborders.
 type ListMerchantSubordersParams struct {
 	// Cursor Opaque cursor returned by the previous page.
@@ -3604,6 +5338,24 @@ type ListMerchantSubordersParams struct {
 	// PageSize Number of items per page, capped at 100.
 	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
 }
+
+// ListPublicContractorCasesParams defines parameters for ListPublicContractorCases.
+type ListPublicContractorCasesParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+
+	// Category Restrict the result to one category code.
+	Category *CategoryCode `form:"category,omitempty" json:"category,omitempty"`
+}
+
+// ListPublicContractorCases200JSONResponseBodyOk defines parameters for ListPublicContractorCases.
+type ListPublicContractorCases200JSONResponseBodyOk bool
+
+// GetPublicContractorCase200JSONResponseBodyOk defines parameters for GetPublicContractorCase.
+type GetPublicContractorCase200JSONResponseBodyOk bool
 
 // ListPublicCategoriesParams defines parameters for ListPublicCategories.
 type ListPublicCategoriesParams struct {
@@ -3616,6 +5368,24 @@ type ListPublicCategoriesParams struct {
 	// Sort Comma-separated field names; prefix a field with - for descending order.
 	Sort *Sort `form:"sort,omitempty" json:"sort,omitempty"`
 }
+
+// ListPublicContractorsParams defines parameters for ListPublicContractors.
+type ListPublicContractorsParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+
+	// Category Restrict the result to one category code.
+	Category *CategoryCode `form:"category,omitempty" json:"category,omitempty"`
+}
+
+// ListPublicContractors200JSONResponseBodyOk defines parameters for ListPublicContractors.
+type ListPublicContractors200JSONResponseBodyOk bool
+
+// GetPublicContractor200JSONResponseBodyOk defines parameters for GetPublicContractor.
+type GetPublicContractor200JSONResponseBodyOk bool
 
 // GetPublicLegal200JSONResponseBodyOk defines parameters for GetPublicLegal.
 type GetPublicLegal200JSONResponseBodyOk bool
@@ -3679,6 +5449,21 @@ type PostAdminAuthStepUpJSONRequestBody = AdminStepUpRequest
 // PostAdminCatalogProductRejectJSONRequestBody defines body for PostAdminCatalogProductReject for application/json ContentType.
 type PostAdminCatalogProductRejectJSONRequestBody = ProductReviewRejectRequest
 
+// SaveAdminPolicyDraftJSONRequestBody defines body for SaveAdminPolicyDraft for application/json ContentType.
+type SaveAdminPolicyDraftJSONRequestBody = PolicyDraftRequest
+
+// PublishAdminPolicyJSONRequestBody defines body for PublishAdminPolicy for application/json ContentType.
+type PublishAdminPolicyJSONRequestBody = PolicyPublishRequest
+
+// CreateBuyerContractorInquiryJSONRequestBody defines body for CreateBuyerContractorInquiry for application/json ContentType.
+type CreateBuyerContractorInquiryJSONRequestBody = ContractorInquiryWriteRequest
+
+// CreateBuyerAddressJSONRequestBody defines body for CreateBuyerAddress for application/json ContentType.
+type CreateBuyerAddressJSONRequestBody = AddressWriteRequest
+
+// UpdateBuyerAddressJSONRequestBody defines body for UpdateBuyerAddress for application/json ContentType.
+type UpdateBuyerAddressJSONRequestBody = AddressPatchRequest
+
 // PostBuyerMeConsentsJSONRequestBody defines body for PostBuyerMeConsents for application/json ContentType.
 type PostBuyerMeConsentsJSONRequestBody = ConsentAcceptRequest
 
@@ -3706,6 +5491,15 @@ type PutDriverMeLanguageJSONRequestBody = LanguageUpdateRequest
 // PostFilePresignJSONRequestBody defines body for PostFilePresign for application/json ContentType.
 type PostFilePresignJSONRequestBody = FilePresignRequest
 
+// CreateMerchantContractorQuoteJSONRequestBody defines body for CreateMerchantContractorQuote for application/json ContentType.
+type CreateMerchantContractorQuoteJSONRequestBody = ContractorQuoteWriteRequest
+
+// CreateMerchantAddressJSONRequestBody defines body for CreateMerchantAddress for application/json ContentType.
+type CreateMerchantAddressJSONRequestBody = AddressWriteRequest
+
+// UpdateMerchantAddressJSONRequestBody defines body for UpdateMerchantAddress for application/json ContentType.
+type UpdateMerchantAddressJSONRequestBody = AddressPatchRequest
+
 // PostMerchantMeConsentsJSONRequestBody defines body for PostMerchantMeConsents for application/json ContentType.
 type PostMerchantMeConsentsJSONRequestBody = ConsentAcceptRequest
 
@@ -3727,11 +5521,156 @@ type CreateMerchantProductJSONRequestBody = ProductCreateRequest
 // UpdateMerchantProductJSONRequestBody defines body for UpdateMerchantProduct for application/json ContentType.
 type UpdateMerchantProductJSONRequestBody = ProductUpdateRequest
 
+// CreateMerchantStaffJSONRequestBody defines body for CreateMerchantStaff for application/json ContentType.
+type CreateMerchantStaffJSONRequestBody = MerchantStaffWriteRequest
+
+// InviteMerchantStaffJSONRequestBody defines body for InviteMerchantStaff for application/json ContentType.
+type InviteMerchantStaffJSONRequestBody = MerchantStaffInviteRequest
+
+// UpdateMerchantStaffJSONRequestBody defines body for UpdateMerchantStaff for application/json ContentType.
+type UpdateMerchantStaffJSONRequestBody = MerchantStaffPatchRequest
+
 // PostAuthRefreshJSONRequestBody defines body for PostAuthRefresh for application/json ContentType.
 type PostAuthRefreshJSONRequestBody = RefreshRequest
 
 // PostTelegramAuthJSONRequestBody defines body for PostTelegramAuth for application/json ContentType.
 type PostTelegramAuthJSONRequestBody = TelegramAuthRequest
+
+// AsMerchantStaffInviteRequest0 returns the union data inside the MerchantStaffInviteRequest as a MerchantStaffInviteRequest0
+func (t MerchantStaffInviteRequest) AsMerchantStaffInviteRequest0() (MerchantStaffInviteRequest0, error) {
+	var body MerchantStaffInviteRequest0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromMerchantStaffInviteRequest0 overwrites any union data inside the MerchantStaffInviteRequest as the provided MerchantStaffInviteRequest0
+func (t *MerchantStaffInviteRequest) FromMerchantStaffInviteRequest0(v MerchantStaffInviteRequest0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeMerchantStaffInviteRequest0 performs a merge with any union data inside the MerchantStaffInviteRequest, using the provided MerchantStaffInviteRequest0
+func (t *MerchantStaffInviteRequest) MergeMerchantStaffInviteRequest0(v MerchantStaffInviteRequest0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsMerchantStaffInviteRequest1 returns the union data inside the MerchantStaffInviteRequest as a MerchantStaffInviteRequest1
+func (t MerchantStaffInviteRequest) AsMerchantStaffInviteRequest1() (MerchantStaffInviteRequest1, error) {
+	var body MerchantStaffInviteRequest1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromMerchantStaffInviteRequest1 overwrites any union data inside the MerchantStaffInviteRequest as the provided MerchantStaffInviteRequest1
+func (t *MerchantStaffInviteRequest) FromMerchantStaffInviteRequest1(v MerchantStaffInviteRequest1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeMerchantStaffInviteRequest1 performs a merge with any union data inside the MerchantStaffInviteRequest, using the provided MerchantStaffInviteRequest1
+func (t *MerchantStaffInviteRequest) MergeMerchantStaffInviteRequest1(v MerchantStaffInviteRequest1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t MerchantStaffInviteRequest) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if t.PermissionScope != nil {
+		object["permission_scope"], err = json.Marshal(t.PermissionScope)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'permission_scope': %w", err)
+		}
+	}
+
+	if t.Phone != nil {
+		object["phone"], err = json.Marshal(t.Phone)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'phone': %w", err)
+		}
+	}
+
+	object["role"], err = json.Marshal(t.Role)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'role': %w", err)
+	}
+
+	if t.TelegramUsername != nil {
+		object["telegram_username"], err = json.Marshal(t.TelegramUsername)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'telegram_username': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *MerchantStaffInviteRequest) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["permission_scope"]; found {
+		err = json.Unmarshal(raw, &t.PermissionScope)
+		if err != nil {
+			return fmt.Errorf("error reading 'permission_scope': %w", err)
+		}
+	}
+
+	if raw, found := object["phone"]; found {
+		err = json.Unmarshal(raw, &t.Phone)
+		if err != nil {
+			return fmt.Errorf("error reading 'phone': %w", err)
+		}
+	}
+
+	if raw, found := object["role"]; found {
+		err = json.Unmarshal(raw, &t.Role)
+		if err != nil {
+			return fmt.Errorf("error reading 'role': %w", err)
+		}
+	}
+
+	if raw, found := object["telegram_username"]; found {
+		err = json.Unmarshal(raw, &t.TelegramUsername)
+		if err != nil {
+			return fmt.Errorf("error reading 'telegram_username': %w", err)
+		}
+	}
+
+	return err
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -3798,12 +5737,51 @@ type ServerInterface interface {
 	// GetAdminOrder Read one buyer order for authorized administrators
 	// (GET /v1/admin/orders/{public_id})
 	GetAdminOrder(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// ListAdminPolicies List policy documents and publication state
+	// (GET /v1/admin/policies)
+	ListAdminPolicies(w http.ResponseWriter, r *http.Request, params ListAdminPoliciesParams)
+	// GetAdminPolicy Read one policy document
+	// (GET /v1/admin/policies/{public_id})
+	GetAdminPolicy(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// SaveAdminPolicyDraft Save a three-language policy draft
+	// (PUT /v1/admin/policies/{public_id}/draft)
+	SaveAdminPolicyDraft(w http.ResponseWriter, r *http.Request, publicId PublicID, params SaveAdminPolicyDraftParams)
+	// PublishAdminPolicy Publish a reviewed three-language policy version
+	// (POST /v1/admin/policies/{public_id}/publish)
+	PublishAdminPolicy(w http.ResponseWriter, r *http.Request, publicId PublicID, params PublishAdminPolicyParams)
+	// ListAdminPolicyVersions List immutable policy publication history
+	// (GET /v1/admin/policies/{public_id}/versions)
+	ListAdminPolicyVersions(w http.ResponseWriter, r *http.Request, publicId PublicID, params ListAdminPolicyVersionsParams)
 	// PostBuyerAuthLogout Revoke the current buyer session
 	// (POST /v1/buyer/auth/logout)
 	PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request, params PostBuyerAuthLogoutParams)
+	// ListBuyerContractorInquiries List the buyer's contractor inquiries
+	// (GET /v1/buyer/contractor-inquiries)
+	ListBuyerContractorInquiries(w http.ResponseWriter, r *http.Request, params ListBuyerContractorInquiriesParams)
+	// CreateBuyerContractorInquiry Submit a contractor inquiry
+	// (POST /v1/buyer/contractor-inquiries)
+	CreateBuyerContractorInquiry(w http.ResponseWriter, r *http.Request, params CreateBuyerContractorInquiryParams)
+	// GetBuyerContractorInquiry Read one buyer contractor inquiry and its status
+	// (GET /v1/buyer/contractor-inquiries/{public_id})
+	GetBuyerContractorInquiry(w http.ResponseWriter, r *http.Request, publicId PublicID)
 	// GetBuyerMe Get the current buyer account profile
 	// (GET /v1/buyer/me)
 	GetBuyerMe(w http.ResponseWriter, r *http.Request)
+	// ListBuyerAddresses List the buyer's saved delivery addresses
+	// (GET /v1/buyer/me/addresses)
+	ListBuyerAddresses(w http.ResponseWriter, r *http.Request, params ListBuyerAddressesParams)
+	// CreateBuyerAddress Add a saved delivery address
+	// (POST /v1/buyer/me/addresses)
+	CreateBuyerAddress(w http.ResponseWriter, r *http.Request, params CreateBuyerAddressParams)
+	// DeleteBuyerAddress Delete a saved delivery address
+	// (DELETE /v1/buyer/me/addresses/{public_id})
+	DeleteBuyerAddress(w http.ResponseWriter, r *http.Request, publicId PublicID, params DeleteBuyerAddressParams)
+	// GetBuyerAddress Read one saved delivery address
+	// (GET /v1/buyer/me/addresses/{public_id})
+	GetBuyerAddress(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// UpdateBuyerAddress Edit a saved delivery address
+	// (PATCH /v1/buyer/me/addresses/{public_id})
+	UpdateBuyerAddress(w http.ResponseWriter, r *http.Request, publicId PublicID, params UpdateBuyerAddressParams)
 	// GetBuyerMeConsents Get consent state
 	// (GET /v1/buyer/me/consents)
 	GetBuyerMeConsents(w http.ResponseWriter, r *http.Request)
@@ -3906,9 +5884,39 @@ type ServerInterface interface {
 	// PostMerchantAuthLogout Revoke the current merchant session
 	// (POST /v1/merchant/auth/logout)
 	PostMerchantAuthLogout(w http.ResponseWriter, r *http.Request, params PostMerchantAuthLogoutParams)
+	// ListMerchantContractorDemands List contractor demands visible to the merchant
+	// (GET /v1/merchant/contractor-demands)
+	ListMerchantContractorDemands(w http.ResponseWriter, r *http.Request, params ListMerchantContractorDemandsParams)
+	// GetMerchantContractorDemand Read one scoped contractor demand
+	// (GET /v1/merchant/contractor-demands/{public_id})
+	GetMerchantContractorDemand(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// ListMerchantContractorQuotes List quotes submitted for a contractor demand
+	// (GET /v1/merchant/contractor-demands/{public_id}/quotes)
+	ListMerchantContractorQuotes(w http.ResponseWriter, r *http.Request, publicId PublicID, params ListMerchantContractorQuotesParams)
+	// CreateMerchantContractorQuote Submit a quote for a contractor demand
+	// (POST /v1/merchant/contractor-demands/{public_id}/quotes)
+	CreateMerchantContractorQuote(w http.ResponseWriter, r *http.Request, publicId PublicID, params CreateMerchantContractorQuoteParams)
+	// GetMerchantContractorQuote Read one merchant contractor quote
+	// (GET /v1/merchant/contractor-demands/{public_id}/quotes/{quote_id})
+	GetMerchantContractorQuote(w http.ResponseWriter, r *http.Request, publicId PublicID, quoteId string)
 	// GetMerchantMe Get the current merchant account profile
 	// (GET /v1/merchant/me)
 	GetMerchantMe(w http.ResponseWriter, r *http.Request)
+	// ListMerchantAddresses List the merchant owner's saved delivery addresses
+	// (GET /v1/merchant/me/addresses)
+	ListMerchantAddresses(w http.ResponseWriter, r *http.Request, params ListMerchantAddressesParams)
+	// CreateMerchantAddress Add a merchant-owner saved address
+	// (POST /v1/merchant/me/addresses)
+	CreateMerchantAddress(w http.ResponseWriter, r *http.Request, params CreateMerchantAddressParams)
+	// DeleteMerchantAddress Delete a merchant-owner saved address
+	// (DELETE /v1/merchant/me/addresses/{public_id})
+	DeleteMerchantAddress(w http.ResponseWriter, r *http.Request, publicId PublicID, params DeleteMerchantAddressParams)
+	// GetMerchantAddress Read one merchant-owner saved address
+	// (GET /v1/merchant/me/addresses/{public_id})
+	GetMerchantAddress(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// UpdateMerchantAddress Edit a merchant-owner saved address
+	// (PATCH /v1/merchant/me/addresses/{public_id})
+	UpdateMerchantAddress(w http.ResponseWriter, r *http.Request, publicId PublicID, params UpdateMerchantAddressParams)
 	// GetMerchantMeConsents Get consent state
 	// (GET /v1/merchant/me/consents)
 	GetMerchantMeConsents(w http.ResponseWriter, r *http.Request)
@@ -3969,6 +5977,24 @@ type ServerInterface interface {
 	// PublishMerchantProduct Publish a product; requires complete trilingual text and at least two price tiers
 	// (POST /v1/merchant/products/{public_id}/publish)
 	PublishMerchantProduct(w http.ResponseWriter, r *http.Request, publicId PublicID, params PublishMerchantProductParams)
+	// ListMerchantStaff List merchant staff and their permission scopes
+	// (GET /v1/merchant/staff)
+	ListMerchantStaff(w http.ResponseWriter, r *http.Request, params ListMerchantStaffParams)
+	// CreateMerchantStaff Create a merchant staff record
+	// (POST /v1/merchant/staff)
+	CreateMerchantStaff(w http.ResponseWriter, r *http.Request, params CreateMerchantStaffParams)
+	// InviteMerchantStaff Invite staff by Telegram username or phone
+	// (POST /v1/merchant/staff/invitations)
+	InviteMerchantStaff(w http.ResponseWriter, r *http.Request, params InviteMerchantStaffParams)
+	// DeleteMerchantStaff Remove a merchant staff record
+	// (DELETE /v1/merchant/staff/{public_id})
+	DeleteMerchantStaff(w http.ResponseWriter, r *http.Request, publicId PublicID, params DeleteMerchantStaffParams)
+	// GetMerchantStaff Read one merchant staff record
+	// (GET /v1/merchant/staff/{public_id})
+	GetMerchantStaff(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// UpdateMerchantStaff Update a merchant staff role or permission scope
+	// (PATCH /v1/merchant/staff/{public_id})
+	UpdateMerchantStaff(w http.ResponseWriter, r *http.Request, publicId PublicID, params UpdateMerchantStaffParams)
 	// ListMerchantSuborders List suborders belonging to the authenticated merchant
 	// (GET /v1/merchant/suborders)
 	ListMerchantSuborders(w http.ResponseWriter, r *http.Request, params ListMerchantSubordersParams)
@@ -3987,9 +6013,21 @@ type ServerInterface interface {
 	// PostTelegramAuth Sign in with Telegram Mini App initData
 	// (POST /v1/public/auth/telegram)
 	PostTelegramAuth(w http.ResponseWriter, r *http.Request)
+	// ListPublicContractorCases List published contractor cases
+	// (GET /v1/public/cases)
+	ListPublicContractorCases(w http.ResponseWriter, r *http.Request, params ListPublicContractorCasesParams)
+	// GetPublicContractorCase Read one published contractor case
+	// (GET /v1/public/cases/{public_id})
+	GetPublicContractorCase(w http.ResponseWriter, r *http.Request, publicId PublicID)
 	// ListPublicCategories List enabled product categories in display order
 	// (GET /v1/public/categories)
 	ListPublicCategories(w http.ResponseWriter, r *http.Request, params ListPublicCategoriesParams)
+	// ListPublicContractors List published contractor profiles
+	// (GET /v1/public/contractors)
+	ListPublicContractors(w http.ResponseWriter, r *http.Request, params ListPublicContractorsParams)
+	// GetPublicContractor Read one published contractor profile
+	// (GET /v1/public/contractors/{public_id})
+	GetPublicContractor(w http.ResponseWriter, r *http.Request, publicId PublicID)
 	// GetPublicLegal Get the current effective legal document
 	// (GET /v1/public/legal/{kind})
 	GetPublicLegal(w http.ResponseWriter, r *http.Request, kind ConsentKind)
@@ -4137,15 +6175,93 @@ func (_ Unimplemented) GetAdminOrder(w http.ResponseWriter, r *http.Request, pub
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListAdminPolicies List policy documents and publication state
+// (GET /v1/admin/policies)
+func (_ Unimplemented) ListAdminPolicies(w http.ResponseWriter, r *http.Request, params ListAdminPoliciesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAdminPolicy Read one policy document
+// (GET /v1/admin/policies/{public_id})
+func (_ Unimplemented) GetAdminPolicy(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SaveAdminPolicyDraft Save a three-language policy draft
+// (PUT /v1/admin/policies/{public_id}/draft)
+func (_ Unimplemented) SaveAdminPolicyDraft(w http.ResponseWriter, r *http.Request, publicId PublicID, params SaveAdminPolicyDraftParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PublishAdminPolicy Publish a reviewed three-language policy version
+// (POST /v1/admin/policies/{public_id}/publish)
+func (_ Unimplemented) PublishAdminPolicy(w http.ResponseWriter, r *http.Request, publicId PublicID, params PublishAdminPolicyParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListAdminPolicyVersions List immutable policy publication history
+// (GET /v1/admin/policies/{public_id}/versions)
+func (_ Unimplemented) ListAdminPolicyVersions(w http.ResponseWriter, r *http.Request, publicId PublicID, params ListAdminPolicyVersionsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // PostBuyerAuthLogout Revoke the current buyer session
 // (POST /v1/buyer/auth/logout)
 func (_ Unimplemented) PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request, params PostBuyerAuthLogoutParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListBuyerContractorInquiries List the buyer's contractor inquiries
+// (GET /v1/buyer/contractor-inquiries)
+func (_ Unimplemented) ListBuyerContractorInquiries(w http.ResponseWriter, r *http.Request, params ListBuyerContractorInquiriesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateBuyerContractorInquiry Submit a contractor inquiry
+// (POST /v1/buyer/contractor-inquiries)
+func (_ Unimplemented) CreateBuyerContractorInquiry(w http.ResponseWriter, r *http.Request, params CreateBuyerContractorInquiryParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetBuyerContractorInquiry Read one buyer contractor inquiry and its status
+// (GET /v1/buyer/contractor-inquiries/{public_id})
+func (_ Unimplemented) GetBuyerContractorInquiry(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetBuyerMe Get the current buyer account profile
 // (GET /v1/buyer/me)
 func (_ Unimplemented) GetBuyerMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListBuyerAddresses List the buyer's saved delivery addresses
+// (GET /v1/buyer/me/addresses)
+func (_ Unimplemented) ListBuyerAddresses(w http.ResponseWriter, r *http.Request, params ListBuyerAddressesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateBuyerAddress Add a saved delivery address
+// (POST /v1/buyer/me/addresses)
+func (_ Unimplemented) CreateBuyerAddress(w http.ResponseWriter, r *http.Request, params CreateBuyerAddressParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteBuyerAddress Delete a saved delivery address
+// (DELETE /v1/buyer/me/addresses/{public_id})
+func (_ Unimplemented) DeleteBuyerAddress(w http.ResponseWriter, r *http.Request, publicId PublicID, params DeleteBuyerAddressParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetBuyerAddress Read one saved delivery address
+// (GET /v1/buyer/me/addresses/{public_id})
+func (_ Unimplemented) GetBuyerAddress(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateBuyerAddress Edit a saved delivery address
+// (PATCH /v1/buyer/me/addresses/{public_id})
+func (_ Unimplemented) UpdateBuyerAddress(w http.ResponseWriter, r *http.Request, publicId PublicID, params UpdateBuyerAddressParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4353,9 +6469,69 @@ func (_ Unimplemented) PostMerchantAuthLogout(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListMerchantContractorDemands List contractor demands visible to the merchant
+// (GET /v1/merchant/contractor-demands)
+func (_ Unimplemented) ListMerchantContractorDemands(w http.ResponseWriter, r *http.Request, params ListMerchantContractorDemandsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetMerchantContractorDemand Read one scoped contractor demand
+// (GET /v1/merchant/contractor-demands/{public_id})
+func (_ Unimplemented) GetMerchantContractorDemand(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListMerchantContractorQuotes List quotes submitted for a contractor demand
+// (GET /v1/merchant/contractor-demands/{public_id}/quotes)
+func (_ Unimplemented) ListMerchantContractorQuotes(w http.ResponseWriter, r *http.Request, publicId PublicID, params ListMerchantContractorQuotesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateMerchantContractorQuote Submit a quote for a contractor demand
+// (POST /v1/merchant/contractor-demands/{public_id}/quotes)
+func (_ Unimplemented) CreateMerchantContractorQuote(w http.ResponseWriter, r *http.Request, publicId PublicID, params CreateMerchantContractorQuoteParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetMerchantContractorQuote Read one merchant contractor quote
+// (GET /v1/merchant/contractor-demands/{public_id}/quotes/{quote_id})
+func (_ Unimplemented) GetMerchantContractorQuote(w http.ResponseWriter, r *http.Request, publicId PublicID, quoteId string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetMerchantMe Get the current merchant account profile
 // (GET /v1/merchant/me)
 func (_ Unimplemented) GetMerchantMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListMerchantAddresses List the merchant owner's saved delivery addresses
+// (GET /v1/merchant/me/addresses)
+func (_ Unimplemented) ListMerchantAddresses(w http.ResponseWriter, r *http.Request, params ListMerchantAddressesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateMerchantAddress Add a merchant-owner saved address
+// (POST /v1/merchant/me/addresses)
+func (_ Unimplemented) CreateMerchantAddress(w http.ResponseWriter, r *http.Request, params CreateMerchantAddressParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteMerchantAddress Delete a merchant-owner saved address
+// (DELETE /v1/merchant/me/addresses/{public_id})
+func (_ Unimplemented) DeleteMerchantAddress(w http.ResponseWriter, r *http.Request, publicId PublicID, params DeleteMerchantAddressParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetMerchantAddress Read one merchant-owner saved address
+// (GET /v1/merchant/me/addresses/{public_id})
+func (_ Unimplemented) GetMerchantAddress(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateMerchantAddress Edit a merchant-owner saved address
+// (PATCH /v1/merchant/me/addresses/{public_id})
+func (_ Unimplemented) UpdateMerchantAddress(w http.ResponseWriter, r *http.Request, publicId PublicID, params UpdateMerchantAddressParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4479,6 +6655,42 @@ func (_ Unimplemented) PublishMerchantProduct(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListMerchantStaff List merchant staff and their permission scopes
+// (GET /v1/merchant/staff)
+func (_ Unimplemented) ListMerchantStaff(w http.ResponseWriter, r *http.Request, params ListMerchantStaffParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateMerchantStaff Create a merchant staff record
+// (POST /v1/merchant/staff)
+func (_ Unimplemented) CreateMerchantStaff(w http.ResponseWriter, r *http.Request, params CreateMerchantStaffParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// InviteMerchantStaff Invite staff by Telegram username or phone
+// (POST /v1/merchant/staff/invitations)
+func (_ Unimplemented) InviteMerchantStaff(w http.ResponseWriter, r *http.Request, params InviteMerchantStaffParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteMerchantStaff Remove a merchant staff record
+// (DELETE /v1/merchant/staff/{public_id})
+func (_ Unimplemented) DeleteMerchantStaff(w http.ResponseWriter, r *http.Request, publicId PublicID, params DeleteMerchantStaffParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetMerchantStaff Read one merchant staff record
+// (GET /v1/merchant/staff/{public_id})
+func (_ Unimplemented) GetMerchantStaff(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateMerchantStaff Update a merchant staff role or permission scope
+// (PATCH /v1/merchant/staff/{public_id})
+func (_ Unimplemented) UpdateMerchantStaff(w http.ResponseWriter, r *http.Request, publicId PublicID, params UpdateMerchantStaffParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ListMerchantSuborders List suborders belonging to the authenticated merchant
 // (GET /v1/merchant/suborders)
 func (_ Unimplemented) ListMerchantSuborders(w http.ResponseWriter, r *http.Request, params ListMerchantSubordersParams) {
@@ -4515,9 +6727,33 @@ func (_ Unimplemented) PostTelegramAuth(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListPublicContractorCases List published contractor cases
+// (GET /v1/public/cases)
+func (_ Unimplemented) ListPublicContractorCases(w http.ResponseWriter, r *http.Request, params ListPublicContractorCasesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetPublicContractorCase Read one published contractor case
+// (GET /v1/public/cases/{public_id})
+func (_ Unimplemented) GetPublicContractorCase(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ListPublicCategories List enabled product categories in display order
 // (GET /v1/public/categories)
 func (_ Unimplemented) ListPublicCategories(w http.ResponseWriter, r *http.Request, params ListPublicCategoriesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListPublicContractors List published contractor profiles
+// (GET /v1/public/contractors)
+func (_ Unimplemented) ListPublicContractors(w http.ResponseWriter, r *http.Request, params ListPublicContractorsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetPublicContractor Read one published contractor profile
+// (GET /v1/public/contractors/{public_id})
+func (_ Unimplemented) GetPublicContractor(w http.ResponseWriter, r *http.Request, publicId PublicID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5546,6 +7782,264 @@ func (siw *ServerInterfaceWrapper) GetAdminOrder(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// ListAdminPolicies operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminPolicies(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminPoliciesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminPolicies(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdminPolicy operation middleware
+func (siw *ServerInterfaceWrapper) GetAdminPolicy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdminPolicy(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SaveAdminPolicyDraft operation middleware
+func (siw *ServerInterfaceWrapper) SaveAdminPolicyDraft(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SaveAdminPolicyDraftParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveAdminPolicyDraft(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PublishAdminPolicy operation middleware
+func (siw *ServerInterfaceWrapper) PublishAdminPolicy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PublishAdminPolicyParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	// ------------- Required header parameter "X-Step-Up-Token" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Step-Up-Token")]; found {
+		var XStepUpToken XStepUpToken
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Step-Up-Token", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Step-Up-Token", valueList[0], &XStepUpToken, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Step-Up-Token", Err: err})
+			return
+		}
+
+		params.XStepUpToken = XStepUpToken
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Step-Up-Token is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Step-Up-Token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PublishAdminPolicy(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListAdminPolicyVersions operation middleware
+func (siw *ServerInterfaceWrapper) ListAdminPolicyVersions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAdminPolicyVersionsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAdminPolicyVersions(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // PostBuyerAuthLogout operation middleware
 func (siw *ServerInterfaceWrapper) PostBuyerAuthLogout(w http.ResponseWriter, r *http.Request) {
 
@@ -5591,11 +8085,353 @@ func (siw *ServerInterfaceWrapper) PostBuyerAuthLogout(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// ListBuyerContractorInquiries operation middleware
+func (siw *ServerInterfaceWrapper) ListBuyerContractorInquiries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListBuyerContractorInquiriesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBuyerContractorInquiries(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBuyerContractorInquiry operation middleware
+func (siw *ServerInterfaceWrapper) CreateBuyerContractorInquiry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateBuyerContractorInquiryParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBuyerContractorInquiry(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBuyerContractorInquiry operation middleware
+func (siw *ServerInterfaceWrapper) GetBuyerContractorInquiry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBuyerContractorInquiry(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetBuyerMe operation middleware
 func (siw *ServerInterfaceWrapper) GetBuyerMe(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetBuyerMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListBuyerAddresses operation middleware
+func (siw *ServerInterfaceWrapper) ListBuyerAddresses(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListBuyerAddressesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListBuyerAddresses(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateBuyerAddress operation middleware
+func (siw *ServerInterfaceWrapper) CreateBuyerAddress(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateBuyerAddressParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBuyerAddress(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteBuyerAddress operation middleware
+func (siw *ServerInterfaceWrapper) DeleteBuyerAddress(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteBuyerAddressParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteBuyerAddress(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBuyerAddress operation middleware
+func (siw *ServerInterfaceWrapper) GetBuyerAddress(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBuyerAddress(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateBuyerAddress operation middleware
+func (siw *ServerInterfaceWrapper) UpdateBuyerAddress(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateBuyerAddressParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateBuyerAddress(w, r, publicId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6792,11 +9628,452 @@ func (siw *ServerInterfaceWrapper) PostMerchantAuthLogout(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ListMerchantContractorDemands operation middleware
+func (siw *ServerInterfaceWrapper) ListMerchantContractorDemands(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMerchantContractorDemandsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMerchantContractorDemands(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMerchantContractorDemand operation middleware
+func (siw *ServerInterfaceWrapper) GetMerchantContractorDemand(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMerchantContractorDemand(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMerchantContractorQuotes operation middleware
+func (siw *ServerInterfaceWrapper) ListMerchantContractorQuotes(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMerchantContractorQuotesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMerchantContractorQuotes(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMerchantContractorQuote operation middleware
+func (siw *ServerInterfaceWrapper) CreateMerchantContractorQuote(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateMerchantContractorQuoteParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMerchantContractorQuote(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMerchantContractorQuote operation middleware
+func (siw *ServerInterfaceWrapper) GetMerchantContractorQuote(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "quote_id" -------------
+	var quoteId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "quote_id", chi.URLParam(r, "quote_id"), &quoteId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "quote_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMerchantContractorQuote(w, r, publicId, quoteId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMerchantMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMerchantMe(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMerchantMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMerchantAddresses operation middleware
+func (siw *ServerInterfaceWrapper) ListMerchantAddresses(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMerchantAddressesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMerchantAddresses(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMerchantAddress operation middleware
+func (siw *ServerInterfaceWrapper) CreateMerchantAddress(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateMerchantAddressParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMerchantAddress(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMerchantAddress operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMerchantAddress(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteMerchantAddressParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMerchantAddress(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMerchantAddress operation middleware
+func (siw *ServerInterfaceWrapper) GetMerchantAddress(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMerchantAddress(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMerchantAddress operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMerchantAddress(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateMerchantAddressParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMerchantAddress(w, r, publicId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -7592,6 +10869,276 @@ func (siw *ServerInterfaceWrapper) PublishMerchantProduct(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// ListMerchantStaff operation middleware
+func (siw *ServerInterfaceWrapper) ListMerchantStaff(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListMerchantStaffParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMerchantStaff(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMerchantStaff operation middleware
+func (siw *ServerInterfaceWrapper) CreateMerchantStaff(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateMerchantStaffParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMerchantStaff(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// InviteMerchantStaff operation middleware
+func (siw *ServerInterfaceWrapper) InviteMerchantStaff(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params InviteMerchantStaffParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.InviteMerchantStaff(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteMerchantStaff operation middleware
+func (siw *ServerInterfaceWrapper) DeleteMerchantStaff(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteMerchantStaffParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteMerchantStaff(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMerchantStaff operation middleware
+func (siw *ServerInterfaceWrapper) GetMerchantStaff(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMerchantStaff(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMerchantStaff operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMerchantStaff(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateMerchantStaffParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMerchantStaff(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMerchantSuborders operation middleware
 func (siw *ServerInterfaceWrapper) ListMerchantSuborders(w http.ResponseWriter, r *http.Request) {
 
@@ -7732,6 +11279,91 @@ func (siw *ServerInterfaceWrapper) PostTelegramAuth(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ListPublicContractorCases operation middleware
+func (siw *ServerInterfaceWrapper) ListPublicContractorCases(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPublicContractorCasesParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "category" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "category", r.URL.Query(), &params.Category, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "category"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "category", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPublicContractorCases(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPublicContractorCase operation middleware
+func (siw *ServerInterfaceWrapper) GetPublicContractorCase(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPublicContractorCase(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListPublicCategories operation middleware
 func (siw *ServerInterfaceWrapper) ListPublicCategories(w http.ResponseWriter, r *http.Request) {
 
@@ -7782,6 +11414,91 @@ func (siw *ServerInterfaceWrapper) ListPublicCategories(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListPublicCategories(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListPublicContractors operation middleware
+func (siw *ServerInterfaceWrapper) ListPublicContractors(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPublicContractorsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "category" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "category", r.URL.Query(), &params.Category, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "category"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "category", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPublicContractors(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPublicContractor operation middleware
+func (siw *ServerInterfaceWrapper) GetPublicContractor(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPublicContractor(w, r, publicId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -8429,6 +12146,105 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/files/{public_id}/download-url", wrapper.GetFileDownloadUrl)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/me/addresses", wrapper.ListBuyerAddresses)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/buyer/me/addresses", wrapper.CreateBuyerAddress)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/buyer/me/addresses/{public_id}", wrapper.DeleteBuyerAddress)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/me/addresses/{public_id}", wrapper.GetBuyerAddress)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/v1/buyer/me/addresses/{public_id}", wrapper.UpdateBuyerAddress)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/me/addresses", wrapper.ListMerchantAddresses)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/merchant/me/addresses", wrapper.CreateMerchantAddress)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/merchant/me/addresses/{public_id}", wrapper.DeleteMerchantAddress)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/me/addresses/{public_id}", wrapper.GetMerchantAddress)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/v1/merchant/me/addresses/{public_id}", wrapper.UpdateMerchantAddress)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/public/contractors", wrapper.ListPublicContractors)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/public/contractors/{public_id}", wrapper.GetPublicContractor)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/public/cases", wrapper.ListPublicContractorCases)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/public/cases/{public_id}", wrapper.GetPublicContractorCase)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/contractor-inquiries", wrapper.ListBuyerContractorInquiries)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/buyer/contractor-inquiries", wrapper.CreateBuyerContractorInquiry)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/buyer/contractor-inquiries/{public_id}", wrapper.GetBuyerContractorInquiry)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/contractor-demands", wrapper.ListMerchantContractorDemands)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/contractor-demands/{public_id}", wrapper.GetMerchantContractorDemand)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/contractor-demands/{public_id}/quotes", wrapper.ListMerchantContractorQuotes)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/merchant/contractor-demands/{public_id}/quotes", wrapper.CreateMerchantContractorQuote)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/contractor-demands/{public_id}/quotes/{quote_id}", wrapper.GetMerchantContractorQuote)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/staff", wrapper.ListMerchantStaff)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/merchant/staff", wrapper.CreateMerchantStaff)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/merchant/staff/invitations", wrapper.InviteMerchantStaff)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/v1/merchant/staff/{public_id}", wrapper.DeleteMerchantStaff)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/merchant/staff/{public_id}", wrapper.GetMerchantStaff)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/v1/merchant/staff/{public_id}", wrapper.UpdateMerchantStaff)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/policies", wrapper.ListAdminPolicies)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/policies/{public_id}", wrapper.GetAdminPolicy)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/admin/policies/{public_id}/versions", wrapper.ListAdminPolicyVersions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/v1/admin/policies/{public_id}/draft", wrapper.SaveAdminPolicyDraft)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/admin/policies/{public_id}/publish", wrapper.PublishAdminPolicy)
 	})
 
 	return r
