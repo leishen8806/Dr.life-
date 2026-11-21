@@ -116,7 +116,11 @@ jobs:
           cache-dependency-path: backend/go.sum
       - name: Run unit tests with race detector
         working-directory: backend
-        run: go test -race -count=1 -skip '^TestDatabaseFramework$' ./...
+        # Testcontainers shares one Ryuk session across the package test
+        # processes spawned by `go test ./...`. Serializing packages prevents
+        # an early process exit from reaping containers still used by a
+        # sibling package.
+        run: go test -race -count=1 -p 1 -skip '^TestDatabaseFramework$' ./...
 
   backend-integration:
     needs: changes
@@ -131,7 +135,7 @@ jobs:
           cache-dependency-path: backend/go.sum
       - name: Run PostgreSQL integration tests
         working-directory: backend
-        run: go test -count=1 -v ./internal/platform/db ./internal/ledger
+        run: go test -count=1 -p 1 -v ./internal/platform/db ./internal/ledger
 
   docker-image:
     needs: changes
