@@ -1,0 +1,55 @@
+name: Staging browser smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Public staging browser smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # Keep URLs in repository Variables rather than source, secrets, or logs.
+      SMOKE_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL }}
+      SMOKE_BUYER_URL: ${{ vars.STAGING_BUYER_URL }}
+      SMOKE_MERCHANT_URL: ${{ vars.STAGING_MERCHANT_URL }}
+      SMOKE_SHOP_URL: ${{ vars.STAGING_SHOP_URL }}
+      SMOKE_EXPECT_EMPTY_CATALOG: ${{ vars.STAGING_SMOKE_EXPECT_EMPTY_CATALOG }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Enable pnpm
+        run: corepack enable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --filter @drlife/website exec playwright install --with-deps chromium
+      - name: Validate staging variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in SMOKE_API_BASE_URL SMOKE_BUYER_URL SMOKE_MERCHANT_URL SMOKE_SHOP_URL; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Repository variable for $name is required"
+              exit 1
+            fi
+          done
+      - name: Run staging smoke with browser checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/drlife-smoke-browser <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec pnpm --filter @drlife/website exec node \
+            "$GITHUB_WORKSPACE/deploy/staging/smoke-browser.mjs" "$@"
+          SH
+          chmod +x /tmp/drlife-smoke-browser
+          SMOKE_BROWSER_COMMAND=/tmp/drlife-smoke-browser deploy/staging/smoke.sh
