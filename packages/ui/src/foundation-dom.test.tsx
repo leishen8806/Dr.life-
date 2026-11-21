@@ -51,6 +51,20 @@ describe("foundation DOM acceptance", () => {
     expect(toast.container.querySelector('[role="alert"]')?.getAttribute("aria-live")).toBeNull();
   });
 
+  it("wraps Tabs focus at both ends and supports Home/End", () => {
+    const change = vi.fn();
+    render(<Tabs tabs={[{ id: "a", label: "A" }, { id: "b", label: "B" }, { id: "c", label: "C" }]} activeId="a" onChange={change} ariaLabel="Tabs" />);
+    const tabs = screen.getAllByRole("tab");
+    fireEvent.keyDown(tabs[0]!, { key: "ArrowLeft" });
+    expect(change).toHaveBeenLastCalledWith("c");
+    expect(document.activeElement).toBe(tabs[2]);
+    fireEvent.keyDown(tabs[2]!, { key: "End" });
+    expect(change).toHaveBeenLastCalledWith("c");
+    fireEvent.keyDown(tabs[2]!, { key: "Home" });
+    expect(change).toHaveBeenLastCalledWith("a");
+    expect(document.activeElement).toBe(tabs[0]);
+  });
+
   it("uses a semantic heading for product cards", () => {
     render(<ProductCard imageAlt="Tile" name="Long tile name" price="$1.25" />);
     expect(screen.getByRole("heading", { name: "Long tile name", level: 3 })).toBeDefined();
