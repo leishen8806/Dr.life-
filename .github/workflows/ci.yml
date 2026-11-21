@@ -108,6 +108,10 @@ jobs:
     if: needs.changes.outputs.docs_only != 'true' && (needs.changes.outputs.backend_changed == 'true' || needs.changes.outputs.infra_changed == 'true' || github.event_name == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # GitHub-hosted runners reclaim all containers after the job; disabling
+      # Ryuk avoids concurrent test packages racing on the same reaper.
+      TESTCONTAINERS_RYUK_DISABLED: 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
