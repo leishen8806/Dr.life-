@@ -31,7 +31,7 @@ test("homepage V13 behavior stays localized and usable at mobile width", async (
   const { port } = server.address();
   try {
     for (const [locale, localizedMarker] of [["", "生活"], ["en/", "INFINITE"], ["km/", "ជីវិត"]]) {
-      const response = await fetch(`http://127.0.0.1:${port}/${locale}`);
+      const response = await globalThis.fetch(`http://127.0.0.1:${port}/${locale}`);
       assert.equal(response.status, 200);
       const html = await response.text();
       assert.match(html, /<h1[\s\S]*?<\/h1>/);
