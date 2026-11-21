@@ -1457,6 +1457,288 @@ func (e TelegramAuthSuccessResponseOk) Valid() bool {
 	}
 }
 
+// Defines values for WmsExceptionCategory.
+const (
+	DamagedGoods     WmsExceptionCategory = "damaged_goods"
+	HandoffFailed    WmsExceptionCategory = "handoff_failed"
+	IntegrationError WmsExceptionCategory = "integration_error"
+	LocationConflict WmsExceptionCategory = "location_conflict"
+	MissingGoods     WmsExceptionCategory = "missing_goods"
+	Other            WmsExceptionCategory = "other"
+	QuantityVariance WmsExceptionCategory = "quantity_variance"
+)
+
+// Valid indicates whether the value is a known member of the WmsExceptionCategory enum.
+func (e WmsExceptionCategory) Valid() bool {
+	switch e {
+	case DamagedGoods:
+		return true
+	case HandoffFailed:
+		return true
+	case IntegrationError:
+		return true
+	case LocationConflict:
+		return true
+	case MissingGoods:
+		return true
+	case Other:
+		return true
+	case QuantityVariance:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsExceptionSeverity.
+const (
+	Critical WmsExceptionSeverity = "critical"
+	Info     WmsExceptionSeverity = "info"
+	Warning  WmsExceptionSeverity = "warning"
+)
+
+// Valid indicates whether the value is a known member of the WmsExceptionSeverity enum.
+func (e WmsExceptionSeverity) Valid() bool {
+	switch e {
+	case Critical:
+		return true
+	case Info:
+		return true
+	case Warning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsExceptionStatus.
+const (
+	Acknowledged WmsExceptionStatus = "acknowledged"
+	Dismissed    WmsExceptionStatus = "dismissed"
+	Open         WmsExceptionStatus = "open"
+	Resolved     WmsExceptionStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the WmsExceptionStatus enum.
+func (e WmsExceptionStatus) Valid() bool {
+	switch e {
+	case Acknowledged:
+		return true
+	case Dismissed:
+		return true
+	case Open:
+		return true
+	case Resolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsHandoffRequestDeliveryMethod.
+const (
+	WmsHandoffRequestDeliveryMethodInhouse WmsHandoffRequestDeliveryMethod = "inhouse"
+	WmsHandoffRequestDeliveryMethodZto     WmsHandoffRequestDeliveryMethod = "zto"
+)
+
+// Valid indicates whether the value is a known member of the WmsHandoffRequestDeliveryMethod enum.
+func (e WmsHandoffRequestDeliveryMethod) Valid() bool {
+	switch e {
+	case WmsHandoffRequestDeliveryMethodInhouse:
+		return true
+	case WmsHandoffRequestDeliveryMethodZto:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsInboundShipmentStatus.
+const (
+	WmsInboundShipmentStatusArrived   WmsInboundShipmentStatus = "arrived"
+	WmsInboundShipmentStatusCancelled WmsInboundShipmentStatus = "cancelled"
+	WmsInboundShipmentStatusException WmsInboundShipmentStatus = "exception"
+	WmsInboundShipmentStatusInTransit WmsInboundShipmentStatus = "in_transit"
+	WmsInboundShipmentStatusReceived  WmsInboundShipmentStatus = "received"
+	WmsInboundShipmentStatusReceiving WmsInboundShipmentStatus = "receiving"
+)
+
+// Valid indicates whether the value is a known member of the WmsInboundShipmentStatus enum.
+func (e WmsInboundShipmentStatus) Valid() bool {
+	switch e {
+	case WmsInboundShipmentStatusArrived:
+		return true
+	case WmsInboundShipmentStatusCancelled:
+		return true
+	case WmsInboundShipmentStatusException:
+		return true
+	case WmsInboundShipmentStatusInTransit:
+		return true
+	case WmsInboundShipmentStatusReceived:
+		return true
+	case WmsInboundShipmentStatusReceiving:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsIntegrationStatusAdapter.
+const (
+	WmsIntegrationStatusAdapterWcs WmsIntegrationStatusAdapter = "wcs"
+	WmsIntegrationStatusAdapterWms WmsIntegrationStatusAdapter = "wms"
+	WmsIntegrationStatusAdapterZto WmsIntegrationStatusAdapter = "zto"
+)
+
+// Valid indicates whether the value is a known member of the WmsIntegrationStatusAdapter enum.
+func (e WmsIntegrationStatusAdapter) Valid() bool {
+	switch e {
+	case WmsIntegrationStatusAdapterWcs:
+		return true
+	case WmsIntegrationStatusAdapterWms:
+		return true
+	case WmsIntegrationStatusAdapterZto:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsIntegrationStatusState.
+const (
+	WmsIntegrationStatusStateDegraded    WmsIntegrationStatusState = "degraded"
+	WmsIntegrationStatusStateDisabled    WmsIntegrationStatusState = "disabled"
+	WmsIntegrationStatusStateHealthy     WmsIntegrationStatusState = "healthy"
+	WmsIntegrationStatusStatePendingSpec WmsIntegrationStatusState = "pending_spec"
+	WmsIntegrationStatusStateUnavailable WmsIntegrationStatusState = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the WmsIntegrationStatusState enum.
+func (e WmsIntegrationStatusState) Valid() bool {
+	switch e {
+	case WmsIntegrationStatusStateDegraded:
+		return true
+	case WmsIntegrationStatusStateDisabled:
+		return true
+	case WmsIntegrationStatusStateHealthy:
+		return true
+	case WmsIntegrationStatusStatePendingSpec:
+		return true
+	case WmsIntegrationStatusStateUnavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsInventoryMovementMovementType.
+const (
+	Adjustment WmsInventoryMovementMovementType = "adjustment"
+	Correction WmsInventoryMovementMovementType = "correction"
+	Pick       WmsInventoryMovementMovementType = "pick"
+	Receipt    WmsInventoryMovementMovementType = "receipt"
+	Return     WmsInventoryMovementMovementType = "return"
+	Transfer   WmsInventoryMovementMovementType = "transfer"
+)
+
+// Valid indicates whether the value is a known member of the WmsInventoryMovementMovementType enum.
+func (e WmsInventoryMovementMovementType) Valid() bool {
+	switch e {
+	case Adjustment:
+		return true
+	case Correction:
+		return true
+	case Pick:
+		return true
+	case Receipt:
+		return true
+	case Return:
+		return true
+	case Transfer:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsPickTaskDeliveryMethod.
+const (
+	WmsPickTaskDeliveryMethodInhouse WmsPickTaskDeliveryMethod = "inhouse"
+	WmsPickTaskDeliveryMethodZto     WmsPickTaskDeliveryMethod = "zto"
+)
+
+// Valid indicates whether the value is a known member of the WmsPickTaskDeliveryMethod enum.
+func (e WmsPickTaskDeliveryMethod) Valid() bool {
+	switch e {
+	case WmsPickTaskDeliveryMethodInhouse:
+		return true
+	case WmsPickTaskDeliveryMethodZto:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsPickTaskStatus.
+const (
+	WmsPickTaskStatusCancelled WmsPickTaskStatus = "cancelled"
+	WmsPickTaskStatusException WmsPickTaskStatus = "exception"
+	WmsPickTaskStatusHandedOff WmsPickTaskStatus = "handed_off"
+	WmsPickTaskStatusPacked    WmsPickTaskStatus = "packed"
+	WmsPickTaskStatusPicking   WmsPickTaskStatus = "picking"
+	WmsPickTaskStatusReady     WmsPickTaskStatus = "ready"
+)
+
+// Valid indicates whether the value is a known member of the WmsPickTaskStatus enum.
+func (e WmsPickTaskStatus) Valid() bool {
+	switch e {
+	case WmsPickTaskStatusCancelled:
+		return true
+	case WmsPickTaskStatusException:
+		return true
+	case WmsPickTaskStatusHandedOff:
+		return true
+	case WmsPickTaskStatusPacked:
+		return true
+	case WmsPickTaskStatusPicking:
+		return true
+	case WmsPickTaskStatusReady:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsReceivingRecordStatus.
+const (
+	WmsReceivingRecordStatusArrived             WmsReceivingRecordStatus = "arrived"
+	WmsReceivingRecordStatusException           WmsReceivingRecordStatus = "exception"
+	WmsReceivingRecordStatusPendingConfirmation WmsReceivingRecordStatus = "pending_confirmation"
+	WmsReceivingRecordStatusReceived            WmsReceivingRecordStatus = "received"
+	WmsReceivingRecordStatusScheduled           WmsReceivingRecordStatus = "scheduled"
+	WmsReceivingRecordStatusStocked             WmsReceivingRecordStatus = "stocked"
+)
+
+// Valid indicates whether the value is a known member of the WmsReceivingRecordStatus enum.
+func (e WmsReceivingRecordStatus) Valid() bool {
+	switch e {
+	case WmsReceivingRecordStatusArrived:
+		return true
+	case WmsReceivingRecordStatusException:
+		return true
+	case WmsReceivingRecordStatusPendingConfirmation:
+		return true
+	case WmsReceivingRecordStatusReceived:
+		return true
+	case WmsReceivingRecordStatusScheduled:
+		return true
+	case WmsReceivingRecordStatusStocked:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for StatusFilter.
 const (
 	StatusFilterDraft    StatusFilter = "draft"
@@ -1553,6 +1835,186 @@ const (
 func (e NotificationSettingsSucceededOk) Valid() bool {
 	switch e {
 	case NotificationSettingsSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsExceptionListSucceededOk.
+const (
+	WmsExceptionListSucceededOkTrue WmsExceptionListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsExceptionListSucceededOk enum.
+func (e WmsExceptionListSucceededOk) Valid() bool {
+	switch e {
+	case WmsExceptionListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsExceptionSucceededOk.
+const (
+	WmsExceptionSucceededOkTrue WmsExceptionSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsExceptionSucceededOk enum.
+func (e WmsExceptionSucceededOk) Valid() bool {
+	switch e {
+	case WmsExceptionSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsInboundShipmentListSucceededOk.
+const (
+	WmsInboundShipmentListSucceededOkTrue WmsInboundShipmentListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsInboundShipmentListSucceededOk enum.
+func (e WmsInboundShipmentListSucceededOk) Valid() bool {
+	switch e {
+	case WmsInboundShipmentListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsInboundShipmentSucceededOk.
+const (
+	WmsInboundShipmentSucceededOkTrue WmsInboundShipmentSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsInboundShipmentSucceededOk enum.
+func (e WmsInboundShipmentSucceededOk) Valid() bool {
+	switch e {
+	case WmsInboundShipmentSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsIntegrationStatusListSucceededOk.
+const (
+	WmsIntegrationStatusListSucceededOkTrue WmsIntegrationStatusListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsIntegrationStatusListSucceededOk enum.
+func (e WmsIntegrationStatusListSucceededOk) Valid() bool {
+	switch e {
+	case WmsIntegrationStatusListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsInventoryListSucceededOk.
+const (
+	WmsInventoryListSucceededOkTrue WmsInventoryListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsInventoryListSucceededOk enum.
+func (e WmsInventoryListSucceededOk) Valid() bool {
+	switch e {
+	case WmsInventoryListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsInventoryMovementListSucceededOk.
+const (
+	WmsInventoryMovementListSucceededOkTrue WmsInventoryMovementListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsInventoryMovementListSucceededOk enum.
+func (e WmsInventoryMovementListSucceededOk) Valid() bool {
+	switch e {
+	case WmsInventoryMovementListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsInventorySucceededOk.
+const (
+	WmsInventorySucceededOkTrue WmsInventorySucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsInventorySucceededOk enum.
+func (e WmsInventorySucceededOk) Valid() bool {
+	switch e {
+	case WmsInventorySucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsPickTaskListSucceededOk.
+const (
+	WmsPickTaskListSucceededOkTrue WmsPickTaskListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsPickTaskListSucceededOk enum.
+func (e WmsPickTaskListSucceededOk) Valid() bool {
+	switch e {
+	case WmsPickTaskListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsPickTaskSucceededOk.
+const (
+	WmsPickTaskSucceededOkTrue WmsPickTaskSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsPickTaskSucceededOk enum.
+func (e WmsPickTaskSucceededOk) Valid() bool {
+	switch e {
+	case WmsPickTaskSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsReceivingRecordListSucceededOk.
+const (
+	WmsReceivingRecordListSucceededOkTrue WmsReceivingRecordListSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsReceivingRecordListSucceededOk enum.
+func (e WmsReceivingRecordListSucceededOk) Valid() bool {
+	switch e {
+	case WmsReceivingRecordListSucceededOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WmsReceivingRecordSucceededOk.
+const (
+	WmsReceivingRecordSucceededOkTrue WmsReceivingRecordSucceededOk = true
+)
+
+// Valid indicates whether the value is a known member of the WmsReceivingRecordSucceededOk enum.
+func (e WmsReceivingRecordSucceededOk) Valid() bool {
+	switch e {
+	case WmsReceivingRecordSucceededOkTrue:
 		return true
 	default:
 		return false
@@ -1829,6 +2291,246 @@ func (e SearchPublicProductsParamsSort) Valid() bool {
 	case PriceDesc:
 		return true
 	case Relevance:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListWmsExceptions200JSONResponseBodyOk.
+const (
+	ListWmsExceptions200JSONResponseBodyOkTrue ListWmsExceptions200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListWmsExceptions200JSONResponseBodyOk enum.
+func (e ListWmsExceptions200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListWmsExceptions200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetWmsException200JSONResponseBodyOk.
+const (
+	GetWmsException200JSONResponseBodyOkTrue GetWmsException200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetWmsException200JSONResponseBodyOk enum.
+func (e GetWmsException200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetWmsException200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ResolveWmsException200JSONResponseBodyOk.
+const (
+	ResolveWmsException200JSONResponseBodyOkTrue ResolveWmsException200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ResolveWmsException200JSONResponseBodyOk enum.
+func (e ResolveWmsException200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ResolveWmsException200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListWmsReceivingRecords200JSONResponseBodyOk.
+const (
+	ListWmsReceivingRecords200JSONResponseBodyOkTrue ListWmsReceivingRecords200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListWmsReceivingRecords200JSONResponseBodyOk enum.
+func (e ListWmsReceivingRecords200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListWmsReceivingRecords200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReceiveWmsInboundShipment200JSONResponseBodyOk.
+const (
+	ReceiveWmsInboundShipment200JSONResponseBodyOkTrue ReceiveWmsInboundShipment200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ReceiveWmsInboundShipment200JSONResponseBodyOk enum.
+func (e ReceiveWmsInboundShipment200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ReceiveWmsInboundShipment200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListWmsInboundShipments200JSONResponseBodyOk.
+const (
+	ListWmsInboundShipments200JSONResponseBodyOkTrue ListWmsInboundShipments200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListWmsInboundShipments200JSONResponseBodyOk enum.
+func (e ListWmsInboundShipments200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListWmsInboundShipments200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetWmsInboundShipment200JSONResponseBodyOk.
+const (
+	GetWmsInboundShipment200JSONResponseBodyOkTrue GetWmsInboundShipment200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetWmsInboundShipment200JSONResponseBodyOk enum.
+func (e GetWmsInboundShipment200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetWmsInboundShipment200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListWmsIntegrationStatuses200JSONResponseBodyOk.
+const (
+	ListWmsIntegrationStatuses200JSONResponseBodyOkTrue ListWmsIntegrationStatuses200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListWmsIntegrationStatuses200JSONResponseBodyOk enum.
+func (e ListWmsIntegrationStatuses200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListWmsIntegrationStatuses200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListWmsInventory200JSONResponseBodyOk.
+const (
+	ListWmsInventory200JSONResponseBodyOkTrue ListWmsInventory200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListWmsInventory200JSONResponseBodyOk enum.
+func (e ListWmsInventory200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListWmsInventory200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetWmsInventory200JSONResponseBodyOk.
+const (
+	GetWmsInventory200JSONResponseBodyOkTrue GetWmsInventory200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetWmsInventory200JSONResponseBodyOk enum.
+func (e GetWmsInventory200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetWmsInventory200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateWmsInventoryAdjustment200JSONResponseBodyOk.
+const (
+	CreateWmsInventoryAdjustment200JSONResponseBodyOkTrue CreateWmsInventoryAdjustment200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the CreateWmsInventoryAdjustment200JSONResponseBodyOk enum.
+func (e CreateWmsInventoryAdjustment200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case CreateWmsInventoryAdjustment200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListWmsInventoryMovements200JSONResponseBodyOk.
+const (
+	ListWmsInventoryMovements200JSONResponseBodyOkTrue ListWmsInventoryMovements200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListWmsInventoryMovements200JSONResponseBodyOk enum.
+func (e ListWmsInventoryMovements200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListWmsInventoryMovements200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListWmsPickTasks200JSONResponseBodyOk.
+const (
+	ListWmsPickTasks200JSONResponseBodyOkTrue ListWmsPickTasks200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the ListWmsPickTasks200JSONResponseBodyOk enum.
+func (e ListWmsPickTasks200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case ListWmsPickTasks200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetWmsPickTask200JSONResponseBodyOk.
+const (
+	GetWmsPickTask200JSONResponseBodyOkTrue GetWmsPickTask200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the GetWmsPickTask200JSONResponseBodyOk enum.
+func (e GetWmsPickTask200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case GetWmsPickTask200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for HandoffWmsPickTask200JSONResponseBodyOk.
+const (
+	HandoffWmsPickTask200JSONResponseBodyOkTrue HandoffWmsPickTask200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the HandoffWmsPickTask200JSONResponseBodyOk enum.
+func (e HandoffWmsPickTask200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case HandoffWmsPickTask200JSONResponseBodyOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PackWmsPickTask200JSONResponseBodyOk.
+const (
+	PackWmsPickTask200JSONResponseBodyOkTrue PackWmsPickTask200JSONResponseBodyOk = true
+)
+
+// Valid indicates whether the value is a known member of the PackWmsPickTask200JSONResponseBodyOk enum.
+func (e PackWmsPickTask200JSONResponseBodyOk) Valid() bool {
+	switch e {
+	case PackWmsPickTask200JSONResponseBodyOkTrue:
 		return true
 	default:
 		return false
@@ -3048,6 +3750,212 @@ type WithdrawalSummary struct {
 	PendingCount    int64 `json:"pending_count"`
 }
 
+// WmsException defines model for WmsException.
+type WmsException struct {
+	Category    WmsExceptionCategory `json:"category"`
+	CreatedAt   time.Time            `json:"created_at"`
+	Description string               `json:"description"`
+	PublicId    string               `json:"public_id"`
+	Reference   string               `json:"reference"`
+	Severity    WmsExceptionSeverity `json:"severity"`
+	Status      WmsExceptionStatus   `json:"status"`
+	UpdatedAt   time.Time            `json:"updated_at"`
+}
+
+// WmsExceptionCategory defines model for WmsException.Category.
+type WmsExceptionCategory string
+
+// WmsExceptionSeverity defines model for WmsException.Severity.
+type WmsExceptionSeverity string
+
+// WmsExceptionStatus defines model for WmsException.Status.
+type WmsExceptionStatus string
+
+// WmsExceptionListData defines model for WmsExceptionListData.
+type WmsExceptionListData struct {
+	Items    []WmsException `json:"items"`
+	Page     int            `json:"page"`
+	PageSize int            `json:"page_size"`
+	Total    int64          `json:"total"`
+}
+
+// WmsExceptionResolveRequest defines model for WmsExceptionResolveRequest.
+type WmsExceptionResolveRequest struct {
+	EvidenceFilePublicIds *[]string `json:"evidence_file_public_ids,omitempty"`
+	Resolution            string    `json:"resolution"`
+}
+
+// WmsHandoffRequest defines model for WmsHandoffRequest.
+type WmsHandoffRequest struct {
+	DeliveryMethod    WmsHandoffRequestDeliveryMethod `json:"delivery_method"`
+	DriverPublicId    *string                         `json:"driver_public_id,omitempty"`
+	TrackingReference *string                         `json:"tracking_reference,omitempty"`
+}
+
+// WmsHandoffRequestDeliveryMethod defines model for WmsHandoffRequest.DeliveryMethod.
+type WmsHandoffRequestDeliveryMethod string
+
+// WmsInboundShipment defines model for WmsInboundShipment.
+type WmsInboundShipment struct {
+	MaskedAddress string                   `json:"masked_address"`
+	MaskedPhone   string                   `json:"masked_phone"`
+	PackageCount  int64                    `json:"package_count"`
+	PublicId      string                   `json:"public_id"`
+	Reference     string                   `json:"reference"`
+	ScheduledAt   time.Time                `json:"scheduled_at"`
+	Status        WmsInboundShipmentStatus `json:"status"`
+	UpdatedAt     time.Time                `json:"updated_at"`
+}
+
+// WmsInboundShipmentStatus defines model for WmsInboundShipment.Status.
+type WmsInboundShipmentStatus string
+
+// WmsInboundShipmentListData defines model for WmsInboundShipmentListData.
+type WmsInboundShipmentListData struct {
+	Items    []WmsInboundShipment `json:"items"`
+	Page     int                  `json:"page"`
+	PageSize int                  `json:"page_size"`
+	Total    int64                `json:"total"`
+}
+
+// WmsIntegrationStatus defines model for WmsIntegrationStatus.
+type WmsIntegrationStatus struct {
+	Adapter       WmsIntegrationStatusAdapter `json:"adapter"`
+	LastAttemptAt *time.Time                  `json:"last_attempt_at"`
+	LastSuccessAt *time.Time                  `json:"last_success_at"`
+	Message       *Messages                   `json:"message,omitempty"`
+	State         WmsIntegrationStatusState   `json:"state"`
+}
+
+// WmsIntegrationStatusAdapter defines model for WmsIntegrationStatus.Adapter.
+type WmsIntegrationStatusAdapter string
+
+// WmsIntegrationStatusState defines model for WmsIntegrationStatus.State.
+type WmsIntegrationStatusState string
+
+// WmsIntegrationStatusListData defines model for WmsIntegrationStatusListData.
+type WmsIntegrationStatusListData struct {
+	Items []WmsIntegrationStatus `json:"items"`
+}
+
+// WmsInventory defines model for WmsInventory.
+type WmsInventory struct {
+	AvailableQuantity     int64                `json:"available_quantity"`
+	LastMovementPublicId  string               `json:"last_movement_public_id"`
+	Location              string               `json:"location"`
+	LocationTotalQuantity int64                `json:"location_total_quantity"`
+	Locations             []WmsLocationBalance `json:"locations"`
+	MaskedPhone           *string              `json:"masked_phone,omitempty"`
+	ProductName           Messages             `json:"product_name"`
+	ProductPublicId       string               `json:"product_public_id"`
+	PublicId              string               `json:"public_id"`
+	Quantity              int64                `json:"quantity"`
+	UpdatedAt             time.Time            `json:"updated_at"`
+	Zone                  string               `json:"zone"`
+}
+
+// WmsInventoryAdjustmentRequest defines model for WmsInventoryAdjustmentRequest.
+type WmsInventoryAdjustmentRequest struct {
+	EvidenceFilePublicIds *[]string `json:"evidence_file_public_ids,omitempty"`
+	Quantity              int64     `json:"quantity"`
+	Reason                string    `json:"reason"`
+}
+
+// WmsInventoryListData defines model for WmsInventoryListData.
+type WmsInventoryListData struct {
+	Items    []WmsInventory `json:"items"`
+	Page     int            `json:"page"`
+	PageSize int            `json:"page_size"`
+	Total    int64          `json:"total"`
+}
+
+// WmsInventoryMovement defines model for WmsInventoryMovement.
+type WmsInventoryMovement struct {
+	CreatedAt     time.Time                        `json:"created_at"`
+	MovementType  WmsInventoryMovementMovementType `json:"movement_type"`
+	PublicId      string                           `json:"public_id"`
+	QuantityDelta int64                            `json:"quantity_delta"`
+	Reference     string                           `json:"reference"`
+}
+
+// WmsInventoryMovementMovementType defines model for WmsInventoryMovement.MovementType.
+type WmsInventoryMovementMovementType string
+
+// WmsInventoryMovementListData defines model for WmsInventoryMovementListData.
+type WmsInventoryMovementListData struct {
+	Items    []WmsInventoryMovement `json:"items"`
+	Page     int                    `json:"page"`
+	PageSize int                    `json:"page_size"`
+	Total    int64                  `json:"total"`
+}
+
+// WmsLocationBalance defines model for WmsLocationBalance.
+type WmsLocationBalance struct {
+	LocationCode string  `json:"location_code"`
+	Quantity     int64   `json:"quantity"`
+	Zone         *string `json:"zone,omitempty"`
+}
+
+// WmsPickTask defines model for WmsPickTask.
+type WmsPickTask struct {
+	DeliveryMethod WmsPickTaskDeliveryMethod `json:"delivery_method"`
+	DriverName     string                    `json:"driver_name"`
+	ItemCount      int64                     `json:"item_count"`
+	MaskedPhone    string                    `json:"masked_phone"`
+	PublicId       string                    `json:"public_id"`
+	Reference      string                    `json:"reference"`
+	Status         WmsPickTaskStatus         `json:"status"`
+	UpdatedAt      time.Time                 `json:"updated_at"`
+}
+
+// WmsPickTaskDeliveryMethod defines model for WmsPickTask.DeliveryMethod.
+type WmsPickTaskDeliveryMethod string
+
+// WmsPickTaskStatus defines model for WmsPickTask.Status.
+type WmsPickTaskStatus string
+
+// WmsPickTaskListData defines model for WmsPickTaskListData.
+type WmsPickTaskListData struct {
+	Items    []WmsPickTask `json:"items"`
+	Page     int           `json:"page"`
+	PageSize int           `json:"page_size"`
+	Total    int64         `json:"total"`
+}
+
+// WmsReceiveRequest defines model for WmsReceiveRequest.
+type WmsReceiveRequest struct {
+	MeasuredQuantity     int64     `json:"measured_quantity"`
+	MeasuredVolumeCm3    int64     `json:"measured_volume_cm3"`
+	ScannedFilePublicIds *[]string `json:"scanned_file_public_ids,omitempty"`
+
+	// VarianceThresholdQuantity Owner-tbd threshold semantics; no business fee rule is implied.
+	VarianceThresholdQuantity *int64 `json:"variance_threshold_quantity,omitempty"`
+}
+
+// WmsReceivingRecord defines model for WmsReceivingRecord.
+type WmsReceivingRecord struct {
+	InboundShipmentPublicId   string                   `json:"inbound_shipment_public_id"`
+	MeasuredQuantity          int64                    `json:"measured_quantity"`
+	MeasuredVolumeCm3         int64                    `json:"measured_volume_cm3"`
+	PublicId                  string                   `json:"public_id"`
+	RecommendedLocation       string                   `json:"recommended_location"`
+	ScheduledQuantity         int64                    `json:"scheduled_quantity"`
+	Status                    WmsReceivingRecordStatus `json:"status"`
+	UpdatedAt                 time.Time                `json:"updated_at"`
+	VarianceThresholdQuantity *int64                   `json:"variance_threshold_quantity,omitempty"`
+}
+
+// WmsReceivingRecordStatus defines model for WmsReceivingRecord.Status.
+type WmsReceivingRecordStatus string
+
+// WmsReceivingRecordListData defines model for WmsReceivingRecordListData.
+type WmsReceivingRecordListData struct {
+	Items    []WmsReceivingRecord `json:"items"`
+	Page     int                  `json:"page"`
+	PageSize int                  `json:"page_size"`
+	Total    int64                `json:"total"`
+}
+
 // AccountLinkID defines model for AccountLinkID.
 type AccountLinkID = string
 
@@ -3223,6 +4131,126 @@ type UnprocessableEntity = ErrorEnvelope
 
 // UnsupportedMediaType defines model for UnsupportedMediaType.
 type UnsupportedMediaType = ErrorEnvelope
+
+// WmsExceptionListSucceeded defines model for WmsExceptionListSucceeded.
+type WmsExceptionListSucceeded struct {
+	Data      WmsExceptionListData        `json:"data"`
+	Ok        WmsExceptionListSucceededOk `json:"ok"`
+	RequestId string                      `json:"request_id"`
+}
+
+// WmsExceptionListSucceededOk defines model for WmsExceptionListSucceeded.Ok.
+type WmsExceptionListSucceededOk bool
+
+// WmsExceptionSucceeded defines model for WmsExceptionSucceeded.
+type WmsExceptionSucceeded struct {
+	Data      WmsException            `json:"data"`
+	Ok        WmsExceptionSucceededOk `json:"ok"`
+	RequestId string                  `json:"request_id"`
+}
+
+// WmsExceptionSucceededOk defines model for WmsExceptionSucceeded.Ok.
+type WmsExceptionSucceededOk bool
+
+// WmsInboundShipmentListSucceeded defines model for WmsInboundShipmentListSucceeded.
+type WmsInboundShipmentListSucceeded struct {
+	Data      WmsInboundShipmentListData        `json:"data"`
+	Ok        WmsInboundShipmentListSucceededOk `json:"ok"`
+	RequestId string                            `json:"request_id"`
+}
+
+// WmsInboundShipmentListSucceededOk defines model for WmsInboundShipmentListSucceeded.Ok.
+type WmsInboundShipmentListSucceededOk bool
+
+// WmsInboundShipmentSucceeded defines model for WmsInboundShipmentSucceeded.
+type WmsInboundShipmentSucceeded struct {
+	Data      WmsInboundShipment            `json:"data"`
+	Ok        WmsInboundShipmentSucceededOk `json:"ok"`
+	RequestId string                        `json:"request_id"`
+}
+
+// WmsInboundShipmentSucceededOk defines model for WmsInboundShipmentSucceeded.Ok.
+type WmsInboundShipmentSucceededOk bool
+
+// WmsIntegrationStatusListSucceeded defines model for WmsIntegrationStatusListSucceeded.
+type WmsIntegrationStatusListSucceeded struct {
+	Data      WmsIntegrationStatusListData        `json:"data"`
+	Ok        WmsIntegrationStatusListSucceededOk `json:"ok"`
+	RequestId string                              `json:"request_id"`
+}
+
+// WmsIntegrationStatusListSucceededOk defines model for WmsIntegrationStatusListSucceeded.Ok.
+type WmsIntegrationStatusListSucceededOk bool
+
+// WmsInventoryListSucceeded defines model for WmsInventoryListSucceeded.
+type WmsInventoryListSucceeded struct {
+	Data      WmsInventoryListData        `json:"data"`
+	Ok        WmsInventoryListSucceededOk `json:"ok"`
+	RequestId string                      `json:"request_id"`
+}
+
+// WmsInventoryListSucceededOk defines model for WmsInventoryListSucceeded.Ok.
+type WmsInventoryListSucceededOk bool
+
+// WmsInventoryMovementListSucceeded defines model for WmsInventoryMovementListSucceeded.
+type WmsInventoryMovementListSucceeded struct {
+	Data      WmsInventoryMovementListData        `json:"data"`
+	Ok        WmsInventoryMovementListSucceededOk `json:"ok"`
+	RequestId string                              `json:"request_id"`
+}
+
+// WmsInventoryMovementListSucceededOk defines model for WmsInventoryMovementListSucceeded.Ok.
+type WmsInventoryMovementListSucceededOk bool
+
+// WmsInventorySucceeded defines model for WmsInventorySucceeded.
+type WmsInventorySucceeded struct {
+	Data      WmsInventory            `json:"data"`
+	Ok        WmsInventorySucceededOk `json:"ok"`
+	RequestId string                  `json:"request_id"`
+}
+
+// WmsInventorySucceededOk defines model for WmsInventorySucceeded.Ok.
+type WmsInventorySucceededOk bool
+
+// WmsPickTaskListSucceeded defines model for WmsPickTaskListSucceeded.
+type WmsPickTaskListSucceeded struct {
+	Data      WmsPickTaskListData        `json:"data"`
+	Ok        WmsPickTaskListSucceededOk `json:"ok"`
+	RequestId string                     `json:"request_id"`
+}
+
+// WmsPickTaskListSucceededOk defines model for WmsPickTaskListSucceeded.Ok.
+type WmsPickTaskListSucceededOk bool
+
+// WmsPickTaskSucceeded defines model for WmsPickTaskSucceeded.
+type WmsPickTaskSucceeded struct {
+	Data      WmsPickTask            `json:"data"`
+	Ok        WmsPickTaskSucceededOk `json:"ok"`
+	RequestId string                 `json:"request_id"`
+}
+
+// WmsPickTaskSucceededOk defines model for WmsPickTaskSucceeded.Ok.
+type WmsPickTaskSucceededOk bool
+
+// WmsReceivingRecordListSucceeded defines model for WmsReceivingRecordListSucceeded.
+type WmsReceivingRecordListSucceeded struct {
+	Data      WmsReceivingRecordListData        `json:"data"`
+	Ok        WmsReceivingRecordListSucceededOk `json:"ok"`
+	RequestId string                            `json:"request_id"`
+}
+
+// WmsReceivingRecordListSucceededOk defines model for WmsReceivingRecordListSucceeded.Ok.
+type WmsReceivingRecordListSucceededOk bool
+
+// WmsReceivingRecordSucceeded defines model for WmsReceivingRecordSucceeded.
+type WmsReceivingRecordSucceeded struct {
+	Data      WmsReceivingRecord            `json:"data"`
+	Ok        WmsReceivingRecordSucceededOk `json:"ok"`
+	RequestId string                        `json:"request_id"`
+}
+
+// WmsReceivingRecordSucceededOk defines model for WmsReceivingRecordSucceeded.Ok.
+type WmsReceivingRecordSucceededOk bool
 
 // ListAdminUsersParams defines parameters for ListAdminUsers.
 type ListAdminUsersParams struct {
@@ -3658,6 +4686,156 @@ type SuggestPublicProductsParams struct {
 	Q string `form:"q" json:"q"`
 }
 
+// ListWmsExceptionsParams defines parameters for ListWmsExceptions.
+type ListWmsExceptionsParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+
+	// Sort Comma-separated field names; prefix a field with - for descending order.
+	Sort *Sort `form:"sort,omitempty" json:"sort,omitempty"`
+}
+
+// ListWmsExceptions200JSONResponseBodyOk defines parameters for ListWmsExceptions.
+type ListWmsExceptions200JSONResponseBodyOk bool
+
+// GetWmsException200JSONResponseBodyOk defines parameters for GetWmsException.
+type GetWmsException200JSONResponseBodyOk bool
+
+// ResolveWmsExceptionParams defines parameters for ResolveWmsException.
+type ResolveWmsExceptionParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ResolveWmsException200JSONResponseBodyOk defines parameters for ResolveWmsException.
+type ResolveWmsException200JSONResponseBodyOk bool
+
+// ListWmsReceivingRecordsParams defines parameters for ListWmsReceivingRecords.
+type ListWmsReceivingRecordsParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+
+	// Sort Comma-separated field names; prefix a field with - for descending order.
+	Sort *Sort `form:"sort,omitempty" json:"sort,omitempty"`
+}
+
+// ListWmsReceivingRecords200JSONResponseBodyOk defines parameters for ListWmsReceivingRecords.
+type ListWmsReceivingRecords200JSONResponseBodyOk bool
+
+// ReceiveWmsInboundShipmentParams defines parameters for ReceiveWmsInboundShipment.
+type ReceiveWmsInboundShipmentParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// ReceiveWmsInboundShipment200JSONResponseBodyOk defines parameters for ReceiveWmsInboundShipment.
+type ReceiveWmsInboundShipment200JSONResponseBodyOk bool
+
+// ListWmsInboundShipmentsParams defines parameters for ListWmsInboundShipments.
+type ListWmsInboundShipmentsParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+
+	// Sort Comma-separated field names; prefix a field with - for descending order.
+	Sort *Sort `form:"sort,omitempty" json:"sort,omitempty"`
+}
+
+// ListWmsInboundShipments200JSONResponseBodyOk defines parameters for ListWmsInboundShipments.
+type ListWmsInboundShipments200JSONResponseBodyOk bool
+
+// GetWmsInboundShipment200JSONResponseBodyOk defines parameters for GetWmsInboundShipment.
+type GetWmsInboundShipment200JSONResponseBodyOk bool
+
+// ListWmsIntegrationStatuses200JSONResponseBodyOk defines parameters for ListWmsIntegrationStatuses.
+type ListWmsIntegrationStatuses200JSONResponseBodyOk bool
+
+// ListWmsInventoryParams defines parameters for ListWmsInventory.
+type ListWmsInventoryParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+
+	// Sort Comma-separated field names; prefix a field with - for descending order.
+	Sort     *Sort   `form:"sort,omitempty" json:"sort,omitempty"`
+	Product  *string `form:"product,omitempty" json:"product,omitempty"`
+	Zone     *string `form:"zone,omitempty" json:"zone,omitempty"`
+	Location *string `form:"location,omitempty" json:"location,omitempty"`
+}
+
+// ListWmsInventory200JSONResponseBodyOk defines parameters for ListWmsInventory.
+type ListWmsInventory200JSONResponseBodyOk bool
+
+// GetWmsInventory200JSONResponseBodyOk defines parameters for GetWmsInventory.
+type GetWmsInventory200JSONResponseBodyOk bool
+
+// CreateWmsInventoryAdjustmentParams defines parameters for CreateWmsInventoryAdjustment.
+type CreateWmsInventoryAdjustmentParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// CreateWmsInventoryAdjustment200JSONResponseBodyOk defines parameters for CreateWmsInventoryAdjustment.
+type CreateWmsInventoryAdjustment200JSONResponseBodyOk bool
+
+// ListWmsInventoryMovementsParams defines parameters for ListWmsInventoryMovements.
+type ListWmsInventoryMovementsParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+}
+
+// ListWmsInventoryMovements200JSONResponseBodyOk defines parameters for ListWmsInventoryMovements.
+type ListWmsInventoryMovements200JSONResponseBodyOk bool
+
+// ListWmsPickTasksParams defines parameters for ListWmsPickTasks.
+type ListWmsPickTasksParams struct {
+	// Page One-based page number.
+	Page *Page `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Number of items per page, capped at 100.
+	PageSize *PageSize `form:"page_size,omitempty" json:"page_size,omitempty"`
+
+	// Sort Comma-separated field names; prefix a field with - for descending order.
+	Sort *Sort `form:"sort,omitempty" json:"sort,omitempty"`
+}
+
+// ListWmsPickTasks200JSONResponseBodyOk defines parameters for ListWmsPickTasks.
+type ListWmsPickTasks200JSONResponseBodyOk bool
+
+// GetWmsPickTask200JSONResponseBodyOk defines parameters for GetWmsPickTask.
+type GetWmsPickTask200JSONResponseBodyOk bool
+
+// HandoffWmsPickTaskParams defines parameters for HandoffWmsPickTask.
+type HandoffWmsPickTaskParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// HandoffWmsPickTask200JSONResponseBodyOk defines parameters for HandoffWmsPickTask.
+type HandoffWmsPickTask200JSONResponseBodyOk bool
+
+// PackWmsPickTaskParams defines parameters for PackWmsPickTask.
+type PackWmsPickTaskParams struct {
+	// IdempotencyKey Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value.
+	IdempotencyKey IdempotencyKey `json:"Idempotency-Key"`
+}
+
+// PackWmsPickTask200JSONResponseBodyOk defines parameters for PackWmsPickTask.
+type PackWmsPickTask200JSONResponseBodyOk bool
+
 // CreateAdminUserJSONRequestBody defines body for CreateAdminUser for application/json ContentType.
 type CreateAdminUserJSONRequestBody = AdminUserCreateRequest
 
@@ -3732,6 +4910,18 @@ type PostAuthRefreshJSONRequestBody = RefreshRequest
 
 // PostTelegramAuthJSONRequestBody defines body for PostTelegramAuth for application/json ContentType.
 type PostTelegramAuthJSONRequestBody = TelegramAuthRequest
+
+// ResolveWmsExceptionJSONRequestBody defines body for ResolveWmsException for application/json ContentType.
+type ResolveWmsExceptionJSONRequestBody = WmsExceptionResolveRequest
+
+// ReceiveWmsInboundShipmentJSONRequestBody defines body for ReceiveWmsInboundShipment for application/json ContentType.
+type ReceiveWmsInboundShipmentJSONRequestBody = WmsReceiveRequest
+
+// CreateWmsInventoryAdjustmentJSONRequestBody defines body for CreateWmsInventoryAdjustment for application/json ContentType.
+type CreateWmsInventoryAdjustmentJSONRequestBody = WmsInventoryAdjustmentRequest
+
+// HandoffWmsPickTaskJSONRequestBody defines body for HandoffWmsPickTask for application/json ContentType.
+type HandoffWmsPickTaskJSONRequestBody = WmsHandoffRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -4005,6 +5195,54 @@ type ServerInterface interface {
 	// SuggestPublicProducts Suggest at most ten matching product-name prefixes
 	// (GET /v1/public/search/suggest)
 	SuggestPublicProducts(w http.ResponseWriter, r *http.Request, params SuggestPublicProductsParams)
+	// ListWmsExceptions List warehouse exceptions
+	// (GET /v1/wms/exceptions)
+	ListWmsExceptions(w http.ResponseWriter, r *http.Request, params ListWmsExceptionsParams)
+	// GetWmsException Read one warehouse exception
+	// (GET /v1/wms/exceptions/{public_id})
+	GetWmsException(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// ResolveWmsException Record a warehouse exception resolution
+	// (POST /v1/wms/exceptions/{public_id}/resolve)
+	ResolveWmsException(w http.ResponseWriter, r *http.Request, publicId PublicID, params ResolveWmsExceptionParams)
+	// ListWmsReceivingRecords List inbound receiving appointments and records
+	// (GET /v1/wms/inbound/receipts)
+	ListWmsReceivingRecords(w http.ResponseWriter, r *http.Request, params ListWmsReceivingRecordsParams)
+	// ReceiveWmsInboundShipment Record measured inbound quantity and volume
+	// (POST /v1/wms/inbound/receipts/{public_id}/receive)
+	ReceiveWmsInboundShipment(w http.ResponseWriter, r *http.Request, publicId PublicID, params ReceiveWmsInboundShipmentParams)
+	// ListWmsInboundShipments List in-transit inbound shipments
+	// (GET /v1/wms/inbound/shipments)
+	ListWmsInboundShipments(w http.ResponseWriter, r *http.Request, params ListWmsInboundShipmentsParams)
+	// GetWmsInboundShipment Read one inbound shipment
+	// (GET /v1/wms/inbound/shipments/{public_id})
+	GetWmsInboundShipment(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// ListWmsIntegrationStatuses Read WMS adapter health and synchronization status
+	// (GET /v1/wms/integrations/status)
+	ListWmsIntegrationStatuses(w http.ResponseWriter, r *http.Request)
+	// ListWmsInventory List inventory by product, zone, and location
+	// (GET /v1/wms/inventory)
+	ListWmsInventory(w http.ResponseWriter, r *http.Request, params ListWmsInventoryParams)
+	// GetWmsInventory Read one inventory record with location detail
+	// (GET /v1/wms/inventory/{public_id})
+	GetWmsInventory(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// CreateWmsInventoryAdjustment Submit an integer stock-count adjustment
+	// (POST /v1/wms/inventory/{public_id}/adjustments)
+	CreateWmsInventoryAdjustment(w http.ResponseWriter, r *http.Request, publicId PublicID, params CreateWmsInventoryAdjustmentParams)
+	// ListWmsInventoryMovements List append-only inventory movements
+	// (GET /v1/wms/inventory/{public_id}/movements)
+	ListWmsInventoryMovements(w http.ResponseWriter, r *http.Request, publicId PublicID, params ListWmsInventoryMovementsParams)
+	// ListWmsPickTasks List outbound pick tasks
+	// (GET /v1/wms/outbound/picks)
+	ListWmsPickTasks(w http.ResponseWriter, r *http.Request, params ListWmsPickTasksParams)
+	// GetWmsPickTask Read one outbound pick task
+	// (GET /v1/wms/outbound/picks/{public_id})
+	GetWmsPickTask(w http.ResponseWriter, r *http.Request, publicId PublicID)
+	// HandoffWmsPickTask Set delivery method and hand off a packed task
+	// (POST /v1/wms/outbound/picks/{public_id}/handoff)
+	HandoffWmsPickTask(w http.ResponseWriter, r *http.Request, publicId PublicID, params HandoffWmsPickTaskParams)
+	// PackWmsPickTask Mark a pick task as packed
+	// (POST /v1/wms/outbound/picks/{public_id}/pack)
+	PackWmsPickTask(w http.ResponseWriter, r *http.Request, publicId PublicID, params PackWmsPickTaskParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -4548,6 +5786,102 @@ func (_ Unimplemented) SearchPublicProducts(w http.ResponseWriter, r *http.Reque
 // SuggestPublicProducts Suggest at most ten matching product-name prefixes
 // (GET /v1/public/search/suggest)
 func (_ Unimplemented) SuggestPublicProducts(w http.ResponseWriter, r *http.Request, params SuggestPublicProductsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListWmsExceptions List warehouse exceptions
+// (GET /v1/wms/exceptions)
+func (_ Unimplemented) ListWmsExceptions(w http.ResponseWriter, r *http.Request, params ListWmsExceptionsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetWmsException Read one warehouse exception
+// (GET /v1/wms/exceptions/{public_id})
+func (_ Unimplemented) GetWmsException(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ResolveWmsException Record a warehouse exception resolution
+// (POST /v1/wms/exceptions/{public_id}/resolve)
+func (_ Unimplemented) ResolveWmsException(w http.ResponseWriter, r *http.Request, publicId PublicID, params ResolveWmsExceptionParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListWmsReceivingRecords List inbound receiving appointments and records
+// (GET /v1/wms/inbound/receipts)
+func (_ Unimplemented) ListWmsReceivingRecords(w http.ResponseWriter, r *http.Request, params ListWmsReceivingRecordsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ReceiveWmsInboundShipment Record measured inbound quantity and volume
+// (POST /v1/wms/inbound/receipts/{public_id}/receive)
+func (_ Unimplemented) ReceiveWmsInboundShipment(w http.ResponseWriter, r *http.Request, publicId PublicID, params ReceiveWmsInboundShipmentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListWmsInboundShipments List in-transit inbound shipments
+// (GET /v1/wms/inbound/shipments)
+func (_ Unimplemented) ListWmsInboundShipments(w http.ResponseWriter, r *http.Request, params ListWmsInboundShipmentsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetWmsInboundShipment Read one inbound shipment
+// (GET /v1/wms/inbound/shipments/{public_id})
+func (_ Unimplemented) GetWmsInboundShipment(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListWmsIntegrationStatuses Read WMS adapter health and synchronization status
+// (GET /v1/wms/integrations/status)
+func (_ Unimplemented) ListWmsIntegrationStatuses(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListWmsInventory List inventory by product, zone, and location
+// (GET /v1/wms/inventory)
+func (_ Unimplemented) ListWmsInventory(w http.ResponseWriter, r *http.Request, params ListWmsInventoryParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetWmsInventory Read one inventory record with location detail
+// (GET /v1/wms/inventory/{public_id})
+func (_ Unimplemented) GetWmsInventory(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateWmsInventoryAdjustment Submit an integer stock-count adjustment
+// (POST /v1/wms/inventory/{public_id}/adjustments)
+func (_ Unimplemented) CreateWmsInventoryAdjustment(w http.ResponseWriter, r *http.Request, publicId PublicID, params CreateWmsInventoryAdjustmentParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListWmsInventoryMovements List append-only inventory movements
+// (GET /v1/wms/inventory/{public_id}/movements)
+func (_ Unimplemented) ListWmsInventoryMovements(w http.ResponseWriter, r *http.Request, publicId PublicID, params ListWmsInventoryMovementsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListWmsPickTasks List outbound pick tasks
+// (GET /v1/wms/outbound/picks)
+func (_ Unimplemented) ListWmsPickTasks(w http.ResponseWriter, r *http.Request, params ListWmsPickTasksParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetWmsPickTask Read one outbound pick task
+// (GET /v1/wms/outbound/picks/{public_id})
+func (_ Unimplemented) GetWmsPickTask(w http.ResponseWriter, r *http.Request, publicId PublicID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// HandoffWmsPickTask Set delivery method and hand off a packed task
+// (POST /v1/wms/outbound/picks/{public_id}/handoff)
+func (_ Unimplemented) HandoffWmsPickTask(w http.ResponseWriter, r *http.Request, publicId PublicID, params HandoffWmsPickTaskParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PackWmsPickTask Mark a pick task as packed
+// (POST /v1/wms/outbound/picks/{public_id}/pack)
+func (_ Unimplemented) PackWmsPickTask(w http.ResponseWriter, r *http.Request, publicId PublicID, params PackWmsPickTaskParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -8047,6 +9381,783 @@ func (siw *ServerInterfaceWrapper) SuggestPublicProducts(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// ListWmsExceptions operation middleware
+func (siw *ServerInterfaceWrapper) ListWmsExceptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWmsExceptionsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWmsExceptions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetWmsException operation middleware
+func (siw *ServerInterfaceWrapper) GetWmsException(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetWmsException(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResolveWmsException operation middleware
+func (siw *ServerInterfaceWrapper) ResolveWmsException(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ResolveWmsExceptionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResolveWmsException(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWmsReceivingRecords operation middleware
+func (siw *ServerInterfaceWrapper) ListWmsReceivingRecords(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWmsReceivingRecordsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWmsReceivingRecords(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReceiveWmsInboundShipment operation middleware
+func (siw *ServerInterfaceWrapper) ReceiveWmsInboundShipment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ReceiveWmsInboundShipmentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReceiveWmsInboundShipment(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWmsInboundShipments operation middleware
+func (siw *ServerInterfaceWrapper) ListWmsInboundShipments(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWmsInboundShipmentsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWmsInboundShipments(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetWmsInboundShipment operation middleware
+func (siw *ServerInterfaceWrapper) GetWmsInboundShipment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetWmsInboundShipment(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWmsIntegrationStatuses operation middleware
+func (siw *ServerInterfaceWrapper) ListWmsIntegrationStatuses(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWmsIntegrationStatuses(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWmsInventory operation middleware
+func (siw *ServerInterfaceWrapper) ListWmsInventory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWmsInventoryParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "product" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "product", r.URL.Query(), &params.Product, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "product"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "product", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "zone" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "zone", r.URL.Query(), &params.Zone, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "zone"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "zone", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "location" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "location", r.URL.Query(), &params.Location, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "location"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "location", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWmsInventory(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetWmsInventory operation middleware
+func (siw *ServerInterfaceWrapper) GetWmsInventory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetWmsInventory(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateWmsInventoryAdjustment operation middleware
+func (siw *ServerInterfaceWrapper) CreateWmsInventoryAdjustment(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateWmsInventoryAdjustmentParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateWmsInventoryAdjustment(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWmsInventoryMovements operation middleware
+func (siw *ServerInterfaceWrapper) ListWmsInventoryMovements(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWmsInventoryMovementsParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWmsInventoryMovements(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWmsPickTasks operation middleware
+func (siw *ServerInterfaceWrapper) ListWmsPickTasks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWmsPickTasksParams
+
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page", r.URL.Query(), &params.Page, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWmsPickTasks(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetWmsPickTask operation middleware
+func (siw *ServerInterfaceWrapper) GetWmsPickTask(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetWmsPickTask(w, r, publicId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// HandoffWmsPickTask operation middleware
+func (siw *ServerInterfaceWrapper) HandoffWmsPickTask(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params HandoffWmsPickTaskParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.HandoffWmsPickTask(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PackWmsPickTask operation middleware
+func (siw *ServerInterfaceWrapper) PackWmsPickTask(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "public_id" -------------
+	var publicId PublicID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "public_id", chi.URLParam(r, "public_id"), &publicId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "public_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PackWmsPickTaskParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PackWmsPickTask(w, r, publicId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -8429,6 +10540,54 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/v1/files/{public_id}/download-url", wrapper.GetFileDownloadUrl)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/inbound/shipments", wrapper.ListWmsInboundShipments)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/inbound/shipments/{public_id}", wrapper.GetWmsInboundShipment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/inbound/receipts", wrapper.ListWmsReceivingRecords)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/wms/inbound/receipts/{public_id}/receive", wrapper.ReceiveWmsInboundShipment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/inventory", wrapper.ListWmsInventory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/inventory/{public_id}", wrapper.GetWmsInventory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/wms/inventory/{public_id}/adjustments", wrapper.CreateWmsInventoryAdjustment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/inventory/{public_id}/movements", wrapper.ListWmsInventoryMovements)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/outbound/picks", wrapper.ListWmsPickTasks)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/outbound/picks/{public_id}", wrapper.GetWmsPickTask)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/wms/outbound/picks/{public_id}/pack", wrapper.PackWmsPickTask)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/wms/outbound/picks/{public_id}/handoff", wrapper.HandoffWmsPickTask)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/exceptions", wrapper.ListWmsExceptions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/exceptions/{public_id}", wrapper.GetWmsException)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/v1/wms/exceptions/{public_id}/resolve", wrapper.ResolveWmsException)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/v1/wms/integrations/status", wrapper.ListWmsIntegrationStatuses)
 	})
 
 	return r

@@ -1630,6 +1630,335 @@ paths:
         "409": {$ref: "#/components/responses/Conflict"}
         "500": {$ref: "#/components/responses/InternalServerError"}
         "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/inbound/shipments:
+    get:
+      tags: [wms]
+      operationId: listWmsInboundShipments
+      summary: List in-transit inbound shipments
+      x-roles: [wms]
+      x-privacy: Shipment contact and address fields are masked; scope is limited to the warehouse permissions of the caller.
+      parameters:
+        - {$ref: "#/components/parameters/Page"}
+        - {$ref: "#/components/parameters/PageSize"}
+        - {$ref: "#/components/parameters/Sort"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsInboundShipmentListSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/inbound/shipments/{public_id}:
+    get:
+      tags: [wms]
+      operationId: getWmsInboundShipment
+      summary: Read one inbound shipment
+      x-roles: [wms]
+      x-privacy: Contact phone and address are masked; no unrelated warehouse records are exposed.
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsInboundShipmentSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/inbound/receipts:
+    get:
+      tags: [wms]
+      operationId: listWmsReceivingRecords
+      summary: List inbound receiving appointments and records
+      x-roles: [wms]
+      x-privacy: Merchant contact and address fields are masked; results are limited to the caller's warehouse scope.
+      parameters:
+        - {$ref: "#/components/parameters/Page"}
+        - {$ref: "#/components/parameters/PageSize"}
+        - {$ref: "#/components/parameters/Sort"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsReceivingRecordListSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/inbound/receipts/{public_id}/receive:
+    post:
+      tags: [wms]
+      operationId: receiveWmsInboundShipment
+      summary: Record measured inbound quantity and volume
+      x-roles: [wms]
+      x-audit: wms.receiving.receive
+      x-privacy: Merchant contact and address remain masked in the receipt result.
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/WmsReceiveRequest"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsReceivingRecordSucceeded"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "415": {$ref: "#/components/responses/UnsupportedMediaType"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/inventory:
+    get:
+      tags: [wms]
+      operationId: listWmsInventory
+      summary: List inventory by product, zone, and location
+      x-roles: [wms]
+      x-privacy: Inventory and location data are restricted to the caller's warehouse scope.
+      parameters:
+        - {$ref: "#/components/parameters/Page"}
+        - {$ref: "#/components/parameters/PageSize"}
+        - {$ref: "#/components/parameters/Sort"}
+        - name: product
+          in: query
+          schema: {type: string, maxLength: 128}
+        - name: zone
+          in: query
+          schema: {type: string, maxLength: 64}
+        - name: location
+          in: query
+          schema: {type: string, maxLength: 128}
+      responses:
+        "200": {$ref: "#/components/responses/WmsInventoryListSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/inventory/{public_id}:
+    get:
+      tags: [wms]
+      operationId: getWmsInventory
+      summary: Read one inventory record with location detail
+      x-roles: [wms]
+      x-privacy: Inventory, warehouse location, movement, and masked contact fields are restricted to warehouse scope.
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsInventorySucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/inventory/{public_id}/adjustments:
+    post:
+      tags: [wms]
+      operationId: createWmsInventoryAdjustment
+      summary: Submit an integer stock-count adjustment
+      x-roles: [wms]
+      x-audit: wms.inventory.adjust
+      x-privacy: Adjustment actor and warehouse scope are audited; no contact data is returned.
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/WmsInventoryAdjustmentRequest"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsInventorySucceeded"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "415": {$ref: "#/components/responses/UnsupportedMediaType"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/inventory/{public_id}/movements:
+    get:
+      tags: [wms]
+      operationId: listWmsInventoryMovements
+      summary: List append-only inventory movements
+      x-roles: [wms]
+      x-privacy: Movement records are restricted to warehouse scope and contain no full phone numbers.
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+        - {$ref: "#/components/parameters/Page"}
+        - {$ref: "#/components/parameters/PageSize"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsInventoryMovementListSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/outbound/picks:
+    get:
+      tags: [wms]
+      operationId: listWmsPickTasks
+      summary: List outbound pick tasks
+      x-roles: [wms]
+      x-privacy: Recipient phone and address fields are masked; task scope follows warehouse permissions.
+      parameters:
+        - {$ref: "#/components/parameters/Page"}
+        - {$ref: "#/components/parameters/PageSize"}
+        - {$ref: "#/components/parameters/Sort"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsPickTaskListSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/outbound/picks/{public_id}:
+    get:
+      tags: [wms]
+      operationId: getWmsPickTask
+      summary: Read one outbound pick task
+      x-roles: [wms]
+      x-privacy: Recipient phone and address fields are masked; task scope follows warehouse permissions.
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsPickTaskSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/outbound/picks/{public_id}/pack:
+    post:
+      tags: [wms]
+      operationId: packWmsPickTask
+      summary: Mark a pick task as packed
+      x-roles: [wms]
+      x-audit: wms.outbound.pack
+      x-privacy: Recipient phone and address fields remain masked in the result.
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsPickTaskSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/outbound/picks/{public_id}/handoff:
+    post:
+      tags: [wms]
+      operationId: handoffWmsPickTask
+      summary: Set delivery method and hand off a packed task
+      x-roles: [wms]
+      x-audit: wms.outbound.handoff
+      x-privacy: Recipient phone and address fields are masked; any delivery-fee state is external to this contract.
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/WmsHandoffRequest"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsPickTaskSucceeded"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "415": {$ref: "#/components/responses/UnsupportedMediaType"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/exceptions:
+    get:
+      tags: [wms]
+      operationId: listWmsExceptions
+      summary: List warehouse exceptions
+      x-roles: [wms]
+      x-privacy: Exception records are restricted to the caller's warehouse scope and redact contact data.
+      parameters:
+        - {$ref: "#/components/parameters/Page"}
+        - {$ref: "#/components/parameters/PageSize"}
+        - {$ref: "#/components/parameters/Sort"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsExceptionListSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/exceptions/{public_id}:
+    get:
+      tags: [wms]
+      operationId: getWmsException
+      summary: Read one warehouse exception
+      x-roles: [wms]
+      x-privacy: Exception detail is restricted to warehouse scope and masks recipient contact data.
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsExceptionSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/exceptions/{public_id}/resolve:
+    post:
+      tags: [wms]
+      operationId: resolveWmsException
+      summary: Record a warehouse exception resolution
+      x-roles: [wms]
+      x-audit: wms.exception.resolve
+      x-privacy: Resolution notes must exclude full phone numbers, secrets, and external system credentials.
+      parameters:
+        - {$ref: "#/components/parameters/PublicID"}
+        - {$ref: "#/components/parameters/IdempotencyKey"}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/WmsExceptionResolveRequest"}
+      responses:
+        "200": {$ref: "#/components/responses/WmsExceptionSucceeded"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "415": {$ref: "#/components/responses/UnsupportedMediaType"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+  /v1/wms/integrations/status:
+    get:
+      tags: [wms]
+      operationId: listWmsIntegrationStatuses
+      summary: Read WMS adapter health and synchronization status
+      x-roles: [wms]
+      x-privacy: Integration diagnostics expose status and timestamps only; no credentials or raw external payloads.
+      responses:
+        "200": {$ref: "#/components/responses/WmsIntegrationStatusListSucceeded"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/TooManyRequests"}
+        "500": {$ref: "#/components/responses/InternalServerError"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+
 components:
   securitySchemes:
     bearerAuth:
@@ -3260,7 +3589,305 @@ components:
         ok: {type: boolean, enum: [true]}
         data: {$ref: "#/components/schemas/LedgerReadData"}
         request_id: {type: string, minLength: 1}
+    WmsInboundShipment:
+      type: object
+      additionalProperties: false
+      required: [public_id, reference, status, scheduled_at, package_count, masked_phone, masked_address, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        reference: {type: string, minLength: 1, maxLength: 128}
+        status: {type: string, enum: [in_transit, arrived, receiving, received, exception, cancelled]}
+        scheduled_at: {type: string, format: date-time}
+        package_count: {type: integer, format: int64, minimum: 0}
+        masked_phone: {type: string, pattern: "^\\*{4}([0-9]{4})?$"}
+        masked_address: {type: string, minLength: 1, maxLength: 500}
+        updated_at: {type: string, format: date-time}
+    WmsReceivingRecord:
+      type: object
+      additionalProperties: false
+      required: [public_id, inbound_shipment_public_id, scheduled_quantity, measured_quantity, measured_volume_cm3, status, recommended_location, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        inbound_shipment_public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        scheduled_quantity: {type: integer, format: int64, minimum: 0}
+        measured_quantity: {type: integer, format: int64, minimum: 0}
+        measured_volume_cm3: {type: integer, format: int64, minimum: 0}
+        variance_threshold_quantity: {type: integer, format: int64, minimum: 0}
+        status: {type: string, enum: [scheduled, arrived, pending_confirmation, received, stocked, exception]}
+        recommended_location: {type: string, minLength: 1, maxLength: 128}
+        updated_at: {type: string, format: date-time}
+    WmsReceiveRequest:
+      type: object
+      additionalProperties: false
+      required: [measured_quantity, measured_volume_cm3]
+      properties:
+        measured_quantity: {type: integer, format: int64, minimum: 0}
+        measured_volume_cm3: {type: integer, format: int64, minimum: 0}
+        variance_threshold_quantity: {type: integer, format: int64, minimum: 0, description: Owner-tbd threshold semantics; no business fee rule is implied.}
+        scanned_file_public_ids: {type: array, items: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}, maxItems: 50}
+    WmsLocationBalance:
+      type: object
+      additionalProperties: false
+      required: [location_code, quantity]
+      properties:
+        location_code: {type: string, minLength: 1, maxLength: 128}
+        zone: {type: string, minLength: 1, maxLength: 64}
+        quantity: {type: integer, format: int64, minimum: 0}
+    WmsInventory:
+      type: object
+      additionalProperties: false
+      required: [public_id, product_public_id, product_name, zone, location, quantity, available_quantity, location_total_quantity, locations, last_movement_public_id, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        product_public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        product_name: {$ref: "#/components/schemas/Messages"}
+        zone: {type: string, minLength: 1, maxLength: 64}
+        location: {type: string, minLength: 1, maxLength: 128}
+        quantity: {type: integer, format: int64, minimum: 0}
+        available_quantity: {type: integer, format: int64, minimum: 0}
+        location_total_quantity: {type: integer, format: int64, minimum: 0}
+        locations: {type: array, items: {$ref: "#/components/schemas/WmsLocationBalance"}}
+        masked_phone: {type: string, pattern: "^\\*{4}([0-9]{4})?$"}
+        last_movement_public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        updated_at: {type: string, format: date-time}
+    WmsInventoryAdjustmentRequest:
+      type: object
+      additionalProperties: false
+      required: [quantity, reason]
+      properties:
+        quantity: {type: integer, format: int64, minimum: 0}
+        reason: {type: string, minLength: 1, maxLength: 1000}
+        evidence_file_public_ids: {type: array, items: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}, maxItems: 50}
+    WmsInventoryMovement:
+      type: object
+      additionalProperties: false
+      required: [public_id, movement_type, quantity_delta, reference, created_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        movement_type: {type: string, enum: [receipt, adjustment, pick, return, transfer, correction]}
+        quantity_delta: {type: integer, format: int64}
+        reference: {type: string, minLength: 1, maxLength: 128}
+        created_at: {type: string, format: date-time}
+    WmsPickTask:
+      type: object
+      additionalProperties: false
+      required: [public_id, reference, item_count, delivery_method, driver_name, masked_phone, status, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        reference: {type: string, minLength: 1, maxLength: 128}
+        item_count: {type: integer, format: int64, minimum: 0}
+        delivery_method: {type: string, enum: [zto, inhouse]}
+        driver_name: {type: string, maxLength: 120}
+        masked_phone: {type: string, pattern: "^\\*{4}([0-9]{4})?$"}
+        status: {type: string, enum: [ready, picking, packed, handed_off, cancelled, exception]}
+        updated_at: {type: string, format: date-time}
+    WmsHandoffRequest:
+      type: object
+      additionalProperties: false
+      required: [delivery_method]
+      properties:
+        delivery_method: {type: string, enum: [zto, inhouse]}
+        driver_public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        tracking_reference: {type: string, maxLength: 128}
+    WmsException:
+      type: object
+      additionalProperties: false
+      required: [public_id, category, severity, status, reference, description, created_at, updated_at]
+      properties:
+        public_id: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}
+        category: {type: string, enum: [quantity_variance, damaged_goods, missing_goods, location_conflict, integration_error, handoff_failed, other]}
+        severity: {type: string, enum: [info, warning, critical]}
+        status: {type: string, enum: [open, acknowledged, resolved, dismissed]}
+        reference: {type: string, minLength: 1, maxLength: 128}
+        description: {type: string, minLength: 1, maxLength: 5000}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    WmsExceptionResolveRequest:
+      type: object
+      additionalProperties: false
+      required: [resolution]
+      properties:
+        resolution: {type: string, minLength: 1, maxLength: 2000}
+        evidence_file_public_ids: {type: array, items: {type: string, pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"}, maxItems: 50}
+    WmsIntegrationStatus:
+      type: object
+      additionalProperties: false
+      required: [adapter, state, last_success_at, last_attempt_at]
+      properties:
+        adapter: {type: string, enum: [wms, wcs, zto]}
+        state: {type: string, enum: [healthy, degraded, unavailable, disabled, pending_spec]}
+        last_success_at: {type: string, format: date-time, nullable: true}
+        last_attempt_at: {type: string, format: date-time, nullable: true}
+        message: {$ref: "#/components/schemas/Messages"}
+    WmsInboundShipmentListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/WmsInboundShipment"}}
+        total: {type: integer, format: int64, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    WmsReceivingRecordListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/WmsReceivingRecord"}}
+        total: {type: integer, format: int64, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    WmsInventoryListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/WmsInventory"}}
+        total: {type: integer, format: int64, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    WmsInventoryMovementListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/WmsInventoryMovement"}}
+        total: {type: integer, format: int64, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    WmsPickTaskListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/WmsPickTask"}}
+        total: {type: integer, format: int64, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    WmsExceptionListData:
+      type: object
+      additionalProperties: false
+      required: [items, total, page, page_size]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/WmsException"}}
+        total: {type: integer, format: int64, minimum: 0}
+        page: {type: integer, minimum: 1}
+        page_size: {type: integer, minimum: 1, maximum: 100}
+    WmsIntegrationStatusListData:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: "#/components/schemas/WmsIntegrationStatus"}}
   responses:
+    WmsInboundShipmentListSucceeded:
+      description: WMS inbound shipments.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsInboundShipmentListData"}
+    WmsInboundShipmentSucceeded:
+      description: WMS inbound shipment.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsInboundShipment"}
+    WmsReceivingRecordListSucceeded:
+      description: WMS receiving records.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsReceivingRecordListData"}
+    WmsReceivingRecordSucceeded:
+      description: WMS receiving record.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsReceivingRecord"}
+    WmsInventoryListSucceeded:
+      description: WMS inventory list.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsInventoryListData"}
+    WmsInventorySucceeded:
+      description: WMS inventory record.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsInventory"}
+    WmsInventoryMovementListSucceeded:
+      description: WMS inventory movement list.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsInventoryMovementListData"}
+    WmsPickTaskListSucceeded:
+      description: WMS pick task list.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsPickTaskListData"}
+    WmsPickTaskSucceeded:
+      description: WMS pick task.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsPickTask"}
+    WmsExceptionListSucceeded:
+      description: WMS exception list.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsExceptionListData"}
+    WmsExceptionSucceeded:
+      description: WMS exception.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsException"}
+    WmsIntegrationStatusListSucceeded:
+      description: WMS integration statuses.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - {$ref: "#/components/schemas/SuccessEnvelope"}
+            properties:
+              data: {$ref: "#/components/schemas/WmsIntegrationStatusListData"}
     NotificationListSucceeded:
       description: Notifications for the authenticated account.
       content:

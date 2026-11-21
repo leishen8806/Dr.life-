@@ -1456,6 +1456,278 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/wms/inbound/shipments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List in-transit inbound shipments */
+        get: operations["listWmsInboundShipments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/inbound/shipments/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one inbound shipment */
+        get: operations["getWmsInboundShipment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/inbound/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List inbound receiving appointments and records */
+        get: operations["listWmsReceivingRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/inbound/receipts/{public_id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record measured inbound quantity and volume */
+        post: operations["receiveWmsInboundShipment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/inventory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List inventory by product, zone, and location */
+        get: operations["listWmsInventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/inventory/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one inventory record with location detail */
+        get: operations["getWmsInventory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/inventory/{public_id}/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit an integer stock-count adjustment */
+        post: operations["createWmsInventoryAdjustment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/inventory/{public_id}/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List append-only inventory movements */
+        get: operations["listWmsInventoryMovements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/outbound/picks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List outbound pick tasks */
+        get: operations["listWmsPickTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/outbound/picks/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one outbound pick task */
+        get: operations["getWmsPickTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/outbound/picks/{public_id}/pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a pick task as packed */
+        post: operations["packWmsPickTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/outbound/picks/{public_id}/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set delivery method and hand off a packed task */
+        post: operations["handoffWmsPickTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List warehouse exceptions */
+        get: operations["listWmsExceptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/exceptions/{public_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one warehouse exception */
+        get: operations["getWmsException"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/exceptions/{public_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a warehouse exception resolution */
+        post: operations["resolveWmsException"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/wms/integrations/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read WMS adapter health and synchronization status */
+        get: operations["listWmsIntegrationStatuses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2327,8 +2599,318 @@ export interface components {
             data: components["schemas"]["LedgerReadData"];
             request_id: string;
         };
+        WmsInboundShipment: {
+            public_id: string;
+            reference: string;
+            /** @enum {string} */
+            status: "in_transit" | "arrived" | "receiving" | "received" | "exception" | "cancelled";
+            /** Format: date-time */
+            scheduled_at: string;
+            /** Format: int64 */
+            package_count: number;
+            masked_phone: string;
+            masked_address: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        WmsReceivingRecord: {
+            public_id: string;
+            inbound_shipment_public_id: string;
+            /** Format: int64 */
+            scheduled_quantity: number;
+            /** Format: int64 */
+            measured_quantity: number;
+            /** Format: int64 */
+            measured_volume_cm3: number;
+            /** Format: int64 */
+            variance_threshold_quantity?: number;
+            /** @enum {string} */
+            status: "scheduled" | "arrived" | "pending_confirmation" | "received" | "stocked" | "exception";
+            recommended_location: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        WmsReceiveRequest: {
+            /** Format: int64 */
+            measured_quantity: number;
+            /** Format: int64 */
+            measured_volume_cm3: number;
+            /**
+             * Format: int64
+             * @description Owner-tbd threshold semantics; no business fee rule is implied.
+             */
+            variance_threshold_quantity?: number;
+            scanned_file_public_ids?: string[];
+        };
+        WmsLocationBalance: {
+            location_code: string;
+            zone?: string;
+            /** Format: int64 */
+            quantity: number;
+        };
+        WmsInventory: {
+            public_id: string;
+            product_public_id: string;
+            product_name: components["schemas"]["Messages"];
+            zone: string;
+            location: string;
+            /** Format: int64 */
+            quantity: number;
+            /** Format: int64 */
+            available_quantity: number;
+            /** Format: int64 */
+            location_total_quantity: number;
+            locations: components["schemas"]["WmsLocationBalance"][];
+            masked_phone?: string;
+            last_movement_public_id: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        WmsInventoryAdjustmentRequest: {
+            /** Format: int64 */
+            quantity: number;
+            reason: string;
+            evidence_file_public_ids?: string[];
+        };
+        WmsInventoryMovement: {
+            public_id: string;
+            /** @enum {string} */
+            movement_type: "receipt" | "adjustment" | "pick" | "return" | "transfer" | "correction";
+            /** Format: int64 */
+            quantity_delta: number;
+            reference: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        WmsPickTask: {
+            public_id: string;
+            reference: string;
+            /** Format: int64 */
+            item_count: number;
+            /** @enum {string} */
+            delivery_method: "zto" | "inhouse";
+            driver_name: string;
+            masked_phone: string;
+            /** @enum {string} */
+            status: "ready" | "picking" | "packed" | "handed_off" | "cancelled" | "exception";
+            /** Format: date-time */
+            updated_at: string;
+        };
+        WmsHandoffRequest: {
+            /** @enum {string} */
+            delivery_method: "zto" | "inhouse";
+            driver_public_id?: string;
+            tracking_reference?: string;
+        };
+        WmsException: {
+            public_id: string;
+            /** @enum {string} */
+            category: "quantity_variance" | "damaged_goods" | "missing_goods" | "location_conflict" | "integration_error" | "handoff_failed" | "other";
+            /** @enum {string} */
+            severity: "info" | "warning" | "critical";
+            /** @enum {string} */
+            status: "open" | "acknowledged" | "resolved" | "dismissed";
+            reference: string;
+            description: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        WmsExceptionResolveRequest: {
+            resolution: string;
+            evidence_file_public_ids?: string[];
+        };
+        WmsIntegrationStatus: {
+            /** @enum {string} */
+            adapter: "wms" | "wcs" | "zto";
+            /** @enum {string} */
+            state: "healthy" | "degraded" | "unavailable" | "disabled" | "pending_spec";
+            /** Format: date-time */
+            last_success_at: string | null;
+            /** Format: date-time */
+            last_attempt_at: string | null;
+            message?: components["schemas"]["Messages"];
+        };
+        WmsInboundShipmentListData: {
+            items: components["schemas"]["WmsInboundShipment"][];
+            /** Format: int64 */
+            total: number;
+            page: number;
+            page_size: number;
+        };
+        WmsReceivingRecordListData: {
+            items: components["schemas"]["WmsReceivingRecord"][];
+            /** Format: int64 */
+            total: number;
+            page: number;
+            page_size: number;
+        };
+        WmsInventoryListData: {
+            items: components["schemas"]["WmsInventory"][];
+            /** Format: int64 */
+            total: number;
+            page: number;
+            page_size: number;
+        };
+        WmsInventoryMovementListData: {
+            items: components["schemas"]["WmsInventoryMovement"][];
+            /** Format: int64 */
+            total: number;
+            page: number;
+            page_size: number;
+        };
+        WmsPickTaskListData: {
+            items: components["schemas"]["WmsPickTask"][];
+            /** Format: int64 */
+            total: number;
+            page: number;
+            page_size: number;
+        };
+        WmsExceptionListData: {
+            items: components["schemas"]["WmsException"][];
+            /** Format: int64 */
+            total: number;
+            page: number;
+            page_size: number;
+        };
+        WmsIntegrationStatusListData: {
+            items: components["schemas"]["WmsIntegrationStatus"][];
+        };
     };
     responses: {
+        /** @description WMS inbound shipments. */
+        WmsInboundShipmentListSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsInboundShipmentListData"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS inbound shipment. */
+        WmsInboundShipmentSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsInboundShipment"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS receiving records. */
+        WmsReceivingRecordListSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsReceivingRecordListData"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS receiving record. */
+        WmsReceivingRecordSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsReceivingRecord"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS inventory list. */
+        WmsInventoryListSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsInventoryListData"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS inventory record. */
+        WmsInventorySucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsInventory"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS inventory movement list. */
+        WmsInventoryMovementListSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsInventoryMovementListData"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS pick task list. */
+        WmsPickTaskListSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsPickTaskListData"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS pick task. */
+        WmsPickTaskSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsPickTask"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS exception list. */
+        WmsExceptionListSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsExceptionListData"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS exception. */
+        WmsExceptionSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsException"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
+        /** @description WMS integration statuses. */
+        WmsIntegrationStatusListSucceeded: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": {
+                    data?: components["schemas"]["WmsIntegrationStatusListData"];
+                } & components["schemas"]["SuccessEnvelope"];
+            };
+        };
         /** @description Notifications for the authenticated account. */
         NotificationListSucceeded: {
             headers: {
@@ -4832,6 +5414,405 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listWmsInboundShipments: {
+        parameters: {
+            query?: {
+                /** @description One-based page number. */
+                page?: components["parameters"]["Page"];
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description Comma-separated field names; prefix a field with - for descending order. */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsInboundShipmentListSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getWmsInboundShipment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsInboundShipmentSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listWmsReceivingRecords: {
+        parameters: {
+            query?: {
+                /** @description One-based page number. */
+                page?: components["parameters"]["Page"];
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description Comma-separated field names; prefix a field with - for descending order. */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsReceivingRecordListSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    receiveWmsInboundShipment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WmsReceiveRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["WmsReceivingRecordSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listWmsInventory: {
+        parameters: {
+            query?: {
+                /** @description One-based page number. */
+                page?: components["parameters"]["Page"];
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description Comma-separated field names; prefix a field with - for descending order. */
+                sort?: components["parameters"]["Sort"];
+                product?: string;
+                zone?: string;
+                location?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsInventoryListSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getWmsInventory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsInventorySucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createWmsInventoryAdjustment: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WmsInventoryAdjustmentRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["WmsInventorySucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listWmsInventoryMovements: {
+        parameters: {
+            query?: {
+                /** @description One-based page number. */
+                page?: components["parameters"]["Page"];
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsInventoryMovementListSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listWmsPickTasks: {
+        parameters: {
+            query?: {
+                /** @description One-based page number. */
+                page?: components["parameters"]["Page"];
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description Comma-separated field names; prefix a field with - for descending order. */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsPickTaskListSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getWmsPickTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsPickTaskSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    packWmsPickTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsPickTaskSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    handoffWmsPickTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WmsHandoffRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["WmsPickTaskSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listWmsExceptions: {
+        parameters: {
+            query?: {
+                /** @description One-based page number. */
+                page?: components["parameters"]["Page"];
+                /** @description Number of items per page, capped at 100. */
+                page_size?: components["parameters"]["PageSize"];
+                /** @description Comma-separated field names; prefix a field with - for descending order. */
+                sort?: components["parameters"]["Sort"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsExceptionListSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getWmsException: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsExceptionSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    resolveWmsException: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Required on write operations. Use 1-64 ASCII letters, digits, hyphens, or underscores; retry the same action with the same value. */
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description ULID public identifier of the resource, lowercase in the URL because the gateway rejects uppercase path segments; responses always carry the canonical uppercase ULID (Crockford Base32 is case-insensitive). */
+                public_id: components["parameters"]["PublicID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WmsExceptionResolveRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["WmsExceptionSucceeded"];
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            415: components["responses"]["UnsupportedMediaType"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalServerError"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listWmsIntegrationStatuses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["WmsIntegrationStatusListSucceeded"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["TooManyRequests"];
             500: components["responses"]["InternalServerError"];
             503: components["responses"]["ServiceUnavailable"];
         };
